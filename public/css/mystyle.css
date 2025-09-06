@@ -1,0 +1,267 @@
+    body {
+        background: #fff;
+        font-family: "Lexend", Arial, sans-serif;
+    }
+
+    .login_illstration {
+        position: relative;
+    }
+
+    .loginlogo img {
+        position: absolute;
+        max-width: 136px;
+        left: 5px;
+    }
+
+    .loginforms {
+        padding-left: 35px;
+        padding-top: 20px;
+    }
+
+    .form-control:focus {
+        box-shadow: none;
+    }
+
+    img {
+        max-width: 100%;
+    }
+
+    .forgetlink {
+        text-align: right;
+    }
+
+    .forgetlink a {
+        color: #000;
+        font-size: 12px;
+        font-weight: 300;
+        line-height: 16px;
+    }
+
+    button.submitbtn {
+        border-radius: 29.709px;
+        background: #2B1871;
+        box-shadow: 0 5.402px 5.402px 0 rgba(0, 0, 0, 0.25);
+        color: #fff;
+        font-size: 16px;
+        font-style: normal;
+        font-weight: 400;
+        min-width: 150px;
+        height: 52px;
+        transition: all 0.5s;
+    }
+
+    button.btn.submitbtn:hover {
+        background: #120058;
+        color: #fff;
+    }
+
+    p.subtext {
+        color: #5E5E5E;
+        font-size: 16px;
+        font-weight: 300;
+    }
+
+    .loginforms .form-control {
+        height: 54px;
+        border: 1px solid #989898;
+        border-radius: 10px;
+    }
+
+    button.simplebtn {
+        background: transparent;
+        border: 0;
+        color: #2B1871;
+        font-size: 12px;
+        font-weight: 500;
+        line-height: normal;
+    }
+
+    .sendotprow span {
+        font-size: 12px;
+        margin-left: 15px;
+        font-weight: 500;
+    }
+
+    .sendotprow .submitbtn {
+        min-width: 250px;
+    }
+
+    .otp-input {
+        width: 50px;
+        height: 50px;
+        text-align: center;
+        font-size: 20px;
+        margin-right: 10px;
+    }
+
+    .password-box {
+        position: relative;
+    }
+
+    .password-toggle {
+        position: absolute;
+        right: 15px;
+        top: 50%;
+        transform: translateY(-50%);
+        cursor: pointer;
+    }
+
+    .btn-login {
+        background-color: #2b167c;
+        color: #fff;
+        border-radius: 25px;
+        padding: 12px;
+        font-size: 18px;
+        width: 100%;
+    }
+
+    .password-box i {
+        position: absolute;
+        right: 0;
+        top: 0px;
+    }
+
+    .wrapotp_check {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .otpsection .password-box span i {
+        top: 8px;
+    }
+
+    .sm_btnsite {
+        display: inline-block;
+        padding: 11px 10px;
+        min-width: 120px;
+        color: #fff;
+        border-radius: 20px;
+        background: #2B1871;
+        font-size: 16.93px;
+        height: 40px;
+        font-style: normal;
+        font-weight: 500;
+        line-height: 11.953px;
+    }
+
+    .profile-dropdown .avatar {
+        margin-right: 7px;
+    }
+
+    .subtxt {
+        color: #9B9B9B;
+        font-size: 12px;
+    }
+
+    .sm-avatar {
+        height: 20px;
+        width: 20px;
+        color: inherit;
+    }
+
+    .bg-soft-success {
+        background: rgba(60, 149, 28, 0.17);
+    }
+
+    .card_avtr_right {
+        position: absolute;
+        right: 12px;
+        bottom: 10px;
+    }
+
+    .dflexbtwn {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .seprate_crdhdr {
+        margin-bottom: 10px;
+    }
+
+    .flxtblhdr {
+        background: rgba(155, 155, 155, 0.18);
+        padding: 15px 60px 14px 22px;
+    }
+
+    .flxtblbody {
+        padding: 15px 60px 14px 22px;
+    }
+
+    .flxtblleft .avatar img {
+        max-width: 29px;
+        height: auto;
+    }
+
+    .bg-light {
+        background: rgba(155, 155, 155, 0.18) !important;
+    }
+
+    .flxtblleft {
+        display: flex;
+        gap: 10px;
+    }
+
+    .mxw-70 {
+        max-width: 70%;
+    }
+
+    .text-lblue {
+        color: #197BF7;
+    }
+
+    .text-lgreen {
+        color: #2BB68D;
+    }
+
+    .text-lorange {
+        color: #FD6D67;
+    }
+
+
+    .unread_notf {
+        background: rgba(43, 24, 113, 0.05);
+    }
+
+    .notflinkarrow {
+        position: relative;
+        right: 10px;
+        display: inline-block;
+    }
+
+    .employee-list {
+        padding-left: 0;
+        margin-bottom: 0;
+    }
+
+    .employee-list li {
+        padding: 2px 0;
+        font-size: 0.875rem;
+    }
+
+    .status-active {
+        color: #198754;
+        font-weight: 500;
+    }
+
+    .status-inactive {
+        color: #6c757d;
+    }
+
+    .status-completed {
+        color: #0d6efd;
+    }
+
+    .status-pending {
+        color: #ffc107;
+    }
+
+    .table th {
+        font-weight: 600;
+        background-color: #f8f9fa;
+    }
+
+    .btn:disabled {
+        cursor: not-allowed;
+    }

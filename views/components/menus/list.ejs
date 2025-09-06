@@ -1,0 +1,327 @@
+<%- include('../../partials/header') %>
+    <div class="page-wrapper">
+        <div class="content">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3">Menu Management</h1>
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addMenuModal">
+                    <i class="fas fa-plus"></i> Add Menu
+                </button>
+            </div>
+
+            <div class="card">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>No.</th>
+                                    <th>Type</th>
+                                    <th>Name</th>
+                                    <th>Priority</th>
+                                    <th>Is Show</th>
+                                    <th>Add Date</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <% menus.forEach((menu, index)=> { %>
+                                    <tr>
+                                        <td>
+                                            <%= index + 1 %>
+                                        </td>
+                                        <td><span class="badge bg-info">
+                                                <%= menu.type %>
+                                            </span></td>
+                                        <td>
+                                            <%= menu.name %>
+                                        </td>
+                                        <td>
+                                            <%= menu.priority %>
+                                        </td>
+                                        <td>
+                                            <span class="badge <%= menu.is_show ? 'bg-success' : 'bg-secondary' %>">
+                                                <%= menu.is_show ? 'Yes' : 'No' %>
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <%= new Date(menu.add_date).toLocaleDateString() %>
+                                        </td>
+                                        <td>
+                                            <button class="btn btn-sm btn-warning edit-menu-btn"
+                                                data-id="<%= menu._id %>" data-type="<%= menu.type %>"
+                                                data-master-id="<%= menu.master_id %>" data-name="<%= menu.name %>"
+                                                data-icon="<%= menu.icon %>" data-url="<%= menu.url %>"
+                                                data-priority="<%= menu.priority %>"
+                                                data-is-show="<%= menu.is_show ? 'Yes' : 'No' %>">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-danger"
+                                                onclick="deleteMenu('<%= menu._id %>')">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    <% }) %>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Add Menu Modal -->
+            <div class="modal fade" id="addMenuModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Add New Menu</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <form id="addMenuForm">
+                            <div class="modal-body">
+                                <div class="mb-3">
+                                    <label class="form-label">Type</label>
+                                    <select class="form-select" name="type" id="menuType" required>
+                                        <option value="">-- Select Type --</option>
+                                        <option value="Master">Master</option>
+                                        <option value="Menu">Menu</option>
+                                        <option value="Submenu">Submenu</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3" id="masterSelectContainer" style="display: none;">
+                                    <label class="form-label">Master Menu</label>
+                                    <select class="form-select" name="master_id">
+                                        <option value="">-- Select Master --</option>
+                                        <% masters.forEach(master=> { %>
+                                            <option value="<%= master._id %>">
+                                                <%= master.name %>
+                                            </option>
+                                            <% }) %>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Name</label>
+                                    <input type="text" class="form-control" name="name" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Icon Code (optional)</label>
+                                    <input type="text" class="form-control" name="icon"
+                                        placeholder='<i class="fa fa-icon"></i>'>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">URL (optional)</label>
+                                    <input type="text" class="form-control" name="url" placeholder="/path">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Priority</label>
+                                    <input type="number" class="form-control" name="priority" required min="1">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Is Show</label>
+                                    <select class="form-select" name="is_show" required>
+                                        <option value="Yes">Yes</option>
+                                        <option value="No">No</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-primary">Add Menu</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Edit Menu Modal -->
+            <div class="modal fade" id="editMenuModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Edit Menu</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <form id="editMenuForm">
+                            <input type="hidden" name="id" id="editMenuId">
+                            <div class="modal-body">
+                                <div class="mb-3">
+                                    <label class="form-label">Type</label>
+                                    <select class="form-select" name="type" id="editMenuType" required>
+                                        <option value="Master">Master</option>
+                                        <option value="Menu">Menu</option>
+                                        <option value="Submenu">Submenu</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3" id="editMasterSelectContainer">
+                                    <label class="form-label">Master Menu</label>
+                                    <select class="form-select" name="master_id" id="editMenuMaster">
+                                        <option value="">-- Select Master --</option>
+                                        <% masters.forEach(master=> { %>
+                                            <option value="<%= master._id %>">
+                                                <%= master.name %>
+                                            </option>
+                                            <% }) %>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Name</label>
+                                    <input type="text" class="form-control" name="name" id="editMenuName" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Icon Code (optional)</label>
+                                    <input type="text" class="form-control" name="icon" id="editMenuIcon">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">URL (optional)</label>
+                                    <input type="text" class="form-control" name="url" id="editMenuUrl">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Priority</label>
+                                    <input type="number" class="form-control" name="priority" id="editMenuPriority"
+                                        required min="1">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Is Show</label>
+                                    <select class="form-select" name="is_show" id="editMenuShow" required>
+                                        <option value="Yes">Yes</option>
+                                        <option value="No">No</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-primary">Update Menu</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <%- include('../../partials/footer') %>
+
+        <script>
+
+            // Show/hide master selection based on menu type
+            document.getElementById('menuType').addEventListener('change', function () {
+                const masterSelect = document.getElementById('masterSelectContainer');
+                masterSelect.style.display = this.value === 'Master' ? 'none' : 'block';
+            });
+
+            document.getElementById('editMenuType').addEventListener('change', function () {
+                const masterSelect = document.getElementById('editMasterSelectContainer');
+                masterSelect.style.display = this.value === 'Master' ? 'none' : 'block';
+            });
+            document.addEventListener('click', function (e) {
+                if (e.target.closest('.edit-menu-btn')) {
+                    const button = e.target.closest('.edit-menu-btn');
+                    const id = button.dataset.id;
+                    const type = button.dataset.type;
+                    const masterId = button.dataset.masterId;
+                    const name = button.dataset.name;
+                    const icon = button.dataset.icon;
+                    const url = button.dataset.url;
+                    const priority = button.dataset.priority;
+                    const isShow = button.dataset.isShow;
+
+                    editMenu(id, type, masterId, name, icon, url, priority, isShow);
+                }
+            });
+
+            // Add Menu Form Submission
+            document.getElementById('addMenuForm').addEventListener('submit', async function (e) {
+                e.preventDefault();
+
+                // Convert form fields into plain object
+                const formData = Object.fromEntries(new FormData(this));
+
+                try {
+                    const response = await fetch(`${BASE_URL}/api/menus/add`, {
+                        method: 'POST',
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(formData)
+                    });
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        showAlert('Menu added successfully');
+                        $('#addMenuModal').modal('hide');
+                        setTimeout(() => location.reload(), 1000);
+                    } else {
+                        showAlert(result.message, 'danger');
+                    }
+                } catch (error) {
+                    showAlert('Error adding menu', 'danger');
+                }
+            });
+
+
+            // Edit Menu Function
+            function editMenu(id, type, masterId, name, icon, url, priority, isShow) {
+                document.getElementById('editMenuId').value = id;
+                document.getElementById('editMenuType').value = type;
+                document.getElementById('editMenuMaster').value = masterId || '';
+                document.getElementById('editMenuName').value = name;
+                document.getElementById('editMenuIcon').value = icon || '';
+                document.getElementById('editMenuUrl').value = url || '';
+                document.getElementById('editMenuPriority').value = priority;
+                document.getElementById('editMenuShow').value = isShow;
+
+                // Show/hide master select based on type
+                const masterSelect = document.getElementById('editMasterSelectContainer');
+                masterSelect.style.display = type === 'Master' ? 'none' : 'block';
+
+                $('#editMenuModal').modal('show');
+            }
+
+            // Edit Menu Form Submission
+            document.getElementById('editMenuForm').addEventListener('submit', async function (e) {
+                e.preventDefault();
+
+                const formData = Object.fromEntries(new FormData(this));
+                const menuId = document.getElementById('editMenuId').value;
+
+                try {
+                    const response = await fetch(`${BASE_URL}/api/menus/update/${menuId}`, {
+                        method: 'PUT',
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(formData)
+                    });
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        showAlert('Menu updated successfully');
+                        $('#editMenuModal').modal('hide');
+                        setTimeout(() => location.reload(), 1000);
+                    } else {
+                        showAlert(result.message, 'danger');
+                    }
+                } catch (error) {
+                    showAlert('Error updating menu', 'danger');
+                }
+            });
+
+
+            // Delete Menu Function
+            async function deleteMenu(id) {
+                if (!confirmDelete()) return;
+
+                try {
+                    const response = await fetch(`${BASE_URL}/api/menus/delete/${id}`, {
+                        method: 'DELETE'
+                    });
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        showAlert('Menu deleted successfully');
+                        setTimeout(() => location.reload(), 1000);
+                    } else {
+                        showAlert(result.message, 'danger');
+                    }
+                } catch (error) {
+                    showAlert('Error deleting menu', 'danger');
+                }
+            }
+        </script>
