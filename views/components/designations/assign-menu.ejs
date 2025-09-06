@@ -1,0 +1,231 @@
+<%- include('../../partials/header') %>
+
+    <div class="page-wrapper">
+        <div class="content">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3">Assign Menu to: <%= designation.name %>
+                </h1>
+                <a href="/designations" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Back to Designations
+                </a>
+            </div>
+
+            <form id="assignMenuForm">
+                <div class="accordion" id="mastersAccordion">
+                    <% const masters=menus.filter(menu=> menu.type === 'Master');
+                        const menuItems = menus.filter(menu => menu.type === 'Menu');
+                        const submenus = menus.filter(menu => menu.type === 'Submenu');
+                        %>
+
+                        <% masters.forEach((master, index)=> { %>
+                            <div class="accordion-item">
+                                <h2 class="accordion-header" id="heading-<%= master._id %>">
+                                    <button
+                                        class="accordion-button collapsed d-flex justify-content-between align-items-center"
+                                        type="button" data-bs-toggle="collapse"
+                                        data-bs-target="#collapse-<%= master._id %>" aria-expanded="false"
+                                        aria-controls="collapse-<%= master._id %>">
+                                        <div>
+                                            <div class="form-check d-inline">
+                                                <input class="form-check-input master-checkbox" type="checkbox"
+                                                    id="master-<%= master._id %>" data-master-id="<%= master._id %>"
+                                                    <%=assignedMenuIds.includes(master._id.toString())
+                                                    ? 'checked="checked"' : '' %> >
+                                                <label class="form-check-label fw-bold" for="master-<%= master._id %>">
+                                                    <%- master.icon %>
+                                                        <%= master.name %>
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </button>
+                                </h2>
+
+                                <div id="collapse-<%= master._id %>" class="accordion-collapse collapse"
+                                    aria-labelledby="heading-<%= master._id %>" data-bs-parent="#mastersAccordion">
+                                    <div class="accordion-body">
+
+                                        <!-- Menus under this Master -->
+                                        <% menuItems.filter(menu=> menu.master_id && menu.master_id.toString() ===
+                                            master._id.toString())
+                                            .forEach(menu => { %>
+                                            <div class="ms-3 mb-2">
+                                                <div class="form-check">
+                                                    <input class="form-check-input menu-checkbox" type="checkbox"
+                                                        name="menu_ids" value="<%= menu._id %>"
+                                                        id="menu-<%= menu._id %>" data-master-id="<%= master._id %>"
+                                                        <%=assignedMenuIds.includes(menu._id.toString())
+                                                        ? 'checked="checked"' : '' %> >
+                                                    <label class="form-check-label fw-semibold"
+                                                        for="menu-<%= menu._id %>">
+                                                        <%= menu.name %>
+                                                    </label>
+                                                </div>
+
+                                                <!-- Submenus under this Menu -->
+                                                <% submenus.filter(sub=> sub.menu_id && sub.menu_id.toString() ===
+                                                    menu._id.toString())
+                                                    .forEach(submenu => { %>
+                                                    <div class="ms-4 mt-1">
+                                                        <div class="form-check">
+                                                            <input class="form-check-input submenu-checkbox"
+                                                                type="checkbox" name="menu_ids"
+                                                                value="<%= submenu._id %>"
+                                                                id="submenu-<%= submenu._id %>"
+                                                                data-menu-id="<%= menu._id %>"
+                                                                <%=assignedMenuIds.includes(submenu._id.toString())
+                                                                ? 'checked="checked"' : '' %> >
+                                                            <label class="form-check-label"
+                                                                for="submenu-<%= submenu._id %>">
+                                                                <%= submenu.name %>
+                                                            </label>
+                                                        </div>
+                                                    </div>
+                                                    <% }) %>
+                                            </div>
+                                            <% }) %>
+
+                                                <!-- Direct Submenus under Master -->
+                                                <% submenus.filter(sub=> sub.master_id && !sub.menu_id &&
+                                                    sub.master_id.toString() === master._id.toString())
+                                                    .forEach(submenu => { %>
+                                                    <div class="ms-3 mt-2">
+                                                        <div class="form-check">
+                                                            <input class="form-check-input submenu-checkbox"
+                                                                type="checkbox" name="menu_ids"
+                                                                value="<%= submenu._id %>"
+                                                                id="submenu-<%= submenu._id %>"
+                                                                data-master-id="<%= master._id %>"
+                                                                <%=assignedMenuIds.includes(submenu._id.toString())
+                                                                ? 'checked="checked"' : '' %> >
+                                                            <label class="form-check-label"
+                                                                for="submenu-<%= submenu._id %>">
+                                                                <%= submenu.name %>
+                                                            </label>
+                                                        </div>
+                                                    </div>
+                                                    <% }) %>
+
+                                    </div>
+                                </div>
+                            </div>
+                            <% }) %>
+                </div>
+
+                <div class="mt-4">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Save Assignments
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
+    <%- include('../../partials/footer') %>
+
+        <script>
+
+            // Checkbox logic (hierarchical)
+            document.querySelectorAll('.master-checkbox').forEach(cb => {
+                cb.addEventListener('change', function () {
+                    const masterId = this.dataset.masterId;
+                    const isChecked = this.checked;
+                    document.querySelectorAll(`.menu-checkbox[data-master-id="${masterId}"], .submenu-checkbox[data-master-id="${masterId}"]`)
+                        .forEach(el => el.checked = isChecked);
+                });
+            });
+
+            document.querySelectorAll('.menu-checkbox').forEach(cb => {
+                cb.addEventListener('change', function () {
+                    const menuId = this.value;
+                    document.querySelectorAll(`.submenu-checkbox[data-menu-id="${menuId}"]`).forEach(el => el.checked = this.checked);
+                    updateMasterCheckbox(this.dataset.masterId);
+                });
+            });
+
+            document.querySelectorAll('.submenu-checkbox').forEach(cb => {
+                cb.addEventListener('change', function () {
+                    const menuId = this.dataset.menuId;
+                    if (menuId) updateMenuCheckbox(menuId);
+                    else updateMasterCheckbox(this.dataset.masterId);
+                });
+            });
+
+            function updateMasterCheckbox(masterId) {
+                const menus = document.querySelectorAll(`.menu-checkbox[data-master-id="${masterId}"]`);
+                const submenus = document.querySelectorAll(`.submenu-checkbox[data-master-id="${masterId}"]:not([data-menu-id])`);
+                const allElements = [...menus, ...submenus];
+                const allChecked = allElements.every(el => el.checked);
+                const anyChecked = allElements.some(el => el.checked);
+                const masterCheckbox = document.querySelector(`.master-checkbox[data-master-id="${masterId}"]`);
+                masterCheckbox.checked = allChecked;
+                masterCheckbox.indeterminate = anyChecked && !allChecked;
+            }
+
+            function updateMenuCheckbox(menuId) {
+                const subs = document.querySelectorAll(`.submenu-checkbox[data-menu-id="${menuId}"]`);
+                const allChecked = Array.from(subs).every(cb => cb.checked);
+                const anyChecked = Array.from(subs).some(cb => cb.checked);
+                const menuCheckbox = document.querySelector(`.menu-checkbox[value="${menuId}"]`);
+                menuCheckbox.checked = allChecked;
+                menuCheckbox.indeterminate = anyChecked && !allChecked;
+                updateMasterCheckbox(menuCheckbox.dataset.masterId);
+            }
+
+            // Initialize checkbox states
+            document.querySelectorAll('.master-checkbox').forEach(cb => updateMasterCheckbox(cb.dataset.masterId));
+            document.querySelectorAll('.menu-checkbox').forEach(cb => updateMenuCheckbox(cb.value));
+
+            // Form submission handler
+            document.getElementById('assignMenuForm').addEventListener('submit', async function (e) {
+                e.preventDefault();
+
+                const designationId = '<%= designation._id %>';
+
+                // Gather all checked menu IDs
+                const menu_ids = Array.from(document.querySelectorAll('.menu-checkbox:checked, .submenu-checkbox:checked'))
+                    .map(cb => cb.value);
+
+                try {
+                    const response = await fetch(`http://localhost:5000/api/designations/assign-menu/update/${designationId}`, {
+                        method: 'PATCH',
+                        headers: { "Content-Type": "application/json" },
+                        credentials: 'include',        // Send session cookie
+                        body: JSON.stringify({ menu_ids })
+                    });
+
+                    const result = await response.json();
+                    console.log("patch result:", result);
+
+                    if (result.success) {
+                        showAlert('Menu assignments saved successfully', 'success');
+                    } else {
+                        showAlert(result.message || 'Failed to save menu assignments', 'danger');
+                    }
+                } catch (err) {
+                    console.error(err);
+                    showAlert('Error saving menu assignments', 'danger');
+                }
+            });
+
+            // showAlert helper
+            function showAlert(message, type = 'success') {
+                // Remove any existing alerts first
+                document.querySelectorAll('.alert').forEach(alert => alert.remove());
+
+                const alertDiv = document.createElement('div');
+                alertDiv.className = `alert alert-${type} alert-dismissible fade show mt-3`;
+                alertDiv.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+                document.querySelector('.content').prepend(alertDiv);
+
+                // Auto-dismiss after 5 seconds
+                setTimeout(() => {
+                    if (alertDiv.parentNode) {
+                        alertDiv.remove();
+                    }
+                }, 5000);
+            }
+        </script>
