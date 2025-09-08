@@ -1,5 +1,6 @@
 // otpEmailTemplate.js
-function getOtpEmailHtml(userName, otp) {
+
+export function getOtpEmailHtml(userName, otp) {
     return `
         <div style="font-family: Arial, sans-serif; text-align: center; padding: 20px;">
             <h2>Hello ${userName || "User"},</h2>
@@ -12,5 +13,3 @@ function getOtpEmailHtml(userName, otp) {
         </div>
     `;
 }
-
-module.exports = { getOtpEmailHtml };

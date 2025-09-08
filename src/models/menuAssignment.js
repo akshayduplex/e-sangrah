@@ -1,5 +1,6 @@
 // models/MenuAssignment.js
-const mongoose = require('mongoose');
+import mongoose from "mongoose";
+
 
 const menuAssignmentSchema = new mongoose.Schema(
     {
@@ -27,4 +28,6 @@ const menuAssignmentSchema = new mongoose.Schema(
 menuAssignmentSchema.index({ designation_id: 1, menu_id: 1 }, { unique: true });
 
 
-module.exports = mongoose.model('MenuAssignment', menuAssignmentSchema);
+const MenuAssignment = mongoose.model('MenuAssignment', menuAssignmentSchema);
+
+export default MenuAssignment;

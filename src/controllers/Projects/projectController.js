@@ -1,10 +1,10 @@
-const mongoose = require("mongoose");
-const Project = require("../../models/project");
-const ProjectList = require("../../models/Projects");
-const { successResponse, failResponse, errorResponse } = require("../../utils/responseHandler");
+import mongoose from "mongoose";
+import Project from "../../models/project.js";
+import ProjectList from "../../models/Projects.js";
+import { successResponse, failResponse, errorResponse } from "../../utils/responseHandler.js";
 
 // Create Project
-exports.createProject = async (req, res) => {
+export const createProject = async (req, res) => {
     try {
         const body = req.body;
         const user = req.user;
@@ -26,7 +26,7 @@ exports.createProject = async (req, res) => {
 
 // Get all projects (simple list)
 // Fetch all projects
-exports.getAllProjects = async (req, res) => {
+export const getAllProjects = async (req, res) => {
     try {
         const projects = await ProjectList.find({}).lean();
         return successResponse(res, projects, "Projects fetched successfully");
@@ -36,7 +36,7 @@ exports.getAllProjects = async (req, res) => {
 };
 
 // Get all managers of a project
-exports.getAllManagers = async (req, res) => {
+export const getAllManagers = async (req, res) => {
     try {
         const { id } = req.params;
         if (!mongoose.Types.ObjectId.isValid(id)) return failResponse(res, "Invalid project ID", 400);
@@ -52,7 +52,7 @@ exports.getAllManagers = async (req, res) => {
 };
 
 // Get projects with filters, pagination, search
-exports.getProjects = async (req, res) => {
+export const getProjects = async (req, res) => {
     try {
         const { status, department, manager, limit = 20, page = 1, search } = req.query;
 
@@ -88,7 +88,7 @@ exports.getProjects = async (req, res) => {
 };
 
 // Get project by ID
-exports.getProjectById = async (req, res) => {
+export const getProjectById = async (req, res) => {
     try {
         const { id } = req.params;
         if (!mongoose.Types.ObjectId.isValid(id)) return failResponse(res, "Invalid project ID", 400);
@@ -105,7 +105,7 @@ exports.getProjectById = async (req, res) => {
 };
 
 // Update project
-exports.updateProject = async (req, res) => {
+export const updateProject = async (req, res) => {
     try {
         const { id } = req.params;
         const body = req.body;
@@ -129,7 +129,7 @@ exports.updateProject = async (req, res) => {
 };
 
 // Delete project
-exports.deleteProject = async (req, res) => {
+export const deleteProject = async (req, res) => {
     try {
         const { id } = req.params;
         const user = req.user;
@@ -150,7 +150,7 @@ exports.deleteProject = async (req, res) => {
 };
 
 // Add team member
-exports.addTeamMember = async (req, res) => {
+export const addTeamMember = async (req, res) => {
     try {
         const { id } = req.params;
         const memberData = req.body;
@@ -174,7 +174,7 @@ exports.addTeamMember = async (req, res) => {
 };
 
 // Remove team member
-exports.removeTeamMember = async (req, res) => {
+export const removeTeamMember = async (req, res) => {
     try {
         const { id, memberId } = req.params;
         const user = req.user;

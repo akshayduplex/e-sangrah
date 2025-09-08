@@ -1,7 +1,8 @@
-const express = require('express');
+import express from 'express';
+import * as departmentController from '../../controllers/Department/departmentController.js';
+import { authenticate, authorize } from '../../middlewares/authMiddleware.js';
+
 const router = express.Router();
-const departmentController = require('../../controllers/Department/departmentController');
-const { authenticate, authorize } = require('../../middlewares/authMiddleware');
 
 // Publicly exposed API routes
 router.get('/', departmentController.getAllDepartments);
@@ -13,4 +14,5 @@ router.post('/', authenticate, authorize('Admin'), departmentController.createDe
 router.put('/:id', authenticate, authorize('Admin'), departmentController.updateDepartment);
 router.delete('/:id', authenticate, authorize('Admin'), departmentController.deleteDepartment);
 
-module.exports = router;
+// Export router as default
+export default router;

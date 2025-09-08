@@ -1,19 +1,19 @@
-const User = require("../../models/User");
-const bcrypt = require("bcryptjs");
-const nodemailer = require("nodemailer");
-const ejs = require("ejs");
-const path = require("path");
+import User from "../../models/User.js";
+import bcrypt from "bcryptjs";
+import nodemailer from "nodemailer";
+import ejs from "ejs";
+import path from "path";
 
-const { successResponse, failResponse, errorResponse } = require("../../utils/responseHandler");
-const { getOtpEmailHtml } = require("../../emailTemplates/otpEmailTemplate");
+import { successResponse, failResponse, errorResponse } from "../../utils/responseHandler.js";
+import { getOtpEmailHtml } from "../../emailTemplates/otpEmailTemplate.js";
 
-// In-memory OTP store (demo only; use DB in prod)
+// In-memory OTP store (demo only; use DB in production)
 const otpStore = {};
 
 // ---------------------------
 // Register
 // ---------------------------
-exports.register = async (req, res) => {
+export const register = async (req, res) => {
     try {
         const { name, email, password, raw_password, role, department, position } = req.body;
 
@@ -39,7 +39,7 @@ exports.register = async (req, res) => {
 // ---------------------------
 // Login
 // ---------------------------
-exports.login = async (req, res) => {
+export const login = async (req, res) => {
     try {
         const { email, password } = req.body;
         if (!email || !password) return failResponse(res, "Email and password are required", 400);
@@ -74,7 +74,7 @@ exports.login = async (req, res) => {
 // ---------------------------
 // Get Logged-in User
 // ---------------------------
-exports.getMe = async (req, res) => {
+export const getMe = async (req, res) => {
     try {
         if (!req.session.user) return failResponse(res, "Not logged in", 401);
 
@@ -90,7 +90,7 @@ exports.getMe = async (req, res) => {
 // ---------------------------
 // Logout
 // ---------------------------
-exports.logout = async (req, res) => {
+export const logout = async (req, res) => {
     try {
         req.session.destroy(err => {
             if (err) return errorResponse(res, err);
@@ -105,7 +105,7 @@ exports.logout = async (req, res) => {
 // ---------------------------
 // Change Password
 // ---------------------------
-exports.changePassword = async (req, res) => {
+export const changePassword = async (req, res) => {
     try {
         const { email, password, confirmPassword } = req.body;
         if (!password || !confirmPassword) return failResponse(res, "Both current and new password are required", 400);
@@ -126,7 +126,7 @@ exports.changePassword = async (req, res) => {
 // ---------------------------
 // Send OTP (for Forgot Password)
 // ---------------------------
-exports.sendOtp = async (req, res) => {
+export const sendOtp = async (req, res) => {
     try {
         const { email } = req.body;
 
@@ -167,7 +167,7 @@ exports.sendOtp = async (req, res) => {
 // ---------------------------
 // Verify OTP
 // ---------------------------
-exports.verifyOtp = (req, res) => {
+export const verifyOtp = (req, res) => {
     try {
         const { email, otp } = req.body;
         if (!otpStore[email]) return failResponse(res, "Please request an OTP first", 400);
@@ -187,7 +187,7 @@ exports.verifyOtp = (req, res) => {
 // ---------------------------
 // Reset Password (via OTP)
 // ---------------------------
-exports.resetPassword = async (req, res) => {
+export const resetPassword = async (req, res) => {
     try {
         const { email, password, confirmPassword } = req.body;
         if (password !== confirmPassword) return failResponse(res, "Passwords do not match", 400);

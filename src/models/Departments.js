@@ -1,4 +1,5 @@
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
+
 
 const departmentSchema = new mongoose.Schema({
     name: {
@@ -83,4 +84,6 @@ departmentSchema.methods.isFileTypeAllowed = function (fileType) {
     return this.settings.allowedFileTypes.includes(fileType.toLowerCase());
 };
 
-module.exports = mongoose.model("Department", departmentSchema);
+const Department = mongoose.model("Department", departmentSchema);
+
+export default Department;

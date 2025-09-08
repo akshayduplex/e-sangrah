@@ -1,47 +1,30 @@
-const express = require("express");
-const { authenticate } = require("../../middlewares/authMiddleware");
-const projectController = require("../../controllers/Projects/projectController");
-const departmentController = require("../../controllers/Department/departmentController");
-const permissionController = require("../../controllers/permissions/permisssions");
-const ProjectCl = require("../../models/Projects");
+import express from "express";
+import * as projectController from "../../controllers/Projects/projectController.js";
+import * as departmentController from "../../controllers/Department/departmentController.js";
+import * as permissionController from "../../controllers/permissions/permisssions.js";
+
+import {
+    getAddMenu,
+    getEditMenu,
+    getMenuList
+} from "../../controllers/menuController.js";
+
+import {
+    assignMenusToDesignation,
+    getAssignedMenus,
+    getAssignMenuPage
+} from "../../controllers/assignMenuController.js";
+import { authenticate } from "../../middlewares/authMiddleware.js";
+
 const router = express.Router();
+
+// --- Home / General Pages ---
 router.get("/", (req, res) => {
     res.render("pages/home", { title: "E-Sangrah - Home" });
 });
 
-router.get('/', (req, res) => {
-    res.render('pages/home', { title: 'Home' });
-});
-
 router.get("/permissions", (req, res) => {
     res.render("pages/permissions", { title: "E-Sangrah - About" });
-});
-router.get('/settings', authenticate, permissionController.getSettings);
-// router.get('/designations', authenticate, permissionController.listDesignations);
-// router.get('/menus', authenticate, permissionController.listMenus);
-// router.get('/designations/assign-menu/:id', authenticate, permissionController.menuAssignmentPage);
-
-router.get("/projects", authenticate, async (req, res) => {
-    try {
-        // Example: fetch projects from a database
-        const projects = await ProjectCl.find(); // or however you get your projects
-
-        res.render("pages/projects", {
-            user: req.user,
-            title: "E-Sangrah - ProjectList",
-            messages: req.flash(), // flash messages if needed
-            projects: projects      // pass projects to EJS
-        });
-    } catch (err) {
-        console.error(err);
-        req.flash("error", "Unable to load projects");
-        res.render("pages/projects", {
-            user: req.user,
-            title: "E-Sangrah - ProjectList",
-            messages: req.flash(),
-            projects: [] // fallback empty array
-        });
-    }
 });
 
 router.get("/login", (req, res) => {
@@ -51,31 +34,56 @@ router.get("/login", (req, res) => {
 router.get("/register", (req, res) => {
     res.render("pages/register", { title: "E-Sangrah - Register" });
 });
-// Update your dashboard route to use the actual API data
+
+router.get("/forgot-password", (req, res) => {
+    res.render("pages/forgot-password", {
+        otpSent: false,
+        otpVerified: false,
+        email: "",
+        message: null,
+        error: null
+    });
+});
+
+// --- Settings & Permissions ---
+router.get("/settings", authenticate, permissionController.getSettings);
+
+// --- Projects ---
+router.get("/projects", authenticate, async (req, res) => {
+    try {
+        // const projects = await ProjectCl.find({}).lean();
+        res.render("pages/projects", {
+            user: req.user,
+            title: "E-Sangrah - ProjectList",
+            messages: req.flash(),
+            // projects
+        });
+    } catch (err) {
+        console.error(err);
+        req.flash("error", "Unable to load projects");
+        res.render("pages/projects", {
+            user: req.user,
+            title: "E-Sangrah - ProjectList",
+            messages: req.flash(),
+            projects: []
+        });
+    }
+});
+
+// --- Dashboard ---
 router.get("/dashboard", authenticate, async (req, res) => {
     try {
-        // Fetch common data
         const [projects, departments] = await Promise.all([
-            projectController.getAllProjects,
-            departmentController.getAllDepartments
+            projectController.getAllProjects(),
+            departmentController.getAllDepartments()
         ]);
 
-        // Role-based rendering
         if (req.user.role === "admin") {
-            return res.render("pages/adminDashboard", {
-                user: req.user,
-                projects,
-                departments
-            });
-        } else if (req.user.role === "employee" || req.user.role === "manager" || req.user.role === "user") {
-            return res.render("pages/userDashboard", {
-                user: req.user,
-                projects,
-                departments
-            });
+            res.render("pages/adminDashboard", { user: req.user, projects, departments });
+        } else if (["employee", "manager", "user"].includes(req.user.role)) {
+            res.render("pages/userDashboard", { user: req.user, projects, departments });
         } else {
-            // fallback for other roles
-            return res.status(403).render("pages/403", {
+            res.status(403).render("pages/403", {
                 message: "Not authorized to view this dashboard",
                 user: req.user
             });
@@ -89,24 +97,15 @@ router.get("/dashboard", authenticate, async (req, res) => {
     }
 });
 
-router.get("/forgot-password", (req, res) => {
-    res.render("pages/forgot-password", {
-        otpSent: false,
-        otpVerified: false,
-        email: "",
-        message: null,
-        error: null
-    });
-});
+// --- Menu Assignment Pages ---
+router.get("/assign-menu", getAssignMenuPage);
+router.get("/assign-menu/designation/:designation_id/menus", getAssignedMenus);
+router.post("/assign-menu/assign", assignMenusToDesignation);
 
+// --- Menu Pages ---
+router.get("/menu/list", getMenuList);
+router.get("/menu/add", getAddMenu);
+router.get("/menu/edit/:id", getEditMenu);
 
-router.get("/assign-menu", permissionController.getAssignMenuPage);
-// Render menu list page
-router.get('/list', permissionController.getMenuList);
-
-// Render add menu page
-router.get('/add', permissionController.getAddMenu);
-
-// Render edit menu page
-router.get('/edit/:id', permissionController.getEditMenu);
-module.exports = router;
+// Export router as default
+export default router;

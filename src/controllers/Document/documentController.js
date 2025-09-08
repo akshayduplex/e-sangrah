@@ -1,12 +1,13 @@
-const mongoose = require("mongoose");
-const { GridFSBucket } = require("mongodb");
-const path = require("path");
-const Document = require("../../models/Document");
-const File = require("../../models/File");
-const { successResponse, failResponse, errorResponse } = require("../../utils/responseHandler");
+import mongoose from "mongoose";
+import { GridFSBucket } from "mongodb";
+import path from "path";
+import Document from "../../models/Document.js";
+import File from "../../models/File.js";
+import { successResponse, failResponse, errorResponse } from "../../utils/responseHandler.js";
+
 
 // Get documents uploaded by user
-exports.getUserUploadedDocuments = async (req, res) => {
+export const getUserUploadedDocuments = async (req, res) => {
     try {
         const { page = 1, limit = 10 } = req.query;
         const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -46,7 +47,7 @@ exports.getUserUploadedDocuments = async (req, res) => {
 };
 
 // Create a new document with files (GridFS)
-exports.createDocument = async (req, res) => {
+export const createDocument = async (req, res) => {
     const session = await mongoose.startSession();
     session.startTransaction();
 
@@ -119,7 +120,7 @@ exports.createDocument = async (req, res) => {
 };
 
 // Update document fields
-exports.toggleFields = async (req, res) => {
+export const toggleFields = async (req, res) => {
     try {
         const { id } = req.params;
         const body = req.body;
@@ -144,7 +145,7 @@ exports.toggleFields = async (req, res) => {
 };
 
 // Get recent documents
-exports.getRecentDocuments = async (req, res) => {
+export const getRecentDocuments = async (req, res) => {
     try {
         const { page = 1, limit = 10, departmentId } = req.query;
         const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -196,7 +197,7 @@ exports.getRecentDocuments = async (req, res) => {
 };
 
 // Get document by ID
-exports.getDocumentById = async (req, res) => {
+export const getDocumentById = async (req, res) => {
     try {
         const { id } = req.params;
         const ip = req.ip;
@@ -217,7 +218,7 @@ exports.getDocumentById = async (req, res) => {
 };
 
 // Update document
-exports.updateDocument = async (req, res) => {
+export const updateDocument = async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -241,7 +242,7 @@ exports.updateDocument = async (req, res) => {
 };
 
 // Delete document
-exports.deleteDocument = async (req, res) => {
+export const deleteDocument = async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -263,7 +264,7 @@ exports.deleteDocument = async (req, res) => {
 };
 
 // Download file
-exports.downloadFile = async (req, res) => {
+export const downloadFile = async (req, res) => {
     try {
         const { docId, fileId } = req.params;
 

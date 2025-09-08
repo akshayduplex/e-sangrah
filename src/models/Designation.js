@@ -1,5 +1,6 @@
 // models/Designation.js
-const mongoose = require('mongoose');
+import mongoose from "mongoose";
+
 
 const designationSchema = new mongoose.Schema({
     name: {
@@ -27,4 +28,6 @@ const designationSchema = new mongoose.Schema({
     }
 });
 
-module.exports = mongoose.model('Designation', designationSchema);
+const Designation = mongoose.model('Designation', designationSchema);
+
+export default Designation;

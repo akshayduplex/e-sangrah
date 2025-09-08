@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
 
 const projectSchema = new mongoose.Schema({
     name: {
@@ -143,4 +143,5 @@ projectSchema.methods.canManage = function (userId) {
     return this.manager.some(m => m.toString() === userId.toString());
 };
 
-module.exports = mongoose.model("Project", projectSchema);
+const Project = mongoose.model("Project", projectSchema);
+export default Project;

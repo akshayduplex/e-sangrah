@@ -1,8 +1,8 @@
-const Notification = require("../../models/notification");
-const { successResponse, failResponse, errorResponse } = require("../../utils/responseHandler");
+import Notification from "../../models/notification.js";
+import { successResponse, failResponse, errorResponse } from "../../utils/responseHandler.js";
 
 // ------------------- Create Notification -------------------
-exports.createNotification = async (req, res) => {
+export const createNotification = async (req, res) => {
     try {
         const data = {
             recipient: req.body.recipient,
@@ -24,7 +24,7 @@ exports.createNotification = async (req, res) => {
 };
 
 // ------------------- Get User Notifications -------------------
-exports.getUserNotifications = async (req, res) => {
+export const getUserNotifications = async (req, res) => {
     try {
         const { page = 1, limit = 20 } = req.query;
         const skip = (page - 1) * limit;
@@ -46,7 +46,7 @@ exports.getUserNotifications = async (req, res) => {
 };
 
 // ------------------- Get Unread Count -------------------
-exports.getUnreadCount = async (req, res) => {
+export const getUnreadCount = async (req, res) => {
     try {
         const count = await Notification.countDocuments({ recipient: req.user._id, isRead: false });
         return successResponse(res, { count }, "Unread notifications count fetched");
@@ -56,7 +56,7 @@ exports.getUnreadCount = async (req, res) => {
 };
 
 // ------------------- Mark Single Notification as Read -------------------
-exports.markAsRead = async (req, res) => {
+export const markAsRead = async (req, res) => {
     try {
         const notification = await Notification.findOneAndUpdate(
             { _id: req.params.id, recipient: req.user._id },
@@ -73,7 +73,7 @@ exports.markAsRead = async (req, res) => {
 };
 
 // ------------------- Mark All Notifications as Read -------------------
-exports.markAllAsRead = async (req, res) => {
+export const markAllAsRead = async (req, res) => {
     try {
         await Notification.updateMany(
             { recipient: req.user._id, isRead: false },
@@ -87,7 +87,7 @@ exports.markAllAsRead = async (req, res) => {
 };
 
 // ------------------- Delete Notification -------------------
-exports.deleteNotification = async (req, res) => {
+export const deleteNotification = async (req, res) => {
     try {
         const result = await Notification.findOneAndDelete({ _id: req.params.id, recipient: req.user._id });
         if (!result) return failResponse(res, "Notification not found or unauthorized", 404);
