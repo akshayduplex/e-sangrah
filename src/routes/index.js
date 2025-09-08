@@ -1,13 +1,13 @@
-const express = require("express");
-const router = express.Router();
-const authRoutes = require('./auth/authRoutes');
-const dashboardRoutes = require('./admin/AdminDashboardRoutes');
-const documentRoutes = require('./documents/documentRoutes');
-const departmentRoutes = require('./department/departmentRoutes');
-const projectRoutes = require('./projects/projectRoutes');
-const notificationRoutes = require('./notification/notificationRoutes');
-const permisssionRoutes = require("../routes/permisssions/index")
+import express from "express";
+import authRoutes from './auth/authRoutes.js';
+import dashboardRoutes from './admin/AdminDashboardRoutes.js';
+import documentRoutes from './documents/documentRoutes.js';
+import departmentRoutes from './department/departmentRoutes.js';
+import projectRoutes from './projects/projectRoutes.js';
+import notificationRoutes from './notification/notificationRoutes.js';
+import permisssionRoutes from "./permisssions/index.js"
 
+const router = express.Router();
 
 router.use('/auth', authRoutes);
 router.use('/dashboard', dashboardRoutes);
@@ -15,6 +15,6 @@ router.use('/documents', documentRoutes);
 router.use('/departments', departmentRoutes);
 router.use('/projects', projectRoutes);
 router.use('/notifications', notificationRoutes);
-router.use("/", permisssionRoutes)
+router.use("/", permisssionRoutes); // mount under /permissions
 
-module.exports = router;
+export default router;

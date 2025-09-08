@@ -1,7 +1,8 @@
-const express = require("express");
+import express from "express";
+import * as notificationController from "../../controllers/notification/notificationController.js";
+import { authenticate } from "../../middlewares/authMiddleware.js";
+
 const router = express.Router();
-const notificationController = require("../../controllers/notification/notificationController");
-const { authenticate } = require("../../middlewares/authMiddleware"); // assume you have JWT/session auth
 
 // All routes require authentication
 router.use(authenticate);
@@ -14,4 +15,5 @@ router.patch("/:id/read", notificationController.markAsRead);
 router.patch("/mark-all-read", notificationController.markAllAsRead);
 router.delete("/:id", notificationController.deleteNotification);
 
-module.exports = router;
+// Export router as default
+export default router;

@@ -1,13 +1,11 @@
-const mongoose = require("mongoose");
-const Document = require("../models/Document");
-const Department = require("../models/Departments");
+import Document from "../models/Document.js";
 
 /**
  * Get department-wise upload percentage
  * @route GET /api/reports/uploads
  * @query period=daily|monthly|yearly
  */
-exports.getDepartmentUploadStats = async (req, res) => {
+export const getDepartmentUploadStats = async (req, res) => {
     try {
         if (!req.session || !req.session.user) {
             return res.status(401).json({ error: "Unauthorized" });
@@ -21,7 +19,7 @@ exports.getDepartmentUploadStats = async (req, res) => {
         const monthlyStart = new Date(today.getFullYear(), today.getMonth(), 1);
         const yearlyStart = new Date(today.getFullYear(), 0, 1);
 
-        // Fetch all documents owned by this user (only once)
+        // Fetch all documents owned by this user
         const docs = await Document.find({ owner: userId }).populate("department", "name");
 
         // Helper: filter and count by department
@@ -58,7 +56,7 @@ exports.getDepartmentUploadStats = async (req, res) => {
         });
 
     } catch (err) {
-        console.error("Error in getMyDepartmentUploadReport:", err);
+        console.error("Error in getDepartmentUploadStats:", err);
         res.status(500).json({ error: "Internal server error" });
     }
 };

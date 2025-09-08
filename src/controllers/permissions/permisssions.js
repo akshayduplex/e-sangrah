@@ -1,14 +1,14 @@
 // controllers/userController.js
-const siteSetting = require("../../models/siteSetting");
-const User = require("../../models/User");
-const Designation = require("../../models/Designation");
-const bcrypt = require("bcryptjs");
-const Menu = require("../../models/Menu");
-const MenuAssignment = require("../../models/menuAssignment");
-const mongoose = require("mongoose");
+import siteSetting from "../../models/siteSetting.js";
+import User from "../../models/User.js";
+import Designation from "../../models/Designation.js";
+import bcrypt from "bcryptjs";
+import Menu from "../../models/Menu.js";
+import MenuAssignment from "../../models/menuAssignment.js";
+import mongoose from "mongoose";
 
 // role permisssions page
-exports.permisssions = async (req, res) => {
+export const permisssions = async (req, res) => {
     try {
         if (!req.session.user) {
             return res.redirect('/login');
@@ -46,7 +46,7 @@ exports.permisssions = async (req, res) => {
     }
 };
 // List all users
-exports.listUsers = async (req, res) => {
+export const listUsers = async (req, res) => {
     try {
         const users = await User.find().populate('designation_id').sort({ add_date: -1 });
         const designations = await Designation.find({ status: 'Active' });
@@ -65,7 +65,7 @@ exports.listUsers = async (req, res) => {
 };
 
 // Add new user
-exports.addUser = async (req, res) => {
+export const addUser = async (req, res) => {
     try {
         const { user_name, user_email, raw_password, role_type, designation_id, whitelist_ip } = req.body;
 
@@ -105,7 +105,7 @@ exports.addUser = async (req, res) => {
 };
 
 // Update user
-exports.updateUser = async (req, res) => {
+export const updateUser = async (req, res) => {
     try {
         const { id } = req.params;
         const { user_name, user_email, role_type, designation_id, status, whitelist_ip } = req.body;
@@ -130,7 +130,7 @@ exports.updateUser = async (req, res) => {
 };
 
 // Delete user
-exports.deleteUser = async (req, res) => {
+export const deleteUser = async (req, res) => {
     try {
         const { id } = req.params;
         await User.findByIdAndDelete(id);
@@ -145,7 +145,7 @@ exports.deleteUser = async (req, res) => {
 
 
 // Get settings page
-exports.getSettings = async (req, res) => {
+export const getSettings = async (req, res) => {
     try {
         let settings = await siteSetting.findOne();
 
@@ -172,7 +172,7 @@ exports.getSettings = async (req, res) => {
 };
 
 // Update settings
-exports.updateSettings = async (req, res) => {
+export const updateSettings = async (req, res) => {
     try {
         const {
             site_title, meta_title, meta_description, currency,
@@ -239,7 +239,7 @@ exports.updateSettings = async (req, res) => {
 };
 
 // List all menus
-exports.listMenus = async (req, res) => {
+export const listMenus = async (req, res) => {
     try {
         const menus = await Menu.find().sort({ priority: 1 });
         const masters = await Menu.find({ type: 'Master' }).sort({ priority: 1 });
@@ -258,7 +258,7 @@ exports.listMenus = async (req, res) => {
 };
 
 // Add new menu
-exports.addMenu = async (req, res) => {
+export const addMenu = async (req, res) => {
     try {
         const { type, master_id, name, icon, url, priority, is_show } = req.body;
         console.log("all menus data", type, master_id, name, icon, url, priority, is_show)
@@ -294,7 +294,7 @@ exports.addMenu = async (req, res) => {
 
 
 // Update menu
-exports.updateMenu = async (req, res) => {
+export const updateMenu = async (req, res) => {
     try {
         const { id } = req.params;
         const { type, master_id, name, icon, url, priority, is_show } = req.body;
@@ -320,7 +320,7 @@ exports.updateMenu = async (req, res) => {
 };
 
 // Delete menu
-exports.deleteMenu = async (req, res) => {
+export const deleteMenu = async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -348,7 +348,7 @@ exports.deleteMenu = async (req, res) => {
     }
 };
 
-exports.listDesignations = async (req, res) => {
+export const listDesignations = async (req, res) => {
     try {
         const designations = await Designation.find().sort({ add_date: -1 });
         res.render('components/designations/list', {
@@ -364,7 +364,7 @@ exports.listDesignations = async (req, res) => {
 };
 
 // Add new designation
-exports.addDesignation = async (req, res) => {
+export const addDesignation = async (req, res) => {
     try {
         const { name, description } = req.body;
 
@@ -385,7 +385,7 @@ exports.addDesignation = async (req, res) => {
 };
 
 // Update designation
-exports.updateDesignation = async (req, res) => {
+export const updateDesignation = async (req, res) => {
     try {
         const { id } = req.params;
         const { name, description, status } = req.body;
@@ -407,7 +407,7 @@ exports.updateDesignation = async (req, res) => {
 };
 
 // Delete designation
-exports.deleteDesignation = async (req, res) => {
+export const deleteDesignation = async (req, res) => {
     try {
         const { id } = req.params;
         const hasUsers = await User.exists({ designation_id: id });
@@ -435,7 +435,7 @@ exports.deleteDesignation = async (req, res) => {
 
 // GET: Menu Assignment Page
 
-exports.menuAssignmentPage = async (req, res) => {
+export const menuAssignmentPage = async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -474,7 +474,7 @@ exports.menuAssignmentPage = async (req, res) => {
 
 
 // PATCH Assign menus to a designation
-exports.assignMenus = async (req, res) => {
+export const assignMenus = async (req, res) => {
     try {
         const { id } = req.params;
         let { menu_ids } = req.body;
@@ -497,165 +497,5 @@ exports.assignMenus = async (req, res) => {
     } catch (error) {
         console.error("Error updating menu assignment:", error);
         res.status(500).json({ success: false, message: "Failed to update menu assignment" });
-    }
-};
-
-
-
-//new 
-
-// Render assign menu page
-exports.getAssignMenuPage = async (req, res) => {
-    try {
-        const designations = await Designation.find({ status: "Active" }).sort({ name: 1 });
-        const menus = await Menu.find({ is_show: true })
-            .populate("master_id", "name")
-            .sort({ type: 1, priority: 1 });
-
-        // Group menus by type
-        const masterMenus = menus.filter(menu => menu.type === "Master");
-        const regularMenus = menus.filter(menu => menu.type === "Menu");
-        const submenus = menus.filter(menu => menu.type === "Submenu");
-
-        // Organize submenus under their parent menus
-        const menuStructure = regularMenus.map(menu => {
-            const children = submenus.filter(
-                submenu => submenu.menu_id && submenu.menu_id.toString() === menu._id.toString()
-            );
-            return {
-                ...menu.toObject(),
-                children
-            };
-        });
-
-        res.render("menus/assign-menu", {
-            designations,
-            masterMenus,
-            menuStructure,
-            title: "E-Sangrah - Assign-Menu"
-        });
-    } catch (error) {
-        console.error("Error loading assign menu page:", error);
-        res.status(500).render("error", {
-            message: "Error loading assign menu page",
-            error: process.env.NODE_ENV === "development" ? error : {}
-        });
-    }
-};
-
-// Get assigned menus for a designation
-exports.getAssignedMenus = async (req, res) => {
-    try {
-        const { designation_id } = req.params;
-
-        const assignedMenus = await menuAssignment.find({ designation_id })
-            .populate("menu_id")
-            .select("menu_id");
-
-        const menuIds = assignedMenus.map(
-            assignment => assignment.menu_id._id.toString()
-        );
-
-        res.json({
-            success: true,
-            data: menuIds
-        });
-    } catch (error) {
-        console.error("Error fetching assigned menus:", error);
-        res.status(500).json({
-            success: false,
-            message: "Error fetching assigned menus"
-        });
-    }
-};
-
-// Assign menus to designation
-exports.assignMenusToDesignation = async (req, res) => {
-    try {
-        const { designation_id, menu_ids } = req.body;
-
-        if (!designation_id || !menu_ids) {
-            return res.status(400).json({
-                success: false,
-                message: "Designation ID and menu IDs are required"
-            });
-        }
-
-        // Remove existing assignments for this designation
-        await menuAssignment.deleteMany({ designation_id });
-
-        // Create new assignments
-        const assignments = menu_ids.map(menu_id => ({
-            designation_id,
-            menu_id
-        }));
-
-        const savedAssignments = await menuAssignment.insertMany(assignments);
-
-        res.json({
-            success: true,
-            message: "Menus assigned successfully",
-            data: savedAssignments
-        });
-    } catch (error) {
-        console.error("Error assigning menus:", error);
-        res.status(500).json({
-            success: false,
-            message: "Error assigning menus"
-        });
-    }
-};
-
-// Render menu list
-exports.getMenuList = async (req, res) => {
-    try {
-        const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 10;
-        const skip = (page - 1) * limit;
-
-        const menus = await Menu.find()
-            .sort({ priority: 1, add_date: -1 })
-            .skip(skip)
-            .limit(limit);
-
-        const total = await Menu.countDocuments();
-        const totalPages = Math.ceil(total / limit);
-
-        res.render("menus/list", {
-            menus,
-            currentPage: page,
-            totalPages,
-            total,
-            limit,
-            title: "E-Sangrah - Menu-list"
-        });
-    } catch (error) {
-        res.status(500).render("error", { message: error.message });
-    }
-};
-
-// Render add menu form
-exports.getAddMenu = async (req, res) => {
-    try {
-        const masters = await Menu.find({ type: "Master" }).sort({ name: 1 });
-        res.render("menus/add", { masters });
-    } catch (error) {
-        res.status(500).render("error", { message: error.message });
-    }
-};
-
-// Render edit menu form
-exports.getEditMenu = async (req, res) => {
-    try {
-        const menu = await Menu.findById(req.params.id);
-        const masters = await Menu.find({ type: "Master" }).sort({ name: 1 });
-
-        if (!menu) {
-            return res.status(404).render("error", { message: "Menu not found" });
-        }
-
-        res.render("menus/edit", { menu, masters });
-    } catch (error) {
-        res.status(500).render("error", { message: error.message });
     }
 };

@@ -1,4 +1,5 @@
-const mongoose = require('mongoose');
+import mongoose from "mongoose";
+
 
 const employeeList = new mongoose.Schema({
     emp_id: {
@@ -60,5 +61,5 @@ const ProjectSchema = new mongoose.Schema({
 // Create index for title field
 ProjectSchema.index({ title: 1 });
 
-const ProjectCl = mongoose.model('dt_projects', ProjectSchema);
-module.exports = ProjectCl;
+const ProjectCl = mongoose.model("dt_projects", ProjectSchema);
+export default ProjectCl;

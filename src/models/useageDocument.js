@@ -1,4 +1,5 @@
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
+
 
 const usageTrackingSchema = new mongoose.Schema({
     department: {
@@ -84,4 +85,6 @@ usageTrackingSchema.statics.getUsageHistory = function (departmentId, days = 30)
     }).sort({ date: 1 });
 };
 
-module.exports = mongoose.model("UsageTracking", usageTrackingSchema);
+const UsageTracking = mongoose.model("UsageTracking", usageTrackingSchema);
+
+export default UsageTracking;

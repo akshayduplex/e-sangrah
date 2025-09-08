@@ -1,16 +1,15 @@
-const ProjectCl = require('../models/Projects');
-const Project = require('../models/Projects');
-const axios = require('axios');
+import axios from 'axios';
+import Project from '../models/Projects.js';
 
 class SyncService {
     async fetchDataFromAPI() {
         try {
             const response = await axios.post(
                 'https://hrmsapis.dtsmis.in/v1/dms/getProjectList',
-                { page_no: "1", per_page_record: "10" },
+                { page_no: "3", per_page_record: "10" },
                 {
                     headers: {
-                        'Authorization': 'Bearer 0da79b1942f7b1b8b14e960f6cb3414d',
+                        'Authorization': `Bearer ${process.env.projectListToken}`,
                         'Accept': 'application/json',
                         'Content-Type': 'application/json'
                     }
@@ -31,18 +30,13 @@ class SyncService {
     async syncData() {
         try {
             const apiData = await this.fetchDataFromAPI();
-            const results = {
-                added: 0,
-                updated: 0,
-                errors: 0
-            };
+            const results = { added: 0, updated: 0, errors: 0 };
 
             for (const projectData of apiData) {
                 try {
                     const projectToSave = {
                         project_id: projectData._id,
                         title: projectData.title,
-                        logo: projectData.logo || '',
                         manager_list: projectData.manager_list || [],
                         in_charge_list: projectData.in_charge_list || [],
                         start_date: projectData.start_date ? new Date(projectData.start_date) : null,
@@ -77,16 +71,6 @@ class SyncService {
             return { success: false, message: error.message };
         }
     }
-
-    // async getAllProjects() {
-    //     try {
-    //         return await ProjectCl.find({}).sort({ updated_on: -1 });
-    //     } catch (error) {
-    //         console.error('Error fetching projects:', error.message);
-    //         throw new Error('Failed to fetch projects');
-    //     }
-    // }
-
 }
 
-module.exports = new SyncService();
+export default SyncService;

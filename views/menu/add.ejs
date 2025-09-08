@@ -1,0 +1,129 @@
+<%- include('../partials/header') %>
+
+    <!-- Page Wrapper -->
+    <div class="page-wrapper">
+        <div class="content">
+            <div class="card-header">
+                <h4 class="mb-0">Add Menu</h4>
+            </div>
+            <div class="card-body">
+                <form id="menuForm" action="/menu" method="POST">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="type" class="form-label">Type</label>
+                            <select class="form-select" id="type" name="type" required>
+                                <option value="">-- Select Type --</option>
+                                <option value="Master">Master</option>
+                                <option value="Menu">Menu</option>
+                                <option value="Submenu">Submenu</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="name" class="form-label">Name</label>
+                            <input type="text" class="form-control" id="name" name="name" placeholder="Enter Name"
+                                required>
+                        </div>
+                    </div>
+
+                    <div class="row mb-3" id="masterSelectContainer" style="display: none;">
+                        <div class="col-md-6">
+                            <label for="master_id" class="form-label">Master</label>
+                            <select class="form-select" id="master_id" name="master_id">
+                                <option value="">-- Select Master --</option>
+                                <% masters.forEach(master=> { %>
+                                    <option value="<%= master._id %>">
+                                        <%= master.name %>
+                                    </option>
+                                    <% }); %>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label for="icon_code" class="form-label">Icon Code</label>
+                            <input type="text" class="form-control" id="icon_code" name="icon_code"
+                                placeholder="Enter Icon Code">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="url" class="form-label">URL</label>
+                            <input type="text" class="form-control" id="url" name="url" placeholder="Enter URL">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="priority" class="form-label">Priority</label>
+                            <input type="number" class="form-control" id="priority" name="priority"
+                                placeholder="Enter Priority" required min="1">
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Is Show</label>
+                            <div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="is_show" id="is_show_yes"
+                                        value="true" checked>
+                                    <label class="form-check-label" for="is_show_yes">Yes</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="is_show" id="is_show_no"
+                                        value="false">
+                                    <label class="form-check-label" for="is_show_no">No</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end">
+                        <button type="submit" class="btn btn-primary">Submit</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <%- include('../partials/footer') %>
+
+        <script>
+            document.getElementById('type').addEventListener('change', function () {
+                const type = this.value;
+                const masterSelectContainer = document.getElementById('masterSelectContainer');
+
+                if (type === 'Submenu') {
+                    masterSelectContainer.style.display = 'block';
+                } else {
+                    masterSelectContainer.style.display = 'none';
+                }
+            });
+
+            document.getElementById('menuForm').addEventListener('submit', async function (e) {
+                e.preventDefault();
+
+                const formData = new FormData(this);
+                const data = Object.fromEntries(formData.entries());
+
+                try {
+                    const response = await fetch('/api/menu', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(data)
+                    });
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        alert('Menu added successfully');
+                        window.location.href = '/menu/list';
+                    } else {
+                        alert('Error: ' + result.message);
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    alert('Error adding menu');
+                }
+            });
+        </script>
+        </body>
+
+        </html>

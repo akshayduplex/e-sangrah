@@ -1,16 +1,17 @@
-const Department = require('../../models/Departments');
-const mongoose = require('mongoose');
-const { successResponse, failResponse, errorResponse } = require("../../utils/responseHandler");
+import mongoose from 'mongoose';
+import Department from '../../models/Departments.js';
+import { successResponse, failResponse, errorResponse } from "../../utils/responseHandler.js";
+
 
 // Get all active departments
-exports.getAllDepartments = async () => {
+export const getAllDepartments = async () => {
     return await Department.find({ isActive: true })
         .select('name')
         .lean();
 };
 
 // Get department by ID
-exports.getDepartmentById = async (req, res) => {
+export const getDepartmentById = async (req, res) => {
     try {
         const { id } = req.params;
         if (!mongoose.Types.ObjectId.isValid(id)) return failResponse(res, 'Invalid department ID', 400);
@@ -29,7 +30,7 @@ exports.getDepartmentById = async (req, res) => {
 };
 
 // Get department storage
-exports.getDepartmentStorage = async (req, res) => {
+export const getDepartmentStorage = async (req, res) => {
     try {
         const { id } = req.params;
         if (!mongoose.Types.ObjectId.isValid(id)) return failResponse(res, 'Invalid department ID', 400);
@@ -55,7 +56,7 @@ exports.getDepartmentStorage = async (req, res) => {
 };
 
 // Create new department
-exports.createDepartment = async (req, res) => {
+export const createDepartment = async (req, res) => {
     try {
         const department = new Department(req.body);
         await department.save();
@@ -66,7 +67,7 @@ exports.createDepartment = async (req, res) => {
 };
 
 // Update department
-exports.updateDepartment = async (req, res) => {
+export const updateDepartment = async (req, res) => {
     try {
         const { id } = req.params;
         if (!mongoose.Types.ObjectId.isValid(id)) return failResponse(res, 'Invalid department ID', 400);
@@ -84,7 +85,7 @@ exports.updateDepartment = async (req, res) => {
 };
 
 // Delete department
-exports.deleteDepartment = async (req, res) => {
+export const deleteDepartment = async (req, res) => {
     try {
         const { id } = req.params;
         if (!mongoose.Types.ObjectId.isValid(id)) return failResponse(res, 'Invalid department ID', 400);

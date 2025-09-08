@@ -1,0 +1,164 @@
+<%- include('../partials/header') %>
+
+    <!-- Page Wrapper -->
+    <div class="page-wrapper">
+        <div class="content">
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h4 class="mb-0">Menu List</h4>
+                            <a href="/menu/add" class="btn btn-primary">
+                                <i class="fas fa-plus me-1"></i> Add Menu
+                            </a>
+                        </div>
+                        <div class="card-body">
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <div class="d-flex align-items-center">
+                                        <span class="me-2">Show</span>
+                                        <select class="form-select form-select-sm w-auto" id="entriesLimit">
+                                            <option value="10">10</option>
+                                            <option value="25">25</option>
+                                            <option value="50">50</option>
+                                            <option value="100">100</option>
+                                        </select>
+                                        <span class="ms-2">entries</span>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="input-group input-group-sm">
+                                        <input type="text" class="form-control" placeholder="Search..."
+                                            id="searchInput">
+                                        <button class="btn btn-outline-secondary" type="button">
+                                            <i class="fas fa-search"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="table-responsive">
+                                <table class="table table-striped table-bordered">
+                                    <thead>
+                                        <tr>
+                                            <th>No.</th>
+                                            <th>Type</th>
+                                            <th>Name</th>
+                                            <th>Priority</th>
+                                            <th>Is Show</th>
+                                            <th>Add Date</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <% menus.forEach((menu, index)=> { %>
+                                            <tr>
+                                                <td>
+                                                    <%= (currentPage - 1) * limit + index + 1 %>
+                                                </td>
+                                                <td>
+                                                    <%= menu.type %>
+                                                </td>
+                                                <td>
+                                                    <%= menu.name %>
+                                                </td>
+                                                <td>
+                                                    <%= menu.priority %>
+                                                </td>
+                                                <td>
+                                                    <span class="badge bg-<%= menu.is_show ? 'success' : 'danger' %>">
+                                                        <%= menu.is_show ? 'Yes' : 'No' %>
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <%= new Date(menu.add_date).toLocaleDateString('en-IN') %>
+                                                </td>
+                                                <td>
+                                                    <a href="/menu/edit/<%= menu._id %>" class="btn btn-sm btn-warning">
+                                                        <i class="fas fa-edit"></i>
+                                                    </a>
+                                                    <button class="btn btn-sm btn-danger"
+                                                        onclick="confirmDelete('<%= menu._id %>')">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                            <% }); %>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>Showing <%= (currentPage - 1) * limit + 1 %> to <%= Math.min(currentPage * limit,
+                                            total) %> of <%= total %> entries</div>
+                                <nav>
+                                    <ul class="pagination pagination-sm">
+                                        <% if (currentPage> 1) { %>
+                                            <li class="page-item">
+                                                <a class="page-link"
+                                                    href="?page=<%= currentPage - 1 %>&limit=<%= limit %>">Previous</a>
+                                            </li>
+                                            <% } %>
+
+                                                <% for (let i=1; i <=totalPages; i++) { %>
+                                                    <li class="page-item <%= currentPage === i ? 'active' : '' %>">
+                                                        <a class="page-link" href="?page=<%= i %>&limit=<%= limit %>">
+                                                            <%= i %>
+                                                        </a>
+                                                    </li>
+                                                    <% } %>
+
+                                                        <% if (currentPage < totalPages) { %>
+                                                            <li class="page-item">
+                                                                <a class="page-link"
+                                                                    href="?page=<%= currentPage + 1 %>&limit=<%= limit %>">Next</a>
+                                                            </li>
+                                                            <% } %>
+                                    </ul>
+                                </nav>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <%- include('../partials/footer') %>
+            <script>
+
+
+                function confirmDelete(menuId) {
+                    if (confirm('Are you sure you want to delete this menu?')) {
+                        fetch(`/api/menu/${menuId}`, {
+                            method: 'DELETE',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            }
+                        })
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.success) {
+                                    alert('Menu deleted successfully');
+                                    location.reload();
+                                } else {
+                                    alert('Error deleting menu: ' + data.message);
+                                }
+                            })
+                            .catch(error => {
+                                console.error('Error:', error);
+                                alert('Error deleting menu');
+                            });
+                    }
+                }
+
+                // Update limit and refresh
+                document.getElementById('entriesLimit').addEventListener('change', function () {
+                    const limit = this.value;
+                    window.location.href = `?page=1&limit=${limit}`;
+                });
+
+                // Set current limit in select
+                document.getElementById('entriesLimit').value = '<%= limit %>';
+            </script>
+            </body>
+
+            </html>

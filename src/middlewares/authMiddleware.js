@@ -1,9 +1,9 @@
-const User = require('../models/User');
+import User from "../models/User.js"; // note the .js extension
 
 /**
  * Authentication middleware (checks session)
  */
-const authenticate = async (req, res, next) => {
+export const authenticate = async (req, res, next) => {
     try {
         if (!req.session.user) {
             // If request is an API (starts with /api), return JSON
@@ -51,7 +51,7 @@ const authenticate = async (req, res, next) => {
 /**
  * Authorization middleware (checks role from session)
  */
-const authorize = (...roles) => {
+export const authorize = (...roles) => {
     return (req, res, next) => {
         if (!req.session.user || !roles.includes(req.session.user.role)) {
             return res.status(403).json({
@@ -62,5 +62,3 @@ const authorize = (...roles) => {
         next();
     };
 };
-
-module.exports = { authenticate, authorize };

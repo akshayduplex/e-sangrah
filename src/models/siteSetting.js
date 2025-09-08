@@ -1,5 +1,6 @@
 // models/SiteSetting.js
-const mongoose = require('mongoose');
+import mongoose from "mongoose";
+
 
 const siteSettingSchema = new mongoose.Schema({
     site_title: {
@@ -76,4 +77,6 @@ const siteSettingSchema = new mongoose.Schema({
     }
 });
 
-module.exports = mongoose.model('SiteSetting', siteSettingSchema);
+const SiteSetting = mongoose.model("SiteSetting", siteSettingSchema);
+
+export default SiteSetting;

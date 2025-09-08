@@ -7,7 +7,7 @@
  * @param {string} message - Response message (default "Success")
  * @param {number} statusCode - HTTP status code (default 200)
  */
-exports.successResponse = (res, data = {}, message = 'Success', statusCode = 200) => {
+export const successResponse = (res, data = {}, message = 'Success', statusCode = 200) => {
     return res.status(statusCode).json({
         success: true,
         message: message || 'Success',
@@ -22,7 +22,7 @@ exports.successResponse = (res, data = {}, message = 'Success', statusCode = 200
  * @param {number} statusCode - HTTP status code (default 400)
  * @param {array} errors - Optional detailed errors
  */
-exports.failResponse = (res, message = 'Failed', statusCode = 400, errors = []) => {
+export const failResponse = (res, message = 'Failed', statusCode = 400, errors = []) => {
     return res.status(statusCode).json({
         success: false,
         message: message || 'Failed',
@@ -37,7 +37,7 @@ exports.failResponse = (res, message = 'Failed', statusCode = 400, errors = []) 
  * @param {string} message - Optional custom message
  * @param {number} statusCode - HTTP status code (default 500)
  */
-exports.errorResponse = (res, error = null, message = 'Internal Server Error', statusCode = 500) => {
+export const errorResponse = (res, error = null, message = 'Internal Server Error', statusCode = 500) => {
     let errorMessage;
 
     if (!error) {
