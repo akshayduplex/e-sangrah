@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import Project from "../../models/project.js";
 import ProjectList from "../../models/Projects.js";
 import { successResponse, failResponse, errorResponse } from "../../utils/responseHandler.js";
+import ProjectCl from "../../models/Projects.js";
 
 // Create Project
 export const createProject = async (req, res) => {
@@ -54,26 +55,20 @@ export const getAllManagers = async (req, res) => {
 // Get projects with filters, pagination, search
 export const getProjects = async (req, res) => {
     try {
-        const { status, department, manager, limit = 20, page = 1, search } = req.query;
+        const { status, limit = 20, page = 1, search } = req.query;
 
         const filter = {};
         if (status) filter.status = status;
-        if (department && mongoose.Types.ObjectId.isValid(department)) filter.department = department;
-        if (manager) {
-            const managerIds = Array.isArray(manager) ? manager : [manager];
-            filter.manager = { $in: managerIds.filter(m => mongoose.Types.ObjectId.isValid(m)) };
-        }
-        if (search) filter.name = { $regex: search, $options: "i" };
+        if (search) filter.title = { $regex: search, $options: "i" };
 
         const skip = (parseInt(page) - 1) * parseInt(limit);
 
-        const projects = await Project.find(filter)
-            .populate("department manager teamMembers.user", "name email role")
-            .sort({ createdAt: -1 })
+        const projects = await ProjectCl.find(filter)
+            .sort({ add_date: -1 })
             .skip(skip)
             .limit(parseInt(limit));
 
-        const total = await Project.countDocuments(filter);
+        const total = await ProjectCl.countDocuments(filter);
 
         return successResponse(res, {
             projects,

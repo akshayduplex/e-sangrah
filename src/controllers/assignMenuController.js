@@ -1,43 +1,42 @@
+import mongoose from "mongoose";
 import Designation from "../models/Designation.js";
 import Menu from "../models/Menu.js";
 import MenuAssignment from "../models/menuAssignment.js";
-import DesignationMenu from "../models/menuAssignment.js";
 
 // Render assign menu page
 export const getAssignMenuPage = async (req, res) => {
     try {
         const designations = await Designation.find({ status: "Active" }).sort({ name: 1 });
-        const menus = await Menu.find({ is_show: true })
-            .populate("master_id", "name")
-            .sort({ type: 1, priority: 1 });
+        const response = await fetch('http://localhost:5000/api/menu');
+        const result = await response.json();
 
-        // Group menus by type
-        const masterMenus = menus.filter(menu => menu.type === "Master");
-        const regularMenus = menus.filter(menu => menu.type === "Menu");
-        const submenus = menus.filter(menu => menu.type === "Submenu");
+        if (!result.success) {
+            return res.render('assignMenu', { masterMenus: [], designations: [] });
+        }
 
-        // Organize submenus under their parent menus
-        const menuStructure = regularMenus.map(menu => {
-            const children = submenus.filter(
-                submenu => submenu.menu_id && submenu.menu_id.toString() === menu._id.toString()
-            );
+        const allMenus = result.data;
+
+        // Filter only Master
+        const masters = allMenus.filter(m => m.type === 'Master');
+
+        // Attach Menu children under their Master
+        const masterMenus = masters.map(master => {
             return {
-                ...menu.toObject(),
-                children
+                ...master,
+                menus: allMenus.filter(menu =>
+                    menu.type === 'Menu' && menu.master_id && menu.master_id._id === master._id
+                )
             };
         });
 
-        res.render("menu/assign-menu", {
-            designations,
+        res.render('menu/assign-menu', {
             masterMenus,
-            menuStructure
+            designations: designations
         });
-    } catch (error) {
-        console.error("Error loading assign menu page:", error);
-        res.status(500).render("error", {
-            message: "Error loading assign menu page",
-            error: process.env.NODE_ENV === "development" ? error : {}
-        });
+
+    } catch (err) {
+        console.error('Error:', err);
+        res.render('assignMenu', { masterMenus: [], designations: [] });
     }
 };
 
@@ -46,24 +45,16 @@ export const getAssignedMenus = async (req, res) => {
     try {
         const { designation_id } = req.params;
 
-        const assignedMenus = await DesignationMenu.find({ designation_id })
-            .populate("menu_id")
+        const assignedMenus = await MenuAssignment.find({ designation_id })
+            .populate("menu_id", "name")
             .select("menu_id");
 
-        const menuIds = assignedMenus.map(
-            assignment => assignment.menu_id._id.toString()
-        );
+        const menuIds = assignedMenus.map(a => a.menu_id?._id?.toString());
 
-        res.json({
-            success: true,
-            data: menuIds
-        });
+        res.json({ success: true, data: menuIds });
     } catch (error) {
         console.error("Error fetching assigned menus:", error);
-        res.status(500).json({
-            success: false,
-            message: "Error fetching assigned menus"
-        });
+        res.status(500).json({ success: false, message: "Error fetching assigned menus" });
     }
 };
 
@@ -72,25 +63,31 @@ export const assignMenusToDesignation = async (req, res) => {
     try {
         const { designation_id, menu_ids } = req.body;
 
-        if (!designation_id || !menu_ids) {
+        if (!designation_id || !Array.isArray(menu_ids) || menu_ids.length === 0) {
             return res.status(400).json({
                 success: false,
                 message: "Designation ID and menu IDs are required"
             });
         }
 
-        // Remove existing assignments for this designation
-        // await DesignationMenu.deleteMany({ designation_id });
+        // Get existing assignments
+        const existing = await MenuAssignment.find({ designation_id }).select("menu_id");
+        const existingIds = existing.map(e => e.menu_id.toString());
 
-        // Create new assignments
-        const uniqueMenuIds = [...new Set(menu_ids.map(id => id.toString()))];
-        const assignments = uniqueMenuIds.map(menu_id => ({
-            designation_id,
-            menu_id
-        }));
+        // Find only new menu_ids that are not already assigned
+        const newMenuIds = menu_ids.filter(id => !existingIds.includes(id));
 
+        if (newMenuIds.length === 0) {
+            return res.json({
+                success: true,
+                message: "No new menus to assign",
+                data: []
+            });
+        }
 
-        const savedAssignments = await DesignationMenu.insertMany(assignments);
+        // Insert only new ones
+        const assignments = newMenuIds.map(menu_id => ({ designation_id, menu_id }));
+        const savedAssignments = await MenuAssignment.insertMany(assignments);
 
         res.json({
             success: true,
@@ -99,19 +96,20 @@ export const assignMenusToDesignation = async (req, res) => {
         });
     } catch (error) {
         console.error("Error assigning menus:", error);
-        res.status(500).json({
-            success: false,
-            message: "Error assigning menus"
-        });
+        res.status(500).json({ success: false, message: "Error assigning menus" });
     }
 };
 
+// Unassign menus from designation
 export const unAssignMenu = async (req, res) => {
     try {
         const { designation_id, menu_ids } = req.body;
 
-        if (!Array.isArray(menu_ids) || menu_ids.length === 0) {
-            return res.status(400).json({ message: "menu_ids must be a non-empty array" });
+        if (!designation_id || !Array.isArray(menu_ids) || menu_ids.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: "Designation ID and menu_ids are required"
+            });
         }
 
         const result = await MenuAssignment.deleteMany({
@@ -119,37 +117,63 @@ export const unAssignMenu = async (req, res) => {
             menu_id: { $in: menu_ids }
         });
 
-        res.json({
-            message: "Menus unselected successfully",
+        return res.json({
+            success: true,
+            message: "Menus unassigned successfully",
             deletedCount: result.deletedCount
         });
     } catch (error) {
-        res.status(500).json({ message: "Server error", error });
+        console.error("Error in unAssignMenu:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Server error",
+            error: error.message
+        });
     }
 };
 
 // Get sidebar menus for logged-in user
+
 export const getSidebarForUser = async (req, res) => {
     try {
         const designationId = req.user.designation_id;
-        console.log("User designation ID:", designationId);
-        const assignments = await MenuAssignment.find({ designation_id: designationId })
-            .populate("menu_id");
-        console.log("Menu assignments:", assignments);
+        console.log("Designation ID:", designationId);
+
+        // Ensure designationId is an ObjectId
+        const assignments = await MenuAssignment.find({
+            designation_id: new mongoose.Types.ObjectId(designationId)
+        }).populate("menu_id");
+
         // Filter only visible menus
         const menus = assignments
             .map(a => a.menu_id)
-            .filter(menu => menu && menu.is_show);
+            .filter(m => m && m.is_show);
 
-        // Build hierarchy
-        const masters = menus.filter(m => m.type === "Master");
+        // Build hierarchy: Masters → Menus/Submenus
+        const masters = menus
+            .filter(m => m.type === "Master")
+            .sort((a, b) => a.priority - b.priority);
+
         const grouped = masters.map(master => ({
             ...master.toObject(),
-            menus: menus.filter(m => m.master_id?.toString() === master._id.toString())
+            children: menus
+                .filter(m => m.master_id?.toString() === master._id.toString())
+                .sort((a, b) => a.priority - b.priority)
         }));
 
-        res.json(grouped);
+        // Prevent cached 304 responses
+        // res.set("Cache-Control", "no-store");
+
+        res.json({
+            success: true,
+            data: grouped
+        });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error("Error in getSidebarForUser:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching sidebar",
+            error: process.env.NODE_ENV === "development" ? error.message : {}
+        });
     }
 };

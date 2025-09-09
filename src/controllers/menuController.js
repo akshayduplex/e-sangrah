@@ -1,18 +1,20 @@
 import Menu from "../models/Menu.js";
 
-// Render menu list
+// Render menu list with pagination
 export const getMenuList = async (req, res) => {
     try {
-        const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 10;
+        const page = Math.max(parseInt(req.query.page) || 1, 1);
+        const limit = Math.min(parseInt(req.query.limit) || 10, 100); // avoid too large queries
         const skip = (page - 1) * limit;
 
-        const menus = await Menu.find()
-            .sort({ priority: 1, add_date: -1 })
-            .skip(skip)
-            .limit(limit);
+        const [menus, total] = await Promise.all([
+            Menu.find()
+                .sort({ priority: 1, add_date: -1 }) // still works since add_date is set via timestamps
+                .skip(skip)
+                .limit(limit),
+            Menu.countDocuments()
+        ]);
 
-        const total = await Menu.countDocuments();
         const totalPages = Math.ceil(total / limit);
 
         res.render("menu/list", {
@@ -30,8 +32,11 @@ export const getMenuList = async (req, res) => {
 // Render add menu form
 export const getAddMenu = async (req, res) => {
     try {
-        const masters = await Menu.find({ type: "Master" }).sort({ name: 1 });
-        res.render("menu/add", { masters });
+        // Only Masters can be parents
+        const masters = await Menu.find({ type: "Master", is_show: true }).sort({ name: 1 });
+
+        // Render the unified form, menu is null for Add
+        res.render("menu/add", { masters, menu: null });
     } catch (error) {
         res.status(500).render("error", { message: error.message });
     }
@@ -41,13 +46,15 @@ export const getAddMenu = async (req, res) => {
 export const getEditMenu = async (req, res) => {
     try {
         const menu = await Menu.findById(req.params.id);
-        const masters = await Menu.find({ type: "Master" }).sort({ name: 1 });
 
         if (!menu) {
             return res.status(404).render("error", { message: "Menu not found" });
         }
 
-        res.render("menu/edit", { menu, masters });
+        const masters = await Menu.find({ type: "Master", is_show: true }).sort({ name: 1 });
+
+        // Render the unified form, passing the existing menu
+        res.render("menu/add", { masters, menu });
     } catch (error) {
         res.status(500).render("error", { message: error.message });
     }
