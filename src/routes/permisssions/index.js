@@ -244,7 +244,8 @@ import express from "express";
 import mongoose from "mongoose";
 import Menu from "../../models/Menu.js";
 import DesignationMenu from "../../models/menuAssignment.js";
-import { assignMenusToDesignation, getAssignedMenus, unAssignMenu } from "../../controllers/assignMenuController.js";
+import { assignMenusToDesignation, getAssignedMenus, getSidebarForUser, unAssignMenu } from "../../controllers/assignMenuController.js";
+import { authenticate } from "../../middlewares/authMiddleware.js";
 
 const router = express.Router();
 
@@ -388,6 +389,8 @@ router.post("/menu/assign", async (req, res) => {
     }
 });
 router.delete("/assign-menu/unselect", unAssignMenu)
+// For logged-in user’s sidebar
+router.get("/sidebar", authenticate, getSidebarForUser);
 // Get assigned menus for a designation
 router.get("/assign-menu/designation/:designation_id/menus", getAssignedMenus);
 router.post("/assign-menu/assign", assignMenusToDesignation);
