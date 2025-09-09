@@ -428,6 +428,189 @@
 
 <!-- Custom JS -->
 <script> const BASE_URL = "<%= BASE_URL %>";</script>
+<script>
+    $(document).ready(function () {
+        // Hide global loader
+        $('#global-loader').fadeOut();
+
+        $.ajax({
+            url: '/api/sidebar',
+            type: 'GET',
+            xhrFields: {
+                withCredentials: true // Include auth cookies
+            },
+            success: function (response) {
+                // Hide loader
+                $('#global-loader').hide();
+
+                // Process the response and generate the menu
+                generateSidebarMenu(response);
+            },
+            error: function (xhr, status, error) {
+                // Hide loader
+                $('#global-loader').hide();
+
+                console.error('Error fetching sidebar data:', error);
+                // Fallback to a default menu or show error message
+                $('#dynamic-menu').html('<li><a href="#"><i class="ti ti-alert-triangle"></i> Error loading menu</a></li>');
+            }
+        });
+        // Function to generate sidebar menu from API response
+        function generateSidebarMenu(menuData) {
+            const menuContainer = $('#dynamic-menu');
+            menuContainer.empty(); // Clear any existing content
+
+            // Process each menu item from the API response
+            menuData.forEach(item => {
+                if (item.is_show) { // Only show if is_show is true
+                    if (item.type === 'Master') {
+                        if (item.menus && item.menus.length > 0) {
+                            // This is a menu with submenus
+                            const submenuItem = createSubmenuItem(item);
+                            menuContainer.append(submenuItem);
+                        } else {
+                            // This is a simple menu item without submenus
+                            const menuItem = createMenuItem(item);
+                            menuContainer.append(menuItem);
+                        }
+                    }
+                }
+            });
+
+            // Add logout button at the end
+            const logoutItem = $('<li>').html(
+                '<a href="javascript:void(0);" class="logout-btn">' +
+                '<i class="ti ti-logout"></i><span class="menuname">Log out</span>' +
+                '</a>'
+            );
+            menuContainer.append(logoutItem);
+
+            // Initialize menu toggle functionality
+            initMenuToggle();
+        }
+
+        // Function to create a submenu item
+        function createSubmenuItem(item) {
+            const hasSubmenus = item.menus && item.menus.length > 0;
+
+            const submenuItem = $('<li>').addClass('submenu');
+            const submenuLink = $('<a>')
+                .attr('href', 'javascript:void(0);')
+                .addClass('subdrop')
+                .html(
+                    '<span class="menu-arrow"></span>' +
+                    '<i class="' + (item.icon_code || getDefaultIcon(item.name)) + '"></i>' +
+                    '<span class="menuname">' + capitalizeFirstLetter(item.name) + '</span>'
+                );
+
+            submenuItem.append(submenuLink);
+
+            if (hasSubmenus) {
+                const dropdownWrap = $('<ul>').addClass('dropdown_wrap');
+
+                // Add submenu items
+                item.menus.forEach(subItem => {
+                    if (subItem.is_show) {
+                        const submenuListItem = $('<li>');
+                        const submenuItemLink = $('<a>')
+                            .attr('href', subItem.url || '#')
+                            .html(
+                                '<i class="ti ti-chevron-right"></i> ' +
+                                capitalizeFirstLetter(subItem.name)
+                            );
+
+                        submenuListItem.append(submenuItemLink);
+                        dropdownWrap.append(submenuListItem);
+                    }
+                });
+
+                submenuItem.append(dropdownWrap);
+            }
+
+            return submenuItem;
+        }
+
+        // Function to create a simple menu item
+        function createMenuItem(item) {
+            const menuItem = $('<li>');
+            const menuLink = $('<a>')
+                .attr('href', item.url || '#')
+                .html(
+                    '<i class="' + (item.icon_code || getDefaultIcon(item.name)) + '"></i>' +
+                    '<span class="menuname">' + capitalizeFirstLetter(item.name) + '</span>'
+                );
+
+            menuItem.append(menuLink);
+            return menuItem;
+        }
+
+        // Helper function to get default icon based on menu name
+        function getDefaultIcon(name) {
+            const iconMap = {
+                'master': 'ti ti-layout-dashboard',
+                'projects': 'ti ti-clipboard-list',
+                'approvals': 'ti ti-user-check',
+                'reports': 'ti ti-clipboard-text',
+                'analytics': 'ti ti-chart-bar-popular',
+                'documents': 'ti ti-files',
+                'management': 'ti ti-users-group',
+                'archive': 'ti ti-archive',
+                'trash': 'ti ti-trash'
+            };
+
+            return iconMap[name.toLowerCase()] || 'ti ti-circle';
+        }
+
+        // Helper function to capitalize first letter
+        function capitalizeFirstLetter(string) {
+            return string.charAt(0).toUpperCase() + string.slice(1);
+        }
+
+        // Initialize menu toggle functionality
+        function initMenuToggle() {
+            // Submenu toggle
+            $('.submenu > a').on('click', function (e) {
+                e.preventDefault();
+                const $this = $(this);
+                const $parent = $this.parent();
+
+                // Close other open menus
+                $('.submenu').not($parent).removeClass('active').find('.dropdown_wrap').slideUp();
+
+                // Toggle current menu
+                $parent.toggleClass('active');
+                $parent.find('.dropdown_wrap').slideToggle();
+            });
+
+            // Handle logout button click
+            $('.logout-btn').on('click', function () {
+                // Implement logout functionality here
+                console.log('Logout clicked');
+                // window.location.href = '/logout';
+            });
+        }
+
+        // Toggle sidebar
+        $('#toggle_btn').on('click', function () {
+            $('.main-wrapper').toggleClass('sidebar-collapsed');
+            // Change icon based on state
+            const icon = $(this).find('i');
+            if ($('.main-wrapper').hasClass('sidebar-collapsed')) {
+                icon.removeClass('ti-arrow-bar-to-left').addClass('ti-arrow-bar-to-right');
+            } else {
+                icon.removeClass('ti-arrow-bar-to-right').addClass('ti-arrow-bar-to-left');
+            }
+        });
+
+        // Mobile sidebar toggle
+        $('#mobile_btn').on('click', function () {
+            $('.main-wrapper').toggleClass('sidebar-mobile-show');
+        });
+
+        // Generate the sidebar menu
+        generateSidebarMenu(menuData);
+    });
+</script>
 
 <script src="/js/todo.js"></script>
 <script src="/js/theme-colorpicker.js"></script>

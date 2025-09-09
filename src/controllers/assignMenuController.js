@@ -1,5 +1,6 @@
 import Designation from "../models/Designation.js";
 import Menu from "../models/Menu.js";
+import MenuAssignment from "../models/menuAssignment.js";
 import DesignationMenu from "../models/menuAssignment.js";
 
 // Render assign menu page
@@ -124,5 +125,31 @@ export const unAssignMenu = async (req, res) => {
         });
     } catch (error) {
         res.status(500).json({ message: "Server error", error });
+    }
+};
+
+// Get sidebar menus for logged-in user
+export const getSidebarForUser = async (req, res) => {
+    try {
+        const designationId = req.user.designation_id;
+        console.log("User designation ID:", designationId);
+        const assignments = await MenuAssignment.find({ designation_id: designationId })
+            .populate("menu_id");
+        console.log("Menu assignments:", assignments);
+        // Filter only visible menus
+        const menus = assignments
+            .map(a => a.menu_id)
+            .filter(menu => menu && menu.is_show);
+
+        // Build hierarchy
+        const masters = menus.filter(m => m.type === "Master");
+        const grouped = masters.map(master => ({
+            ...master.toObject(),
+            menus: menus.filter(m => m.master_id?.toString() === master._id.toString())
+        }));
+
+        res.json(grouped);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
     }
 };
