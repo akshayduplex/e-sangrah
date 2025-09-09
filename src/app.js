@@ -7,8 +7,8 @@ import compression from "compression";
 import session from "express-session";
 import MongoStore from "connect-mongo";
 import flash from "connect-flash";
-
-import ApiRoutes from "./routes/index.js";  // <-- ES module import
+import methodOverride from "method-override";
+import ApiRoutes from "./routes/index.js";
 import pageRoutes from "./routes/web/index.js";
 import errorHandler from "./middlewares/errorHandler.js";
 
@@ -26,7 +26,7 @@ app.use(session({
     }),
     cookie: { maxAge: 1000 * 60 * 60, secure: false }
 }));
-
+app.use(methodOverride('_method'));
 app.use(compression());
 app.use(morgan("dev"));
 app.use(flash());

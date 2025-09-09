@@ -1,66 +1,3 @@
-// import mongoose from "mongoose";
-
-
-// const menuSchema = new mongoose.Schema(
-//     {
-//         master_id: {
-//             type: mongoose.Schema.Types.ObjectId,
-//             ref: 'Menu',
-//             default: null,
-//         },
-//         menu_id: {
-//             type: mongoose.Schema.Types.ObjectId,
-//             ref: 'Menu',
-//             default: null,
-//         },
-//         type: {
-//             type: String,
-//             enum: ['Master', 'Menu', 'Submenu'],
-//             required: true,
-//         },
-//         name: {
-//             type: String,
-//             required: true,
-//             trim: true,
-//         },
-//         icon: {
-//             type: String,
-//             trim: true,
-//         },
-//         url: {
-//             type: String,
-//             trim: true,
-//         },
-//         priority: {
-//             type: Number,
-//             required: true,
-//             default: 1,
-//         },
-//         is_show: {
-//             type: Boolean,
-//             default: true,
-//         },
-//         icon_code: {
-//             type: String,
-//             trim: true,
-//         },
-//     },
-//     {
-//         timestamps: {
-//             createdAt: 'add_date',
-//             updatedAt: 'update_date',
-//         },
-//     }
-// );
-
-// // Indexes for performance
-// menuSchema.index({ master_id: 1, type: 1 });
-// menuSchema.index({ priority: 1 });
-
-// const Menu = mongoose.model('Menu', menuSchema);
-
-// export default Menu;
-
 import mongoose from 'mongoose';
 
 const { Schema, model, Types } = mongoose;
@@ -68,7 +5,7 @@ const { Schema, model, Types } = mongoose;
 const menuSchema = new Schema({
     type: {
         type: String,
-        enum: ['Master', 'Menu', 'Submenu'],
+        enum: ['Master', 'Menu'], // Only 2 levels
         required: true
     },
     name: {
@@ -95,7 +32,8 @@ const menuSchema = new Schema({
     priority: {
         type: Number,
         required: true,
-        min: 1
+        min: 1,
+        default: 1
     },
     is_show: {
         type: Boolean,
@@ -107,16 +45,14 @@ const menuSchema = new Schema({
         default: null,
         validate: {
             validator: function (value) {
-                if (this.type === 'Submenu') return !!value;
+                // Menus must have a master_id
+                if (this.type === 'Menu') return !!value;
+                // Masters must NOT have a master_id
+                if (this.type === 'Master') return !value;
                 return true;
             },
-            message: 'Master ID is required for Submenu type'
+            message: 'Menu must belong to a Master, Master cannot have a parent'
         }
-    },
-    menu_id: {
-        type: Types.ObjectId,
-        ref: 'Menu',
-        default: null
     },
     add_date: {
         type: Date,
@@ -136,14 +72,14 @@ menuSchema.index({ priority: 1 });
 menuSchema.index({ master_id: 1 });
 menuSchema.index({ is_show: 1 });
 
-// Pre-save validation
+// Pre-save rules
 menuSchema.pre('save', function (next) {
-    if (this.type === 'Master' && (this.master_id || this.menu_id)) {
-        return next(new Error('Master menus cannot have parent references'));
+    if (this.type === 'Master' && this.master_id) {
+        return next(new Error('Master cannot have a parent master_id'));
     }
 
-    if (this.type === 'Menu' && this.master_id && !this.menu_id) {
-        return next(new Error('Menu should have either master_id or menu_id, not both'));
+    if (this.type === 'Menu' && !this.master_id) {
+        return next(new Error('Menu must have a parent master_id'));
     }
 
     next();

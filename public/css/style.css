@@ -7,7 +7,7 @@
 body {
   font-family: "Lexend", sans-serif;
   font-size: 14px;
-  color: #6B7280;
+  color: #5E5E5E;
   line-height: 1.5;
   background-color: #F8F9FA;
   overflow-y: auto;
@@ -6596,7 +6596,7 @@ h6,
 }
 
 .text-gray {
-  color: #6B7280 !important;
+  color: #9B9B9B !important;
 }
 
 .text-black {
@@ -7853,7 +7853,7 @@ hr.text-danger {
   line-height: 1.6;
   border-radius: 5px;
   padding: 0.5rem 0.625rem;
-  height: 38px;
+  height: 43px;
   transition: all 0.5s;
 }
 .form-control:focus {
@@ -7959,7 +7959,7 @@ textarea.form-control {
   width: 0.9rem;
   height: 0.9rem;
   background-color: #FFF;
-  border: 1px solid #E5E7EB;
+  border:1px solid #9B9B9B;
 }
 .form-check-input:checked {
   background-color: #2B1871;
@@ -23574,7 +23574,7 @@ a#notification_popup {
   z-index: 99;
 }
 .select2-container .select2-selection--single {
-  height: 38px;
+  height: 43px;
 }
 
 .select2-container--default .select2-selection--single {
@@ -23583,7 +23583,7 @@ a#notification_popup {
 }
 .select2-container--default .select2-selection--single .select2-selection__rendered {
   color: #111827 !important;
-  line-height: 38px;
+  line-height: 43px;
   border-radius: 5px;
   padding-left: 10px;
   font-size: 14px;
@@ -28378,3 +28378,6 @@ span.flatpickr-weekday {
 /* End:: swiper js */
 
 /*# sourceMappingURL=style.css.map */
+
+
+.text-neutral { color:#5E5E5E !important;  }

@@ -15,6 +15,6 @@ router.use('/documents', documentRoutes);
 router.use('/departments', departmentRoutes);
 router.use('/projects', projectRoutes);
 router.use('/notifications', notificationRoutes);
-router.use("/", permisssionRoutes); // mount under /permissions
+router.use("/", permisssionRoutes);
 
 export default router;
