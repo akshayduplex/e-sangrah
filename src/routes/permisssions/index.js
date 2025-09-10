@@ -254,26 +254,35 @@ const router = express.Router();
 // --------------------
 
 // Get paginated menus
-router.get("/menu", async (req, res) => {
+router.get("/menu", authenticate, async (req, res) => {
     try {
+        // Get page & limit from query, default to 1 and 10
         const page = Math.max(parseInt(req.query.page) || 1, 1);
         const limit = Math.max(parseInt(req.query.limit) || 10, 1);
         const skip = (page - 1) * limit;
 
+        // Fetch paginated menus
         const [menus, total] = await Promise.all([
             Menu.find()
                 .sort({ priority: 1, add_date: -1 })
                 .skip(skip)
                 .limit(limit)
-                .populate("master_id", "name")
+                .populate("added_by updated_by", "name email")
+
                 .lean(),
             Menu.countDocuments()
         ]);
 
+        // Send paginated response
         res.json({
             success: true,
             data: menus,
-            pagination: { page, limit, total, pages: Math.ceil(total / limit) }
+            pagination: {
+                page,
+                limit,
+                total,
+                pages: Math.ceil(total / limit)
+            }
         });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -281,51 +290,78 @@ router.get("/menu", async (req, res) => {
 });
 
 // Create menu
-router.post("/menu", async (req, res) => {
+router.post("/menu", authenticate, async (req, res) => {
     try {
-        const { type, name, icon, url, priority, is_show, master_id, menu_id, icon_code } = req.body;
-
-        if (!type || !name || priority === undefined) {
-            return res.status(400).json({ success: false, message: "Type, name, and priority are required" });
-        }
+        const user = req.user;
+        const { type, master_id, name, icon_code, url, priority, is_show } = req.body;
 
         const menu = new Menu({
             type,
-            name,
-            icon,
-            url,
-            priority,
-            is_show: is_show !== undefined ? is_show : true,
             master_id: master_id || null,
-            menu_id: menu_id || null,
-            icon_code
+            name,
+            icon_code: icon_code || '',
+            url: url || '#',
+            priority: parseInt(priority) || 1,
+            is_show: is_show === 'true' || is_show === true,
+            added_by: {
+                user_id: user._id,
+                name: user.name,
+                email: user.email
+            },
+            updated_by: {
+                user_id: user._id,
+                name: user.name,
+                email: user.email
+            }
         });
 
-        const savedMenu = await menu.save();
-        res.status(201).json({ success: true, data: savedMenu });
+        await menu.save();
+        res.json({ success: true, data: menu });
     } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
+        console.error("Error creating menu:", error);
+        res.status(500).json({ success: false, message: "Error creating menu" });
     }
 });
 
 // Update menu
-router.put("/menu/:id", async (req, res) => {
+router.put("/menu/:id", authenticate, async (req, res) => {
     try {
-        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-            return res.status(400).json({ success: false, message: "Invalid menu ID" });
-        }
+        const { id } = req.params;
+        const { type, master_id, name, icon_code, url, priority, is_show } = req.body;
 
-        const menu = await Menu.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
-        if (!menu) return res.status(404).json({ success: false, message: "Menu not found" });
+        const menu = await Menu.findByIdAndUpdate(
+            id,
+            {
+                type,
+                master_id: master_id || null,
+                name,
+                icon_code,
+                url,
+                priority,
+                is_show: is_show === "true",
+                updated_by: {
+                    user_id: req.session.user_id,
+                    name: req.user.name,
+                    email: req.user.email
+                },
+                updated_date: Date.now()
+            },
+            { new: true }
+        );
+
+        if (!menu) {
+            return res.status(404).json({ success: false, message: "Menu not found" });
+        }
 
         res.json({ success: true, data: menu });
     } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
+        console.error("Error updating menu:", error);
+        res.status(500).json({ success: false, message: "Error updating menu" });
     }
 });
 
 // Delete menu
-router.delete("/menu/:id", async (req, res) => {
+router.delete("/menu/:id", authenticate, async (req, res) => {
     try {
         if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
             return res.status(400).json({ success: false, message: "Invalid menu ID" });
@@ -342,7 +378,7 @@ router.delete("/menu/:id", async (req, res) => {
 });
 
 // Get menus by type
-router.get("/menu/type/:type", async (req, res) => {
+router.get("/menu/type/:type", authenticate, async (req, res) => {
     try {
         const menus = await Menu.find({ type: req.params.type })
             .sort({ priority: 1, name: 1 })
@@ -358,7 +394,7 @@ router.get("/menu/type/:type", async (req, res) => {
 // ---------------------------
 
 // Assign menus to a designation
-router.post("/menu/assign", async (req, res) => {
+router.post("/menu/assign", authenticate, async (req, res) => {
     try {
         const { designation_id, menu_ids } = req.body;
 
@@ -388,11 +424,11 @@ router.post("/menu/assign", async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 });
-router.delete("/assign-menu/unselect", unAssignMenu)
+router.delete("/assign-menu/unselect", authenticate, unAssignMenu)
 // For logged-in user’s sidebar
 router.get("/sidebar", authenticate, getSidebarForUser);
 // Get assigned menus for a designation
-router.get("/assign-menu/designation/:designation_id/menus", getAssignedMenus);
-router.post("/assign-menu/assign", assignMenusToDesignation);
+router.get("/assign-menu/designation/:designation_id/menus", authenticate, getAssignedMenus);
+router.post("/assign-menu/assign", authenticate, assignMenusToDesignation);
 
 export default router;

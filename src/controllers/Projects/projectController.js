@@ -17,19 +17,20 @@ export const createProject = async (req, res) => {
 
         const project = new Project({ ...body, createdBy: user._id });
         await project.save();
-
         return successResponse(res, project, "Project created successfully", 201);
 
     } catch (err) {
+        if (err.code === 11000 && err.keyPattern && err.keyPattern.code) {
+            return failResponse(res, "Project code already exists", 400);
+        }
         return errorResponse(res, err);
     }
 };
 
-// Get all projects (simple list)
 // Fetch all projects
 export const getAllProjects = async (req, res) => {
     try {
-        const projects = await ProjectList.find({}).lean();
+        const projects = await Project.find({}).lean();
         return successResponse(res, projects, "Projects fetched successfully");
     } catch (err) {
         return errorResponse(res, err, "Failed to fetch projects");
@@ -59,19 +60,43 @@ export const getProjects = async (req, res) => {
 
         const filter = {};
         if (status) filter.status = status;
-        if (search) filter.title = { $regex: search, $options: "i" };
+        if (search) filter.name = { $regex: search, $options: "i" };
 
         const skip = (parseInt(page) - 1) * parseInt(limit);
 
-        const projects = await ProjectCl.find(filter)
-            .sort({ add_date: -1 })
+        const projects = await Project.find(filter)
+            .populate("department", "name") // get department name
+            .populate("manager", "name email") // get manager info
+            .populate("teamMembers.user", "name email") // get team member info
+            .sort({ createdAt: -1 })
             .skip(skip)
             .limit(parseInt(limit));
 
-        const total = await ProjectCl.countDocuments(filter);
+        const total = await Project.countDocuments(filter);
+
+        // Map projects to table-friendly format
+        const tableData = projects.map((proj, index) => ({
+            index: index + 1,
+            fileName: proj.name,
+            lastModifiedOn: proj.updatedAt,
+            owner: proj.manager.map(m => m.name).join(", "),
+            department: proj.department?.name || "",
+            project: proj.code,
+            sharedWith: proj.teamMembers.map(t => t.user?.name).join(", "),
+            tags: proj.tags.join(", "),
+            metaData: {
+                startDate: proj.startDate,
+                endDate: proj.endDate,
+                duration: proj.duration
+            },
+            createdOn: proj.createdAt,
+            description: proj.description,
+            remark: "", // can add logic for remarks if needed
+            status: proj.status
+        }));
 
         return successResponse(res, {
-            projects,
+            projects: tableData,
             total,
             page: parseInt(page),
             pages: Math.ceil(total / limit)
@@ -88,8 +113,10 @@ export const getProjectById = async (req, res) => {
         const { id } = req.params;
         if (!mongoose.Types.ObjectId.isValid(id)) return failResponse(res, "Invalid project ID", 400);
 
-        const project = await Project.findById(id)
-            .populate("department manager teamMembers.user", "name email role");
+        const projects = await Project.find({})
+            .populate("department manager teamMembers.user", "name email role")
+            .lean({ virtuals: true });
+
         if (!project) return failResponse(res, "Project not found", 404);
 
         return successResponse(res, project, "Project fetched successfully");

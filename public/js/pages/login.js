@@ -1,79 +1,152 @@
 // login.js
 
-document.addEventListener("DOMContentLoaded", () => {
+// -------- Utility Functions --------
+
+// Show error message
+function showError(message) {
+    const loginMessage = document.getElementById("loginMessage");
+    if (loginMessage) {
+        loginMessage.textContent = message;
+        loginMessage.classList.remove("text-success");
+        loginMessage.classList.add("text-danger");
+    }
+}
+
+// Show success message
+function showSuccess(message) {
+    const loginMessage = document.getElementById("loginMessage");
+    if (loginMessage) {
+        loginMessage.textContent = message;
+        loginMessage.classList.remove("text-danger");
+        loginMessage.classList.add("text-success");
+    }
+}
+
+// Show/Hide Password
+function togglePassword(inputId, toggleEl) {
+    const input = document.getElementById(inputId);
+    const icon = toggleEl.querySelector("i");
+    if (!input || !icon) return;
+
+    if (input.type === "password") {
+        input.type = "text";
+        icon.classList.replace("fa-eye", "fa-eye-slash");
+    } else {
+        input.type = "password";
+        icon.classList.replace("fa-eye-slash", "fa-eye");
+    }
+}
+
+// Attach password toggle buttons
+function initPasswordToggles() {
+    document.querySelectorAll(".password-toggle").forEach(toggle => {
+        const targetInput = toggle.previousElementSibling?.id;
+        if (targetInput) {
+            toggle.addEventListener("click", () => togglePassword(targetInput, toggle));
+        }
+    });
+}
+
+// -------- Auth Handlers --------
+
+// Handle login submission
+async function handleLogin({ emailInput, passwordInput, loginBtn }) {
+    const email = emailInput.value.trim();
+    const password = passwordInput.value;
+
+    // Validation
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email || !emailPattern.test(email)) {
+        showError("Please enter a valid email.");
+        return;
+    }
+    if (!password) {
+        showError("Password is required.");
+        return;
+    }
+
+    // Disable button while processing
+    loginBtn.disabled = true;
+    loginBtn.textContent = "Logging in...";
+
+    try {
+        const response = await fetch("/api/auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, password }),
+            credentials: "include"
+        });
+
+        const data = await response.json().catch(() => ({}));
+
+        if (response.ok && data.success) {
+            showSuccess("Login successful! Redirecting...");
+            setTimeout(() => {
+                window.location.href = "/dashboard";
+            }, 1000);
+        } else {
+            showError(data.message || "Login failed. Please try again.");
+        }
+    } catch (error) {
+        console.error("Login error:", error);
+        showError("Network error. Please try again later.");
+    } finally {
+        loginBtn.disabled = false;
+        loginBtn.textContent = "Submit";
+    }
+}
+
+// Handle logout link
+async function handleLogoutLink(logoutLink) {
+    logoutLink.textContent = "Logging out...";
+
+    try {
+        const response = await fetch("/api/auth/logout", {
+            method: "POST",
+            credentials: "include"
+        });
+
+        const data = await response.json().catch(() => ({}));
+
+        if (response.ok && data.success) {
+            window.location.href = "/login"; // redirect after logout
+        } else {
+            showError(data.message || "Logout failed. Try again.");
+            logoutLink.textContent = "Logout";
+        }
+    } catch (error) {
+        console.error("Logout error:", error);
+        showError("Network error. Please try again later.");
+        logoutLink.textContent = "Logout";
+    }
+}
+
+
+// -------- Initialization --------
+function initLoginPage() {
     const loginBtn = document.getElementById("loginBtn");
     const emailInput = document.getElementById("emailInput");
     const passwordInput = document.getElementById("passwordInput");
-    const loginMessage = document.getElementById("loginMessage");
+    const logoutLink = document.getElementById("logoutLink"); // anchor tag
 
-    // Show/Hide Password
-    const togglePassword = (id, el) => {
-        const input = document.getElementById(id);
-        const icon = el.querySelector("i");
-        if (input.type === "password") {
-            input.type = "text";
-            icon.classList.remove("fa-eye");
-            icon.classList.add("fa-eye-slash");
-        } else {
-            input.type = "password";
-            icon.classList.remove("fa-eye-slash");
-            icon.classList.add("fa-eye");
-        }
-    };
+    // Init features
+    initPasswordToggles();
 
-    // Attach toggle to all password-toggle elements
-    document.querySelectorAll(".password-toggle").forEach(toggle => {
-        const targetInput = toggle.previousElementSibling.id;
-        toggle.addEventListener("click", () => togglePassword(targetInput, toggle));
-    });
+    // Bind login handler
+    if (loginBtn && emailInput && passwordInput) {
+        loginBtn.addEventListener("click", () =>
+            handleLogin({ emailInput, passwordInput, loginBtn })
+        );
+    }
 
-    // Handle login
-    loginBtn.addEventListener("click", async () => {
-        const email = emailInput.value.trim();
-        const password = passwordInput.value;
+    // Bind logout link
+    if (logoutLink) {
+        logoutLink.addEventListener("click", (e) => {
+            e.preventDefault();
+            handleLogoutLink(logoutLink);
+        });
+    }
+}
 
-        // Clear previous messages
-        loginMessage.textContent = "";
-        loginMessage.classList.remove("text-success", "text-danger");
-
-        if (!email || !password) {
-            loginMessage.textContent = "Please enter both email and password.";
-            loginMessage.classList.add("text-danger");
-            return;
-        }
-
-        // Disable button while processing
-        loginBtn.disabled = true;
-        loginBtn.textContent = "Logging in...";
-
-        try {
-            const response = await fetch("/api/auth/login", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email, password }),
-                credentials: "include" // allow session cookies
-            });
-
-            const data = await response.json();
-
-            if (response.ok && data.success) {
-                loginMessage.textContent = "Login successful! Redirecting...";
-                loginMessage.classList.add("text-success");
-
-                setTimeout(() => {
-                    window.location.href = "/dashboard"; // adjust to your dashboard route
-                }, 1000);
-            } else {
-                loginMessage.textContent = data.message || "Login failed. Please try again.";
-                loginMessage.classList.add("text-danger");
-            }
-        } catch (error) {
-            console.error(error);
-            loginMessage.textContent = "Something went wrong. Please try again later.";
-            loginMessage.classList.add("text-danger");
-        } finally {
-            loginBtn.disabled = false;
-            loginBtn.textContent = "Submit";
-        }
-    });
-});
+// Run once DOM is parsed (script has defer)
+initLoginPage();

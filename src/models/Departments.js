@@ -1,6 +1,5 @@
 import mongoose from "mongoose";
 
-
 const departmentSchema = new mongoose.Schema({
     name: {
         type: String,
@@ -9,80 +8,47 @@ const departmentSchema = new mongoose.Schema({
         unique: true,
         maxlength: 100
     },
-    code: {
+    priority: {
+        type: Number,
+        default: 0
+    },
+    status: {
         type: String,
-        required: true,
-        uppercase: true,
-        unique: true,
-        maxlength: 10
+        enum: ["Active", "Inactive"],
+        default: "Active"
     },
-    description: {
-        type: String,
-        trim: true,
-        maxlength: 500
+    addedBy: {
+        name: { type: String, required: true },
+        email: { type: String, required: true },
+        user_id: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true }
     },
-    manager: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "User"
+    updatedBy: {
+        name: { type: String },
+        email: { type: String },
+        user_id: { type: mongoose.Schema.Types.ObjectId, ref: "User" }
     },
-    parentDepartment: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Department",
-        default: null
+    add_date: {
+        type: Date,
+        default: Date.now
     },
-    isActive: {
-        type: Boolean,
-        default: true
-    },
-    settings: {
-        maxStorage: {
-            type: Number,
-            default: 10737418240 // 10GB in bytes
-        },
-        allowedFileTypes: [{
-            type: String,
-            lowercase: true
-        }],
-        maxFileSize: {
-            type: Number,
-            default: 52428800 // 50MB in bytes
-        }
+    updated_date: {
+        type: Date,
+        default: Date.now
     }
 }, {
-    timestamps: true
+    timestamps: false
 });
 
 // Indexes
 departmentSchema.index({ name: 1 });
-departmentSchema.index({ code: 1 });
-departmentSchema.index({ parentDepartment: 1 });
-departmentSchema.index({ isActive: 1 });
+departmentSchema.index({ priority: 1 });
+departmentSchema.index({ status: 1 });
 
-// Virtual for child departments
-departmentSchema.virtual("childDepartments", {
-    ref: "Department",
-    localField: "_id",
-    foreignField: "parentDepartment"
+// Pre-save hook to update `updated_date` automatically
+departmentSchema.pre("save", function (next) {
+    this.updated_date = Date.now();
+    next();
 });
-
-// Virtual for department users
-departmentSchema.virtual("users", {
-    ref: "User",
-    localField: "_id",
-    foreignField: "department"
-});
-
-// Method to check storage usage (to be implemented with actual usage tracking)
-departmentSchema.methods.getStorageUsage = async function () {
-    // This would typically query documents and sum their sizes
-    return 0; // Placeholder
-};
-
-// Method to check if file type is allowed
-departmentSchema.methods.isFileTypeAllowed = function (fileType) {
-    if (!this.settings.allowedFileTypes.length) return true;
-    return this.settings.allowedFileTypes.includes(fileType.toLowerCase());
-};
 
 const Department = mongoose.model("Department", departmentSchema);
 
