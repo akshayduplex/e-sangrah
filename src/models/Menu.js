@@ -5,7 +5,7 @@ const { Schema, model, Types } = mongoose;
 const menuSchema = new Schema({
     type: {
         type: String,
-        enum: ['Master', 'Menu'], // Only 2 levels
+        enum: ['Master', 'Menu', 'Dashboard'], // Only 2 levels
         required: true
     },
     name: {

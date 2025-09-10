@@ -17,7 +17,7 @@ export const getAssignMenuPage = async (req, res) => {
         const allMenus = result.data;
 
         // Filter only Master
-        const masters = allMenus.filter(m => m.type === 'Master');
+        const masters = allMenus.filter(m => m.type === 'Master' || m.type === 'Dashboard');
 
         // Attach Menu children under their Master
         const masterMenus = masters.map(master => {
