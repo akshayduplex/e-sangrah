@@ -6,39 +6,67 @@ import MenuAssignment from "../models/menuAssignment.js";
 // Render assign menu page
 export const getAssignMenuPage = async (req, res) => {
     try {
-        const designations = await Designation.find({ status: "Active" }).sort({ name: 1 });
-        const response = await fetch('http://localhost:5000/api/menu');
+        // 1️⃣ Fetch active designations
+        const designations = await Designation.find({ status: "Active" })
+            .select("name status")
+            .sort({ name: 1 });
+
+        // 2️⃣ Fetch menus from API
+        const response = await fetch("http://localhost:5000/api/menu");
         const result = await response.json();
 
-        if (!result.success) {
-            return res.render('assignMenu', { masterMenus: [], designations: [] });
+        if (!result.success || !Array.isArray(result.data)) {
+            return res.render("menu/assign-menu", {
+                masterMenus: [],
+                designations
+            });
         }
 
         const allMenus = result.data;
 
-        // Filter only Master
-        const masters = allMenus.filter(m => m.type === 'Master' || m.type === 'Dashboard');
+        // 3️⃣ Filter top-level masters (Master + Dashboard)
+        const masters = allMenus.filter(
+            m => m.type === "Master" || m.type === "Dashboard"
+        );
 
-        // Attach Menu children under their Master
+        // 4️⃣ Attach child menus
         const masterMenus = masters.map(master => {
+            // Child menus for this master
+            const menus = allMenus.filter(menu =>
+                menu.type === "Menu" &&
+                menu.master_id &&
+                menu.master_id.toString() === master._id.toString()
+            );
+
+            // Optional: attach submenus under each menu
+            const menusWithSubmenus = menus.map(menu => ({
+                ...menu,
+                submenus: allMenus.filter(
+                    sm => sm.type === "Submenu" && sm.master_id && sm.master_id.toString() === menu._id.toString()
+                )
+            }));
+
             return {
                 ...master,
-                menus: allMenus.filter(menu =>
-                    menu.type === 'Menu' && menu.master_id && menu.master_id._id === master._id
-                )
+                menus: menusWithSubmenus
             };
         });
 
-        res.render('menu/assign-menu', {
+        // 5️⃣ Render EJS
+        res.render("menu/assign-menu", {
             masterMenus,
-            designations: designations
+            designations
         });
 
     } catch (err) {
-        console.error('Error:', err);
-        res.render('assignMenu', { masterMenus: [], designations: [] });
+        console.error("Error in getAssignMenuPage:", err);
+        res.render("menu/assign-menu", {
+            masterMenus: [],
+            designations: []
+        });
     }
 };
+
 
 // Get assigned menus for a designation
 export const getAssignedMenus = async (req, res) => {
@@ -89,6 +117,16 @@ export const assignMenusToDesignation = async (req, res) => {
         const assignments = newMenuIds.map(menu_id => ({ designation_id, menu_id }));
         const savedAssignments = await MenuAssignment.insertMany(assignments);
 
+        // Update Designation audit info
+        await Designation.findByIdAndUpdate(designation_id, {
+            updated_by: {
+                user_id: req.user._id,
+                name: req.user.name,
+                email: req.user.email
+            },
+            updated_date: Date.now()
+        });
+
         res.json({
             success: true,
             message: "Menus assigned successfully",
@@ -115,6 +153,16 @@ export const unAssignMenu = async (req, res) => {
         const result = await MenuAssignment.deleteMany({
             designation_id,
             menu_id: { $in: menu_ids }
+        });
+
+        // Update Designation audit info
+        await Designation.findByIdAndUpdate(designation_id, {
+            updated_by: {
+                user_id: req.user._id,
+                name: req.user.name,
+                email: req.user.email
+            },
+            updated_date: Date.now()
         });
 
         return res.json({

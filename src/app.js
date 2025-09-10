@@ -40,12 +40,15 @@ app.use(express.static(path.resolve("public")));
 
 // Global locals
 app.use((req, res, next) => {
-    res.locals.BASE_URL = process.env.BASE_URL;
     const user = req.session.user || {};
+    res.locals.BASE_URL = process.env.BASE_URL;
     res.locals.avatar = user.avatar || null;
     res.locals.role = user.role || null;
     res.locals.email = user.email || null;
     res.locals.name = user.name || null;
+
+    // Make req.user available in controllers
+    req.user = user;
     next();
 });
 

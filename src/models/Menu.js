@@ -1,11 +1,10 @@
 import mongoose from 'mongoose';
-
 const { Schema, model, Types } = mongoose;
 
 const menuSchema = new Schema({
     type: {
         type: String,
-        enum: ['Master', 'Menu', 'Dashboard'], // Only 2 levels
+        enum: ['Master', 'Menu', 'Dashboard'],
         required: true
     },
     name: {
@@ -45,25 +44,25 @@ const menuSchema = new Schema({
         default: null,
         validate: {
             validator: function (value) {
-                // Menus must have a master_id
                 if (this.type === 'Menu') return !!value;
-                // Masters must NOT have a master_id
                 if (this.type === 'Master') return !value;
                 return true;
             },
             message: 'Menu must belong to a Master, Master cannot have a parent'
         }
     },
-    add_date: {
-        type: Date,
-        default: Date.now
+    added_by: {
+        user_id: { type: Types.ObjectId, ref: 'User', required: true },
+        name: { type: String, required: true },
+        email: { type: String, required: true }
     },
-    modified_date: {
-        type: Date,
-        default: Date.now
+    updated_by: {
+        user_id: { type: Types.ObjectId, ref: 'User' },
+        name: { type: String },
+        email: { type: String }
     }
 }, {
-    timestamps: { createdAt: 'add_date', updatedAt: 'modified_date' }
+    timestamps: { createdAt: 'add_date', updatedAt: 'updated_date' }
 });
 
 // Indexes
@@ -72,16 +71,14 @@ menuSchema.index({ priority: 1 });
 menuSchema.index({ master_id: 1 });
 menuSchema.index({ is_show: 1 });
 
-// Pre-save rules
+// Pre-save validation
 menuSchema.pre('save', function (next) {
     if (this.type === 'Master' && this.master_id) {
         return next(new Error('Master cannot have a parent master_id'));
     }
-
     if (this.type === 'Menu' && !this.master_id) {
         return next(new Error('Menu must have a parent master_id'));
     }
-
     next();
 });
 

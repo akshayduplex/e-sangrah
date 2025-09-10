@@ -40,7 +40,7 @@
                                                     <div class="menu-item">
                                                         <div class="form-check">
                                                             <input class="form-check-input master-checkbox"
-                                                                type="checkbox" value="<%= master._id %>"
+                                                                type="checkbox" value="<%= master._id.toString() %>"
                                                                 id="master_<%= master._id %>">
                                                             <label class="form-check-label fw-bold"
                                                                 for="master_<%= master._id %>">
@@ -55,7 +55,8 @@
                                                                 <% master.menus.forEach(menu=> { %>
                                                                     <div class="form-check">
                                                                         <input class="form-check-input menu-checkbox"
-                                                                            type="checkbox" value="<%= menu._id %>"
+                                                                            type="checkbox"
+                                                                            value="<%= menu._id.toString() %>"
                                                                             id="menu_<%= menu._id %>">
                                                                         <label class="form-check-label"
                                                                             for="menu_<%= menu._id %>">
@@ -63,14 +64,38 @@
                                                                             <%= menu.name %>
                                                                         </label>
                                                                     </div>
-                                                                    <% }) %>
+
+                                                                    <% if (Array.isArray(menu.submenus) &&
+                                                                        menu.submenus.length> 0) { %>
+                                                                        <div class="sub-submenu-items ms-4">
+                                                                            <% menu.submenus.forEach(submenu=> { %>
+                                                                                <div class="form-check">
+                                                                                    <input
+                                                                                        class="form-check-input menu-checkbox"
+                                                                                        type="checkbox"
+                                                                                        value="<%= submenu._id.toString() %>"
+                                                                                        id="submenu_<%= submenu._id %>">
+                                                                                    <label class="form-check-label"
+                                                                                        for="submenu_<%= submenu._id %>">
+                                                                                        <i
+                                                                                            class="fas fa-file-alt me-1"></i>
+                                                                                        <%= submenu.name %>
+                                                                                    </label>
+                                                                                </div>
+                                                                                <% }) %>
+                                                                        </div>
+                                                                        <% } %>
+
+                                                                            <% }) %>
                                                             </div>
                                                             <% } %>
+
                                                     </div>
                                                     <% }) %>
                                                         <% } else { %>
                                                             <p class="text-muted">No menus found.</p>
                                                             <% } %>
+
                                         </div>
                                     </div>
                                 </div>

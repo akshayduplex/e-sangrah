@@ -1,31 +1,28 @@
 // Global API Fetch Utility
-async function fetchData(url, options = {}) {
+async function apiFetch(url, options = {}) {
     try {
         const response = await fetch(url, {
-            method: options.method || "GET",
-            credentials: "include", // send cookies/session automatically
             headers: {
-                "Accept": "application/json",
                 "Content-Type": "application/json",
-                ...(options.headers || {})
+                ...options.headers
             },
-            body: options.body ? JSON.stringify(options.body) : undefined
+            credentials: "include",
+            ...options
         });
 
-        // If response is not OK, throw with details
         if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`API Error ${response.status}: ${errorText}`);
+            const text = await response.text();
+            throw new Error(`HTTP error! status: ${response.status}, message: ${text}`);
         }
 
-        return await response.json();
-
+        const data = await response.json();
+        return data;
     } catch (error) {
-        console.error(`[fetchData] Error fetching ${url}:`, error);
-        showError(error.message || "Unexpected error occurred");
-        throw error; // rethrow so caller can handle if needed
+        console.error("API Fetch Error:", error);
+        throw error;
     }
 }
+
 
 // Success Notification
 function showSuccess(message) {

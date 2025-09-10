@@ -42,14 +42,16 @@ export const register = async (req, res) => {
 export const login = async (req, res) => {
     try {
         const { email, password } = req.body;
-        if (!email || !password) return failResponse(res, "Email and password are required", 400);
 
         const user = await User.findOne({ email }).select("+password");
-        if (!user) return failResponse(res, "Invalid credentials", 401);
-        if (!user.isActive) return failResponse(res, "Account is deactivated", 403);
+        if (!user || !user.isActive) {
+            return failResponse(res, "User Not Found", 401);
+        }
 
-        // const isPasswordValid = await user.comparePassword(password);
-        // if (!isPasswordValid) return failResponse(res, "Invalid credentials", 401);
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+        if (!isPasswordValid) {
+            return failResponse(res, "Password incorrect", 401);
+        }
 
         user.lastLogin = new Date();
         await user.save();
@@ -57,9 +59,7 @@ export const login = async (req, res) => {
         req.session.user = {
             _id: user._id,
             role: user.role,
-            name: user.name,
-            avatar: user.avatar,
-            email: user.email
+            name: user.name
         };
 
         const userResponse = user.toObject();
@@ -67,7 +67,8 @@ export const login = async (req, res) => {
 
         return successResponse(res, userResponse, "Login successful");
     } catch (err) {
-        return errorResponse(res, err);
+        console.error("Login error:", err);
+        return errorResponse(res, "Internal server error");
     }
 };
 
@@ -93,12 +94,22 @@ export const getMe = async (req, res) => {
 export const logout = async (req, res) => {
     try {
         req.session.destroy(err => {
-            if (err) return errorResponse(res, err);
-            res.clearCookie("connect.sid");
+            if (err) {
+                return errorResponse(res, "Failed to logout. Try again.", 500);
+            }
+
+            // Remove session cookie
+            res.clearCookie("connect.sid", {
+                path: "/",         // must match cookie path
+                httpOnly: true,    // prevent JS access
+                secure: process.env.NODE_ENV === "production", // HTTPS only in prod
+                sameSite: "lax"
+            });
+
             return successResponse(res, {}, "Logged out successfully");
         });
     } catch (err) {
-        return errorResponse(res, err);
+        return errorResponse(res, err.message || "Server error", 500);
     }
 };
 
@@ -133,7 +144,9 @@ export const sendOtp = async (req, res) => {
         const user = await User.findOne({ email });
         if (!user) return failResponse(res, "User not found", 404);
 
-        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        // 4-digit OTP
+        const otp = Math.floor(1000 + Math.random() * 9000).toString();
+
 
         otpStore[email] = {
             code: otp,
@@ -190,15 +203,26 @@ export const verifyOtp = (req, res) => {
 export const resetPassword = async (req, res) => {
     try {
         const { email, password, confirmPassword } = req.body;
-        if (password !== confirmPassword) return failResponse(res, "Passwords do not match", 400);
+
+        if (password !== confirmPassword)
+            return failResponse(res, "Passwords do not match", 400);
 
         const user = await User.findOne({ email });
         if (!user) return failResponse(res, "User not found", 404);
 
-        user.password = password;
+        // Set raw_password so the pre-save hook hashes it
+        user.raw_password = password;
+
+        // Optionally update password directly if you want a separate field
+        // user.password = await bcrypt.hash(password, 12); // alternative
+
         await user.save();
 
-        return successResponse(res, {}, "Password successfully updated. You can now login.");
+        return successResponse(
+            res,
+            {},
+            "Password successfully updated. You can now login."
+        );
     } catch (err) {
         return errorResponse(res, err, "Failed to reset password");
     }

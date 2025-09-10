@@ -10,8 +10,8 @@
 export const successResponse = (res, data = {}, message = 'Success', statusCode = 200) => {
     return res.status(statusCode).json({
         success: true,
-        message: message || 'Success',
-        data: data || {}
+        message,
+        ...data // spread the data to avoid unnecessary nesting
     });
 };
 

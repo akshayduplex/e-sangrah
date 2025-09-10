@@ -9,20 +9,21 @@ export const getMenuList = async (req, res) => {
 
         const [menus, total] = await Promise.all([
             Menu.find()
-                .sort({ priority: 1, add_date: -1 }) // still works since add_date is set via timestamps
+                .sort({ priority: 1, add_date: -1 })
                 .skip(skip)
-                .limit(limit),
+                .limit(limit)
+                .lean(), // lean for performance
             Menu.countDocuments()
         ]);
 
         const totalPages = Math.ceil(total / limit);
-
         res.render("menu/list", {
             menus,
             currentPage: page,
             totalPages,
             total,
             limit,
+            layout: !req.xhr
         });
     } catch (error) {
         res.status(500).render("error", { message: error.message });
