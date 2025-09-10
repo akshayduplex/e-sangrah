@@ -99,3 +99,102 @@ $(document).on('submit', '#sync-form', function (e) {
                 .html('<i class="ti ti-sync me-1"></i> Sync Now');
         });
 });
+
+// Fetch projects from API
+function fetchProjects(search = '', callback) {
+    $.ajax({
+        url: '/api/projects',
+        method: 'GET',
+        data: {
+            status: 'Active',
+            page: 1,
+            limit: 10,
+            search: search
+        },
+        xhrFields: {
+            withCredentials: true
+        },
+        success: function (response) {
+            if (response.success) {
+                callback(null, response.data.projects);
+            } else {
+                callback('No data received');
+            }
+        },
+        error: function (err) {
+            callback(err);
+        }
+    });
+}
+
+// Render projects into HTML
+function renderProjects(projects) {
+    let html = '';
+
+    if (projects.length > 0) {
+        projects.forEach(project => {
+            html += `
+                <div class="col-sm-3">
+                    <div class="card projectcard">
+                        <div class="card-body">
+                            <h5 class="fs-20 fw-normal mb-2">${project.title}</h5>
+                            <h6 class="fs-16 fw-normal text-neutral">
+                                Department: ${project.manager_list.map(m => m.emp_name).join(', ')}
+                            </h6>
+                            <small class="fs-12 text-black fw-light">
+                                Created on: ${new Date(project.add_date).toLocaleDateString('en-US', { day: '2-digit', month: 'long', year: 'numeric' })}
+                            </small>
+                            <h6 class="fs-16 fw-normal mt-2 text-neutral">
+                                In Charge: ${project.in_charge_list.map(i => i.emp_name).join(', ')}
+                            </h6>
+                            <div class="prjtxt mt-3">
+                                <p class="fs-12 fw-light">Duration: ${project.duration} | Status: ${project.status}</p>
+                                <div class="dflexbtwn">
+                                    <a href="project-files.php?project_id=${project.project_id}" class="site-btnmd fw-light fs-12">Access Files</a>
+                                    <span>0 Files</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+    } else {
+        html = `<div class="col-12"><p class="text-center">No projects found.</p></div>`;
+    }
+
+    $('#projectContainer').html(html);
+}
+
+// Handle loading projects (wrapper function)
+function loadProjects(search = '') {
+    fetchProjects(search, function (err, projects) {
+        if (err) {
+            console.error('Error fetching projects:', err);
+            $('#projectContainer').html(`<div class="col-12"><p class="text-center text-danger">Failed to load projects.</p></div>`);
+        } else {
+            renderProjects(projects);
+        }
+    });
+}
+
+// Debounce function
+function debounce(func, delay) {
+    let timer;
+    return function (...args) {
+        clearTimeout(timer);
+        timer = setTimeout(() => func.apply(this, args), delay);
+    };
+}
+
+// Initialize when DOM is ready
+$(document).ready(function () {
+    // Initial load
+    loadProjects();
+
+    // Search input with debounce
+    $('.simplesrchbox').on('input', debounce(function () {
+        let searchText = $(this).val();
+        loadProjects(searchText);
+    }, 300));
+});
