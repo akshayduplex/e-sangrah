@@ -3,64 +3,33 @@ import Designation from "../models/Designation.js";
 import Menu from "../models/Menu.js";
 import MenuAssignment from "../models/menuAssignment.js";
 
+import { buildMenuTree } from "../utils/buildMenuTree.js";
 // Render assign menu page
 export const getAssignMenuPage = async (req, res) => {
     try {
         // 1️⃣ Fetch active designations
         const designations = await Designation.find({ status: "Active" })
             .select("name status")
-            .sort({ name: 1 });
+            .sort({ name: 1 })
+            .lean();
 
-        // 2️⃣ Fetch menus from API
-        const response = await fetch("http://localhost:5000/api/menu");
-        const result = await response.json();
+        // 2️⃣ Fetch all menus
+        const menus = await Menu.find()
+            .sort({ priority: 1, add_date: -1 })
+            .populate("added_by updated_by", "name email")
+            .lean();
 
-        if (!result.success || !Array.isArray(result.data)) {
-            return res.render("menu/assign-menu", {
-                masterMenus: [],
-                designations
-            });
-        }
+        // 3️⃣ Build menu tree
+        const masterMenus = buildMenuTree(menus);
 
-        const allMenus = result.data;
-
-        // 3️⃣ Filter top-level masters (Master + Dashboard)
-        const masters = allMenus.filter(
-            m => m.type === "Master" || m.type === "Dashboard"
-        );
-
-        // 4️⃣ Attach child menus
-        const masterMenus = masters.map(master => {
-            // Child menus for this master
-            const menus = allMenus.filter(menu =>
-                menu.type === "Menu" &&
-                menu.master_id &&
-                menu.master_id.toString() === master._id.toString()
-            );
-
-            // Optional: attach submenus under each menu
-            const menusWithSubmenus = menus.map(menu => ({
-                ...menu,
-                submenus: allMenus.filter(
-                    sm => sm.type === "Submenu" && sm.master_id && sm.master_id.toString() === menu._id.toString()
-                )
-            }));
-
-            return {
-                ...master,
-                menus: menusWithSubmenus
-            };
-        });
-
-        // 5️⃣ Render EJS
+        // 4️⃣ Render page
         res.render("menu/assign-menu", {
             masterMenus,
             designations
         });
-
-    } catch (err) {
-        console.error("Error in getAssignMenuPage:", err);
-        res.render("menu/assign-menu", {
+    } catch (error) {
+        console.error("Error in getAssignMenuPage:", error);
+        res.status(500).render("menu/assign-menu", {
             masterMenus: [],
             designations: []
         });
@@ -185,21 +154,18 @@ export const unAssignMenu = async (req, res) => {
 export const getSidebarForUser = async (req, res) => {
     try {
         const designationId = req.user.designation_id;
-        console.log("Designation ID:", designationId);
 
-        // Ensure designationId is an ObjectId
         const assignments = await MenuAssignment.find({
-            designation_id: new mongoose.Types.ObjectId(designationId)
+            designation_id: new mongoose.Types.ObjectId(designationId) // string is okay
         }).populate("menu_id");
 
-        // Filter only visible menus
+
         const menus = assignments
             .map(a => a.menu_id)
             .filter(m => m && m.is_show);
 
-        // Build hierarchy: Masters → Menus/Submenus
         const masters = menus
-            .filter(m => m.type === "Master")
+            .filter(m => m.type === "Master" || m.type === "Menu" || m.type === "Dashboard")
             .sort((a, b) => a.priority - b.priority);
 
         const grouped = masters.map(master => ({
@@ -209,8 +175,11 @@ export const getSidebarForUser = async (req, res) => {
                 .sort((a, b) => a.priority - b.priority)
         }));
 
-        // Prevent cached 304 responses
-        // res.set("Cache-Control", "no-store");
+        // **Important: disable caching**
+        res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+        res.set("Pragma", "no-cache");
+        res.set("Expires", "0");
+        res.set("Surrogate-Control", "no-store");
 
         res.json({
             success: true,
