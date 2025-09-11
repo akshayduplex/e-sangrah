@@ -1,4 +1,4 @@
-<%- include('../partials/header') %>
+<%- include('../../partials/header') %>
 
     <div class="page-wrapper">
         <div class="content">
@@ -59,7 +59,7 @@
         </div>
     </div>
 
-    <%- include('../partials/footer') %>
+    <%- include('../../partials/footer') %>
 
         <script>
             // Delete confirmation
@@ -151,5 +151,34 @@
                     { orderable: false, targets: -1 } // disable sorting on "Action"
                 ]
             });
+            // Attach event delegation for toggle switch
+            $(document).on("change", ".form-check-input", function () {
+                const menuId = $(this).attr("id").replace("isShow_", ""); // extract ID
+                const checked = $(this).is(":checked");
 
+                fetch(`/api/menu/${menuId}/toggle-status`, {
+                    method: "PATCH",
+                    headers: {
+                        "Content-Type": "application/json"
+                    }
+                })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.success) {
+                            // Update label text dynamically
+                            const label = $(`label[for='isShow_${menuId}']`);
+                            label.text(data.data.is_show ? "Yes" : "No");
+                        } else {
+                            alert("Error toggling status: " + data.message);
+                            // revert checkbox if API fails
+                            $(this).prop("checked", !checked);
+                        }
+                    })
+                    .catch(err => {
+                        console.error("Error:", err);
+                        alert("Server error while toggling status");
+                        // revert checkbox if API fails
+                        $(this).prop("checked", !checked);
+                    });
+            });
         </script>

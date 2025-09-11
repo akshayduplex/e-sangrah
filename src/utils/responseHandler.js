@@ -7,11 +7,29 @@
  * @param {string} message - Response message (default "Success")
  * @param {number} statusCode - HTTP status code (default 200)
  */
+// export const successResponse = (res, data = {}, message = 'Success', statusCode = 200) => {
+//     return res.status(statusCode).json({
+//         success: true,
+//         message,
+//         ...data // spread the data to avoid unnecessary nesting
+//     });
+// };
+/**
+ * Success Response
+ * @param {object} res - Express response
+ * @param {any} data - Response data (default empty object)
+ * @param {string} message - Response message (default "Success")
+ * @param {number} statusCode - HTTP status code (default 200)
+ */
 export const successResponse = (res, data = {}, message = 'Success', statusCode = 200) => {
+    if (data?.toObject) {
+        data = data.toObject();
+    }
+
     return res.status(statusCode).json({
         success: true,
         message,
-        ...data // spread the data to avoid unnecessary nesting
+        data
     });
 };
 

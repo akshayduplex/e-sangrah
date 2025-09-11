@@ -2,12 +2,16 @@ import mongoose from 'mongoose';
 import Department from '../../models/Departments.js';
 import { successResponse, failResponse, errorResponse } from "../../utils/responseHandler.js";
 
-
 // Get all active departments
-export const getAllDepartments = async () => {
-    return await Department.find({ isActive: true })
-        .select('name')
-        .lean();
+export const getAllDepartments = async (req, res) => {
+    try {
+        const departments = await Department.find({ status: "Active" })
+            .select('name priority status addedBy add_date')
+            .lean();
+        return successResponse(res, departments, 'Departments fetched successfully');
+    } catch (err) {
+        return errorResponse(res, err);
+    }
 };
 
 // Get department by ID
@@ -16,40 +20,10 @@ export const getDepartmentById = async (req, res) => {
         const { id } = req.params;
         if (!mongoose.Types.ObjectId.isValid(id)) return failResponse(res, 'Invalid department ID', 400);
 
-        const department = await Department.findById(id)
-            .populate('manager', 'name email')
-            .populate('parentDepartment', 'name code')
-            .populate('childDepartments', 'name code');
-
+        const department = await Department.findById(id).lean();
         if (!department) return failResponse(res, 'Department not found', 404);
 
         return successResponse(res, department, 'Department fetched successfully');
-    } catch (err) {
-        return errorResponse(res, err);
-    }
-};
-
-// Get department storage
-export const getDepartmentStorage = async (req, res) => {
-    try {
-        const { id } = req.params;
-        if (!mongoose.Types.ObjectId.isValid(id)) return failResponse(res, 'Invalid department ID', 400);
-
-        const department = await Department.findById(id);
-        if (!department) return failResponse(res, 'Department not found', 404);
-
-        // Assuming Department schema has getStorageUsage method
-        const storageUsage = await department.getStorageUsage();
-        const usagePercentage = (storageUsage / department.settings.maxStorage) * 100;
-
-        const storageData = {
-            used: storageUsage,
-            total: department.settings.maxStorage,
-            percentage: usagePercentage.toFixed(2),
-            remaining: department.settings.maxStorage - storageUsage
-        };
-
-        return successResponse(res, storageData, 'Department storage fetched successfully');
     } catch (err) {
         return errorResponse(res, err);
     }

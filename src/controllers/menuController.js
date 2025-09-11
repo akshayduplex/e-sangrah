@@ -17,7 +17,7 @@ export const getMenuList = async (req, res) => {
         ]);
 
         const totalPages = Math.ceil(total / limit);
-        res.render("menu/list", {
+        res.render("pages/permissions/list", {
             menus,
             currentPage: page,
             totalPages,
@@ -37,7 +37,7 @@ export const getAddMenu = async (req, res) => {
         const masters = await Menu.find({ type: "Master", is_show: true }).sort({ name: 1 });
 
         // Render the unified form, menu is null for Add
-        res.render("menu/add", { masters, menu: null });
+        res.render("pages/permissions/add", { masters, menu: null });
     } catch (error) {
         res.status(500).render("error", { message: error.message });
     }
@@ -55,7 +55,7 @@ export const getEditMenu = async (req, res) => {
         const masters = await Menu.find({ type: "Master", is_show: true }).sort({ name: 1 });
 
         // Render the unified form, passing the existing menu
-        res.render("menu/add", { masters, menu });
+        res.render("pages/permissions/add", { masters, menu });
     } catch (error) {
         res.status(500).render("error", { message: error.message });
     }

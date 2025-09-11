@@ -1,178 +1,114 @@
-// let projectsTable;
+// projects.js
+document.addEventListener("DOMContentLoaded", () => {
+    const projectTableBody = document.querySelector(".datatable tbody");
+    const paginationContainer = document.createElement("div");
+    paginationContainer.classList.add("mt-3", "d-flex", "justify-content-center", "gap-2");
+    document.querySelector(".datatable").after(paginationContainer);
 
-// $(document).ready(function () {
-//     if ($('#projectsTable').length) {
-//         projectsTable = $('#projectsTable').DataTable({
-//             ajax: {
-//                 url: '/api/projects/all-projects',
-//                 dataSrc: 'data'
-//             },
-//             responsive: true,
-//             pageLength: 10,
-//             lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
-//             order: [[0, "asc"]],
-//             dom: '<"row mb-2"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>' +
-//                 '<"row"<"col-sm-12"tr>>' +
-//                 '<"row mt-2"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',
-//             language: {
-//                 search: "_INPUT_",
-//                 searchPlaceholder: "Search projects...",
-//                 lengthMenu: "Show _MENU_ entries",
-//                 info: "Showing _START_ to _END_ of _TOTAL_ entries",
-//                 infoEmpty: "Showing 0 to 0 of 0 entries",
-//                 infoFiltered: "(filtered from _MAX_ total entries)",
-//                 zeroRecords: "No matching records found",
-//                 paginate: {
-//                     first: "« First",
-//                     last: "Last »",
-//                     next: "› Next",
-//                     previous: "‹ Prev"
-//                 }
-//             },
-//             columns: [
-//                 { data: "title" },
-//                 {
-//                     data: "in_charge_list",
-//                     render: data => (!data?.length)
-//                         ? '<span class="text-muted">Not assigned</span>'
-//                         : `<ul class="list-unstyled mb-0">` +
-//                         data.map(emp => `<li><small>${emp.emp_name} (${emp.emp_code})</small></li>`).join('') +
-//                         `</ul>`
-//                 },
-//                 {
-//                     data: "manager_list",
-//                     render: data => (!data?.length)
-//                         ? '<span class="text-muted">Not assigned</span>'
-//                         : `<ul class="list-unstyled mb-0">` +
-//                         data.map(emp => `<li><small>${emp.emp_name} (${emp.emp_code})</small></li>`).join('') +
-//                         `</ul>`
-//                 },
-//                 { data: "start_date", render: d => d ? new Date(d).toLocaleDateString() : 'N/A' },
-//                 { data: "end_date", render: d => d ? new Date(d).toLocaleDateString() : 'N/A' },
-//                 { data: "duration" },
-//                 {
-//                     data: "status",
-//                     render: status => {
-//                         let cls = 'secondary';
-//                         if (status === 'Active') cls = 'success';
-//                         else if (status === 'Completed') cls = 'primary';
-//                         else if (status === 'Pending') cls = 'warning';
-//                         return `<span class="badge bg-${cls}">${status}</span>`;
-//                     }
-//                 },
-//                 { data: "updated_on", render: d => d ? new Date(d).toLocaleString() : 'N/A' }
-//             ],
-//             columnDefs: [
-//                 { responsivePriority: 1, targets: 0 },
-//                 { responsivePriority: 2, targets: 6 },
-//                 { orderable: false, targets: [1, 2, 5, 6] },
-//                 { className: "dt-nowrap", targets: [3, 4, 7] }
-//             ],
-//             initComplete: function () {
-//                 $('.dataTables_length select').addClass('form-select form-select-sm');
-//                 $('.dataTables_filter input').addClass('form-control form-control-sm');
-//                 $('.dataTables_paginate').addClass('pagination-sm');
-//             }
-//         });
-//     }
-// });
+    let currentPage = 1;
+    let totalPages = 1;
+    const urlParams = new URLSearchParams(window.location.search);
+    const searchKeyword = urlParams.get("q") || "";
 
+    // Fetch Projects
+    async function fetchProjects(page = 1) {
+        try {
+            let url = `http://localhost:5000/api/projects/search?page=${page}&limit=10`;
+            if (searchKeyword) url += `&q=${encodeURIComponent(searchKeyword)}`;
 
-// // Fetch projects from API
-// function fetchProjects(search = '', callback) {
-//     $.ajax({
-//         url: '/api/projects',
-//         method: 'GET',
-//         data: {
-//             status: 'Active',
-//             page: 1,
-//             limit: 10,
-//             search: search
-//         },
-//         xhrFields: {
-//             withCredentials: true
-//         },
-//         success: function (response) {
-//             if (response.success) {
-//                 callback(null, response.data.projects);
-//             } else {
-//                 callback('No data received');
-//             }
-//         },
-//         error: function (err) {
-//             callback(err);
-//         }
-//     });
-// }
+            const res = await fetch(url, { credentials: "include" });
+            const result = await res.json();
 
-// // Render projects into HTML
-// function renderProjects(projects) {
-//     let html = '';
+            totalPages = result.pagination?.totalPages || 1;
+            projectTableBody.innerHTML = "";
 
-//     if (projects.length > 0) {
-//         projects.forEach(project => {
-//             html += `
-//                 <div class="col-sm-3">
-//                     <div class="card projectcard">
-//                         <div class="card-body">
-//                             <h5 class="fs-20 fw-normal mb-2">${project.title}</h5>
-//                             <h6 class="fs-16 fw-normal text-neutral">
-//                                 Department: ${project.manager_list.map(m => m.emp_name).join(', ')}
-//                             </h6>
-//                             <small class="fs-12 text-black fw-light">
-//                                 Created on: ${new Date(project.add_date).toLocaleDateString('en-US', { day: '2-digit', month: 'long', year: 'numeric' })}
-//                             </small>
-//                             <h6 class="fs-16 fw-normal mt-2 text-neutral">
-//                                 In Charge: ${project.in_charge_list.map(i => i.emp_name).join(', ')}
-//                             </h6>
-//                             <div class="prjtxt mt-3">
-//                                 <p class="fs-12 fw-light">Duration: ${project.duration} | Status: ${project.status}</p>
-//                                 <div class="dflexbtwn">
-//                                     <a href="project-files.php?project_id=${project.project_id}" class="site-btnmd fw-light fs-12">Access Files</a>
-//                                     <span>0 Files</span>
-//                                 </div>
-//                             </div>
-//                         </div>
-//                     </div>
-//                 </div>
-//             `;
-//         });
-//     } else {
-//         html = `<div class="col-12"><p class="text-center">No projects found.</p></div>`;
-//     }
+            if (!result.data || result.data.length === 0) {
+                projectTableBody.innerHTML = `<tr><td colspan="13" class="text-center">No projects found</td></tr>`;
+                renderPagination();
+                return;
+            }
 
-//     $('#projectContainer').html(html);
-// }
+            result.data.forEach(project => {
+                const tr = document.createElement("tr");
+                tr.innerHTML = `
+                    <td>
+                        <div class="btn-group" role="group">
+                            <button type="button" class="btn border-0" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="ti ti-settings"></i>
+                            </button>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="#"><i class="ti ti-eye"></i> View</a></li>
+                                <li><a class="dropdown-item" href="add-document.php"><i class="ti ti-pencil-minus"></i> Edit</a></li>
+                            </ul>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="flxtblleft">
+                            <span class="avatar rounded bg-light mb-2">
+                                <img src="assets/img/icons/fn1.png">
+                            </span>
+                            <div class="flxtbltxt">
+                                <p class="fs-14 mb-1 fw-normal text-neutral">${project.projectName}</p>
+                                <span class="fs-11 fw-light text-black">190KB</span>
+                            </div>
+                        </div>
+                    </td>
+                    <td><p class="tbl_date">${new Date(project.projectEndDate).toLocaleDateString()} &nbsp;&nbsp; ${new Date(project.projectEndDate).toLocaleTimeString()}</p></td>
+                    <td><p>${project.projectManager?.name || "—"}</p></td>
+                    <td><p>${project.department?.name || "—"}</p></td>
+                    <td><p>${project.projectName}</p></td>
+                    <td><p>—</p></td>
+                    <td><p>${(project.tags || []).join(", ")}</p></td>
+                    <td><p>Document</p></td>
+                    <td><p class="tbl_date">${new Date(project.createdAt).toLocaleDateString()} &nbsp;&nbsp; ${new Date(project.createdAt).toLocaleTimeString()}</p></td>
+                    <td><p>${project.projectDescription || ""}</p></td>
+                    <td><p>—</p></td>
+                    <td><span class="badge badge-md bg-soft-success">${project.projectStatus || "Unknown"}</span></td>
+                `;
+                projectTableBody.appendChild(tr);
+            });
 
-// // Handle loading projects (wrapper function)
-// function loadProjects(search = '') {
-//     fetchProjects(search, function (err, projects) {
-//         if (err) {
-//             console.error('Error fetching projects:', err);
-//             $('#projectContainer').html(`<div class="col-12"><p class="text-center text-danger">Failed to load projects.</p></div>`);
-//         } else {
-//             renderProjects(projects);
-//         }
-//     });
-// }
+            renderPagination();
+        } catch (error) {
+            console.error("Error fetching projects:", error);
+        }
+    }
 
-// // Debounce function
-// function debounce(func, delay) {
-//     let timer;
-//     return function (...args) {
-//         clearTimeout(timer);
-//         timer = setTimeout(() => func.apply(this, args), delay);
-//     };
-// }
+    // Pagination
+    function renderPagination() {
+        paginationContainer.innerHTML = "";
 
-// // Initialize when DOM is ready
-// $(document).ready(function () {
-//     // Initial load
-//     loadProjects();
+        const prevBtn = document.createElement("button");
+        prevBtn.classList.add("btn", "btn-outline-primary");
+        prevBtn.textContent = "Previous";
+        prevBtn.disabled = currentPage === 1;
+        prevBtn.addEventListener("click", () => {
+            if (currentPage > 1) {
+                currentPage--;
+                fetchProjects(currentPage);
+            }
+        });
 
-//     // Search input with debounce
-//     $('.simplesrchbox').on('input', debounce(function () {
-//         let searchText = $(this).val();
-//         loadProjects(searchText);
-//     }, 300));
-// });
+        const nextBtn = document.createElement("button");
+        nextBtn.classList.add("btn", "btn-outline-primary");
+        nextBtn.textContent = "Next";
+        nextBtn.disabled = currentPage === totalPages;
+        nextBtn.addEventListener("click", () => {
+            if (currentPage < totalPages) {
+                currentPage++;
+                fetchProjects(currentPage);
+            }
+        });
+
+        const pageInfo = document.createElement("span");
+        pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
+        pageInfo.classList.add("align-self-center");
+
+        paginationContainer.appendChild(prevBtn);
+        paginationContainer.appendChild(pageInfo);
+        paginationContainer.appendChild(nextBtn);
+    }
+
+    // Init
+    fetchProjects(currentPage);
+});
