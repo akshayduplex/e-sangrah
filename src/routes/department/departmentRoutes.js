@@ -7,12 +7,14 @@ const router = express.Router();
 // Publicly exposed API routes
 router.get('/', departmentController.getAllDepartments);
 router.get('/:id', authenticate, departmentController.getDepartmentById);
-router.get('/:id/storage', authenticate, departmentController.getDepartmentStorage);
+
+// Commented out: requires schema update to support storage
+// router.get('/:id/storage', authenticate, departmentController.getDepartmentStorage);
 
 // Admin-only routes (CRUD)
-router.post('/', authenticate, authorize('Admin'), departmentController.createDepartment);
-router.put('/:id', authenticate, authorize('Admin'), departmentController.updateDepartment);
-router.delete('/:id', authenticate, authorize('Admin'), departmentController.deleteDepartment);
+router.post('/', authenticate, authorize('admin'), departmentController.createDepartment);
+router.put('/:id', authenticate, authorize('admin'), departmentController.updateDepartment);
+router.delete('/:id', authenticate, authorize('a    dmin'), departmentController.deleteDepartment);
 
 // Export router as default
 export default router;

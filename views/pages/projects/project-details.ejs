@@ -1,0 +1,130 @@
+<%- include('../../partials/header') %>
+
+    <div class="page-wrapper">
+        <div class="content">
+
+            <!-- Breadcrumb -->
+            <div class="d-flex align-items-center justify-content-between page-breadcrumb mb-3">
+                <div class="my-auto mb-2">
+                    <h2 class="mb-1">
+                        <%= project.projectName %>
+                    </h2>
+                    <nav>
+                        <ol class="breadcrumb mb-0">
+                            <li class="breadcrumb-item"><a href="#"><i class="ti ti-smart-home"></i></a></li>
+                            <li class="breadcrumb-item">Dashboard</li>
+                            <li class="breadcrumb-item">Project List</li>
+                            <li class="breadcrumb-item active">
+                                <%= project.projectName %>
+                            </li>
+                        </ol>
+                    </nav>
+                </div>
+                <div class="rtbtn">
+                    <a href="/projects/edit/<%= project._id %>" class="btn btn-primary btn-lg rounded-pill me-2 mb-2">
+                        <i class="ti ti-plus me-1"></i> Edit
+                    </a>
+                </div>
+            </div>
+            <!-- /Breadcrumb -->
+
+            <!-- Project Details -->
+            <div class="project-details card shadow-sm p-4">
+
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <strong>Project Name</strong><br>
+                        <%= project.projectName || "N/A" %>
+                    </div>
+                    <div class="col-md-4">
+                        <strong>Project Code/ID</strong><br>
+                        <%= project.projectCode || "N/A" %>
+                    </div>
+                    <div class="col-md-4">
+                        <strong>Project Type</strong><br>
+                        <%= project.projectType || "N/A" %>
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <strong>Project Manager</strong><br>
+                        <%= project.projectManager?.name || project.projectManager || "Unassigned" %>
+                    </div>
+                    <div class="col-md-4">
+                        <strong>Donor(s)</strong><br>
+                        <% if (Array.isArray(project.donor) && project.donor.length) { %>
+                            <%= project.donor.map(d=> d.name).join(", ") %>
+                                <% } else { %>
+                                    N/A
+                                    <% } %>
+                    </div>
+                    <div class="col-md-4">
+                        <strong>Vendor(s)</strong><br>
+                        <% if (Array.isArray(project.vendor) && project.vendor.length) { %>
+                            <%= project.vendor.map(v=> v.name).join(", ") %>
+                                <% } else { %>
+                                    N/A
+                                    <% } %>
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <strong>Start Date</strong><br>
+                        <%= project.projectEndDate ? formatDateDDMMYYYY(project.projectStartDate) : "N/A" %>
+                    </div>
+                    <div class="col-md-4">
+                        <strong>End Date</strong><br>
+                        <%= project.projectEndDate ? formatDateDDMMYYYY(project.projectEndDate) : "N/A" %>
+                    </div>
+                    <div class="col-md-4">
+                        <strong>Duration</strong><br>
+                        <%= project.projectDuration || project.duration || "N/A" %> Days
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <strong>Project Status</strong><br>
+                        <%= project.projectStatus || "Unknown" %>
+                    </div>
+                    <div class="col-md-4">
+                        <strong>Department</strong><br>
+                        <%= project.department?.name || project.department || "N/A" %>
+                    </div>
+                    <div class="col-md-4">
+                        <strong>Priority</strong><br>
+                        <% if (project.priority==="High" ) { %>
+                            <span class="text-danger">
+                                <%= project.priority %> &#9888;
+                            </span>
+                            <% } else { %>
+                                <%= project.priority || "N/A" %>
+                                    <% } %>
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-12">
+                        <strong>Project Description</strong><br>
+                        <%= project.projectDescription || "No description available" %>
+                    </div>
+                </div>
+
+            </div>
+            <!-- /Project Details -->
+
+        </div>
+
+        <!-- Footer -->
+        <footer class="footer mt-4 d-sm-flex align-items-center justify-content-between border-top bg-white p-3">
+            <p class="mb-0">2025 &copy; HLFPPT.</p>
+            <p>Designed & Developed by
+                <a href="javascript:void(0);" class="text-primary">Duplex Services & Technology</a>
+            </p>
+        </footer>
+        <!-- /Footer -->
+    </div>
+
+    <%- include('../../partials/footer') %>

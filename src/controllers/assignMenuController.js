@@ -23,13 +23,13 @@ export const getAssignMenuPage = async (req, res) => {
         const masterMenus = buildMenuTree(menus);
 
         // 4️⃣ Render page
-        res.render("menu/assign-menu", {
+        res.render("pages/permissions/assign-menu", {
             masterMenus,
             designations
         });
     } catch (error) {
         console.error("Error in getAssignMenuPage:", error);
-        res.status(500).render("menu/assign-menu", {
+        res.status(500).render("pages/permissions/assign-menu", {
             masterMenus: [],
             designations: []
         });
@@ -165,7 +165,7 @@ export const getSidebarForUser = async (req, res) => {
             .filter(m => m && m.is_show);
 
         const masters = menus
-            .filter(m => m.type === "Master" || m.type === "Menu" || m.type === "Dashboard")
+            .filter(m => m.type === "Master" || m.type === "Dashboard")
             .sort((a, b) => a.priority - b.priority);
 
         const grouped = masters.map(master => ({

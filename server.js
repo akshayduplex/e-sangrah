@@ -6,11 +6,6 @@ import { connectDB } from "./src/config/db.js";
 const PORT = process.env.PORT || 5000;
 
 connectDB()
-    .then(() => console.log("Database connected successfully"))
-    .catch((err) => {
-        console.error("Database connection failed:", err);
-        process.exit(1);
-    });
 
 const server = http.createServer(app);
 

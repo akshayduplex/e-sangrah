@@ -11,6 +11,7 @@ import methodOverride from "method-override";
 import ApiRoutes from "./routes/index.js";
 import pageRoutes from "./routes/web/index.js";
 import errorHandler from "./middlewares/errorHandler.js";
+import { formatDateDDMMYYYY } from "./utils/formatDate.js";
 
 const app = express();
 
@@ -46,7 +47,7 @@ app.use((req, res, next) => {
     res.locals.role = user.role || null;
     res.locals.email = user.email || null;
     res.locals.name = user.name || null;
-
+    res.locals.formatDateDDMMYYYY = formatDateDDMMYYYY;
     // Make req.user available in controllers
     req.user = user;
     next();
