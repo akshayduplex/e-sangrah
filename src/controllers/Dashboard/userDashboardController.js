@@ -1,4 +1,4 @@
-import Document from "../models/Document.js";
+import Document from "../../models/Document.js";
 
 /**
  * Get department-wise upload percentage

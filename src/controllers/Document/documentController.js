@@ -152,7 +152,7 @@ export const getRecentDocuments = async (req, res) => {
 
         const matchQuery = {};
         if (departmentId) matchQuery.department = departmentId;
-        else if (!["admin", "superadmin"].includes(req.user.role)) matchQuery.department = req.user.department;
+        else if (!["admin", "superadmin"].includes(req.user.profile_type)) matchQuery.department = req.user.department;
 
         const docs = await Document.find(matchQuery)
             .populate("owner", "name")

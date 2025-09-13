@@ -32,7 +32,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const sendOtp = async () => {
         const email = emailInput.value.trim();
         if (!email) {
-            alert("Please enter your email");
+            showToast("Please enter your email", "warning");
             return;
         }
 
@@ -47,17 +47,17 @@ document.addEventListener("DOMContentLoaded", function () {
             const data = await response.json();
 
             if (data.success) {
-                alert("OTP sent to your email!");
+                showToast("OTP sent to your email!", "info");
                 if (otpSection) otpSection.style.display = "block";
                 otpInputs[0].focus();
                 otpSent = true;
             } else {
-                alert(data.message || "Failed to send OTP.");
+                showToast(data.message || "Failed to send OTP.", "error");
                 sendOtpBtn.disabled = false; // Re-enable if failed
             }
         } catch (err) {
             console.error("Send OTP error:", err);
-            alert("Something went wrong. Please try again.");
+            showToast("Something went wrong. Please try again.", "error");
             sendOtpBtn.disabled = false;
         }
     };
@@ -93,7 +93,7 @@ document.addEventListener("DOMContentLoaded", function () {
     // -------------------- VERIFY OTP --------------------
     const verifyOtp = async () => {
         if (!otpSent) {
-            alert("Please request an OTP first");
+            showToast("Please request an OTP first", "info");
             return;
         }
 
@@ -114,13 +114,13 @@ document.addEventListener("DOMContentLoaded", function () {
                 loginBtn.style.display = "block";
                 loginBtn.textContent = "Submit";
             } else {
-                alert(data.message || "Invalid OTP, try again.");
+                showToast(data.message || "Invalid OTP, try again.", "error");
                 otpInputs.forEach(inp => inp.value = "");
                 otpInputs[0].focus();
             }
         } catch (err) {
             console.error("Verify OTP error:", err);
-            alert("Something went wrong. Please try again.");
+            showToast("Something went wrong. Please try again.", "error");
         }
     };
 
@@ -131,12 +131,12 @@ document.addEventListener("DOMContentLoaded", function () {
         const confirmPassword = document.getElementById("confirmPassword").value.trim();
 
         if (!password || !confirmPassword) {
-            alert("Please fill both password fields.");
+            showToast("Please fill both password fields.", "info");
             return;
         }
 
         if (password !== confirmPassword) {
-            alert("Passwords do not match!");
+            showToast("Passwords do not match!", "info");
             return;
         }
 
@@ -149,14 +149,14 @@ document.addEventListener("DOMContentLoaded", function () {
             const data = await response.json();
 
             if (data.success) {
-                alert("Password reset successful! You can now login.");
+                showToast("Password reset successful! You can now login.", "success");
                 window.location.href = "/login";
             } else {
-                alert(data.message || "Failed to reset password.");
+                showToast(data.message || "Failed to reset password.", "error");
             }
         } catch (err) {
             console.error("Reset password error:", err);
-            alert("Something went wrong. Please try again.");
+            showToast("Something went wrong. Please try again.", "error");
         }
     });
 });

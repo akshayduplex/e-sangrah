@@ -1,0 +1,128 @@
+<%- include('../partials/header') %>
+	<!-- Page Wrapper -->
+	<!-- Page Wrapper -->
+	<div class="page-wrapper">
+		<div class="content">
+			<!-- Breadcrumb -->
+			<div class="d-md-flex d-block align-items-center justify-content-between page-breadcrumb mb-3">
+				<div class="my-auto mb-2">
+					<h2 class="mb-1">User Registration Form</h2>
+					<nav>
+						<ol class="breadcrumb mb-0">
+							<li class="breadcrumb-item">
+								<a href="#"><i class="ti ti-smart-home"></i></a>
+							</li>
+							<li class="breadcrumb-item">
+								User Registration Form
+							</li>
+						</ol>
+					</nav>
+				</div>
+			</div>
+			<!-- /Breadcrumb -->
+
+			<div class="add-info-fieldset">
+				<form id="registerForm" enctype="multipart/form-data">
+					<div class="modal-body">
+						<div class="row">
+							<div class="col-md-6">
+								<div class="mb-3">
+									<label class="form-label">Full Name</label>
+									<input type="text" name="fullName" class="form-control" required>
+								</div>
+							</div>
+							<div class="col-md-6">
+								<div class="mb-3">
+									<label class="form-label">Email Address</label>
+									<input type="email" name="email" class="form-control" required>
+								</div>
+							</div>
+							<div class="col-md-6">
+								<div class="mb-3">
+									<label class="form-label">Phone Number</label>
+									<input type="text" name="phone" class="form-control" required>
+								</div>
+							</div>
+							<div class="col-md-6">
+								<div class="mb-3">
+									<label class="form-label">Employee Id</label>
+									<input type="text" name="employeeId" class="form-control" required>
+								</div>
+							</div>
+							<div class="col-md-6">
+								<div class="mb-3">
+									<label class="form-label">Department</label>
+									<select name="department" class="form-select" required>
+										<% departments.forEach(dep=> { %>
+											<option value="<%= dep._id %>">
+												<%= dep.name %>
+											</option>
+											<% }) %>
+									</select>
+								</div>
+							</div>
+							<div class="col-md-6">
+								<div class="mb-3">
+									<label class="form-label">Designation</label>
+									<select name="designation" class="form-select" required>
+										<% designations.forEach(des=> { %>
+											<option value="<%= des._id %>">
+												<%= des.name %>
+											</option>
+											<% }) %>
+									</select>
+								</div>
+							</div>
+							<div class="col-md-6">
+								<div class="mb-3">
+									<label class="form-label">Address <span class="optnl_lbl">(Optional)</span></label>
+									<textarea name="address" class="d-block simpletxtarea form-control"></textarea>
+								</div>
+							</div>
+							<div class="col-md-6">
+								<label class="form-label">Profile Image <span
+										class="optnl_lbl">(Optional)</span></label>
+								<div class="upload-profilebox form-control mb-3" id="uploadprofileBox">
+									<input type="file" name="profileImage" class="form-control d-none" id="fileInput">
+									<div class="preview" id="preview"></div>
+									<div class="upload-icon"><i class="ti ti-plus fa-2x mb-2"></i></div>
+								</div>
+							</div>
+						</div>
+					</div>
+					<div class="d-flex align-items-center justify-content-end mt-4">
+						<button class="btn btn-primary btn-w-lg rounded-pill" type="submit">Register</button>
+					</div>
+				</form>
+
+			</div>
+		</div>
+
+		<div class="footer mt-4 d-sm-flex align-items-center justify-content-between border-top bg-white p-3">
+			<p class="mb-0">2025 &copy; HLFPPT.</p>
+			<p>Designed & Developed by <a href="javascript:void(0);" class="text-primary">Duplex services &
+					Technology</a></p>
+		</div>
+
+	</div>
+	<!-- /Page Wrapper -->
+
+	<%- include('../partials/footer') %>
+
+		<div id="data-success-register" class="modal fade" tabindex="-1" role="dialog" aria-hidden="true">
+			<div class="modal-dialog modal-dialog-centered modalw620">
+				<div class="modal-content p-4">
+					<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+					<div class="modal-body">
+						<div class="success_mdltxt text-center">
+							<div class="imgscs mb-3"><img src="assets/img/icons/success.png"></div>
+							<h4 class="fs-24 text-dark fw-medium mb-4">Your Registration has been <br> done successfully
+							</h4>
+							<div class="mb-3 text-center">
+								<button class="btn btn-primary rounded-pill minw80" type="submit">Ok</button>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>

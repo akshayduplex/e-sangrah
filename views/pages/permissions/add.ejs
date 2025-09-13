@@ -36,11 +36,10 @@
                                         <label for="type" class="form-label">Type</label>
                                         <select class="form-select" id="type" name="type" required>
                                             <option value="">-- Select Type --</option>
-                                            <option value="Dashboard" <%=menu?.type==="Dashboard" ? "selected" : "" %>
-                                                >Dashboard</option>
-                                            <option value="Master" <%=menu?.type==="Master" ? "selected" : "" %>>Menu
+                                            <option value="Menu" <%=menu?.type==="Menu" ? "selected" : "" %>>Menu
                                             </option>
-                                            <option value="Menu" <%=menu?.type==="Menu" ? "selected" : "" %>>Submenu
+                                            <option value="SubMenu" <%=menu?.type==="SubMenu" ? "selected" : "" %>
+                                                >SubMenu
                                             </option>
                                         </select>
                                     </div>
@@ -163,16 +162,16 @@
                             const result = await response.json();
 
                             if (result.success) {
-                                showSuccess("<%= menu ? 'Menu updated successfully' : 'Menu added successfully' %>");
+                                showToast("<%= menu ? 'Menu updated successfully' : 'Menu added successfully' %>", "success");
                                 setTimeout(() => {
                                     window.location.href = "/menu/list";
-                                }, 1500);
+                                }, 1000);
                             } else {
-                                showError(result.message || "Something went wrong");
+                                showToast(result.message || "Something went wrong", 'error');
                             }
                         } catch (err) {
                             console.error(err);
-                            showError(err.message || "An error occurred");
+                            showToast(err.message || "An error occurred", 'error');
                         }
                     });
                 });

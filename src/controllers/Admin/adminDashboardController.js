@@ -1,18 +1,8 @@
 import mongoose from "mongoose";
 import Document from "../../models/Document.js";
+import { calculateStartDate } from "../../utils/calculateStartDate.js";
 
 const validPeriods = ["daily", "weekly", "monthly", "yearly"];
-
-function calculateStartDate(period) {
-    const startDate = new Date();
-    switch (period) {
-        case "daily": startDate.setDate(startDate.getDate() - 1); break;
-        case "weekly": startDate.setDate(startDate.getDate() - 7); break;
-        case "monthly": startDate.setMonth(startDate.getMonth() - 1); break;
-        case "yearly": startDate.setFullYear(startDate.getFullYear() - 1); break;
-    }
-    return startDate;
-}
 
 // ================= Dashboard APIs =================
 

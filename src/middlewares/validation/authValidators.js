@@ -19,9 +19,9 @@ export const registerValidator = [
         .optional()
         .isLength({ min: 6 }).withMessage("Raw password must be at least 6 characters long"),
 
-    body("role")
+    body("profile_type")
         .optional()
-        .isIn(["employee", "manager", "admin"]).withMessage("Invalid role"),
+        .isIn(["employee", "manager", "admin"]).withMessage("Invalid profile_type"),
 
     body("department").optional().isMongoId().withMessage("Invalid department ID"),
     body("position").optional().isString()

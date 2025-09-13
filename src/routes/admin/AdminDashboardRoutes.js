@@ -1,6 +1,6 @@
 import express from 'express';
 import * as dashboardController from '../../controllers/Admin/adminDashboardController.js';
-import { getDepartmentUploadStats } from '../../controllers/userDashboardController.js';
+import { getDepartmentUploadStats } from '../../controllers/Dashboard/userDashboardController.js';
 import { authenticate } from '../../middlewares/authMiddleware.js';
 
 const router = express.Router();

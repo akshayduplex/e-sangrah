@@ -141,7 +141,7 @@
                         });
                     } catch (err) {
                         console.error(err);
-                        showError('Failed to fetch assigned menus.');
+                        showToast('Failed to fetch assigned menus.', "error");
                     }
                 });
 
@@ -157,7 +157,7 @@
                     e.preventDefault();
 
                     const designationId = designationSelect.value;
-                    if (!designationId) return showWarning('Please select a designation first.');
+                    if (!designationId) return showToast('Please select a designation first.', "warning");
 
                     const selected = Array.from(allCheckboxes())
                         .filter(cb => cb.checked)
@@ -167,7 +167,7 @@
                     const toUnassign = assignedMenus.filter(id => !selected.includes(id));
 
                     if (toAssign.length === 0 && toUnassign.length === 0) {
-                        return showInfo('No changes to save.');
+                        return showToast('No changes to save.', "info");
                     }
 
                     try {
@@ -196,15 +196,17 @@
 
                         if (failed.length === 0) {
                             assignedMenus = selected;
-                            showSuccess('Menu assignments updated successfully!');
+                            showToast('Menu assignments successfully!', 'success', 1000);
+                            setTimeout(() => window.location.reload(), 1200);
+
                         } else {
                             console.error("Assignment API errors:", failed);
-                            showError(`Some requests failed: ${failed.map(f => f.message).join(", ")}`);
+                            showToast(`Some requests failed: ${failed.map(f => f.message).join(", ")}`, "error");
                         }
 
                     } catch (err) {
                         console.error(err);
-                        showError('Error updating menus.');
+                        showToast('Error updating menus.', 'error');
                     }
                 });
             });

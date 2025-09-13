@@ -22,13 +22,17 @@
 
     <!-- Theme Script js -->
     <script src="/js/theme-script.js"></script>
-
+    <link href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" rel="stylesheet">
     <!-- Bootstrap CSS -->
     <link rel="stylesheet" href="/css/bootstrap.min.css">
 
     <!-- Feather CSS -->
     <link rel="stylesheet" href="/plugins/icons/feather/feather.css">
+    <!-- Toastify CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
 
+    <!-- Toastify JS -->
+    <!-- <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script> -->
     <!-- Tabler Icon CSS -->
     <link rel="stylesheet" href="/plugins/tabler-icons/tabler-icons.min.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -64,7 +68,7 @@
     <!-- Main CSS -->
     <link rel="stylesheet" href="/css/style.css">
     <link rel="stylesheet" href="/css/mystyle.css">
-
+    <!-- <link rel="stylesheet" href="/css/custom-datable.css"> -->
 </head>
 
 <body>
@@ -260,7 +264,7 @@
                                             <%=name %>
                                         </h5>
                                         <p class="subtxt">
-                                            <%= role %>
+                                            <%= profile_type %>
                                         </p>
                                     </span>
                                 </a>
@@ -276,7 +280,7 @@
                                                         <%= name || "User" %>
                                                     </h5>
                                                     <p class=" subtxt">
-                                                        <%= role || "Guest" %>
+                                                        <%= profile_type || "Guest" %>
                                                     </p>
                                                 </span>
                                             </div>
