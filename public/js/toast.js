@@ -15,11 +15,11 @@ function showToast(message, type = "info", duration = 4000) {
         backgroundColor: colors[type] || colors.info,
         stopOnFocus: true,
         close: true // allows user to manually close the toast
-    }).showToast();
+    });
 }
 
 // Convenience wrappers
-function showSuccess(message, duration) {
+function showSuccess(message, duration = 1000) {
     showToast(message, "success", duration);
 }
 

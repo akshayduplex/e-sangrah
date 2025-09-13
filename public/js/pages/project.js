@@ -45,39 +45,37 @@ document.addEventListener("DOMContentLoaded", () => {
             const card = document.createElement('div');
             card.className = 'col-sm-3';
             card.innerHTML = `
-    <div class="card projectcard position-relative">
-        <div class="card-body">
-            <h5 class="fs-20 fw-normal mb-2">${project.projectName ?? 'Unnamed Project'}</h5>
-            <a href="/projects/${project._id}/project-details" 
-               class="position-absolute top-0 end-0 mt-2 me-4 text-primary fs-12 fw-light text-decoration-none">
-               View
-            </a>
-            <h6 class="fs-16 fw-normal text-neutral">
-                Department: ${project.department?.name ?? 'N/A'}
-            </h6>
-            <small class="fs-12 text-black fw-light">
-                Created on: ${new Date(project.createdAt ?? project.projectStartDate).toLocaleDateString()}
-            </small>
-            <h6 class="fs-16 fw-normal mt-2 text-neutral">
-                ${project.projectManager?.name ?? 'Unassigned'}
-            </h6>
-            <small class="fs-12 fw-light">Status: ${project.projectStatus ?? 'Unknown'}</small>
+                <div class="card projectcard position-relative">
+                    <div class="card-body">
+                        <h5 class="fs-20 fw-normal mb-2">${project.projectName ?? 'Unnamed Project'}</h5>
+                        <a href="/projects/${project._id}/project-details" 
+                           class="position-absolute top-0 end-0 mt-2 me-4 text-primary fs-12 fw-light text-decoration-none">
+                           View
+                        </a>
+                        <h6 class="fs-16 fw-normal text-neutral">
+                            Department: ${project.department?.name ?? 'N/A'}
+                        </h6>
+                        <small class="fs-12 text-black fw-light">
+                            Created on: ${new Date(project.createdAt ?? project.projectStartDate).toLocaleDateString()}
+                        </small>
+                        <h6 class="fs-16 fw-normal mt-2 text-neutral">
+                            ${project.projectManager?.name ?? 'Unassigned'}
+                        </h6>
+                        <small class="fs-12 fw-light">Status: ${project.projectStatus ?? 'Unknown'}</small>
 
-            <div class="prjtxt mt-3">
-                <p class="fs-12 fw-light">${project.projectDescription ?? ''}</p>
-                <div class="dflexbtwn">
-                    <a href="project-files.php?id=${project._id}" class="site-btnmd fw-light fs-12">Access Files</a>
-                    <span>${project.tags?.length ?? 0} Tags</span>
+                        <div class="prjtxt mt-3">
+                            <p class="fs-12 fw-light">${project.projectDescription ?? ''}</p>
+                            <div class="dflexbtwn">
+                                <a href="project-files.php?id=${project._id}" class="site-btnmd fw-light fs-12">Access Files</a>
+                                <span>${project.tags?.length ?? 0} Tags</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            </div>
-        </div>
-    </div>
-`;
-
+            `;
             projectsContainer.appendChild(card);
         });
     }
-
 
     // Infinite scroll
     window.addEventListener('scroll', () => {
@@ -89,13 +87,31 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    // Search
-    searchInput.addEventListener('input', () => {
+    // Debounce function
+    function debounce(func, delay) {
+        let timeout;
+        return function (...args) {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => func.apply(this, args), delay);
+        };
+    }
+
+    const handleSearch = debounce(() => {
         currentQuery = searchInput.value.trim();
+        if (currentQuery.length < 2) {
+            projectsContainer.innerHTML = '<p>Type at least 2 characters to search.</p>';
+            return;
+        }
+
         currentPage = 1;
         totalPages = 1;
+
+        console.log("🔎 Searching for:", currentQuery); // <-- debug log
         fetchProjects(currentPage, currentQuery, false);
-    });
+    }, 400);
+
+    searchInput.addEventListener("input", handleSearch);
+
 
     // Initial load
     fetchProjects();

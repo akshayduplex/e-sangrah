@@ -60,7 +60,10 @@
     </div>
 
     <%- include('../../partials/footer') %>
+        <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+        <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
 
+        <link href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" rel="stylesheet">
         <script>
             // Delete confirmation
             function confirmDelete(menuId) {
@@ -72,113 +75,163 @@
                         .then(res => res.json())
                         .then(data => {
                             if (data.success) {
-                                alert('Menu deleted successfully');
+                                showToast('Menu deleted successfully', "success");
                                 location.reload();
                             } else {
-                                alert('Error deleting menu: ' + data.message);
+                                showToast('Error deleting menu: ' + data.message, "error");
                             }
                         })
                         .catch(err => {
                             console.error('Error:', err);
-                            alert('Error deleting menu');
+                            showToast('Error deleting menu', "error");
                         });
                 }
             }
-            if ($.fn.DataTable.isDataTable('#menuTable')) {
-                $('#menuTable').DataTable().destroy();
+
+            let menuTable;
+
+            // Debounce helper
+            function debounce(fn, delay) {
+                let timer;
+                return function (...args) {
+                    clearTimeout(timer);
+                    timer = setTimeout(() => fn.apply(this, args), delay);
+                };
             }
-            // Init DataTable
-            $('#menuTable').DataTable({
-                pageLength: 10,
-                lengthMenu: [10, 25, 50, 100],
-                ordering: true,
-                serverSide: true,
-                processing: true,
-                ajax: function (data, callback) {
-                    const page = Math.floor(data.start / data.length) + 1;
-                    fetch(`/api/menu?page=${page}&limit=${data.length}`)
+
+            $(document).ready(function () {
+                let allMenuData = []; // Store all data for client-side operations
+
+                // Function to fetch all data
+                function fetchAllMenuData() {
+                    fetch('/api/menu?limit=0') // Modify API to accept limit=0 for all records
                         .then(res => res.json())
                         .then(result => {
-                            callback({
-                                recordsTotal: result.pagination.total,
-                                recordsFiltered: result.pagination.total,
-                                data: result.data
-                            });
+                            allMenuData = result.data;
+                            initializeDataTable();
+                        })
+                        .catch(err => {
+                            console.error("Error loading data:", err);
                         });
-                },
-                columns: [
-                    {
-                        data: null,
-                        render: function (data, type, row, meta) {
-                            return meta.row + meta.settings._iDisplayStart + 1;
-                        }
-                    },
-                    { data: 'type' },
-                    { data: 'url', render: data => `/${data}` },
-                    { data: 'name' },
-                    { data: 'priority' },
-                    {
-                        data: 'is_show',
-                        render: function (data, type, row) {
-                            return `
-                <div class="form-check form-switch">
-                    <input class="form-check-input" type="checkbox" role="switch"
-                        id="isShow_${row._id}" ${data ? "checked" : ""}>
-                    <label class="form-check-label" for="isShow_${row._id}">
-                        ${data ? "Yes" : "No"}
-                    </label>
-                </div>`;
-                        }
-                    },
-                    { data: 'add_date', render: data => new Date(data).toLocaleDateString('en-IN') },
-                    {
-                        data: '_id',
-                        render: (data) => `
-                <div class="action-icon d-inline-flex">
-                    <a href="/menu/edit/${data}" id="edit_${data}" class="me-2">
-                        <i class="ti ti-edit"></i>
-                    </a>
-                    <a href="javascript:void(0);" id="delete_${data}" 
-                       class="deleteMenuBtn" data-id="${data}" 
-                       onclick="confirmDelete('${data}')">
-                        <i class="ti ti-trash"></i>
-                    </a>
-                </div>
-            `
-                    }
-                ],
-                columnDefs: [
-                    { orderable: false, targets: -1 } // disable sorting on "Action"
-                ]
-            });
-            // Attach event delegation for toggle switch
-            $(document).on("change", ".form-check-input", function () {
-                const menuId = $(this).attr("id").replace("isShow_", ""); // extract ID
-                const checked = $(this).is(":checked");
+                }
 
-                fetch(`/api/menu/${menuId}/toggle-status`, {
-                    method: "PATCH",
-                    headers: {
-                        "Content-Type": "application/json"
+                // Initialize DataTable with client-side processing
+                function initializeDataTable() {
+                    if ($.fn.DataTable.isDataTable('#menuTable')) {
+                        $('#menuTable').DataTable().destroy();
                     }
-                })
-                    .then(res => res.json())
-                    .then(data => {
-                        if (data.success) {
-                            // Update label text dynamically
-                            const label = $(`label[for='isShow_${menuId}']`);
-                            label.text(data.data.is_show ? "Yes" : "No");
-                        } else {
-                            alert("Error toggling status: " + data.message);
-                            // revert checkbox if API fails
-                            $(this).prop("checked", !checked);
+
+                    menuTable = $('#menuTable').DataTable({
+                        data: allMenuData,
+                        pageLength: 10,
+                        lengthMenu: [10, 25, 50, 100],
+                        ordering: true,
+                        serverSide: false,
+                        processing: true,
+                        searching: true,
+                        columns: [
+                            {
+                                data: null,
+                                render: (data, type, row, meta) => meta.row + 1
+                            },
+                            { data: "type" },
+                            { data: "name" },
+                            {
+                                data: "url",
+                                render: data => `/${data}`
+                            },
+                            { data: "priority" },
+                            {
+                                data: "is_show",
+                                render: (data, type, row) => `
+                            <div class="form-check form-switch">
+                                <input class="form-check-input toggleShow" type="checkbox" 
+                                    data-id="${row._id}" ${data ? "checked" : ""}>
+                                <label class="form-check-label">
+                                    ${data ? "Yes" : "No"}
+                                </label>
+                            </div>`
+                            },
+                            {
+                                data: "add_date",
+                                render: d => new Date(d).toLocaleDateString("en-IN")
+                            },
+                            {
+                                data: "_id",
+                                orderable: false,
+                                render: id => `
+                            <div class="action-icon d-inline-flex">
+                                <a href="/menu/add/${id}" class="me-2"><i class="ti ti-edit"></i></a>
+                                <a href="javascript:void(0);" onclick="confirmDelete('${id}')">
+                                    <i class="ti ti-trash"></i>
+                                </a>
+                            </div>`
+                            }
+                        ],
+                        language: {
+                            search: "Search:",
+                            lengthMenu: "Show _MENU_ entries",
+                            info: "Showing _START_ to _END_ of _TOTAL_ entries",
+                            infoEmpty: "Showing 0 to 0 of 0 entries",
+                            infoFiltered: "(filtered from _MAX_ total entries)",
+                            paginate: {
+                                first: "First",
+                                last: "Last",
+                                next: "Next",
+                                previous: "Previous"
+                            }
                         }
-                    })
-                    .catch(err => {
-                        console.error("Error:", err);
-                        alert("Server error while toggling status");
-                        // revert checkbox if API fails
-                        $(this).prop("checked", !checked);
                     });
+
+                    // Move search box and entries dropdown
+                    $('.dataTables_length').addClass(' me-3');
+                    $('.dataTables_filter').addClass('');
+                    $('.dataTables_wrapper').addClass('p-3');
+                    $('#menuTable').addClass('mt-2');
+
+                    // Handle toggle switch (re-attach after redraws)
+                    menuTable.on('draw', function () {
+                        attachToggleHandlers();
+                    });
+
+                    // Initial attachment
+                    attachToggleHandlers();
+                }
+
+                // Function to attach toggle event handlers
+                function attachToggleHandlers() {
+                    $('.toggleShow').off('change').on('change', function () {
+                        const menuId = $(this).data("id");
+                        const checked = $(this).is(":checked");
+                        const label = $(this).siblings("label");
+
+                        fetch(`/api/menu/${menuId}/toggle-status`, {
+                            method: "PATCH",
+                            headers: { "Content-Type": "application/json" }
+                        })
+                            .then(res => res.json())
+                            .then(data => {
+                                if (data.success) {
+                                    const index = allMenuData.findIndex(item => item._id === menuId);
+                                    if (index !== -1) {
+                                        allMenuData[index].is_show = data.data.is_show;
+                                    }
+                                    label.text(data.data.is_show ? "Yes" : "No");
+                                    showToast("Status updated", "success");
+                                } else {
+                                    $(this).prop("checked", !checked);
+                                    showToast("Error: " + data.message, "error");
+                                }
+                            })
+                            .catch(err => {
+                                console.error("Toggle error:", err);
+                                $(this).prop("checked", !checked);
+                                showToast("Server error", "error");
+                            });
+                    });
+                }
+
+                // Initial data fetch
+                fetchAllMenuData();
             });
         </script>

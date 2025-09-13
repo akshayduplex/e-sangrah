@@ -2,8 +2,9 @@ import express from "express";
 import mongoose from "mongoose";
 import Menu from "../../models/Menu.js";
 import DesignationMenu from "../../models/menuAssignment.js";
-import { assignMenusToDesignation, getAssignedMenus, getSidebarForUser, unAssignMenu } from "../../controllers/assignMenuController.js";
+import { assignMenusToDesignation, getAssignedMenus, getSidebarForUser, unAssignMenu } from "../../controllers/permissions/permisssions.js";
 import { authenticate } from "../../middlewares/authMiddleware.js";
+import { assignMenusValidator, getAssignedMenusValidator, unAssignMenusValidator } from "../../validators/permissionsValidator.js";
 
 const router = express.Router();
 
@@ -14,6 +15,27 @@ const router = express.Router();
 // Get paginated menus
 router.get("/menu", authenticate, async (req, res) => {
     try {
+        // Check if limit=0 (get all records)
+        if (req.query.limit === "0") {
+            const menus = await Menu.find()
+                .sort({ priority: 1, add_date: -1 })
+                .populate("added_by updated_by", "name email")
+                .lean();
+
+            const total = await Menu.countDocuments();
+
+            return res.json({
+                success: true,
+                data: menus,
+                pagination: {
+                    page: 1,
+                    limit: 0,
+                    total,
+                    pages: 1
+                }
+            });
+        }
+
         // Get page & limit from query, default to 1 and 10
         const page = Math.max(parseInt(req.query.page) || 1, 1);
         const limit = Math.max(parseInt(req.query.limit) || 10, 1);
@@ -26,7 +48,6 @@ router.get("/menu", authenticate, async (req, res) => {
                 .skip(skip)
                 .limit(limit)
                 .populate("added_by updated_by", "name email")
-
                 .lean(),
             Menu.countDocuments()
         ]);
@@ -220,11 +241,11 @@ router.post("/menu/assign", authenticate, async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 });
-router.delete("/assign-menu/unselect", authenticate, unAssignMenu)
+router.delete("/assign-menu/unselect", authenticate, unAssignMenusValidator, unAssignMenu)
 // For logged-in user’s sidebar
 router.get("/sidebar", authenticate, getSidebarForUser);
 // Get assigned menus for a designation
-router.get("/assign-menu/designation/:designation_id/menus", authenticate, getAssignedMenus);
-router.post("/assign-menu/assign", authenticate, assignMenusToDesignation);
+router.get("/assign-menu/designation/:designation_id/menus", authenticate, getAssignedMenusValidator, getAssignedMenus);
+router.post("/assign-menu/assign", authenticate, assignMenusValidator, assignMenusToDesignation);
 
 export default router;

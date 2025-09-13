@@ -1,19 +1,9 @@
 const mongoose = require("mongoose");
 const Document = require("../../models/Document");
 const { successResponse, failResponse, errorResponse } = require("../../utils/responseHandler");
+const { calculateStartDate } = require("../../utils/calculateStartDate");
 
 const validPeriods = ["daily", "weekly", "monthly", "yearly"];
-
-function calculateStartDate(period) {
-    let startDate = new Date();
-    switch (period) {
-        case "daily": startDate.setDate(startDate.getDate() - 1); break;
-        case "weekly": startDate.setDate(startDate.getDate() - 7); break;
-        case "monthly": startDate.setMonth(startDate.getMonth() - 1); break;
-        case "yearly": startDate.setFullYear(startDate.getFullYear() - 1); break;
-    }
-    return startDate;
-}
 
 // ------------------- Dashboard Stats -------------------
 exports.getDashboardStats = async (req, res) => {

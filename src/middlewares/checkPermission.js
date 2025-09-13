@@ -12,7 +12,7 @@ const checkPermissions = async (req, res, next) => {
         if (!user) return res.redirect('/login'); // redirect if not logged in
 
         // Superadmin bypass
-        if (user.role === 'superadmin') return next();
+        if (user.profile_type === 'superadmin') return next();
 
         if (!user.designation_id) {
             return res.status(403).render('403', {

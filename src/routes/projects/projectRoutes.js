@@ -28,7 +28,14 @@ import {
     searchProjects,
 } from '../../controllers/Projects/projectController.js';
 import { authenticate, authorize } from '../../middlewares/authMiddleware.js';
-
+import {
+    createProjectValidator,
+    updateProjectValidator,
+    donorValidator,
+    vendorValidator,
+    projectIdValidator,
+    searchProjectsValidator
+} from "../../validators/projectValidator.js";
 const router = express.Router();
 
 // All routes are protected
@@ -40,7 +47,9 @@ router.route('/')
         authorize('superadmin', 'admin', 'manager', 'employee', 'viewer'),
         getAllProjects
     )
-    .post(authorize('superadmin', 'admin', 'manager'), createProject);
+    .post(
+        createProjectValidator,
+        authorize('superadmin', 'admin', 'manager'), createProject);
 
 
 router.route('/:id/status')
@@ -63,7 +72,7 @@ router.route('/upcoming-deadlines')
 
 // Search route
 router.route('/search')
-    .get(authorize('superadmin', 'admin', 'manager', 'employee', 'viewer'), searchProjects);
+    .get(authorize('superadmin', 'admin', 'manager', 'employee', 'viewer'), searchProjectsValidator, searchProjects);
 
 // Bulk operations
 router.route('/bulk/update')
@@ -87,7 +96,7 @@ router.route('/:id/donors/:donorId')
 
 // Vendor management routes
 router.route('/:id/vendors')
-    .post(authorize('superadmin', 'admin', 'manager'), addVendorToProject);
+    .post(donorValidator, authorize('superadmin', 'admin', 'manager'), vendorValidator, addVendorToProject);
 
 router.route('/:id/vendors/:vendorId')
     .put(authorize('superadmin', 'admin', 'manager'), updateVendorInProject)
@@ -103,8 +112,8 @@ router.route('/:id/archive')
 // Single project operations
 router.route('/:id')
     .get(authorize('superadmin', 'admin', 'manager', 'employee', 'viewer'), getProject)
-    .patch(authorize('superadmin', 'admin', 'manager'), updateProject)
-    .delete(authorize('superadmin', 'admin'), deleteProject);
+    .patch(updateProjectValidator, authorize('superadmin', 'admin', 'manager'), updateProject)
+    .delete(projectIdValidator, authorize('superadmin', 'admin'), deleteProject);
 router.route('/:id/restore')
     .patch(authorize('superadmin', 'admin'), restoreProject);
 

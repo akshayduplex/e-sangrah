@@ -1,0 +1,129 @@
+<%- include('../../partials/header') %>
+
+    <div class="page-wrapper">
+        <div class="content">
+
+            <!-- Breadcrumb -->
+            <div class="d-flex align-items-center justify-content-between page-breadcrumb mb-3">
+                <div class="my-auto mb-2">
+                    <h2 class="mb-1">Add New Project</h2>
+                    <nav>
+                        <ol class="breadcrumb mb-0">
+                            <li class="breadcrumb-item"><a href="#"><i class="ti ti-smart-home"></i></a></li>
+                            <li class="breadcrumb-item">Dashboard</li>
+                            <li class="breadcrumb-item">Project List</li>
+                            <li class="breadcrumb-item active">Add Project</li>
+                        </ol>
+                    </nav>
+                </div>
+            </div>
+            <!-- /Breadcrumb -->
+
+            <!-- Add Mode -->
+            <div class="project-details card shadow-sm p-4">
+                <form id="addProjectForm">
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label><strong>Project Name</strong></label>
+                            <input type="text" name="projectName" class="form-control" placeholder="Enter project name">
+                        </div>
+                        <div class="col-md-4">
+                            <label><strong>Project Code</strong></label>
+                            <input type="text" name="projectCode" placeholder="Enter Project Code" class="form-control"
+                                required>
+                        </div>
+                        <div class="col-md-4">
+                            <label><strong>Project Type</strong></label>
+                            <input type="text" name="projectType" placeholder="Enter Project Type" class="form-control">
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label><strong>Project Manager</strong></label>
+                            <select name="projectManager" class="form-control" required>
+                                <% users.forEach(u=> { %>
+                                    <option value="<%= u._id %>">
+                                        <%= u.name %>
+                                    </option>
+                                    <% }) %>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label><strong>Department</strong></label>
+                            <select name="department" class="form-control" required>
+                                <% departments.forEach(d=> { %>
+                                    <option value="<%= d._id %>">
+                                        <%= d.name %>
+                                    </option>
+                                    <% }) %>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label><strong>Status</strong></label>
+                            <input type="text" name="projectStatus" class="form-control" value="Planned">
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label><strong>Start Date</strong></label>
+                            <input type="date" name="projectStartDate" class="form-control">
+                        </div>
+                        <div class="col-md-4">
+                            <label><strong>End Date</strong></label>
+                            <input type="date" name="projectEndDate" class="form-control">
+                        </div>
+                        <div class="col-md-4">
+                            <label><strong>Priority</strong></label>
+                            <select name="priority" class="form-control">
+                                <option value="">Select</option>
+                                <option value="Low">Low</option>
+                                <option value="Medium" selected>Medium</option>
+                                <option value="High">High</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label><strong>Donors</strong> <small>(comma separated)</small></label>
+                            <input type="text" name="donors" class="form-control"
+                                placeholder="e.g. CultureFund, UNICEF">
+                        </div>
+                        <div class="col-md-4">
+                            <label><strong>Vendors</strong> <small>(comma separated)</small></label>
+                            <input type="text" name="vendors" class="form-control"
+                                placeholder="e.g. HeritageTech, SupplyCo">
+                        </div>
+                        <div class="col-md-4">
+                            <label><strong>Duration (Days)</strong></label>
+                            <input type="number" name="projectDuration" class="form-control" placeholder="Total Days">
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-12">
+                            <label><strong>Description</strong></label>
+                            <textarea name="projectDescription" class="form-control"
+                                placeholder="Enter about Project"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end">
+                        <a href="/projects" class="btn btn-secondary me-2">Cancel</a>
+                        <button type="submit" class="btn btn-primary">Create Project</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="footer mt-4 d-sm-flex align-items-center justify-content-between border-top bg-white p-3">
+            <p class="mb-0">2025 &copy; HLFPPT.</p>
+            <p>Designed & Developed by <a href="#" class="text-primary">Duplex Services & Technology</a></p>
+        </footer>
+    </div>
+
+    <script src="/js/pages/projects/add-project.js"></script>
+    <%- include('../../partials/footer') %>
