@@ -39,10 +39,6 @@ const departmentSchema = new mongoose.Schema({
     timestamps: false
 });
 
-// Indexes
-departmentSchema.index({ name: 1 });
-departmentSchema.index({ priority: 1 });
-departmentSchema.index({ status: 1 });
 
 // Pre-save hook to update `updated_date` automatically
 departmentSchema.pre("save", function (next) {

@@ -7,50 +7,23 @@ const menuSchema = new Schema({
         enum: ['Menu', 'SubMenu'],
         default: 'Menu'
     },
-    name: {
-        type: String,
-        required: true,
-        trim: true,
-        maxlength: 100
-    },
-    icon_code: {
-        type: String,
-        trim: true,
-        default: ''
-    },
-    url: {
-        type: String,
-        trim: true,
-        default: '#',
-        validate: {
-            validator: function (v) {
-                // Prevent null, empty, or whitespace-only URLs
-                return v != null && v.trim() !== '';
-            },
-            message: 'URL cannot be null, empty, or only spaces'
-        }
-    },
-    priority: {
-        type: Number,
-        required: true,
-        min: 1,
-        default: 1
-    },
-    is_show: {
-        type: Boolean,
-        default: true
-    },
+    name: { type: String, required: true, trim: true, maxlength: 100 },
+    icon_code: { type: String, trim: true, default: '' },
+    url: { type: String, trim: true, default: '#' },
+    priority: { type: Number, required: true, min: 1, default: 1 },
+    is_show: { type: Boolean, default: true },
+
     master_id: {
         type: Types.ObjectId,
         ref: 'Menu',
         default: null,
         validate: {
             validator: function (value) {
-                if (this.type === 'Menu') return !!value;
-                if (this.type === 'SubMenu') return !value;
+                if (this.type === 'Menu' && value) return false;     // top-level cannot have master
+                if (this.type === 'SubMenu' && !value) return false; // submenu must have master
                 return true;
             },
-            message: 'SubMenu must belong to a Menu, Menu cannot have a parent'
+            message: 'Invalid master_id for type'
         }
     },
     added_by: {
@@ -68,10 +41,10 @@ const menuSchema = new Schema({
 });
 
 // Regular indexes
-menuSchema.index({ type: 1 });
-menuSchema.index({ priority: 1 });
-menuSchema.index({ master_id: 1 });
-menuSchema.index({ is_show: 1 });
+// menuSchema.index({ type: 1 });
+// menuSchema.index({ priority: 1 });
+// menuSchema.index({ master_id: 1 });
+// menuSchema.index({ is_show: 1 });
 
 // Partial unique indexes for non-Masters
 menuSchema.index(

@@ -28,14 +28,7 @@ import {
     searchProjects,
 } from '../../controllers/Projects/projectController.js';
 import { authenticate, authorize } from '../../middlewares/authMiddleware.js';
-import {
-    createProjectValidator,
-    updateProjectValidator,
-    donorValidator,
-    vendorValidator,
-    projectIdValidator,
-    searchProjectsValidator
-} from "../../validators/projectValidator.js";
+import { createProjectValidator, donorValidator, projectIdValidator, searchProjectsValidator, updateProjectValidator, vendorValidator } from '../../middlewares/validation/projectValidator.js';
 const router = express.Router();
 
 // All routes are protected

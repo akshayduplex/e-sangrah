@@ -1,117 +1,8 @@
-// import User from "../../models/User.js";
-
-// // Create a new user
-// export const createUser = async (req, res) => {
-//     try {
-//         // Force profile_type to "user" for this endpoint
-//         req.body.profile_type = "user";
-
-//         // Handle profile image upload if present
-//         if (req.file) {
-//             req.body.profile_image = req.file.path; // Match model field name
-//         }
-
-//         // Validate required userDetails for profile_type "user"
-//         if (!req.body.userDetails || !req.body.userDetails.employee_id) {
-//             return res.status(400).json({
-//                 message: "Employee ID is required for user profile type",
-//             });
-//         }
-
-//         const user = new User(req.body);
-//         const savedUser = await user.save();
-
-//         res.status(201).json(savedUser);
-//     } catch (error) {
-//         // Handle duplicate email or other mongoose validation errors
-//         if (error.code === 11000) {
-//             return res.status(400).json({ message: "Email already exists" });
-//         }
-//         res.status(400).json({ message: error.message });
-//     }
-// };
-
-// // Get all users
-// export const getAllUsers = async (req, res) => {
-//     try {
-//         const users = await User.find()
-//             .populate("designation_id")
-//             .populate("department");
-//         res.status(200).json(users);
-//     } catch (error) {
-//         res.status(500).json({ message: error.message });
-//     }
-// };
-
-// // Get a single user by ID
-// export const getUserById = async (req, res) => {
-//     try {
-//         const user = await User.findById(req.params.id)
-//             .populate("designation_id")
-//             .populate("department");
-//         if (!user) {
-//             return res.status(404).json({ message: "User not found" });
-//         }
-//         res.status(200).json(user);
-//     } catch (error) {
-//         res.status(500).json({ message: error.message });
-//     }
-// };
-
-// // Update a user by ID
-// export const updateUser = async (req, res) => {
-//     try {
-//         // Handle file upload if present
-//         if (req.file) {
-//             req.body.profileImage = req.file.path;
-//         }
-
-//         const updatedUser = await User.findByIdAndUpdate(
-//             req.params.id,
-//             req.body,
-//             { new: true, runValidators: true }
-//         );
-//         if (!updatedUser) {
-//             return res.status(404).json({ message: "User not found" });
-//         }
-//         res.status(200).json(updatedUser);
-//     } catch (error) {
-//         res.status(400).json({ message: error.message });
-//     }
-// };
-
-// // Delete a user by ID
-// export const deleteUser = async (req, res) => {
-//     try {
-//         const deletedUser = await User.findByIdAndDelete(req.params.id);
-//         if (!deletedUser) {
-//             return res.status(404).json({ message: "User not found" });
-//         }
-//         res.status(200).json({ message: "User deleted successfully" });
-//     } catch (error) {
-//         res.status(500).json({ message: error.message });
-//     }
-// };
-
 import User from "../../models/User.js";
-// import Department from "../../models/Department.js";
-// import Designation from "../../models/Designation.js";
 import { validationResult } from "express-validator";
-import crypto from "crypto";
 import registration from "../../emailTemplates/registeration.js";
-
-// Generate employee ID
-const generateEmployeeId = async () => {
-    const count = await User.countDocuments({ profile_type: "user" });
-    return `EMP${String(count + 1).padStart(4, "0")}`;
-};
-
-// Helper to generate random password
-const generateRandomPassword = (length = 10) => {
-    return crypto.randomBytes(Math.ceil(length / 2))
-        .toString("hex")
-        .slice(0, length);
-};
+import { generateEmployeeId } from "../../helper/generateEmployeeId.js";
+import { generateRandomPassword } from "../../helper/generateRandomPassword.js";
 
 // Register user with profile type 'user'
 export const registerUser = async (req, res) => {
@@ -120,7 +11,7 @@ export const registerUser = async (req, res) => {
         let profile_image = null;
 
         if (req.file) {
-            profile_image = `/uploads/${req.file.profileImage}`;
+            profile_image = `/uploads/general/${req.file.filename}`;
         }
 
         // Check if user already exists
@@ -163,17 +54,12 @@ export const registerUser = async (req, res) => {
             subject: "Your Account Has Been Created",
             text: `Hello ${fullName},\n\nYour account has been created successfully.\n\nEmployee ID: ${employee_id}\nEmail: ${email}\nPassword: ${randomPassword}\n\nPlease log in and change your password immediately.\n\nThank you.`
         });
-
-        // Generate JWT token
-        const token = newUser.generateAuthToken();
-
         // Return success response
         res.status(201).json({
             success: true,
             message: "User registered successfully. Login details sent to email.",
             data: {
-                user: newUser.toJSON(),
-                token,
+                user: newUser.toJSON()
             },
         });
     } catch (error) {

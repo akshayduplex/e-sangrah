@@ -28,9 +28,12 @@
             <div class="card">
                 <div class="card-body">
                     <div class="add-info-fieldset">
-                        <form id="menuForm" action="#">
+                        <form id="menuForm" data-url="<%= menu ? `/api/menu/${menu._id}` : '/api/menu' %>"
+                            data-method="<%= menu ? 'PUT' : 'POST' %>">
+
                             <div class="modal-body">
                                 <div class="row">
+                                    <!-- Type -->
                                     <!-- Type -->
                                     <div class="col-md-4">
                                         <label for="type" class="form-label">Type</label>
@@ -39,24 +42,25 @@
                                             <option value="Menu" <%=menu?.type==="Menu" ? "selected" : "" %>>Menu
                                             </option>
                                             <option value="SubMenu" <%=menu?.type==="SubMenu" ? "selected" : "" %>
-                                                >SubMenu
-                                            </option>
+                                                >SubMenu</option>
                                         </select>
                                     </div>
 
-                                    <!-- Master -->
+                                    <!-- Parent Menu -->
                                     <div class="col-md-4" id="masterField" style="display: none;">
-                                        <label for="master_id" class="form-label">Master</label>
+                                        <label for="master_id" class="form-label">Parent Menu</label>
                                         <select class="form-select" id="master_id" name="master_id">
-                                            <option value="">-- Select Master --</option>
+                                            <option value="">-- Select Parent Menu --</option>
                                             <% masters.forEach(master=> { %>
                                                 <option value="<%= master._id %>" <%=menu?.master_id &&
                                                     menu.master_id.toString()===master._id.toString() ? "selected" : ""
-                                                    %>><%= master.name %>
+                                                    %>>
+                                                    <%= master.name %>
                                                 </option>
                                                 <% }) %>
                                         </select>
                                     </div>
+
 
                                     <!-- Name -->
                                     <div class="col-md-4">
@@ -120,59 +124,5 @@
             </div>
 
         </div>
-
+        <script src="/js/pages/permissions/add-edit-menu.js" defer></script>
         <%- include('../../partials/footer') %>
-
-            <script>
-                document.addEventListener("DOMContentLoaded", function () {
-                    const typeSelect = document.getElementById("type");
-                    const masterField = document.getElementById("masterField");
-                    const masterSelect = document.getElementById("master_id");
-                    const form = document.getElementById("menuForm");
-
-                    function toggleMasterField() {
-                        if (typeSelect.value === "Menu") {
-                            masterField.style.display = "block";
-                            masterSelect.disabled = false;
-                        } else {
-                            masterField.style.display = "none";
-                            masterSelect.value = "";
-                            masterSelect.disabled = true;
-                        }
-                    }
-
-                    typeSelect.addEventListener("change", toggleMasterField);
-                    toggleMasterField(); // run on load
-
-                    form.addEventListener("submit", async function (e) {
-                        e.preventDefault();
-                        const formData = new FormData(form);
-                        const data = Object.fromEntries(formData.entries());
-
-                        const url = "<%= menu ? `/api/menu/${menu._id}` : '/api/menu' %>";
-                        const method = "<%= menu ? 'PUT' : 'POST' %>";
-
-                        try {
-                            const response = await fetch(url, {
-                                method: method,
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify(data)
-                            });
-
-                            const result = await response.json();
-
-                            if (result.success) {
-                                showToast("<%= menu ? 'Menu updated successfully' : 'Menu added successfully' %>", "success");
-                                setTimeout(() => {
-                                    window.location.href = "/menu/list";
-                                }, 1000);
-                            } else {
-                                showToast(result.message || "Something went wrong", 'error');
-                            }
-                        } catch (err) {
-                            console.error(err);
-                            showToast(err.message || "An error occurred", 'error');
-                        }
-                    });
-                });
-            </script>

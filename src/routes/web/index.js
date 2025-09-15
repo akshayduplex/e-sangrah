@@ -19,7 +19,7 @@ import {
     getAssignedMenusValidator,
     getMenuListValidator,
     menuIdParamValidator
-} from "../../validators/permissionsValidator.js";
+} from "../../middlewares/validation/permissionValidator.js";
 
 // --- Middlewares ---
 import { authenticate } from "../../middlewares/authMiddleware.js";

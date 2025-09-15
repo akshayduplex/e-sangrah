@@ -1,51 +1,54 @@
+// export function buildMenuTree(data) {
+//     console.log("Building menu tree from data:", data);
+//     const masters = data.filter(item => item.type === 'Master' || item.type === 'Dashboard');
+//     const menus = data.filter(item => item.type === 'Menu');
+//     const submenus = data.filter(item => item.type === 'Submenu');
+
+//     // Build initial tree
+//     const roots = masters.map(master => {
+//         const masterMenus = menus.filter(
+//             m => m.master_id && (m.master_id._id ? m.master_id._id : m.master_id) === master._id
+//         );
+
+//         return {
+//             ...master,
+//             children: masterMenus.map(menu => {
+//                 const menuSubmenus = submenus.filter(
+//                     s => s.master_id && (s.master_id._id ? s.master_id._id : s.master_id) === menu._id
+//                 );
+//                 return { ...menu, children: menuSubmenus };
+//             })
+//         };
+//     });
+
+//     // Recursive filter: only remove hidden items
+//     function filterTree(nodes) {
+//         return nodes
+//             .filter(node => node.is_show !== false) // ✅ only filter hidden
+//             .map(node => ({
+//                 ...node,
+//                 children: filterTree(node.children)
+//             }));
+//     }
+
+//     return filterTree(roots);
+// }
+
 export function buildMenuTree(data) {
-    console.log("Building menu tree from data:", data);
+    const menus = data.filter(m => m.type === "Menu");
+    const subMenus = data.filter(m => m.type === "SubMenu");
 
-    const masters = data.filter(item => item.type === "Master");
-    const dashboards = data.filter(item => item.type === "Dashboard");
-    const menus = data.filter(item => item.type === "Menu");
-
-    // --- Helper: get children recursively ---
-    function getMenuChildren(parentId) {
-        return menus
-            .filter(m => {
-                const masterId = m.master_id?._id || m.master_id;
-                return masterId && masterId.toString() === parentId.toString();
-            })
-            .map(menu => ({
-                ...menu,
-                children: getMenuChildren(menu._id) // recursion for submenus
-            }));
+    function getChildren(parentId) {
+        return subMenus
+            .filter(s => s.master_id?.toString() === parentId.toString())
+            .sort((a, b) => a.priority - b.priority);
     }
 
-    // --- Build Master roots ---
-    const roots = masters.map(master => ({
-        ...master,
-        children: getMenuChildren(master._id)
-    }));
-
-    // --- Special Dashboard root ---
-    if (dashboards.length > 0) {
-        roots.unshift({
-            _id: "dashboard_root",
-            name: "Dashboard",
-            type: "DashboardRoot",
-            children: dashboards.map(d => ({
-                ...d,
-                children: [] // dashboards never have submenus
-            }))
-        });
-    }
-
-    // --- Recursive filter: remove hidden items ---
-    function filterTree(nodes) {
-        return nodes
-            .filter(node => node.is_show !== false)
-            .map(node => ({
-                ...node,
-                children: filterTree(node.children || [])
-            }));
-    }
-
-    return filterTree(roots);
+    return menus
+        .filter(m => m.is_show)
+        .sort((a, b) => a.priority - b.priority)
+        .map(menu => ({
+            ...menu,
+            children: getChildren(menu._id)
+        }));
 }

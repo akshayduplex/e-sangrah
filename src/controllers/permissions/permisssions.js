@@ -699,10 +699,9 @@ export const getSidebarForUser = async (req, res) => {
     // }
     try {
         const profileType = req.user?.profile_type;
-
         let menus = [];
 
-        if (profileType === "admin") {
+        if (profileType === "admin" || profileType === "superadmin") {
             // Admin: get all menus that are set to show
             menus = await Menu.find({ is_show: true }).sort({ priority: 1 });
         } else {
@@ -726,8 +725,9 @@ export const getSidebarForUser = async (req, res) => {
 
         // Filter masters (top-level menus) and sort
         const masters = menus
-            .filter(m => m.type === "Master" || m.type === "Dashboard")
+            .filter(m => m.type === "Menu" && !m.master_id)
             .sort((a, b) => a.priority - b.priority);
+
 
         // Group children (submenus) under each master
         const grouped = masters.map(master => ({
@@ -793,7 +793,8 @@ export const getMenuList = async (req, res) => {
 export const getAddMenu = async (req, res) => {
     try {
         // Only Masters can be parents
-        const masters = await Menu.find({ type: "Master", is_show: true }).sort({ name: 1 });
+        const masters = await Menu.find({ type: "Menu", is_show: true }).sort({ name: 1 });
+
 
         // Render the unified form, menu is null for Add
         res.render("pages/permissions/add", { masters, menu: null });
@@ -811,7 +812,8 @@ export const getEditMenu = async (req, res) => {
             return res.status(404).render("error", { message: "Menu not found" });
         }
 
-        const masters = await Menu.find({ type: "Master", is_show: true }).sort({ name: 1 });
+        const masters = await Menu.find({ type: "Menu", is_show: true }).sort({ name: 1 });
+
 
         // Render the unified form, passing the existing menu
         res.render("pages/permissions/add", { masters, menu });

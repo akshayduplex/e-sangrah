@@ -386,7 +386,6 @@
 <!-- jQuery -->
 <!-- <script data-cfasync="false" src="../../../cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script> -->
 <script src="/js/jquery-3.7.1.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
 <!-- <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
 
@@ -432,6 +431,7 @@
 
 
 <script src="/js/todo.js"></script>
+<script src="/js/toast.js"></script>
 <script src="/js/theme-colorpicker.js"></script>
 <script src="/js/script.js"></script>
 <script src="/js/pages/userRegister.js"></script>
@@ -441,35 +441,8 @@
 <script src="/js/searchableDropdown.js"></script>
 <script defer src="/js/pages/login.js"></script>
 <script scr="/js/pages/projectList.js"></script>
+<script src="/js/pages/permissions.js"></script>
 
-
-<!-- Toastify CSS -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
-<!-- Toastify JS -->
-<script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
-<script>
-    // Base Toast function
-    function showToast(message, type = "info", duration = 4000) {
-        const colors = {
-            success: "#2B1871",
-            error: "#e74c3c",
-            info: "#3498db",
-            warning: "#f39c12"
-        };
-
-        Toastify({
-            text: message || "No message provided",
-            duration: duration,
-            gravity: "top",
-            position: "right",
-            backgroundColor: colors[type] || colors.info,
-            stopOnFocus: true,
-            close: true // allows user to manually close the toast
-        }).showToast();
-    }
-
-
-</script>
 
 
 </body>

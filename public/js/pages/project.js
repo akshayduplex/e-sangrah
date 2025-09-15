@@ -105,8 +105,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
         currentPage = 1;
         totalPages = 1;
-
-        console.log("🔎 Searching for:", currentQuery); // <-- debug log
         fetchProjects(currentPage, currentQuery, false);
     }, 400);
 

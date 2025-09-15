@@ -79,19 +79,19 @@ import errorHandler from "./middlewares/errorHandler.js";
 import { formatDateDDMMYYYY } from "./utils/formatDate.js";
 
 const app = express();
-app.use(
-    helmet.contentSecurityPolicy({
-        directives: {
-            defaultSrc: ["'self'"],
-            scriptSrc: ["'self'", "https://cdn.jsdelivr.net"],
-            styleSrc: ["'self'", "https://cdn.jsdelivr.net"],
-        },
-    })
-);
+// app.use(
+//     helmet.contentSecurityPolicy({
+//         directives: {
+//             defaultSrc: ["'self'"],
+//             scriptSrc: ["'self'", "https://cdn.jsdelivr.net"],
+//             styleSrc: ["'self'", "https://cdn.jsdelivr.net"],
+//         },
+//     })
+// );
 
 // Security middlewares
-app.use(helmet());
-app.disable("x-powered-by");
+app.use(helmet({ contentSecurityPolicy: false }));
+// app.disable("x-powered-by");
 
 // Session
 app.use(

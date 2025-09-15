@@ -4,7 +4,7 @@ import Menu from "../../models/Menu.js";
 import DesignationMenu from "../../models/menuAssignment.js";
 import { assignMenusToDesignation, getAssignedMenus, getSidebarForUser, unAssignMenu } from "../../controllers/permissions/permisssions.js";
 import { authenticate } from "../../middlewares/authMiddleware.js";
-import { assignMenusValidator, getAssignedMenusValidator, unAssignMenusValidator } from "../../validators/permissionsValidator.js";
+import { assignMenusValidator, getAssignedMenusValidator, unAssignMenusValidator } from "../../middlewares/validation/permissionValidator.js";
 
 const router = express.Router();
 
@@ -74,14 +74,22 @@ router.post("/menu", authenticate, async (req, res) => {
         const user = req.user;
         const { type, master_id, name, icon_code, url, priority, is_show } = req.body;
 
+        // Pre-validation
+        if (type === "SubMenu" && !master_id) {
+            return res.status(400).json({ success: false, message: "SubMenu requires a master_id" });
+        }
+        if (type === "Menu" && master_id) {
+            return res.status(400).json({ success: false, message: "Menu cannot have a master_id" });
+        }
+
         const menu = new Menu({
             type,
             master_id: master_id || null,
             name,
-            icon_code: icon_code || '',
-            url: url || '#',
-            priority: parseInt(priority) || 1,
-            is_show: is_show === 'true' || is_show === true,
+            icon_code: icon_code || "",
+            url: url || "#",
+            priority: Number(priority) || 1,
+            is_show: !!is_show,
             added_by: {
                 user_id: user._id,
                 name: user.name,
@@ -97,16 +105,31 @@ router.post("/menu", authenticate, async (req, res) => {
         await menu.save();
         res.json({ success: true, data: menu });
     } catch (error) {
+        if (error.code === 11000) {
+            return res.status(400).json({ success: false, message: "URL must be unique" });
+        }
+        if (error.name === "ValidationError") {
+            return res.status(400).json({ success: false, message: error.message });
+        }
         console.error("Error creating menu:", error);
         res.status(500).json({ success: false, message: "Error creating menu" });
     }
 });
+
 
 // Update menu
 router.put("/menu/:id", authenticate, async (req, res) => {
     try {
         const { id } = req.params;
         const { type, master_id, name, icon_code, url, priority, is_show } = req.body;
+
+        // Pre-validation
+        if (type === "SubMenu" && !master_id) {
+            return res.status(400).json({ success: false, message: "SubMenu requires a master_id" });
+        }
+        if (type === "Menu" && master_id) {
+            return res.status(400).json({ success: false, message: "Menu cannot have a master_id" });
+        }
 
         const menu = await Menu.findByIdAndUpdate(
             id,
@@ -116,16 +139,15 @@ router.put("/menu/:id", authenticate, async (req, res) => {
                 name,
                 icon_code,
                 url,
-                priority,
-                is_show: is_show === "true",
+                priority: Number(priority) || 1,
+                is_show: !!is_show,
                 updated_by: {
-                    user_id: req.session.user_id,
+                    user_id: req.user._id,
                     name: req.user.name,
                     email: req.user.email
-                },
-                updated_date: Date.now()
+                }
             },
-            { new: true }
+            { new: true, runValidators: true }
         );
 
         if (!menu) {
@@ -134,10 +156,17 @@ router.put("/menu/:id", authenticate, async (req, res) => {
 
         res.json({ success: true, data: menu });
     } catch (error) {
+        if (error.code === 11000) {
+            return res.status(400).json({ success: false, message: "URL must be unique" });
+        }
+        if (error.name === "ValidationError") {
+            return res.status(400).json({ success: false, message: error.message });
+        }
         console.error("Error updating menu:", error);
         res.status(500).json({ success: false, message: "Error updating menu" });
     }
 });
+
 
 // Delete menu
 router.delete("/menu/:id", authenticate, async (req, res) => {
