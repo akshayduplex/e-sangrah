@@ -44,13 +44,31 @@ async function loadSidebar() {
             document.getElementById("menu-list").innerHTML = menuHtml;
 
             // Toggle submenus
+            document.querySelectorAll("#menu-list a").forEach(a => {
+                const href = a.getAttribute("href");
+                if (!href) return;
+                const trimmed = href.trim();
+
+                // skip void, hashes, absolute paths and external urls
+                const isJsVoid = trimmed.toLowerCase() === "javascript:void(0);";
+                const isHash = trimmed.startsWith("#");
+                const isAbsolute = trimmed.startsWith("/") || trimmed.startsWith("http") || trimmed.startsWith("mailto:");
+                if (isJsVoid || isHash || isAbsolute) return;
+
+                // ensure leading slash
+                const normalized = trimmed.startsWith("./") ? "/" + trimmed.replace(/^\.\//, "") : "/" + trimmed;
+                a.setAttribute("href", normalized);
+            });
             document.querySelectorAll(".submenu > .menu-link").forEach(link => {
                 link.addEventListener("click", (e) => {
                     e.preventDefault();
                     const submenu = link.nextElementSibling;
+                    if (!submenu) return;
                     const isVisible = submenu.style.display === "block";
+                    // close other open submenus
                     document.querySelectorAll(".dropdown_wrap").forEach(u => u.style.display = "none");
                     document.querySelectorAll(".menu-link.subdrop").forEach(l => l.classList.remove("subdrop"));
+                    // toggle current
                     submenu.style.display = isVisible ? "none" : "block";
                     if (!isVisible) link.classList.add("subdrop");
                 });

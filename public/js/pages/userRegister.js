@@ -4,7 +4,6 @@ document.getElementById("registerForm").addEventListener("submit", async functio
 
     const form = e.target;
     const formData = new FormData(form);
-
     try {
         const response = await fetch("/api/user/register", {
             method: "POST",
@@ -12,6 +11,13 @@ document.getElementById("registerForm").addEventListener("submit", async functio
         });
 
         const result = await response.json();
+        if (result.errors && result.errors.length > 0) {
+            result.errors.forEach(err => {
+                const message = typeof err === "string" ? err : err.msg;
+                showToast(message);
+            });
+            return;
+        }
 
         if (response.ok && result.success) {
             // Show success modal
@@ -22,11 +28,11 @@ document.getElementById("registerForm").addEventListener("submit", async functio
             form.reset();
             document.getElementById("preview").innerHTML = "";
         } else {
-            alert(result.message || "Something went wrong!");
+            showToast(result.error || "Something went wrong!");
         }
     } catch (err) {
         console.error("Error:", err);
-        alert("Internal server error");
+        showToast(err.message || err || "Internal server error");
     }
 });
 

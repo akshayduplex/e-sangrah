@@ -43,10 +43,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
         projects.forEach(project => {
             const card = document.createElement('div');
-            card.className = 'col-sm-3';
+            card.className = 'col-sm-3 d-flex';
             card.innerHTML = `
-                <div class="card projectcard position-relative">
-                    <div class="card-body">
+                <div class="card projectcard position-relative w-100">
+                    <div class="card-body pjcrdbody">
                         <h5 class="fs-20 fw-normal mb-2">${project.projectName ?? 'Unnamed Project'}</h5>
                         <a href="/projects/${project._id}/project-details" 
                            class="position-absolute top-0 end-0 mt-2 me-4 text-primary fs-12 fw-light text-decoration-none">

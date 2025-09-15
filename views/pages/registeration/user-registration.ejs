@@ -1,4 +1,4 @@
-<%- include('../partials/header') %>
+<%- include('../../partials/header') %>
 
 	<!-- Page Wrapper -->
 	<div class="page-wrapper">
@@ -26,9 +26,9 @@
 							<!-- Full Name -->
 							<div class="col-md-6">
 								<div class="mb-3">
-									<label for="fullName" class="form-label">Full Name <span
+									<label for="name" class="form-label">Full Name <span
 											class="text-danger">*</span></label>
-									<input type="text" id="fullName" name="fullName" class="form-control"
+									<input type="text" id="name" name="name" class="form-control"
 										placeholder="Enter full name" required>
 								</div>
 							</div>
@@ -46,9 +46,9 @@
 							<!-- Phone Number -->
 							<div class="col-md-6">
 								<div class="mb-3">
-									<label for="phone" class="form-label">Phone Number <span
+									<label for="phone_number" class="form-label">Phone Number <span
 											class="text-danger">*</span></label>
-									<input type="tel" id="phone" name="phone" class="form-control"
+									<input type="tel" id="phone_number" name="phone_number" class="form-control"
 										placeholder="Enter 10-digit phone number" pattern="^[0-9]{10}$" maxlength="10"
 										required oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0,10)">
 								</div>
@@ -57,10 +57,10 @@
 							<!-- Employee ID -->
 							<div class="col-md-6">
 								<div class="mb-3">
-									<label for="employeeId" class="form-label">Employee ID <span
+									<label for="employee_id" class="form-label">Employee ID <span
 											class="text-danger">*</span></label>
-									<input type="text" id="employeeId" name="employeeId" class="form-control"
-										placeholder="Enter Employee ID" required style="text-transform: uppercase;"
+									<input type="text" id="employee_id" name="employee_id" class="form-control"
+										placeholder="Enter Employee ID" required
 										oninput="this.value = this.value.toUpperCase()">
 								</div>
 							</div>
@@ -70,7 +70,7 @@
 								<div class="mb-3">
 									<label for="department" class="form-label">Department <span
 											class="text-danger">*</span></label>
-									<select id="department" name="department" class="form-select" required>
+									<select id="department" name="department" class="form-select select2" required>
 										<option value="">-- Select Department --</option>
 										<% if (departments && departments.length) { %>
 											<% departments.forEach(dep=> { %>
@@ -90,7 +90,7 @@
 								<div class="mb-3">
 									<label for="designation" class="form-label">Designation <span
 											class="text-danger">*</span></label>
-									<select id="designation" name="designation" class="form-select" required>
+									<select id="designation" name="designation" class="form-select select2" required>
 										<option value="">-- Select Designation --</option>
 										<% if (designations && designations.length) { %>
 											<% designations.forEach(des=> { %>
@@ -126,7 +126,6 @@
 										<div class="preview" id="preview"></div>
 										<div class="upload-icon text-center"><i class="ti ti-plus fa-2x mb-2"></i></div>
 									</div>
-									<small class="text-muted">Accepted formats: JPG, PNG (max 2MB)</small>
 								</div>
 							</div>
 						</div>
@@ -151,7 +150,7 @@
 	</div>
 	<!-- /Page Wrapper -->
 
-	<%- include('../partials/footer') %>
+	<%- include('../../partials/footer') %>
 
 		<!-- Success Modal -->
 		<div id="data-success-register" class="modal fade" tabindex="-1" aria-hidden="true">

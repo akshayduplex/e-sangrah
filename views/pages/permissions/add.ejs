@@ -37,7 +37,7 @@
                                     <!-- Type -->
                                     <div class="col-md-4">
                                         <label for="type" class="form-label">Type</label>
-                                        <select class="form-select" id="type" name="type" required>
+                                        <select class="form-select select2" id="type" name="type" required>
                                             <option value="">-- Select Type --</option>
                                             <option value="Menu" <%=menu?.type==="Menu" ? "selected" : "" %>>Menu
                                             </option>
@@ -49,7 +49,7 @@
                                     <!-- Parent Menu -->
                                     <div class="col-md-4" id="masterField" style="display: none;">
                                         <label for="master_id" class="form-label">Parent Menu</label>
-                                        <select class="form-select" id="master_id" name="master_id">
+                                        <select class="form-select select2" id="master_id" name="master_id">
                                             <option value="">-- Select Parent Menu --</option>
                                             <% masters.forEach(master=> { %>
                                                 <option value="<%= master._id %>" <%=menu?.master_id &&
@@ -71,7 +71,7 @@
                                 </div>
 
                                 <!-- Icon, URL, Priority -->
-                                <div class="row mb-4">
+                                <div class="row mb-4 pt-3">
                                     <div class="col-md-4">
                                         <label for="icon_code" class="form-label">Icon Code</label>
                                         <input type="text" class="form-control" id="icon_code" name="icon_code"
@@ -93,22 +93,24 @@
                                 <!-- Is Show -->
                                 <div class="row mb-4">
                                     <div class="col-md-12 d-flex align-items-center">
-                                        <label class="form-label me-3 mb-0">Is Active</label>
-                                        <div class="btn-group" role="group" aria-label="Is Show">
-                                            <input type="radio" class="btn-check" name="is_show" id="is_show_yes"
-                                                value="true" autocomplete="off" <%=menu?.is_show !==false ? "checked"
-                                                : "" %>>
-                                            <label class="btn btn-outline-secondary" for="is_show_yes"><i
-                                                    class="fas fa-eye"></i> Yes</label>
-
-                                            <input type="radio" class="btn-check" name="is_show" id="is_show_no"
-                                                value="false" autocomplete="off" <%=menu?.is_show===false ? "checked"
-                                                : "" %>>
-                                            <label class="btn btn-outline-secondary" for="is_show_no"><i
-                                                    class="fas fa-eye-slash"></i> No</label>
+                                        <label class="form-label me-3 mb-0">Is Show?</label>
+                                        <div>
+                                            <div class="form-check form-check-inline">
+                                                <input class="form-check-input" type="radio" name="is_show"
+                                                    id="is_show_yes" value="true" <%=menu?.is_show !==false ? "checked"
+                                                    : "" %>>
+                                                <label class="form-check-label" for="is_show_yes">Yes</label>
+                                            </div>
+                                            <div class="form-check form-check-inline">
+                                                <input class="form-check-input" type="radio" name="is_show"
+                                                    id="is_show_no" value="false" <%=menu?.is_show===false ? "checked"
+                                                    : "" %>>
+                                                <label class="form-check-label" for="is_show_no">No</label>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
+
 
                                 <!-- Buttons -->
                                 <div class="d-flex justify-content-end mt-4">
@@ -124,5 +126,6 @@
             </div>
 
         </div>
-        <script src="/js/pages/permissions/add-edit-menu.js" defer></script>
-        <%- include('../../partials/footer') %>
+    </div>
+    <script src="/js/pages/permissions/add-edit-menu.js" defer></script>
+    <%- include('../../partials/footer') %>

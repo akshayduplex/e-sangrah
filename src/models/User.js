@@ -11,7 +11,7 @@ const userDetailsSchema = new mongoose.Schema(
             trim: true,
             required: true,
         },
-        designation_id: {
+        designation: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "Designation",
         },
@@ -69,12 +69,12 @@ const userSchema = new mongoose.Schema(
             unique: true,
             lowercase: true,
             trim: true,
-            match: [
-                /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,})+$/,
-                "Invalid email format",
-            ],
+            // match: [
+            //     /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,})+$/,
+            //     "Invalid email format",
+            // ],
         },
-        phone_number: { type: String, trim: true },
+        phone_number: { type: Number, trim: true },
         raw_password: {
             type: String,
             minlength: 8,

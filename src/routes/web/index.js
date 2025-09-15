@@ -37,7 +37,7 @@ const router = express.Router();
    Home & Authentication
 =========================== */
 router.get("/", authenticate, (req, res) => {
-    res.render("pages/home", { title: "E-Sangrah - Home" });
+    res.render("pages/temp", { title: "E-Sangrah - Home" });
 });
 
 router.get("/login", (req, res) => {
@@ -47,12 +47,16 @@ router.get("/login", (req, res) => {
 router.get("/register", (req, res) => {
     res.render("pages/register", { title: "E-Sangrah - Register" });
 });
+
+router.get("/users-list", async (req, res) => {
+    res.render("pages/registeration/user-listing", { title: "E-Sangrah - Users-List" });
+});
 router.get("/user-register", async (req, res) => {
     const departments = await Department.find({ status: "Active" }, "name").lean();
     const designations = await Designation.find({ status: "Active" })
         .sort({ name: 1 })
         .lean();
-    res.render("pages/user-registration", { title: "E-Sangrah - Register", departments, designations });
+    res.render("pages/registeration/user-registration", { title: "E-Sangrah - Register", departments, designations });
 });
 router.get("/donor-register", (req, res) => {
     res.render("pages/donor-registration", { title: "E-Sangrah - Register" });

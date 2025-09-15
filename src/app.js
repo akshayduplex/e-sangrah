@@ -1,67 +1,3 @@
-// import "dotenv/config"; // loads .env
-// import express from "express";
-// import path from "path";
-// import morgan from "morgan";
-// import helmet from "helmet";
-// import compression from "compression";
-// import session from "express-session";
-// import MongoStore from "connect-mongo";
-// import flash from "connect-flash";
-// import methodOverride from "method-override";
-// import ApiRoutes from "./routes/index.js";
-// import pageRoutes from "./routes/web/index.js";
-// import errorHandler from "./middlewares/errorHandler.js";
-// import { formatDateDDMMYYYY } from "./utils/formatDate.js";
-
-// const app = express();
-
-// // Session
-// app.use(session({
-//     secret: process.env.SESSION_SECRET || "super-secret-key",
-//     resave: false,
-//     saveUninitialized: false,
-//     store: MongoStore.create({
-//         mongoUrl: process.env.MONGO_URI,
-//         collectionName: "sessions",
-//         ttl: 60 * 60 // 1 hour
-//     }),
-//     cookie: { maxAge: 1000 * 60 * 60, secure: false }
-// }));
-// app.use(methodOverride('_method'));
-// app.use(compression());
-// app.use(morgan("dev"));
-// app.use(flash());
-// app.use(express.json());
-// app.use(express.urlencoded({ extended: true }));
-
-// // Views
-// app.set("view engine", "ejs");
-// app.set("views", path.resolve("views"));
-// app.use(express.static(path.resolve("public")));
-
-// // Global locals
-// app.use((req, res, next) => {
-//     const user = req.session.user || {};
-//     res.locals.BASE_URL = process.env.BASE_URL;
-//     res.locals.avatar = user.avatar || null;
-//     res.locals.role = user.role || null;
-//     res.locals.email = user.email || null;
-//     res.locals.name = user.name || null;
-//     res.locals.formatDateDDMMYYYY = formatDateDDMMYYYY;
-//     // Make req.user available in controllers
-//     req.user = user;
-//     next();
-// });
-
-// // Routes
-// app.use("/api", ApiRoutes);
-// app.use("/", pageRoutes);
-
-// // Error handling
-// app.use(errorHandler);
-
-// export default app;
-
 import "dotenv/config"; // loads .env
 import express from "express";
 import path from "path";
@@ -72,26 +8,28 @@ import session from "express-session";
 import MongoStore from "connect-mongo";
 import flash from "connect-flash";
 import methodOverride from "method-override";
-
+import bodyParser from 'body-parser';
+import mongoose from 'mongoose';
 import ApiRoutes from "./routes/index.js";
 import pageRoutes from "./routes/web/index.js";
 import errorHandler from "./middlewares/errorHandler.js";
 import { formatDateDDMMYYYY } from "./utils/formatDate.js";
+import cleanupJob from "./helper/node-cron.js";
 
 const app = express();
-// app.use(
-//     helmet.contentSecurityPolicy({
-//         directives: {
-//             defaultSrc: ["'self'"],
-//             scriptSrc: ["'self'", "https://cdn.jsdelivr.net"],
-//             styleSrc: ["'self'", "https://cdn.jsdelivr.net"],
-//         },
-//     })
-// );
+
+// Connect to MongoDB
+mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/secure-upload')
+    .then(() => {
+        console.log('✅ Connected to MongoDB');
+    })
+    .catch(err => {
+        console.error('❌ MongoDB connection error:', err);
+        process.exit(1);
+    });
 
 // Security middlewares
 app.use(helmet({ contentSecurityPolicy: false }));
-// app.disable("x-powered-by");
 
 // Session
 app.use(
@@ -113,10 +51,14 @@ app.use(
     })
 );
 
+// Initialize cleanup job
+cleanupJob();
+
 app.use(methodOverride("_method"));
 app.use(compression());
 app.use(morgan("dev"));
 app.use(flash());
+app.use(bodyParser.urlencoded({ extended: false }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -125,7 +67,7 @@ app.set("view engine", "ejs");
 app.set("views", path.resolve("views"));
 app.use(express.static(path.resolve("public")));
 
-// Global locals (available in templates)
+// Global locals
 app.use((req, res, next) => {
     const user = req.session.user || {};
     res.locals.BASE_URL = process.env.BASE_URL || "";
@@ -135,7 +77,7 @@ app.use((req, res, next) => {
     res.locals.name = user.name || null;
     res.locals.formatDateDDMMYYYY = formatDateDDMMYYYY;
 
-    req.user = user; // convenience for controllers
+    req.user = user;
     next();
 });
 
@@ -146,4 +88,5 @@ app.use("/", pageRoutes);
 // Error handling
 app.use(errorHandler);
 
+// Make sure to export the app
 export default app;

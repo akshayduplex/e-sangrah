@@ -1,8 +1,8 @@
 import mongoose, { isValidObjectId } from "mongoose";
-import Project from "../../models/Project.js";
 import { successResponse, failResponse, errorResponse } from "../../utils/responseHandler.js";
 import Department from "../../models/Departments.js";
 import User from "../../models/User.js";
+import Project from "../../models/project.js";
 
 // Create a new project
 export const createProject = async (req, res) => {

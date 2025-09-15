@@ -1,3 +1,5 @@
+import User from "../models/User.js";
+
 // Generate employee ID
 export const generateEmployeeId = async () => {
     const count = await User.countDocuments({ profile_type: "user" });

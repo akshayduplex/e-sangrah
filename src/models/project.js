@@ -40,5 +40,5 @@ projectSchema.methods.canManage = function (userId) {
     return this.projectManager.toString() === userId.toString();
 };
 
-const Project = mongoose.model("Project", projectSchema);
+const Project = mongoose.models.Project || mongoose.model("Project", projectSchema);
 export default Project;

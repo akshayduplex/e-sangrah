@@ -25,7 +25,7 @@
                     <div class="row mb-3">
                         <div class="col-md-4">
                             <label><strong>Project Name</strong></label>
-                            <input type="text" name="projectName" class="form-control" placeholder="Enter project name">
+                            <input type="text" name="projectName" class="form-control" placeholder="Enter Project Name">
                         </div>
                         <div class="col-md-4">
                             <label><strong>Project Code</strong></label>
@@ -41,7 +41,7 @@
                     <div class="row mb-3">
                         <div class="col-md-4">
                             <label><strong>Project Manager</strong></label>
-                            <select name="projectManager" class="form-control" required>
+                            <select name="projectManager" class="form-control select2" required>
                                 <% users.forEach(u=> { %>
                                     <option value="<%= u._id %>">
                                         <%= u.name %>
@@ -51,7 +51,7 @@
                         </div>
                         <div class="col-md-4">
                             <label><strong>Department</strong></label>
-                            <select name="department" class="form-control" required>
+                            <select name="department" class="form-control select2" required>
                                 <% departments.forEach(d=> { %>
                                     <option value="<%= d._id %>">
                                         <%= d.name %>
@@ -61,7 +61,13 @@
                         </div>
                         <div class="col-md-4">
                             <label><strong>Status</strong></label>
-                            <input type="text" name="projectStatus" class="form-control" value="Planned">
+                            <select name="projectStatus" class="form-control select2">
+                                <option value="Planned" selected>Planned</option>
+                                <option value="Active">Active</option>
+                                <option value="OnHold">On Hold</option>
+                                <option value="Completed">Completed</option>
+                                <option value="Cancelled">Cancelled</option>
+                            </select>
                         </div>
                     </div>
 
@@ -76,7 +82,7 @@
                         </div>
                         <div class="col-md-4">
                             <label><strong>Priority</strong></label>
-                            <select name="priority" class="form-control">
+                            <select name="priority" class="form-control select2">
                                 <option value="">Select</option>
                                 <option value="Low">Low</option>
                                 <option value="Medium" selected>Medium</option>
@@ -105,8 +111,9 @@
                     <div class="row mb-3">
                         <div class="col-md-12">
                             <label><strong>Description</strong></label>
-                            <textarea name="projectDescription" class="form-control"
-                                placeholder="Enter about Project"></textarea>
+                            <textarea name="projectDescription" class="form-control" placeholder="Enter about Project"
+                                rows="4" style="resize: vertical"></textarea>
+
                         </div>
                     </div>
 

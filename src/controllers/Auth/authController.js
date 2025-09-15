@@ -296,78 +296,26 @@ const otpStore = {};
 // Register
 // ---------------------------
 export const register = async (req, res) => {
-    // try {
-    //     const { name, email, password, raw_password, role, department, position } = req.body;
-
-    //     if (!name || !email || !password) {
-    //         return failResponse(res, "Name, email, and password are required", 400);
-    //     }
-
-    //     const existingUser = await User.findOne({ email });
-    //     if (existingUser) return failResponse(res, "User already exists with this email", 409);
-
-    //     const user = new User({ name, email, password, raw_password, role: role || "employee", department, position });
-    //     await user.save();
-
-    //     const userResponse = user.toObject();
-    //     delete userResponse.password;
-
-    //     return successResponse(res, userResponse, "User registered successfully", 201);
-    // } catch (err) {
-    //     return errorResponse(res, err);
-    // }
     try {
-        const { name, email, role, employeeDetails, vendorDetails, donorDetails, password, raw_password } = req.body;
+        const { name, email, password, raw_password, role, department, position } = req.body;
 
-        if (!name || !email) {
-            return failResponse(res, "Name and email are required", 400);
+        if (!name || !email || !password) {
+            return failResponse(res, "Name, email, and password are required", 400);
         }
 
-        // Check for existing user
         const existingUser = await User.findOne({ email });
         if (existingUser) return failResponse(res, "User already exists with this email", 409);
 
-        let finalRawPassword = raw_password || password;
-
-        // For employee, vendor, donor -> generate random password if none provided
-        if (["employee", "vendor", "donor"].includes(role)) {
-            finalRawPassword = generateRandomPassword(12);
-
-            try {
-                await sendEmail({
-                    to: email,
-                    subject: "Your Account Credentials",
-                    text: `Hello ${name},\n\nYour account has been created.\n\nLogin email: ${email}\nPassword: ${finalRawPassword}\n\nPlease change your password after login.\n\nThank you.`
-                });
-            } catch (emailError) {
-                return failResponse(res, "User creation failed: Could not send email", 500);
-            }
-        }
-
-        if (!finalRawPassword) {
-            return failResponse(res, "Password is required for this role", 400);
-        }
-
-        // Create new user
-        const user = new User({
-            name,
-            email,
-            raw_password: finalRawPassword,
-            role: role || "user",
-            employeeDetails: role === "employee" ? employeeDetails : undefined,
-            vendorDetails: role === "vendor" ? vendorDetails : undefined,
-            donorDetails: role === "donor" ? donorDetails : undefined
-        });
-
+        const user = new User({ name, email, password, raw_password, role: role || "employee", department, position });
         await user.save();
 
-        const userResponse = user.toJSON(); // cleans password
-        return successResponse(res, userResponse, "User registered successfully", 201);
+        const userResponse = user.toObject();
+        delete userResponse.password;
 
+        return successResponse(res, userResponse, "User registered successfully", 201);
     } catch (err) {
         return errorResponse(res, err);
     }
-
 };
 
 

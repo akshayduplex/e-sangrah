@@ -26,15 +26,15 @@ document.addEventListener("DOMContentLoaded", () => {
             });
 
             if (res.ok) {
-                alert("Project created successfully!");
+                showToast("Project created successfully!", "success");
                 window.location.href = "/projects"; // redirect to project list
             } else {
                 const err = await res.json();
-                alert("Error: " + (err.message || "Failed to create project"));
+                showToast((err.message || "Failed to create project"), "error");
             }
         } catch (error) {
             console.error("Error:", error);
-            alert("Something went wrong.");
+            showToast("Something went wrong.", "error");
         }
     });
 });

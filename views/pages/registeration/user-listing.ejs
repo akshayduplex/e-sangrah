@@ -1,0 +1,192 @@
+<%- include('../../partials/header') %>
+
+    <div class="page-wrapper">
+        <div class="content">
+
+            <!-- Breadcrumb + Filter Button -->
+            <div class="dflexbtwn page-breadcrumb mb-3" id="breadcrumbWrapper">
+                <div class="my-auto mb-2">
+                    <h2 class="mb-1" id="pageTitle">User List</h2>
+                    <nav>
+                        <ol class="breadcrumb mb-0" id="breadcrumbNav">
+                            <li class="breadcrumb-item">
+                                <a href="#"><i class="ti ti-smart-home"></i></a>
+                            </li>
+                            <li class="breadcrumb-item">User List</li>
+                        </ol>
+                    </nav>
+                </div>
+                <div class="listbtn" id="listBtnWrapper">
+                    <a href="#" id="btnFilter" class="site-btnmd fs-14">Filter</a>
+                </div>
+            </div>
+
+            <!-- Filter Fields (hidden by default, placed outside breadcrumb) -->
+            <div id="filterContainer" class="mb-3" style="display: none;">
+                <div class="row g-2">
+                    <div class="col-md-2">
+                        <input type="text" id="filterEmail" class="form-control" placeholder="Filter by Email">
+                    </div>
+                    <div class="col-md-2">
+                        <input type="text" id="filterPhone" class="form-control" placeholder="Filter by Phone">
+                    </div>
+                    <div class="col-md-2">
+                        <input type="text" id="filterDepartment" class="form-control"
+                            placeholder="Filter by Department">
+                    </div>
+                    <div class="col-md-2">
+                        <input type="text" id="filterDesignation" class="form-control"
+                            placeholder="Filter by Designation">
+                    </div>
+                    <div class="col-md-2">
+                        <input type="text" id="filterLastLogin" class="form-control" placeholder="Filter by Last Login">
+                    </div>
+                    <div class="col-md-2">
+                        <input type="text" id="filterCreatedAt" class="form-control" placeholder="Filter by Created At">
+                    </div>
+                </div>
+            </div>
+
+            <!-- User List Table -->
+            <div class="card" id="userListCard">
+                <div class="card-body p-0" id="userListBody">
+                    <div class="custom-datatable-filter table-responsive" id="userTableWrapper">
+                        <table class="table datatable" id="userTable">
+                            <thead class="thead-light">
+                                <tr>
+                                    <th>Sr No.</th>
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                    <th>Phone</th>
+                                    <th>Profile Type</th>
+                                    <th>Status</th>
+                                    <th>Department</th>
+                                    <th>Designation</th>
+                                    <th>Last Login</th>
+                                    <th>Created At</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="userTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="footer mt-4 d-sm-flex align-items-center justify-content-between border-top bg-white p-3"
+                id="footerWrapper">
+                <p class="mb-0">2025 &copy; HLFPPT.</p>
+                <p>Designed & Developed by
+                    <a href="javascript:void(0);" id="devLink" class="text-primary">Duplex Services & Technology</a>
+                </p>
+            </div>
+
+        </div>
+    </div>
+
+    <%- include('../../partials/footer') %>
+
+        <link href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+        <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+        <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+
+        <script>
+            $(document).ready(function () {
+                let table;
+
+                // Toggle filter container
+                $('#btnFilter').click(function (e) {
+                    e.preventDefault();
+                    $('#filterContainer').slideToggle();
+                });
+
+                // Fetch users from API
+                $.ajax({
+                    url: '/api/user',
+                    method: 'GET',
+                    success: function (res) {
+                        if (!res.success) { alert('Failed to fetch users!'); return; }
+
+                        let users = res.users;
+                        let tbody = '';
+                        users.forEach((user, index) => {
+                            let department = user.userDetails?.department?.name || '-';
+                            let designation = user.userDetails?.designation?.name || '-';
+                            let phone = user.phone_number || '-';
+                            let lastLogin = user.lastLogin ? new Date(user.lastLogin).toLocaleString() : '-';
+                            let createdAt = new Date(user.createdAt).toLocaleString();
+
+                            tbody += `
+    <tr>
+        <td>${index + 1}</td>
+        <td>${user.name}</td>
+        <td>${user.email}</td>
+        <td>${phone}</td>
+        <td>${user.profile_type}</td>
+        <td>${user.status}</td>
+        <td>${department}</td>
+        <td>${designation}</td>
+        <td>${lastLogin}</td>
+        <td>${createdAt}</td>
+        <td>
+            <a href="/user-edit/${user._id}" class="text-primary me-2" title="Edit">
+                <i class="ti ti-edit"></i>
+            </a>
+            <a href="#" class="text-danger btn-delete" data-id="${user._id}" title="Delete">
+                <i class="ti ti-trash"></i>
+            </a>
+        </td>
+    </tr>
+`;
+
+                        });
+                        $('#userTableBody').html(tbody);
+
+                        // Initialize DataTable
+                        table = $('#userTable').DataTable({
+                            "columnDefs": [
+                                { "orderable": false, "targets": [0, 1, 4, 5, 10] },
+                                { "orderable": true, "targets": [2, 3, 6, 7, 8, 9] }
+                            ],
+                            "order": []
+                        });
+
+                        // Column filters
+                        $('#filterEmail').on('keyup', function () { table.column(2).search(this.value).draw(); });
+                        $('#filterPhone').on('keyup', function () { table.column(3).search(this.value).draw(); });
+                        $('#filterDepartment').on('keyup', function () { table.column(6).search(this.value).draw(); });
+                        $('#filterDesignation').on('keyup', function () { table.column(7).search(this.value).draw(); });
+                        $('#filterLastLogin').on('keyup', function () { table.column(8).search(this.value).draw(); });
+                        $('#filterCreatedAt').on('keyup', function () { table.column(9).search(this.value).draw(); });
+                    },
+                    error: function (err) {
+                        console.error(err);
+                        alert('Error fetching users');
+                    }
+                });
+
+                // Delete user
+                $(document).on('click', '.btn-delete', function () {
+                    let userId = $(this).data('id');
+                    if (!confirm('Are you sure you want to delete this user?')) return;
+
+                    $.ajax({
+                        url: `/api/user/${userId}`,
+                        method: 'DELETE',
+                        success: function (res) {
+                            if (res.success) {
+                                alert('User deleted successfully!');
+                                location.reload();
+                            } else {
+                                alert('Failed to delete user');
+                            }
+                        },
+                        error: function (err) {
+                            console.error(err);
+                            alert('Error deleting user');
+                        }
+                    });
+                });
+            });
+        </script>

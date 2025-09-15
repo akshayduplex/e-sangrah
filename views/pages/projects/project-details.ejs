@@ -118,7 +118,7 @@
                     <div class="row mb-3">
                         <div class="col-md-4">
                             <label><strong>Project Manager</strong></label>
-                            <select name="projectManager" class="form-control">
+                            <select name="projectManager" class="form-control select2">
                                 <% users.forEach(u=> { %>
                                     <option value="<%= u._id %>" <%=project.projectManager?._id==u._id ? "selected" : ""
                                         %>>
@@ -129,7 +129,7 @@
                         </div>
                         <div class="col-md-4">
                             <label><strong>Department</strong></label>
-                            <select name="department" class="form-control">
+                            <select name="department" class="form-control select2">
                                 <% departments.forEach(d=> { %>
                                     <option value="<%= d._id %>" <%=project.department?._id==d._id ? "selected" : "" %>>
                                         <%= d.name %>
@@ -139,8 +139,19 @@
                         </div>
                         <div class="col-md-4">
                             <label><strong>Status</strong></label>
-                            <input type="text" name="projectStatus" value="<%= project.projectStatus || "" %>"
-                                class="form-control">
+                            <select name="projectStatus" class="form-control select2" required>
+                                <option value="Planned" <%=project.projectStatus==="Planned" ? "selected" : "" %>
+                                    >Planned</option>
+                                <option value="Active" <%=project.projectStatus==="Active" ? "selected" : "" %>>Active
+                                </option>
+                                <option value="OnHold" <%=project.projectStatus==="OnHold" ? "selected" : "" %>>On Hold
+                                </option>
+                                <option value="Completed" <%=project.projectStatus==="Completed" ? "selected" : "" %>
+                                    >Completed</option>
+                                <option value="Cancelled" <%=project.projectStatus==="Cancelled" ? "selected" : "" %>
+                                    >Cancelled</option>
+                            </select>
+
                         </div>
                     </div>
 
@@ -159,7 +170,7 @@
                         </div>
                         <div class="col-md-4">
                             <label><strong>Priority</strong></label>
-                            <select name="priority" class="form-control">
+                            <select name="priority" class="form-control select2">
                                 <option value="">Select</option>
                                 <option value="Low" <%=project.priority==="Low" ? "selected" : "" %>>Low</option>
                                 <option value="Medium" <%=project.priority==="Medium" ? "selected" : "" %>>Medium
@@ -210,6 +221,7 @@
         </footer>
     </div>
 
-
+    <!-- Hidden project ID container -->
+    <div id="projectDetails" data-project-id="<%= project._id.toString() %>"></div>
     <script src="/js/pages/projects/project-details.js"></script>
     <%- include('../../partials/footer') %>

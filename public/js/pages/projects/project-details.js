@@ -23,7 +23,8 @@ document.getElementById('cancelEditBtn').addEventListener('click', () => {
 // Save form
 document.getElementById('editProjectForm').addEventListener('submit', async function (e) {
     e.preventDefault();
-    const projectId = "<%= project._id %>";
+    const projectId = document.getElementById("projectDetails").dataset.projectId;
+
     const data = Object.fromEntries(new FormData(this).entries());
 
     try {

@@ -7,7 +7,7 @@ import { generateRandomPassword } from "../../helper/generateRandomPassword.js";
 // Register user with profile type 'user'
 export const registerUser = async (req, res) => {
     try {
-        const { fullName, email, phone_number, department, designation_id, address } = req.body;
+        const { name, email, phone_number, employee_id, department, designation, address } = req.body;
         let profile_image = null;
 
         if (req.file) {
@@ -24,14 +24,14 @@ export const registerUser = async (req, res) => {
         }
 
         // Generate employee ID
-        const employee_id = await generateEmployeeId();
+        // const employee_id = await generateEmployeeId();
 
         // Generate random password
         const randomPassword = generateRandomPassword();
 
         // Create new user
         const newUser = new User({
-            name: fullName,
+            name,
             email,
             phone_number,
             raw_password: randomPassword, // will be hashed by pre-save middleware
@@ -40,7 +40,7 @@ export const registerUser = async (req, res) => {
             userDetails: {
                 employee_id,
                 department,
-                designation_id,
+                designation,
             },
             address
         });
@@ -75,13 +75,10 @@ export const registerUser = async (req, res) => {
 // Get all users with profile type 'user'
 export const getAllUsers = async (req, res) => {
     try {
-        const {
-            page = 1,
-            limit = 10,
-            search = "",
-            department,
-            status,
-        } = req.query;
+        let { page = 1, limit = 10, search = "", department, status } = req.query;
+
+        page = parseInt(page, 10);
+        limit = parseInt(limit, 10);
 
         const filter = { profile_type: "user" };
 
@@ -103,9 +100,9 @@ export const getAllUsers = async (req, res) => {
 
         const users = await User.find(filter)
             .populate("userDetails.department", "name")
-            .populate("designation_id", "name")
+            .populate("userDetails.designation", "name")
             .select("-password -raw_password")
-            .limit(limit * 1)
+            .limit(limit)
             .skip((page - 1) * limit)
             .sort({ createdAt: -1 });
 
@@ -113,12 +110,12 @@ export const getAllUsers = async (req, res) => {
 
         res.status(200).json({
             success: true,
-            data: {
-                users,
-                totalPages: Math.ceil(total / limit),
-                currentPage: page,
-                total,
-            },
+            message: "Users fetched successfully",
+            users,
+            totalPages: Math.ceil(total / limit),
+            currentPage: page,
+            total,
+
         });
     } catch (error) {
         console.error("Get users error:", error);
@@ -129,12 +126,13 @@ export const getAllUsers = async (req, res) => {
     }
 };
 
+
 // Get single user by ID
 export const getUserById = async (req, res) => {
     try {
         const user = await User.findById(req.params.id)
             .populate("userDetails.department", "name")
-            .populate("designation_id", "name")
+            .populate("userDetails.designation", "name")
             .select("-password -raw_password");
 
         if (!user || user.profile_type !== "user") {
@@ -180,18 +178,21 @@ export const updateUser = async (req, res) => {
             });
         }
 
-        // Update fields
         if (name) user.name = name;
         if (phone_number) user.phone_number = phone_number;
-        if (designation_id) user.designation_id = designation_id;
         if (status) user.status = status;
+
+        // Ensure userDetails exists
+        if (!user.userDetails) user.userDetails = {};
+
         if (department) user.userDetails.department = department;
+        if (designation_id) user.userDetails.designation = designation_id;
 
         await user.save();
 
         const updatedUser = await User.findById(user._id)
             .populate("userDetails.department", "name")
-            .populate("designation_id", "name")
+            .populate("userDetails.designation", "name")
             .select("-password -raw_password");
 
         res.status(200).json({
@@ -208,6 +209,7 @@ export const updateUser = async (req, res) => {
     }
 };
 
+
 // Delete user
 export const deleteUser = async (req, res) => {
     try {
@@ -220,7 +222,11 @@ export const deleteUser = async (req, res) => {
             });
         }
 
-        await User.findByIdAndDelete(req.params.id);
+        // Use deleteOne() on the document
+        await user.deleteOne();
+
+        // Alternatively, you could do:
+        // await User.findByIdAndDelete(req.params.id);
 
         res.status(200).json({
             success: true,
@@ -234,3 +240,4 @@ export const deleteUser = async (req, res) => {
         });
     }
 };
+
