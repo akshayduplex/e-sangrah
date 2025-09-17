@@ -18,7 +18,7 @@ router.use(authenticate);
 router.post("/register", upload.single("profile_image"), registerUser);
 router.get("/", getAllUsers);
 router.get("/:id", getUserById);
-router.put("/:id", updateValidation, validate, updateUser);
+router.put("/:id", updateUser);
 router.delete("/:id", deleteUser);
 
 export default router;

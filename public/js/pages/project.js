@@ -52,9 +52,6 @@ document.addEventListener("DOMContentLoaded", () => {
                            class="position-absolute top-0 end-0 mt-2 me-4 text-primary fs-12 fw-light text-decoration-none">
                            View
                         </a>
-                        <h6 class="fs-16 fw-normal text-neutral">
-                            Department: ${project.department?.name ?? 'N/A'}
-                        </h6>
                         <small class="fs-12 text-black fw-light">
                             Created on: ${new Date(project.createdAt ?? project.projectStartDate).toLocaleDateString()}
                         </small>

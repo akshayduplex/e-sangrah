@@ -8,8 +8,7 @@ import {
     loginValidator,
     sendOtpValidator,
     verifyOtpValidator,
-    resetPasswordValidator,
-    changePasswordValidator
+    resetPasswordValidator
 } from "../../middlewares/validation/authValidators.js";
 
 const router = express.Router();
@@ -26,14 +25,15 @@ router.post("/send-otp", sendOtpValidator, validate, authController.sendOtp);
 router.post("/verify-otp", verifyOtpValidator, validate, authController.verifyOtp);
 
 router.post("/reset-password", resetPasswordValidator, validate, authController.resetPassword);
-
-router.post("/direct-password", changePasswordValidator, validate, authController.changePassword);
+// In your routes file
+router.post('/send-reset-link', authController.sendResetLink);
+router.get('/verify-reset/:token', authController.verifyResetLink);
 
 // ---------------------------
 // Session-protected routes
 // ---------------------------
-router.get("/me", authenticate, authController.getMe);
-
+router.get("/profile", authenticate, authController.getMe);
+router.post("/edit-profile", authenticate, authController.updateProfile);
 router.post("/logout", authenticate, authController.logout);
 
 export default router;

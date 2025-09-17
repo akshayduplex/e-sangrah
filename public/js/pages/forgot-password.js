@@ -1,34 +1,49 @@
 document.addEventListener("DOMContentLoaded", function () {
-    const emailInput = document.getElementById("exampleFormControlInput1");
-    const sendOtpBtn = document.querySelector(".submitbtn");
-    const otpSection = document.querySelector(".otpsection");
+    const emailInput = document.getElementById("emailInput");
+    const sendOtpBtn = document.querySelector(".submit-btn");
+    const otpSection = document.querySelector(".otp-section");
     const otpInputs = document.querySelectorAll(".otp-input");
-    const passwordBoxes = document.querySelectorAll(".password-box");
-    const loginBtn = document.querySelector(".btn-login");
-    const resendBtn = document.querySelector(".simplebtn");
-    const otpVerifiedText = document.querySelector(".wrapotp_check .text-success");
+    const resetForm = document.getElementById("resetPasswordForm");
+    const resendBtn = document.querySelector(".resend-btn");
+    const otpVerifiedText = otpSection.querySelector(".text-success");
+    const countdownDisplay = document.getElementById("otp-timer");
 
-    let otpSent = false; // Track if OTP has been sent
+    let countdownInterval;
+    let otpSent = false;
 
-    // -------------------- INITIAL RESET --------------------
+    // Reset all fields
     const resetAllFields = () => {
         if (emailInput) emailInput.value = "";
         otpInputs.forEach(inp => inp.value = "");
-        passwordBoxes.forEach(box => {
-            const input = box.querySelector("input");
-            if (input) input.value = "";
-        });
         if (otpSection) otpSection.style.display = "none";
-        passwordBoxes.forEach(box => box.style.display = "none");
-        if (loginBtn) loginBtn.style.display = "none";
+        if (resetForm) resetForm.style.display = "none";
         if (otpVerifiedText) otpVerifiedText.style.display = "none";
         if (sendOtpBtn) sendOtpBtn.disabled = false;
         otpSent = false;
+        clearInterval(countdownInterval);
     };
 
-    resetAllFields(); // Clear everything on page load
+    resetAllFields();
 
-    // -------------------- Send OTP FUNCTION --------------------
+    // OTP Countdown
+    function startCountdown(duration = 600) {
+        let timer = duration;
+        clearInterval(countdownInterval);
+
+        countdownInterval = setInterval(() => {
+            let minutes = Math.floor(timer / 60);
+            let seconds = timer % 60;
+            countdownDisplay.textContent = `OTP expires in ${minutes}:${seconds < 10 ? "0" + seconds : seconds}`;
+
+            if (--timer < 0) {
+                clearInterval(countdownInterval);
+                countdownDisplay.textContent = "⏰ OTP expired. Please resend.";
+                otpInputs.forEach(inp => inp.disabled = true);
+            }
+        }, 1000);
+    }
+
+    // Send OTP
     const sendOtp = async () => {
         const email = emailInput.value.trim();
         if (!email) {
@@ -36,10 +51,10 @@ document.addEventListener("DOMContentLoaded", function () {
             return;
         }
 
-        sendOtpBtn.disabled = true; // Disable button immediately
+        sendOtpBtn.disabled = true;
 
         try {
-            const response = await fetch("http://localhost:5000/api/auth/send-otp", {
+            const response = await fetch("/api/auth/send-otp", {
                 method: "POST",
                 headers: { "Content-Type": "application/x-www-form-urlencoded" },
                 body: new URLSearchParams({ email })
@@ -48,12 +63,14 @@ document.addEventListener("DOMContentLoaded", function () {
 
             if (data.success) {
                 showToast("OTP sent to your email!", "info");
-                if (otpSection) otpSection.style.display = "block";
+                otpSection.style.display = "block";
                 otpInputs[0].focus();
                 otpSent = true;
+                startCountdown(600);
+                otpInputs.forEach(inp => inp.disabled = false);
             } else {
                 showToast(data.message || "Failed to send OTP.", "error");
-                sendOtpBtn.disabled = false; // Re-enable if failed
+                sendOtpBtn.disabled = false;
             }
         } catch (err) {
             console.error("Send OTP error:", err);
@@ -62,22 +79,23 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     };
 
-    // -------------------- Send OTP BUTTON --------------------
-    sendOtpBtn.addEventListener("click", sendOtp);
-
-    // -------------------- Resend OTP BUTTON --------------------
-    resendBtn.addEventListener("click", function () {
-        otpInputs.forEach(inp => inp.value = ""); // clear OTP inputs
-        passwordBoxes.forEach(box => box.style.display = "none"); // hide password
-        if (loginBtn) loginBtn.style.display = "none";
-        if (otpVerifiedText) otpVerifiedText.style.display = "none";
-        otpSection.style.display = "block"; // keep OTP section visible
-        otpSent = false; // reset flag
-
-        sendOtp(); // actually send a new OTP
+    // Send OTP button
+    sendOtpBtn.addEventListener("click", function (e) {
+        e.preventDefault();
+        sendOtp();
     });
 
-    // -------------------- OTP AUTO-FOCUS --------------------
+    // Resend OTP button
+    resendBtn.addEventListener("click", function () {
+        otpInputs.forEach(inp => inp.value = "");
+        resetForm.style.display = "none";
+        if (otpVerifiedText) otpVerifiedText.style.display = "none";
+        otpSection.style.display = "block";
+        otpSent = false;
+        sendOtp();
+    });
+
+    // OTP auto-focus
     otpInputs.forEach((input, index) => {
         input.addEventListener("input", () => {
             if (input.value.length === 1 && index < otpInputs.length - 1) {
@@ -90,7 +108,7 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     });
 
-    // -------------------- VERIFY OTP --------------------
+    // Verify OTP
     const verifyOtp = async () => {
         if (!otpSent) {
             showToast("Please request an OTP first", "info");
@@ -101,7 +119,7 @@ document.addEventListener("DOMContentLoaded", function () {
         const otp = [...otpInputs].map(inp => inp.value).join("");
 
         try {
-            const response = await fetch("http://localhost:5000/api/auth/verify-otp", {
+            const response = await fetch("/api/auth/verify-otp", {
                 method: "POST",
                 headers: { "Content-Type": "application/x-www-form-urlencoded" },
                 body: new URLSearchParams({ email, otp })
@@ -109,10 +127,10 @@ document.addEventListener("DOMContentLoaded", function () {
             const data = await response.json();
 
             if (data.success) {
-                if (otpVerifiedText) otpVerifiedText.style.display = "block";
-                passwordBoxes.forEach(box => box.style.display = "block");
-                loginBtn.style.display = "block";
-                loginBtn.textContent = "Submit";
+                clearInterval(countdownInterval);
+                countdownDisplay.style.display = "none"; // Hide OTP countdown
+                otpVerifiedText.style.display = "block";
+                resetForm.style.display = "block";       // show password form
             } else {
                 showToast(data.message || "Invalid OTP, try again.", "error");
                 otpInputs.forEach(inp => inp.value = "");
@@ -124,8 +142,10 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     };
 
-    // -------------------- RESET PASSWORD --------------------
-    loginBtn.addEventListener("click", async function () {
+    // Submit new password (send verification link)
+    resetForm.addEventListener("submit", async function (e) {
+        e.preventDefault();
+
         const email = emailInput.value.trim();
         const password = document.getElementById("newPassword").value.trim();
         const confirmPassword = document.getElementById("confirmPassword").value.trim();
@@ -141,21 +161,23 @@ document.addEventListener("DOMContentLoaded", function () {
         }
 
         try {
-            const response = await fetch("http://localhost:5000/api/auth/reset-password", {
+            const response = await fetch("/api/auth/send-reset-link", {
                 method: "POST",
-                headers: { "Content-Type": "application/x-www-form-urlencoded" },
-                body: new URLSearchParams({ email, password, confirmPassword })
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email, password, confirmPassword })
             });
             const data = await response.json();
 
             if (data.success) {
-                showToast("Password reset successful! You can now login.", "success");
-                window.location.href = "/login";
+                showToast("A verification link has been sent to your email. Please click the link to complete the password reset.", "success");
+
+                // Hide reset form but keep email visible
+                resetForm.style.display = "none";
             } else {
-                showToast(data.message || "Failed to reset password.", "error");
+                showToast(data.message || "Failed to send verification link.", "error");
             }
         } catch (err) {
-            console.error("Reset password error:", err);
+            console.error("Send reset link error:", err);
             showToast("Something went wrong. Please try again.", "error");
         }
     });

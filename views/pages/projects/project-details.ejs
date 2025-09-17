@@ -7,7 +7,7 @@
             <div class="d-flex align-items-center justify-content-between page-breadcrumb mb-3">
                 <div class="my-auto mb-2">
                     <h2 class="mb-1">
-                        <%= project.projectName %>
+                        <%= project ? project.projectName : "Add New Project" %>
                     </h2>
                     <nav>
                         <ol class="breadcrumb mb-0">
@@ -15,203 +15,47 @@
                             <li class="breadcrumb-item">Dashboard</li>
                             <li class="breadcrumb-item">Project List</li>
                             <li class="breadcrumb-item active">
-                                <%= project.projectName %>
+                                <%= project ? project.projectName : "Add Project" %>
                             </li>
                         </ol>
                     </nav>
                 </div>
-                <div class="rtbtn">
-                    <button id="toggleModeBtn" class="btn btn-primary btn-lg rounded-pill me-2 mb-2">
-                        <i class="ti ti-pencil me-1"></i> Edit
-                    </button>
-                </div>
+
+                <% if (project) { %>
+                    <div class="rtbtn">
+                        <button id="toggleModeBtn" class="btn btn-primary btn-lg rounded-pill me-2 mb-2">
+                            <i class="ti ti-pencil me-1"></i> Edit
+                        </button>
+                    </div>
+                    <% } %>
             </div>
             <!-- /Breadcrumb -->
 
-            <!-- View Mode -->
-            <div id="viewMode" class="project-details card shadow-sm p-4">
-                <div class="row mb-3">
-                    <div class="col-md-4"><strong>Project Name</strong><br>
-                        <%= project.projectName || "N/A" %>
-                    </div>
-                    <div class="col-md-4"><strong>Project Code</strong><br>
-                        <%= project.projectCode || "N/A" %>
-                    </div>
-                    <div class="col-md-4"><strong>Project Type</strong><br>
-                        <%= project.projectType || "N/A" %>
-                    </div>
+            <% if (!project) { %>
+                <!-- ADD MODE -->
+                <div class="project-details">
+                    <form id="addProjectForm" enctype="multipart/form-data">
+                        <%- include('../../forms/project-form', { users, donors: [], vendors: [], project: null,
+                            viewOnly: false }) %>
+                    </form>
                 </div>
-
-                <div class="row mb-3">
-                    <div class="col-md-4"><strong>Project Manager</strong><br>
-                        <%= project.projectManager?.name || "Unassigned" %>
-                    </div>
-                    <div class="col-md-4"><strong>Department</strong><br>
-                        <%= project.department?.name || "N/A" %>
-                    </div>
-                    <div class="col-md-4"><strong>Status</strong><br>
-                        <%= project.projectStatus || "Unknown" %>
-                    </div>
-                </div>
-
-                <div class="row mb-3">
-                    <div class="col-md-4"><strong>Start Date</strong><br>
-                        <%= formatDateDDMMYYYY(project.projectStartDate) %>
-                    </div>
-                    <div class="col-md-4"><strong>End Date</strong><br>
-                        <%= formatDateDDMMYYYY(project.projectEndDate) %>
-                    </div>
-                    <div class="col-md-4"><strong>Duration</strong><br>
-                        <%= project.projectDuration || "N/A" %> Days
-                    </div>
-                </div>
-
-                <div class="row mb-3">
-                    <div class="col-md-4"><strong>Priority</strong><br>
-                        <% if (project.priority==="High" ) { %>
-                            <span class="text-danger">
-                                <%= project.priority %> &#9888;
-                            </span>
-                            <% } else { %>
-                                <%= project.priority || "N/A" %>
-                                    <% } %>
-                    </div>
-                    <div class="col-md-4"><strong>Donors</strong><br>
-                        <% if (project.donor?.length) { %>
-                            <%= project.donor.map(d=> d.name).join(", ") %>
-                                <% } else { %> N/A <% } %>
-                    </div>
-                    <div class="col-md-4"><strong>Vendors</strong><br>
-                        <% if (project.vendor?.length) { %>
-                            <%= project.vendor.map(v=> v.name).join(", ") %>
-                                <% } else { %> N/A <% } %>
-                    </div>
-                </div>
-
-                <div class="row mb-3">
-                    <div class="col-md-12"><strong>Description</strong><br>
-                        <%= project.projectDescription || "No description available" %>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Edit Mode (same structure as view) -->
-            <div id="editMode" class="project-details card shadow-sm p-4" style="display:none;">
-                <form id="editProjectForm">
-                    <div class="row mb-3">
-                        <div class="col-md-4">
-                            <label><strong>Project Name</strong></label>
-                            <input type="text" name="projectName" value="<%= project.projectName %>"
-                                class="form-control">
-                        </div>
-                        <div class="col-md-4">
-                            <label><strong>Project Code</strong></label>
-                            <input type="text" value="<%= project.projectCode %>" class="form-control" readonly>
-                        </div>
-                        <div class="col-md-4">
-                            <label><strong>Project Type</strong></label>
-                            <input type="text" name="projectType" value="<%= project.projectType %>"
-                                class="form-control">
-                        </div>
+                <% } else { %>
+                    <!-- VIEW MODE -->
+                    <div id="viewMode" class="project-details">
+                        <%- include('../../forms/project-form', { users, donors, vendors, project, viewOnly: true }) %>
                     </div>
 
-                    <div class="row mb-3">
-                        <div class="col-md-4">
-                            <label><strong>Project Manager</strong></label>
-                            <select name="projectManager" class="form-control select2">
-                                <% users.forEach(u=> { %>
-                                    <option value="<%= u._id %>" <%=project.projectManager?._id==u._id ? "selected" : ""
-                                        %>>
-                                        <%= u.name %>
-                                    </option>
-                                    <% }) %>
-                            </select>
-                        </div>
-                        <div class="col-md-4">
-                            <label><strong>Department</strong></label>
-                            <select name="department" class="form-control select2">
-                                <% departments.forEach(d=> { %>
-                                    <option value="<%= d._id %>" <%=project.department?._id==d._id ? "selected" : "" %>>
-                                        <%= d.name %>
-                                    </option>
-                                    <% }) %>
-                            </select>
-                        </div>
-                        <div class="col-md-4">
-                            <label><strong>Status</strong></label>
-                            <select name="projectStatus" class="form-control select2" required>
-                                <option value="Planned" <%=project.projectStatus==="Planned" ? "selected" : "" %>
-                                    >Planned</option>
-                                <option value="Active" <%=project.projectStatus==="Active" ? "selected" : "" %>>Active
-                                </option>
-                                <option value="OnHold" <%=project.projectStatus==="OnHold" ? "selected" : "" %>>On Hold
-                                </option>
-                                <option value="Completed" <%=project.projectStatus==="Completed" ? "selected" : "" %>
-                                    >Completed</option>
-                                <option value="Cancelled" <%=project.projectStatus==="Cancelled" ? "selected" : "" %>
-                                    >Cancelled</option>
-                            </select>
-
-                        </div>
+                    <!-- EDIT MODE -->
+                    <div id="editMode" class="project-details" style="display:none;">
+                        <form id="editProjectForm">
+                            <%- include('../../forms/project-form', { users, donors, vendors, project, viewOnly: false
+                                }) %>
+                        </form>
                     </div>
 
-                    <div class="row mb-3">
-                        <div class="col-md-4">
-                            <label><strong>Start Date</strong></label>
-                            <input type="date" name="projectStartDate"
-                                value="<%= project.projectStartDate ? project.projectStartDate.toISOString().split('T')[0] : '' %>"
-                                class="form-control">
-                        </div>
-                        <div class="col-md-4">
-                            <label><strong>End Date</strong></label>
-                            <input type="date" name="projectEndDate"
-                                value="<%= project.projectEndDate ? project.projectEndDate.toISOString().split('T')[0] : '' %>"
-                                class="form-control">
-                        </div>
-                        <div class="col-md-4">
-                            <label><strong>Priority</strong></label>
-                            <select name="priority" class="form-control select2">
-                                <option value="">Select</option>
-                                <option value="Low" <%=project.priority==="Low" ? "selected" : "" %>>Low</option>
-                                <option value="Medium" <%=project.priority==="Medium" ? "selected" : "" %>>Medium
-                                </option>
-                                <option value="High" <%=project.priority==="High" ? "selected" : "" %>>High</option>
-                            </select>
-                        </div>
-                    </div>
+                    <div id="projectDetails" data-project-id="<%= project._id.toString() %>"></div>
+                    <% } %>
 
-                    <div class="row mb-3">
-                        <div class="col-md-4">
-                            <label><strong>Donors</strong></label>
-                            <input type="text" name="donors" value="<%= project.donor?.map(d=>d.name).join(', ') %>"
-                                class="form-control">
-                        </div>
-                        <div class="col-md-4">
-                            <label><strong>Vendors</strong></label>
-                            <input type="text" name="vendors" value="<%= project.vendor?.map(v=>v.name).join(', ') %>"
-                                class="form-control">
-                        </div>
-                        <div class="col-md-4">
-                            <label><strong>Duration (Days)</strong></label>
-                            <input type="number" name="projectDuration" value="<%= project.projectDuration || '' %>"
-                                class="form-control">
-                        </div>
-                    </div>
-
-                    <div class="row mb-3">
-                        <div class="col-md-12">
-                            <label><strong>Description</strong></label>
-                            <textarea name="projectDescription"
-                                class="form-control"><%= project.projectDescription %></textarea>
-                        </div>
-                    </div>
-
-                    <div class="d-flex justify-content-end">
-                        <button type="button" id="cancelEditBtn" class="btn btn-secondary me-2">Cancel</button>
-                        <button type="submit" class="btn btn-primary">Save Changes</button>
-                    </div>
-                </form>
-            </div>
         </div>
 
         <!-- Footer -->
@@ -220,8 +64,27 @@
             <p>Designed & Developed by <a href="#" class="text-primary">Duplex Services & Technology</a></p>
         </footer>
     </div>
+    <!-- Success Modal -->
+    <div id="data-success-register" class="modal fade" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modalw620">
+            <div class="modal-content p-4">
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <div class="modal-body">
+                    <div class="success_mdltxt text-center">
+                        <div class="imgscs mb-3">
+                            <img src="/img/icons/success.png" alt="Success Icon">
+                        </div>
+                        <h4 class="fs-24 text-dark fw-medium mb-4">
+                            Your Registration has been <br> completed successfully
+                        </h4>
+                        <div class="mb-3 text-center">
+                            <button class="btn btn-primary rounded-pill minw80" data-bs-dismiss="modal">Ok</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
-    <!-- Hidden project ID container -->
-    <div id="projectDetails" data-project-id="<%= project._id.toString() %>"></div>
     <script src="/js/pages/projects/project-details.js"></script>
     <%- include('../../partials/footer') %>

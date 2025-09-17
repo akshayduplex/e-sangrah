@@ -288,7 +288,7 @@ import {
 } from "../../utils/responseHandler.js";
 import { getOtpEmailHtml } from "../../emailTemplates/otpEmailTemplate.js";
 // Configure multer for file uploads
-
+import crypto from "crypto"
 // In-memory OTP store (⚠️ replace with Redis/DB in production)
 const otpStore = {};
 
@@ -360,17 +360,18 @@ export const login = async (req, res) => {
 // ---------------------------
 export const getMe = async (req, res) => {
     try {
-        if (!req.session.user) return failResponse(res, "Not logged in", 401);
+        const userId = req.user.userId; // from authMiddleware
+        const user = await User.findById(userId)
+            .populate("userDetails.designation")
+            .populate("userDetails.department")
+            .lean();
 
-        const user = await User.findById(req.session.user._id)
-            .populate("userDetails.department._id", "name")
-            .populate("userDetails.designation._id", "name");
+        if (!user) return res.status(404).send("User not found");
 
-        if (!user) return failResponse(res, "User not found", 404);
-
-        return successResponse(res, user.toJSON());
+        res.render("profile/my-profile", { user }); // pass user to EJS
     } catch (err) {
-        return errorResponse(res, err);
+        console.error(err);
+        res.status(500).send("Server Error");
     }
 };
 
@@ -395,29 +396,6 @@ export const logout = async (req, res) => {
         });
     } catch (err) {
         return errorResponse(res, err.message || "Server error", 500);
-    }
-};
-
-// ---------------------------
-// Change Password
-// ---------------------------
-export const changePassword = async (req, res) => {
-    try {
-        const { email, password, confirmPassword } = req.body;
-        if (!password || !confirmPassword)
-            return failResponse(res, "Both current and new password are required", 400);
-        if (password !== confirmPassword)
-            return failResponse(res, "Passwords do not match", 400);
-
-        const user = await User.findOne({ email }).select("+password");
-        if (!user) return failResponse(res, "User not found", 404);
-
-        user.raw_password = password; // triggers hash in pre-save
-        await user.save();
-
-        return successResponse(res, {}, "Password updated successfully");
-    } catch (err) {
-        return errorResponse(res, err);
     }
 };
 
@@ -502,31 +480,127 @@ export const resetPassword = async (req, res) => {
         return errorResponse(res, err, "Failed to reset password");
     }
 };
+// ---------------------------
+// Send Password Reset Link (after password entry)
+// ---------------------------
+export const sendResetLink = async (req, res) => {
+    try {
+        const { email, password, confirmPassword } = req.body;
+
+        // Validate inputs
+        if (!email || !password || !confirmPassword) {
+            return failResponse(res, "All fields are required", 400);
+        }
+
+        if (password !== confirmPassword) {
+            return failResponse(res, "Passwords do not match", 400);
+        }
+
+        // Check if user exists
+        const user = await User.findOne({ email });
+        if (!user) return failResponse(res, "User not found", 404);
+
+        // Generate secure token and store with new password
+        const token = crypto.randomBytes(32).toString("hex");
+        const tokenExpiry = Date.now() + 15 * 60 * 1000; // 15 minutes
+
+        // Store token, new password, and expiry (in production, use Redis/DB)
+        otpStore[email] = {
+            resetToken: token,
+            newPassword: password,
+            expires: tokenExpiry
+        };
+
+        // Send reset link
+        const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:5000'}/api/auth/verify-reset/${token}?email=${encodeURIComponent(email)}`;
+
+        const transporter = nodemailer.createTransport({
+            service: "gmail",
+            auth: {
+                user: process.env.EMAIL_USER,
+                pass: process.env.EMAIL_PASSWORD
+            },
+        });
+
+        await transporter.sendMail({
+            from: `"Your App" <${process.env.EMAIL_USER}>`,
+            to: email,
+            subject: "Verify Password Change",
+            html: `<p>You have requested to change your password. Click the link below to verify this change:</p>
+                   <a href="${resetLink}">${resetLink}</a>
+                   <p>This link will expire in 15 minutes.</p>
+                   <p>If you didn't request this change, please ignore this email.</p>`,
+        });
+
+        return successResponse(res, {}, "Verification link sent to your email");
+    } catch (err) {
+        console.error("Send reset link error:", err);
+        return errorResponse(res, err);
+    }
+};
 
 // ---------------------------
-// Helpers
+// Verify Reset Link and Update Password
 // ---------------------------
-function generateRandomPassword(length = 12) {
-    const chars =
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()";
-    return Array.from({ length }, () =>
-        chars.charAt(Math.floor(Math.random() * chars.length))
-    ).join("");
-}
+export const verifyResetLink = async (req, res) => {
+    try {
+        const { token } = req.params;
+        const { email } = req.query;
 
-async function sendEmail({ to, subject, text }) {
-    const transporter = nodemailer.createTransport({
-        service: "gmail",
-        auth: {
-            user: process.env.EMAIL_USER,
-            pass: process.env.EMAIL_PASSWORD,
-        },
-    });
+        if (!otpStore[email] || otpStore[email].resetToken !== token) {
+            return failResponse(res, "Invalid or expired reset link", 400);
+        }
 
-    await transporter.sendMail({
-        from: `"Your App" <${process.env.EMAIL_USER}>`,
-        to,
-        subject,
-        text,
-    });
-}
+        if (otpStore[email].expires < Date.now()) {
+            delete otpStore[email];
+            return failResponse(res, "Reset link expired", 400);
+        }
+
+        // Update password with the stored new password
+        const user = await User.findOne({ email });
+        if (!user) return failResponse(res, "User not found", 404);
+
+        user.raw_password = otpStore[email].newPassword;
+        await user.save();
+
+        // Clean up
+        delete otpStore[email];
+
+        // return successResponse(res, {}, "Password successfully updated");
+        return res.redirect("/login?success=Password+updated");
+    } catch (err) {
+        console.error("Verify reset link error:", err);
+        return errorResponse(res, err);
+    }
+};
+
+
+// POST update profile
+export const updateProfile = async (req, res) => {
+    try {
+        const userId = req.user.userId;
+        const { name, email, phone_number, department } = req.body;
+
+        const updateFields = {
+            name,
+            email,
+            phone_number,
+            "userDetails.department": department,
+        };
+
+        // Optional: handle profile image upload here
+        if (req.file) {
+            updateFields.profile_image = `/uploads/${req.file.filename}`;
+        }
+
+        const updatedUser = await User.findByIdAndUpdate(userId, updateFields, { new: true })
+            .populate("userDetails.designation")
+            .populate("userDetails.department")
+            .lean();
+
+        res.redirect("/profile"); // reload profile page with updated data
+    } catch (err) {
+        console.error(err);
+        res.status(500).send("Server Error");
+    }
+};

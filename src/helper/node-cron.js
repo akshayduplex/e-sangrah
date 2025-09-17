@@ -1,68 +1,48 @@
-import cron from 'node-cron';
-import { DeleteObjectsCommand } from '@aws-sdk/client-s3';
-import TempFile from '../models/tempFile.js';
-import { s3 } from '../config/s3Client.js';
+import cron from "node-cron";
+import TempFile from "../models/tempFile.js";
+import { deleteObject } from "../utils/s3Helpers.js";
 
-let isRunning = false;
+// Function to cleanup old temp files
+export const cleanupOldTempFiles = async () => {
+    try {
+        // for real use: 2 hours
+        const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
 
-const cleanupJob = () => {
-    cron.schedule('0 */2 * * *', async () => {
-        if (isRunning) {
-            console.log('Cleanup job is already running');
-            return;
-        }
+        // for testing: 2 minutes
+        // const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
 
-        isRunning = true;
-        console.log('🧹 Starting temporary files cleanup job...');
+        const oldFiles = await TempFile.find({
+            status: "temp",
+            addDate: { $lt: twoMinutesAgo },
+        });
 
-        try {
-            const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+        for (const file of oldFiles) {
+            try {
+                // 1️⃣ Delete from S3
+                await deleteObject(file.s3Filename);
 
-            const oldFiles = await TempFile.find({
-                status: 'temp',
-                addedDate: { $lt: twoHoursAgo }
-            });
+                // 2️⃣ Remove from DB completely
+                await TempFile.deleteOne({ _id: file._id });
 
-            if (oldFiles.length === 0) {
-                console.log('No old files to clean up');
-                isRunning = false;
-                return;
+                console.log(`🗑️ Permanently deleted file: ${file.s3Filename}`);
+            } catch (err) {
+                console.error(`❌ Failed to delete file ${file.s3Filename}:`, err);
             }
-
-            console.log(`Found ${oldFiles.length} temporary files to clean up`);
-
-            // Collect S3 keys for files that have s3FileName
-            // const objectsToDelete = oldFiles
-            //     .filter(file => file.s3FileName)
-            //     .map(file => ({ Key: file.s3FileName }));
-
-            // Batch delete from S3 if there are objects to delete
-            // if (objectsToDelete.length > 0) {
-            //     try {
-            //         await s3.send(new DeleteObjectsCommand({
-            //             Bucket: process.env.S3_BUCKET_NAME || process.env.AWS_BUCKET,
-            //             Delete: { Objects: objectsToDelete },
-            //         }));
-            //         console.log(`Deleted ${objectsToDelete.length} files from S3`);
-            //     } catch (s3Error) {
-            //         console.error('Error deleting files from S3:', s3Error);
-            //     }
-            // }
-
-            // Delete from DB in bulk
-            const deleteResult = await TempFile.deleteMany({
-                _id: { $in: oldFiles.map(f => f._id) }
-            });
-
-            console.log(`🧹 Cleaned up ${deleteResult.deletedCount} temporary files from database`);
-        } catch (error) {
-            console.error('Error in cleanup job:', error);
-        } finally {
-            isRunning = false;
         }
-    });
 
-    console.log('✅ Cleanup job scheduled to run every 2 hours');
+        console.log(`🧹 Cleanup complete. ${oldFiles.length} files permanently removed.`);
+        return oldFiles.length;
+    } catch (err) {
+        console.error("❌ Cleanup error:", err);
+        return 0;
+    }
 };
 
-export default cleanupJob;
+// Schedule cron job to run every 2 minutes
+export const startCleanupJob = () => {
+    cron.schedule("*/2 * * * *", async () => {
+        console.log("⏳ Running cleanup job...");
+        await cleanupOldTempFiles();
+    });
+    console.log("✅ Cleanup cron job scheduled (runs every 2 mins)");
+};

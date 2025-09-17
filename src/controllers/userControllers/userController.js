@@ -52,7 +52,7 @@ export const registerUser = async (req, res) => {
         await registration({
             to: email,
             subject: "Your Account Has Been Created",
-            text: `Hello ${fullName},\n\nYour account has been created successfully.\n\nEmployee ID: ${employee_id}\nEmail: ${email}\nPassword: ${randomPassword}\n\nPlease log in and change your password immediately.\n\nThank you.`
+            text: `Hello ${name},\n\nYour account has been created successfully.\n\nEmployee ID: ${employee_id}\nEmail: ${email}\nPassword: ${randomPassword}\n\nPlease log in and change your password immediately.\n\nThank you.`
         });
         // Return success response
         res.status(201).json({
@@ -167,10 +167,9 @@ export const updateUser = async (req, res) => {
             });
         }
 
-        const { name, phone_number, department, designation_id, status } = req.body;
+        const { name, phone_number, department, designation_id, status, employee_id } = req.body;
 
         const user = await User.findById(req.params.id);
-
         if (!user || user.profile_type !== "user") {
             return res.status(404).json({
                 success: false,
@@ -182,9 +181,9 @@ export const updateUser = async (req, res) => {
         if (phone_number) user.phone_number = phone_number;
         if (status) user.status = status;
 
-        // Ensure userDetails exists
         if (!user.userDetails) user.userDetails = {};
 
+        if (employee_id) user.userDetails.employee_id = employee_id;
         if (department) user.userDetails.department = department;
         if (designation_id) user.userDetails.designation = designation_id;
 

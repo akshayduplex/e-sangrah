@@ -1,116 +1,139 @@
-import crypto from 'crypto';
-import { PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import TempFile from '../models/tempFile.js';
-import { s3 } from '../config/s3Client.js'; // Fixed import
+import { v4 as uuidv4 } from "uuid";
+import { putObject, deleteObject } from "../utils/s3Helpers.js";
+import TempFile from "../models/tempFile.js";
+import crypto from "crypto";
+import path from "path";
+// Unique filename generator
+function generateUniqueFileName(originalName) {
+    const ext = path.extname(originalName);
+    const base = path.basename(originalName, ext);
+    const id = crypto.randomBytes(8).toString("hex");
+    return `${base}_${id}${ext}`;
+}
 
-// Create temp file record
-export const createTempFile = async (req, res) => {
+// Upload temporary file
+export const uploadFile = async (req, res) => {
     try {
         if (!req.file) {
-            return res.status(400).json({ success: false, error: 'No file uploaded' });
+            return res.status(400).json({ error: "No file uploaded" });
         }
 
-        // Generate a unique "S3-like" name if you want, or just use local name
-        const uniqueFileName = `${crypto.randomUUID()}_${req.file.originalname}`;
+        const { originalname, mimetype, buffer, path: localPath } = req.file;
+        const s3Filename = generateUniqueFileName(originalname);
 
-        const tempFile = new TempFile({
-            fileName: req.file.originalname,
-            fileType: req.file.mimetype,
-            s3FileName: uniqueFileName,
-            fileSize: req.file.size,
-            localPath: req.file.path, // save local path
-            status: 'temp'
+        // Upload to S3
+        const { url, key } = await putObject(buffer, s3Filename, mimetype);
+        // Delete local file if using diskStorage
+        if (localPath && fs.existsSync(localPath)) {
+            fs.unlinkSync(localPath);
+        }
+
+        // Save in DB
+        const tempFile = await TempFile.create({
+            fileName: originalname,
+            originalName: originalname,
+            s3Filename: key,
+            fileType: mimetype,
+            status: "temp",
         });
 
-        await tempFile.save();
-
-        res.json({ success: true, id: tempFile._id });
-    } catch (error) {
-        console.error('Error creating temp file record:', error);
-        res.status(500).json({ success: false, error: error.message });
-    }
-};
-
-// Get presigned upload URL
-export const getPresignedUrl = async (req, res) => {
-    try {
-
-        const { fileId } = req.params;
-
-        const tempFile = await TempFile.findById(fileId);
-        if (!tempFile) {
-            return res.status(404).json({ success: false, error: 'File not found' });
-        }
-
-        const command = new PutObjectCommand({
-            Bucket: process.env.S3_BUCKET_NAME || process.env.AWS_BUCKET,
-            Key: tempFile.s3FileName,
-            ContentType: tempFile.fileType,
+        res.json({
+            success: true,
+            message: "File uploaded temporarily",
+            fileId: tempFile._id,
+            s3Filename: key,
+            s3Url: url,
+            temp: true,
         });
-
-        const presignedUrl = await getSignedUrl(s3, command, { expiresIn: 3600 });
-
-        res.json({ success: true, url: presignedUrl });
-    } catch (error) {
-        console.error('Error generating presigned URL:', error);
-        res.status(500).json({ success: false, error: error.message });
+    } catch (err) {
+        console.error("Upload error:", err);
+        res.status(500).json({ error: "File upload failed" });
     }
 };
 
-// Update temp file status
-export const updateTempFile = async (req, res) => {
+// Submit form and mark files permanent
+export const submitForm = async (req, res) => {
     try {
-        const { fileId } = req.params;
-        const { status } = req.body;
+        const { fileIds, formData } = req.body;
 
-        const tempFile = await TempFile.findByIdAndUpdate(
-            fileId,
-            { status },
-            { new: true }
-        );
-
-        if (!tempFile) {
-            return res.status(404).json({ success: false, error: 'File not found' });
+        if (!fileIds || !Array.isArray(fileIds)) {
+            return res.status(400).json({ error: "File IDs are required" });
         }
 
-        res.json({ success: true });
-    } catch (error) {
-        console.error('Error updating temp file:', error);
-        res.status(500).json({ success: false, error: error.message });
-    }
-};
+        const results = [];
 
-// Delete temp file
-export const deleteTempFile = async (req, res) => {
-    try {
-        const { fileId } = req.params;
-
-        const tempFile = await TempFile.findById(fileId);
-        if (!tempFile) {
-            return res.status(404).json({ success: false, error: 'File not found' });
-        }
-
-        // If file was already uploaded to S3, delete it
-        if (tempFile.status === 'uploaded' && tempFile.s3FileName) {
-            try {
-                const command = new DeleteObjectCommand({
-                    Bucket: process.env.S3_BUCKET_NAME || process.env.AWS_BUCKET,
-                    Key: tempFile.s3FileName,
-                });
-
-                await s3.send(command);
-            } catch (s3Error) {
-                console.error('Error deleting from S3:', s3Error);
-                // Continue with DB deletion even if S3 deletion fails
+        for (const fileId of fileIds) {
+            const file = await TempFile.findById(fileId);
+            if (file && file.status === "temp") {
+                file.status = "permanent";
+                file.formDataId = formData?.id || null;
+                await file.save();
+                results.push({ fileId: file._id, status: "permanent", success: true });
+            } else {
+                results.push({ fileId, status: "not_found_or_invalid", success: false });
             }
         }
 
-        await TempFile.findByIdAndDelete(fileId);
+        res.json({
+            success: true,
+            message: "Form submitted successfully",
+            files: results,
+            formData,
+        });
+    } catch (err) {
+        console.error("Form submission error:", err);
+        res.status(500).json({ error: "Form submission failed" });
+    }
+};
 
-        res.json({ success: true, message: 'Temporary file deleted successfully' });
-    } catch (error) {
-        console.error('Error deleting temp file:', error);
-        res.status(500).json({ success: false, error: error.message });
+// Cancel/Delete temp file
+export const deleteFile = async (req, res) => {
+    try {
+        const { fileId } = req.params;
+        const file = await TempFile.findById(fileId);
+
+        if (!file) return res.status(404).json({ error: "File not found" });
+
+        if (file.status === "temp") {
+            // Delete from S3
+            const result = await deleteObject(file.s3Filename);
+            if (result.status !== 204) {
+                return res.status(500).json({ error: "Failed to delete file from S3" });
+            }
+
+            await TempFile.deleteOne({ _id: file._id });
+            // Delete from local disk (if any)
+            if (file.localPath && fs.existsSync(file.localPath)) {
+                fs.unlinkSync(file.localPath);
+            }
+
+
+            res.json({ success: true, message: "File deleted successfully" });
+        } else {
+            res.status(400).json({ error: "Cannot delete non-temporary file" });
+        }
+    } catch (err) {
+        console.error("Delete error:", err);
+        res.status(500).json({ error: "File deletion failed" });
+    }
+};
+
+// Get file status
+export const getFileStatus = async (req, res) => {
+    try {
+        const { fileId } = req.params;
+        const file = await TempFile.findById(fileId);
+        if (!file) return res.status(404).json({ error: "File not found" });
+
+        res.json({
+            fileId: file._id,
+            status: file.status,
+            s3Filename: file.s3Filename,
+            originalName: file.originalName,
+            addDate: file.addDate,
+        });
+    } catch (err) {
+        console.error("Status check error:", err);
+        res.status(500).json({ error: "Status check failed" });
     }
 };

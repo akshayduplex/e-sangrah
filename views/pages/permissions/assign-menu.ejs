@@ -13,8 +13,7 @@
                                 <div class="row mb-4">
                                     <div class="col-md-6">
                                         <label for="designation_id" class="form-label">Designation</label>
-                                        <select class="form-select select2" id="designation_id" name="designation_id"
-                                            required>
+                                        <select class="form-select" id="designation_id" name="designation_id" required>
                                             <option value="">-- Select Designation --</option>
                                             <% if (Array.isArray(designations) && designations.length> 0) { %>
                                                 <% designations.forEach(designation=> { %>

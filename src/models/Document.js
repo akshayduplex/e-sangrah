@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 
 const documentSchema = new mongoose.Schema({
+    // Basic Info
     title: {
         type: String,
         required: true,
@@ -12,22 +13,17 @@ const documentSchema = new mongoose.Schema({
         trim: true,
         maxlength: 1000
     },
-    status: {
-        type: String,
-        enum: ["Draft", "Pending", "UnderReview", "Approved", "Rejected", "Archived"],
-        default: "Draft"
+    project: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Project",
+        default: null
     },
     department: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Department",
         required: true
     },
-    project: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Project",
-        default: null
-    },
-    documentManager: {
+    projectManager: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
         default: null
@@ -37,68 +33,19 @@ const documentSchema = new mongoose.Schema({
         ref: "User",
         required: true
     },
-    // Shared with specific users
-    sharedWith: [{
-        user: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: "User"
-        },
-        permission: {
-            type: String,
-            enum: ["view", "comment", "edit"],
-            default: "view"
-        },
-        sharedAt: {
-            type: Date,
-            default: Date.now
-        },
-        sharedBy: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: "User"
-        }
-    }],
-    // Shared with entire departments
-    sharedWithDepartments: [{
-        department: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: "Department"
-        },
-        permission: {
-            type: String,
-            enum: ["view", "comment", "edit"],
-            default: "view"
-        },
-        sharedAt: {
-            type: Date,
-            default: Date.now
-        },
-        sharedBy: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: "User"
-        }
-    }],
-    files: [{
-        file: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: "File",
-            required: true
-        },
-        version: {
-            type: Number,
-            default: 1
-        },
-        uploadedAt: {
-            type: Date,
-            default: Date.now
-        },
-        isPrimary: {
-            type: Boolean,
-            default: false
-        }
-    }],
-    currentVersion: {
-        type: Number,
-        default: 1
+    documentManager: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        default: null
+    },
+    documentDate: {
+        type: Date,
+        default: Date.now
+    },
+    status: {
+        type: String,
+        enum: ["Draft", "Pending", "UnderReview", "Approved", "Rejected", "Archived"],
+        default: "Draft"
     },
     tags: [{
         type: String,
@@ -109,9 +56,12 @@ const documentSchema = new mongoose.Schema({
         type: String,
         trim: true
     },
+    // Unified metadata
     metadata: {
-        type: mongoose.Schema.Types.Mixed,
-        default: {}
+        fileName: { type: String, trim: true },
+        fileDescription: { type: String, trim: true },
+        mainHeading: { type: String, trim: true },
+        additional: { type: mongoose.Schema.Types.Mixed, default: {} } // arbitrary extra data
     },
     compliance: {
         isCompliance: {
@@ -156,6 +106,74 @@ const documentSchema = new mongoose.Schema({
             comments: String
         }]
     },
+    files: [{
+        file: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "File",
+            required: true
+        },
+        version: {
+            type: Number,
+            default: 1
+        },
+        uploadedAt: {
+            type: Date,
+            default: Date.now
+        },
+        isPrimary: {
+            type: Boolean,
+            default: false
+        }
+    }],
+    currentVersion: {
+        type: Number,
+        default: 1
+    },
+    signature: {
+        fileName: { type: String },
+        fileUrl: { type: String }
+    },
+    link: {
+        type: String
+    },
+    sharedWith: [{
+        user: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User"
+        },
+        permission: {
+            type: String,
+            enum: ["view", "comment", "edit"],
+            default: "view"
+        },
+        sharedAt: {
+            type: Date,
+            default: Date.now
+        },
+        sharedBy: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User"
+        }
+    }],
+    sharedWithDepartments: [{
+        department: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Department"
+        },
+        permission: {
+            type: String,
+            enum: ["view", "comment", "edit"],
+            default: "view"
+        },
+        sharedAt: {
+            type: Date,
+            default: Date.now
+        },
+        sharedBy: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User"
+        }
+    }],
     auditLog: [{
         action: {
             type: String,
@@ -208,102 +226,70 @@ const documentSchema = new mongoose.Schema({
     viewCount: {
         type: Number,
         default: 0
+    },
+    comment: {
+        type: String
+    },
+    createdAt: {
+        type: Date,
+        default: Date.now
     }
 }, {
     timestamps: true
 });
 
-// Indexes for better performance
+// Indexes
 documentSchema.index({ title: "text", description: "text", tags: "text" });
-documentSchema.index({ status: 1 });
-documentSchema.index({ department: 1 });
-documentSchema.index({ owner: 1 });
-documentSchema.index({ "sharedWith.user": 1 });
-documentSchema.index({ "sharedWithDepartments.department": 1 });
-documentSchema.index({ tags: 1 });
-documentSchema.index({ "compliance.expiryDate": 1 });
-documentSchema.index({ createdAt: 1 });
-documentSchema.index({ updatedAt: 1 });
+documentSchema.index({ status: 1, department: 1, owner: 1, "sharedWith.user": 1, "sharedWithDepartments.department": 1, tags: 1, "compliance.expiryDate": 1, createdAt: 1, updatedAt: 1 });
 
-// Virtual for expired documents
+// Virtuals
 documentSchema.virtual("isExpired").get(function () {
-    if (!this.compliance.expiryDate) return false;
-    return this.compliance.expiryDate < new Date();
+    return this.compliance.expiryDate ? this.compliance.expiryDate < new Date() : false;
 });
 
-// Method to check if user has access
+// Methods
 documentSchema.methods.hasAccess = function (userId, departmentId) {
-    // Owner always has access
-    if (this.owner.toString() === userId.toString()) return true;
+    if (this.owner.toString() === userId.toString() || this.isPublic) return true;
 
-    // Public documents
-    if (this.isPublic) return true;
-
-    // Check shared with users
-    const userShared = this.sharedWith.find(share =>
-        share.user.toString() === userId.toString()
-    );
+    const userShared = this.sharedWith.find(share => share.user.toString() === userId.toString());
     if (userShared) return true;
 
-    // Check shared with departments
-    const departmentShared = this.sharedWithDepartments.find(share =>
-        share.department.toString() === departmentId.toString()
-    );
+    const departmentShared = this.sharedWithDepartments.find(share => share.department.toString() === departmentId.toString());
     if (departmentShared) return true;
 
     return false;
 };
 
-// Method to check user permission level
 documentSchema.methods.getUserPermission = function (userId, departmentId) {
-    // Owner has full permissions
     if (this.owner.toString() === userId.toString()) return "edit";
 
-    // Check shared with users
-    const userShared = this.sharedWith.find(share =>
-        share.user.toString() === userId.toString()
-    );
+    const userShared = this.sharedWith.find(share => share.user.toString() === userId.toString());
     if (userShared) return userShared.permission;
 
-    // Check shared with departments
-    const departmentShared = this.sharedWithDepartments.find(share =>
-        share.department.toString() === departmentId.toString()
-    );
+    const departmentShared = this.sharedWithDepartments.find(share => share.department.toString() === departmentId.toString());
     if (departmentShared) return departmentShared.permission;
 
     return null;
 };
 
-// Method to add to audit log
 documentSchema.methods.addAuditLog = function (action, performedBy, details = {}) {
-    this.auditLog.push({
-        action,
-        performedBy,
-        details
-    });
+    this.auditLog.push({ action, performedBy, details });
     return this.save();
 };
 
-// Method to add to access log
 documentSchema.methods.addAccessLog = function (accessedBy, action, ipAddress, userAgent) {
     if (action === "view") this.viewCount += 1;
     if (action === "download") this.downloadCount += 1;
 
-    this.accessLog.push({
-        accessedBy,
-        action,
-        ipAddress,
-        userAgent
-    });
+    this.accessLog.push({ accessedBy, action, ipAddress, userAgent });
     return this.save();
 };
 
-// Pre-save middleware to ensure only one primary file
+// Ensure only one primary file
 documentSchema.pre("save", function (next) {
     if (this.isModified("files")) {
         const primaryFiles = this.files.filter(file => file.isPrimary);
         if (primaryFiles.length > 1) {
-            // Keep the first one as primary, mark others as not primary
             for (let i = 1; i < primaryFiles.length; i++) {
                 primaryFiles[i].isPrimary = false;
             }
@@ -313,5 +299,4 @@ documentSchema.pre("save", function (next) {
 });
 
 const Document = mongoose.model("Document", documentSchema);
-
 export default Document;

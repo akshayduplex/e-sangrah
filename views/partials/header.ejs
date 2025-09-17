@@ -131,7 +131,7 @@
                                     <div
                                         class="d-flex align-items-center justify-content-between border-bottom p-0 pb-3 mb-3">
                                         <h4 class="notification-title">Notifications (2)</h4>
-                                        <a href="#" class="fs-16">View All</a>
+                                        <a href="/notifications" class="fs-16">View All</a>
                                     </div>
                                     <div class="noti-content">
                                         <div class="d-flex flex-column">
@@ -233,18 +233,25 @@
                                     </div>
                                 </div>
                             </div>
-
+                            <div class="input-group d-inline-flex me-1">
+                                <select id="projectSelect" class="form-select" style="width: 200px;">
+                                    <option></option>
+                                </select>
+                                <span class="input-icon-addon">
+                                    <i class="ti ti-search"></i>
+                                </span>
+                            </div>
                             <div class="dropdown me-1">
                                 <a href="#" class="btn sm_btnsite" data-bs-toggle="dropdown">Upload <i
                                         class="ti ti-chevron-down"></i></a>
                                 <div class="dropdown-menu dropdown-menu-end">
                                     <div class="card mb-0 border-0 shadow-none">
                                         <div class="card-body">
-                                            <a href="#" class="d-block pb-2">
+                                            <a href="/upload-folder" class="d-block pb-2">
                                                 <span class="avatar avatar-md bg-transparent-dark me-2">
                                                     <i class="ti ti-folder-filled text-gray-9"></i></span>New Folder
                                             </a>
-                                            <a href="#" class="d-block py-2">
+                                            <a href="/add-document" class="d-block py-2">
                                                 Upload Document
                                             </a>
                                             <a href="#" class="d-block py-2">
@@ -289,7 +296,7 @@
                                         </div>
                                         <div class="card-body">
                                             <a class="dropdown-item d-inline-flex align-items-center p-0 py-2"
-                                                href="profile.html">
+                                                href="/my-profile">
                                                 <i class="ti ti-user-circle me-1"></i>My Profile
                                             </a>
                                             <a class="dropdown-item d-inline-flex align-items-center p-0 py-2"
@@ -361,3 +368,48 @@
             </div>
         </div>
         <!-- /Sidebar -->
+    </div>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="/plugins/select2/js/select2.min.js"></script>
+
+    <script>
+        $(document).ready(function () {
+            // Initialize Select2
+            $('#projectSelect').select2({
+                placeholder: 'Search projects...',
+                allowClear: true,
+                width: 'resolve',
+                ajax: {
+                    url: '/api/projects',
+                    dataType: 'json',
+                    delay: 250,
+                    data: function (params) {
+                        return { search: params.term || '' };
+                    },
+                    processResults: function (response) {
+                        return {
+                            results: response.data.map(project => ({
+                                id: project._id,
+                                text: project.projectName
+                            }))
+                        };
+                    },
+                    cache: true
+                },
+                minimumInputLength: 0 // <-- allow showing options without typing
+            });
+
+            // Load first 10 projects initially
+            $.get('/api/projects', function (response) {
+                const initialOptions = response.data.slice(0, 10).map(p =>
+                    new Option(p.projectName, p._id, false, false)
+                );
+                $('#projectSelect').append(initialOptions).trigger('change');
+            });
+        });
+
+    </script>
+
+</body>
+
+</html>

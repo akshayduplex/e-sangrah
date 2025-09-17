@@ -1,17 +1,24 @@
-import express from 'express';
+import express from "express";
+import multer from "multer";
 import {
-    createTempFile,
-    getPresignedUrl,
-    updateTempFile,
-    deleteTempFile
-} from '../controllers/tempFileController.js';
-import upload from '../middlewares/fileUploads.js';
+    uploadFile,
+    submitForm,
+    deleteFile,
+    getFileStatus,
+} from "../controllers/tempFileController.js";
 
 const router = express.Router();
 
-router.post('/temp-files', upload.single('file'), createTempFile);
-router.get('/presigned-url/:fileId', getPresignedUrl);
-router.patch('/temp-files/:fileId', updateTempFile);
-router.delete('/temp-files/:fileId', deleteTempFile);
+// Multer memory storage (for direct S3 upload)
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: {}, // 10MB
+});
+
+// Routes
+router.post("/upload", upload.single("file"), uploadFile);
+router.post("/submit-form", submitForm);
+router.delete("/:fileId", deleteFile);
+router.get("/:fileId/status", getFileStatus);
 
 export default router;

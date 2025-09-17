@@ -2,7 +2,7 @@ import { body } from "express-validator";
 
 // Validation rules
 export const registrationValidation = [
-    body("fullName")
+    body("name")
         .notEmpty().withMessage("Full name is required")
         .isLength({ min: 3, max: 50 }).withMessage("Full name must be 3-50 characters long"),
 

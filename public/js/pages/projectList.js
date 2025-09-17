@@ -45,7 +45,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     <td>
                         <div class="flxtblleft">
                             <span class="avatar rounded bg-light mb-2">
-                                <img src="assets/img/icons/fn1.png">
+                                <img src="/img/icons/fn1.png">
                             </span>
                             <div class="flxtbltxt">
                                 <p class="fs-14 mb-1 fw-normal text-neutral">${project.projectName}</p>

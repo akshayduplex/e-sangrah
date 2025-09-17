@@ -14,12 +14,12 @@ import ApiRoutes from "./routes/index.js";
 import pageRoutes from "./routes/web/index.js";
 import errorHandler from "./middlewares/errorHandler.js";
 import { formatDateDDMMYYYY } from "./utils/formatDate.js";
-import cleanupJob from "./helper/node-cron.js";
+// import { startCleanupJob } from "./helper/node-cron.js";
 
 const app = express();
 
 // Connect to MongoDB
-mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/secure-upload')
+mongoose.connect(process.env.MONGO_URI)
     .then(() => {
         console.log('✅ Connected to MongoDB');
     })
@@ -51,8 +51,6 @@ app.use(
     })
 );
 
-// Initialize cleanup job
-cleanupJob();
 
 app.use(methodOverride("_method"));
 app.use(compression());
@@ -85,6 +83,8 @@ app.use((req, res, next) => {
 app.use("/api", ApiRoutes);
 app.use("/", pageRoutes);
 
+// Start cleanup cron job
+// startCleanupJob();
 // Error handling
 app.use(errorHandler);
 

@@ -1,57 +1,107 @@
+$(document).ready(function () {
+    /**
+     * Email validation on input
+     */
+    $('#email').on('input', function () {
+        const email = $(this).val();
+        const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (emailPattern.test(email)) {
+            $(this).removeClass('is-invalid').addClass('is-valid');
+        } else {
+            $(this).removeClass('is-valid').addClass('is-invalid');
+        }
+    });
 
-document.getElementById("registerForm").addEventListener("submit", async function (e) {
-    e.preventDefault();
+    /**
+     * Phone number validation on input
+     */
+    $('#phone_number').on('input', function () {
+        let mobile = $(this).val().replace(/\D/g, '').slice(0, 10);
+        $(this).val(mobile);
 
-    const form = e.target;
-    const formData = new FormData(form);
-    try {
-        const response = await fetch("/api/user/register", {
-            method: "POST",
-            body: formData
+        const mobilePattern = /^\d{10}$/;
+        if (mobilePattern.test(mobile)) {
+            $(this).removeClass('is-invalid').addClass('is-valid');
+        } else {
+            $(this).removeClass('is-valid').addClass('is-invalid');
+        }
+    });
+
+    /**
+     * Form submit
+     */
+    $('#registerForm').on('submit', async function (e) {
+        e.preventDefault();
+
+        let isValid = true;
+        const requiredFields = $(this).find('[required]');
+
+        requiredFields.each(function () {
+            if (!$(this).val()) {
+                isValid = false;
+                $(this).addClass('is-invalid');
+            } else {
+                $(this).removeClass('is-invalid').addClass('is-valid');
+            }
         });
 
-        const result = await response.json();
-        if (result.errors && result.errors.length > 0) {
-            result.errors.forEach(err => {
-                const message = typeof err === "string" ? err : err.msg;
-                showToast(message);
-            });
+        // Email check
+        const emailInput = $('#email');
+        const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailPattern.test(emailInput.val())) {
+            isValid = false;
+            emailInput.addClass('is-invalid');
+        }
+
+        // Mobile check
+        const mobileInput = $('#phone_number');
+        const mobilePattern = /^\d{10}$/;
+        if (!mobilePattern.test(mobileInput.val())) {
+            isValid = false;
+            mobileInput.addClass('is-invalid');
+        }
+
+        if (!isValid) {
+            if (typeof showToast === 'function') {
+                showToast('Please fill all required fields correctly.', 'error');
+            } else {
+                alert('Please fill all required fields correctly.');
+            }
             return;
         }
 
-        if (response.ok && result.success) {
-            // Show success modal
-            const successModal = new bootstrap.Modal(document.getElementById("data-success-register"));
-            successModal.show();
+        const form = this;
+        const formData = new FormData(form);
 
-            // Reset form & clear preview
-            form.reset();
-            document.getElementById("preview").innerHTML = "";
-        } else {
-            showToast(result.error || "Something went wrong!");
+        try {
+            const response = await fetch('/api/user/register', {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.json();
+            if (result.errors && result.errors.length > 0) {
+                result.errors.forEach(err => {
+                    const message = typeof err === 'string' ? err : err.msg;
+                    showToast(message, 'error');
+                });
+                return;
+            }
+
+            if (response.ok && result.success) {
+                const successModal = new bootstrap.Modal(document.getElementById('data-success-register'));
+                successModal.show();
+
+                form.reset();
+                preview.empty();
+                uploadIcon.show();
+                $('.is-valid, .is-invalid').removeClass('is-valid is-invalid');
+            } else {
+                showToast(result.error || 'Something went wrong!', 'error');
+            }
+        } catch (err) {
+            console.error('Error:', err);
+            showToast(err.message || 'Internal server error', 'error');
         }
-    } catch (err) {
-        console.error("Error:", err);
-        showToast(err.message || err || "Internal server error");
-    }
+    });
 });
-
-// File preview
-document.getElementById("uploadprofileBox").addEventListener("click", () => {
-    document.getElementById("fileInput").click();
-});
-
-document.getElementById("fileInput").addEventListener("change", (e) => {
-    const preview = document.getElementById("preview");
-    preview.innerHTML = "";
-
-    const file = e.target.files[0];
-    if (file) {
-        const img = document.createElement("img");
-        img.src = URL.createObjectURL(file);
-        img.style.maxWidth = "100px";
-        img.classList.add("img-thumbnail");
-        preview.appendChild(img);
-    }
-});
-

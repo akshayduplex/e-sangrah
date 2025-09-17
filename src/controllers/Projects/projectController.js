@@ -1,10 +1,12 @@
-import mongoose, { isValidObjectId } from "mongoose";
+import mongoose from "mongoose";
+const { isValidObjectId, Types } = mongoose;
 import { successResponse, failResponse, errorResponse } from "../../utils/responseHandler.js";
 import Department from "../../models/Departments.js";
 import User from "../../models/User.js";
-import Project from "../../models/project.js";
+import Project from "../../models/Project.js";
+import { normalizeToArray, validateObjectIdArray } from "../../helper/validateobjectId.js";
 
-// Create a new project
+
 export const createProject = async (req, res) => {
     try {
         const body = req.body;
@@ -14,32 +16,36 @@ export const createProject = async (req, res) => {
         const requiredFields = [
             "projectName",
             "projectCode",
-            "department",
             "projectManager",
             "projectStartDate",
             "projectEndDate"
         ];
-
+        body.donor = normalizeToArray(body.donor);
+        body.vendor = normalizeToArray(body.vendor);
+        body.projectCollaborationTeam = normalizeToArray(body.projectCollaborationTeam);
         for (const field of requiredFields) {
             if (!body[field]) {
-                return failResponse(
-                    res,
-                    `Missing required field: ${field}`,
-                    400
-                );
+                return failResponse(res, `Missing required field: ${field}`, 400);
             }
         }
 
-        // Ensure department and projectManager are valid ObjectId
-        if (!mongoose.Types.ObjectId.isValid(body.department)) {
-            return failResponse(res, "Invalid department ID", 400);
+        // Validate ObjectId fields
+        const objectIdFields = ["projectManager"];
+        for (const field of objectIdFields) {
+            if (!isValidObjectId(body[field])) {
+                return failResponse(res, `Invalid ${field} ID`, 400);
+            }
         }
 
-        if (!mongoose.Types.ObjectId.isValid(body.projectManager)) {
-            return failResponse(res, "Invalid projectManager ID", 400);
+        // Validate optional array of ObjectIds
+        const arrayFields = ["projectCollaborationTeam", "donor", "vendor"];
+        for (const field of arrayFields) {
+            if (body[field] && !validateObjectIdArray(body[field], field)) {
+                return failResponse(res, `Invalid ID in ${field}`, 400);
+            }
         }
 
-        // Convert dates to proper Date objects
+        // Convert dates
         const startDate = new Date(body.projectStartDate);
         const endDate = new Date(body.projectEndDate);
 
@@ -47,40 +53,75 @@ export const createProject = async (req, res) => {
             return failResponse(res, "Invalid date format", 400);
         }
 
-        // Create new project
-        const project = new Project({
-            ...body,
-            projectCode: body.projectCode,
-            department: body.department,
+        if (endDate <= startDate) {
+            return failResponse(res, "End date must be after start date", 400);
+        }
+
+        // Check if project code already exists
+        const existingProject = await Project.findOne({ projectCode: body.projectCode.trim().toUpperCase() });
+        if (existingProject) {
+            return failResponse(res, "Project code already exists", 400);
+        }
+
+        // Prepare project data
+        const projectData = {
+            projectName: body.projectName.trim(),
+            projectCode: body.projectCode.trim().toUpperCase(),
+            projectType: body.projectType,
+            projectDescription: body.projectDescription?.trim() || "",
             projectManager: body.projectManager,
+            projectCollaborationTeam: body.projectCollaborationTeam || [],
+            donor: body.donor || [],
+            vendor: body.vendor || [],
             projectStartDate: startDate,
             projectEndDate: endDate,
+            projectDuration: Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)),
+            projectStatus: body.projectStatus || "Active",
+            // priority: body.priority || "Medium",
+            tags: body.tags?.map(tag => tag.trim().toLowerCase()) || [],
+            isActive: body.isActive !== undefined ? body.isActive : true,
             createdBy: user._id
-        });
+        };
+        // Handle project logo if uploaded
+        // Optional logo
+        if (req.file && req.file.path) {
+            body.projectLogo = req.file.path; // only assign if file uploaded
+        } else {
+            delete body.projectLogo; // do not overwrite existing logo
+        }
 
+        const project = new Project(projectData);
         await project.save();
 
         return successResponse(res, project, "Project created successfully", 201);
 
     } catch (err) {
-        // Handle duplicate projectCode
-        if (err.code === 11000 && err.keyPattern && err.keyPattern.projectCode) {
-            return failResponse(res, "Project code already exists", 400);
-        }
-
         return errorResponse(res, err);
     }
 };
 
-// Get all projects
+
+// Get all projects with search
 export const getAllProjects = async (req, res) => {
     try {
-        const projects = await Project.find({}).lean();
+        const { search } = req.query; // Get search keyword from query params
+
+        // Build search query
+        let query = {};
+        if (search) {
+            const regex = new RegExp(search, "i"); // case-insensitive search
+            query.projectName = { $regex: regex };
+        }
+
+        // Find projects with only _id and projectName
+        const projects = await Project.find(query, { _id: 1, projectName: 1 }).lean();
+
         return successResponse(res, projects, "Projects fetched successfully");
     } catch (err) {
         return errorResponse(res, err, "Failed to fetch projects");
     }
 };
+
 
 // Get a single project by ID
 export const getProject = async (req, res) => {
@@ -105,18 +146,65 @@ export const updateProject = async (req, res) => {
         const body = req.body;
 
         const project = await Project.findById(id);
-        if (!project) {
-            return failResponse(res, "Project not found", 404);
-        }
+        if (!project) return failResponse(res, "Project not found", 404);
 
-        // Only allow projectManager to update if they are the manager
-        if (req.user.profile_type === "manager" && !project.canManage(req.user._id)) {
+        // authorization: only admin/superadmin or projectManager can update
+        if (
+            ["user"].includes(req.user.profile_type) &&
+            !project.canManage(req.user._id)
+        ) {
             return failResponse(res, "Unauthorized to update this project", 403);
         }
 
-        Object.assign(project, body);
-        await project.save();
+        // Validate single ObjectId fields
+        const singleFields = ["projectManager"];
+        for (const field of singleFields) {
+            if (body[field]) {
+                if (!isValidObjectId(body[field])) {
+                    return failResponse(res, `Invalid ${field} ID`, 400);
+                }
+                body[field] = new mongoose.Types.ObjectId(body[field]);
+            }
+        }
 
+        // Normalize and validate arrays
+        const arrayFields = ["projectCollaborationTeam", "donor", "vendor"];
+        for (const field of arrayFields) {
+            body[field] = normalizeToArray(body[field]);
+            for (const val of body[field]) {
+                if (!isValidObjectId(val)) {
+                    return failResponse(res, `Invalid ID in ${field}`, 400);
+                }
+            }
+            body[field] = body[field].map((val) => new mongoose.Types.ObjectId(val));
+        }
+        // Optional logo
+        if (req.file && req.file.path) {
+            body.projectLogo = req.file.path; // only assign if file uploaded
+        } else {
+            delete body.projectLogo; // do not overwrite existing logo
+        }
+
+
+        // Apply updates
+        Object.assign(project, body);
+
+        // Recompute projectDuration if dates present
+        if (project.projectStartDate && project.projectEndDate) {
+            const start = new Date(project.projectStartDate);
+            const end = new Date(project.projectEndDate);
+            if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+                return failResponse(res, "Invalid date format", 400);
+            }
+            if (end <= start) {
+                return failResponse(res, "End date must be after start date", 400);
+            }
+            project.projectDuration = Math.ceil(
+                (end - start) / (1000 * 60 * 60 * 24)
+            );
+        }
+
+        await project.save();
         return successResponse(res, project, "Project updated successfully");
     } catch (err) {
         if (err.code === 11000 && err.keyPattern?.projectCode) {
@@ -151,7 +239,7 @@ export const getProjectsByStatus = async (req, res) => {
         page = parseInt(page);
         limit = parseInt(limit);
 
-        const validStatuses = ["Planned", "Active", "OnHold", "Completed", "Cancelled"];
+        const validStatuses = ["Active", "Inactive", "Closed"];
         if (!validStatuses.includes(projectStatus)) {
             return res.status(400).json({ success: false, message: "Invalid status value" });
         }
@@ -708,7 +796,7 @@ export const addDonorToProject = async (req, res) => {
         }
 
         // Add donor to project
-        project.donor.push(donorData);
+        project.donor.push(Types.ObjectId(donorId));
         project.updatedBy = req.user._id;
 
         await project.save();
@@ -1021,7 +1109,7 @@ export const getProjectTimeline = async (req, res) => {
 // Search projects with advanced filtering
 export const searchProjects = async (req, res) => {
     try {
-        const { q, status, department, manager, priority, startDate, endDate, page = 1, limit = 10 } = req.query;
+        const { q, status, manager, priority, startDate, endDate, page = 1, limit = 10 } = req.query;
 
         // Build search query
         const query = { isActive: true };
@@ -1039,11 +1127,6 @@ export const searchProjects = async (req, res) => {
         // Filter by status
         if (status) {
             query.projectStatus = status;
-        }
-
-        // Filter by department
-        if (department && isValidObjectId(department)) {
-            query.department = department;
         }
 
         // Filter by manager
@@ -1068,7 +1151,6 @@ export const searchProjects = async (req, res) => {
             limit: parseInt(limit),
             sort: { createdAt: -1 },
             populate: [
-                { path: 'department', select: 'name' },
                 { path: 'projectManager', select: 'name email' }
             ]
         };
@@ -1077,7 +1159,7 @@ export const searchProjects = async (req, res) => {
 
         res.status(200).json({
             success: true,
-            query: { q, status, department, manager, priority, startDate, endDate },
+            query: { q, status, manager, priority, startDate, endDate },
             count: projects.totalDocs,
             data: projects.docs,
             pagination: {

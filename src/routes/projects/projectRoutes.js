@@ -29,6 +29,7 @@ import {
 } from '../../controllers/Projects/projectController.js';
 import { authenticate, authorize } from '../../middlewares/authMiddleware.js';
 import { createProjectValidator, donorValidator, projectIdValidator, searchProjectsValidator, updateProjectValidator, vendorValidator } from '../../middlewares/validation/projectValidator.js';
+import upload from "../../middlewares/fileUploads.js"
 const router = express.Router();
 
 // All routes are protected
@@ -42,7 +43,7 @@ router.route('/')
     )
     .post(
         createProjectValidator,
-        authorize('superadmin', 'admin', 'manager'), createProject);
+        authorize('superadmin', 'admin', 'manager'), upload.single('projectLogo'), createProject);
 
 
 router.route('/:id/status')
@@ -105,7 +106,7 @@ router.route('/:id/archive')
 // Single project operations
 router.route('/:id')
     .get(authorize('superadmin', 'admin', 'manager', 'employee', 'viewer'), getProject)
-    .patch(updateProjectValidator, authorize('superadmin', 'admin', 'manager'), updateProject)
+    .patch(authorize('superadmin', 'admin', 'manager'), upload.single('projectLogo'), updateProject)
     .delete(projectIdValidator, authorize('superadmin', 'admin'), deleteProject);
 router.route('/:id/restore')
     .patch(authorize('superadmin', 'admin'), restoreProject);
