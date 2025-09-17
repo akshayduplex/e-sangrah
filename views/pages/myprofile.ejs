@@ -1,0 +1,169 @@
+<%- include('../partials/header') %>
+
+	<!-- Page Wrapper -->
+	<div class="page-wrapper">
+		<div class="content">
+			<!-- Breadcrumb -->
+			<div class="d-flex align-items-center justify-content-between page-breadcrumb mb-3">
+				<div class="my-auto mb-2">
+					<h2 class="mb-1">My Profile</h2>
+					<nav>
+						<ol class="breadcrumb mb-0">
+							<li class="breadcrumb-item">
+								<a href="#"><i class="ti ti-smart-home"></i></a>
+							</li>
+							<li class="breadcrumb-item">
+								My Profile
+							</li>
+						</ol>
+					</nav>
+				</div>
+			</div>
+			<!-- /Breadcrumb -->
+			<div class="profile-card dflexbtwn mb-4">
+				<div class="d-flex align-items-center">
+					<span class="avatar avatar-lg me-3 avatar-rounded">
+						<img src="/img/profiles/avatar-12.jpg" alt="img">
+					</span>
+					<div>
+						<h6 class="mb-0">
+							<%= user.name || "Guest" %>
+						</h6>
+						<small class="text-muted">Manager</small>
+					</div>
+				</div>
+				<button class="btn btn-primary" onclick="toggleProfile()">Edit Profile</button>
+			</div>
+
+			<!-- View Mode -->
+			<div id="viewProfile">
+				<div class="row g-4">
+					<div class="col-md-12 profileview_fields">
+						<div class="label">Name:</div>
+						<div class="value">Ashish Nitwal</div>
+					</div>
+					<div class="col-md-12 profileview_fields">
+						<div class="label">Email:</div>
+						<div class="value">ashishnitvel@gmail.com</div>
+					</div>
+					<div class="col-md-12 profileview_fields">
+						<div class="label">Phone Number:</div>
+						<div class="value">0987654321</div>
+					</div>
+					<div class="col-md-12 profileview_fields">
+						<div class="label">Designation:</div>
+						<div class="value">Manager</div>
+					</div>
+					<div class="col-md-12 profileview_fields">
+						<div class="label">Department:</div>
+						<div class="value">IT & Operation</div>
+					</div>
+					<div class="col-md-12 profileview_fields">
+						<div class="label">Address:</div>
+						<div class="value">234, street road, Siamola area, Noida, UP</div>
+					</div>
+					<div class="col-md-12 profileview_fields">
+						<div class="label">Country:</div>
+						<div class="value">India</div>
+					</div>
+					<div class="col-md-12 profileview_fields">
+						<div class="label">State:</div>
+						<div class="value">Uttar Pradesh</div>
+					</div>
+					<div class="col-md-12 profileview_fields">
+						<div class="label">City:</div>
+						<div class="value">Noida</div>
+					</div>
+					<div class="col-md-12 profileview_fields">
+						<div class="label">Post Code:</div>
+						<div class="value">234566</div>
+					</div>
+				</div>
+			</div>
+
+			<!-- Edit Mode -->
+			<div id="editProfile" style="display:none;">
+				<form>
+					<div class="row g-4">
+						<div class="col-md-6">
+							<label class="form-label">First Name</label>
+							<input type="text" class="form-control" value="Ashish">
+						</div>
+						<div class="col-md-6">
+							<label class="form-label">Last Name</label>
+							<input type="text" class="form-control" value="Nitvel">
+						</div>
+
+						<div class="col-md-6">
+							<label class="form-label">Email</label>
+							<input type="email" class="form-control" value="ashishnitvel@gmail.com">
+						</div>
+						<div class="col-md-6">
+							<label class="form-label">Phone Number</label>
+							<input type="text" class="form-control" value="0987654321">
+						</div>
+						<div class="col-md-6">
+							<label class="form-label">Designation</label>
+							<input type="text" class="form-control" value="Manager" disabled>
+						</div>
+						<div class="col-md-6">
+							<label class="form-label">Department</label>
+							<input type="text" class="form-control" value="IT & Operation">
+						</div>
+						<div class="col-12">
+							<label class="form-label">Address</label>
+							<input type="text" class="form-control" value="234, street road, Siamola area, Noida, UP">
+						</div>
+						<div class="col-md-4">
+							<label class="form-label">Country</label>
+							<input type="text" class="form-control" value="India">
+						</div>
+						<div class="col-md-4">
+							<label class="form-label">State</label>
+							<input type="text" class="form-control" value="Uttar Pradesh">
+						</div>
+						<div class="col-md-4">
+							<label class="form-label">City</label>
+							<input type="text" class="form-control" value="Noida">
+						</div>
+						<div class="col-md-6">
+							<label class="form-label">Post Code</label>
+							<input type="text" class="form-control" value="234566">
+						</div>
+					</div>
+					<div class="d-flex justify-content-end mt-4">
+						<button type="button" class="btn btn-light me-2" onclick="toggleProfile()">Cancel</button>
+						<button type="submit" class="btn btn-primary">Update</button>
+					</div>
+				</form>
+			</div>
+
+		</div>
+
+		<div class="footer mt-4 d-sm-flex align-items-center justify-content-between border-top bg-white p-3">
+			<p class="mb-0">2025 &copy; HLFPPT.</p>
+			<p>Designed & Developed by <a href="javascript:void(0);" class="text-primary">Duplex services &
+					Technology</a></p>
+		</div>
+
+	</div>
+	<!-- /Page Wrapper -->
+
+
+	<%- include('../partials/footer') %>
+
+
+
+		<script>
+			function toggleProfile() {
+				const view = document.getElementById('viewProfile');
+				const edit = document.getElementById('editProfile');
+				if (view.style.display === "none") {
+					view.style.display = "block";
+					edit.style.display = "none";
+				} else {
+					view.style.display = "none";
+					edit.style.display = "block";
+				}
+			}
+		</script>

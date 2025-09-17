@@ -1,0 +1,198 @@
+<%- include('../../partials/header') %>
+
+	<!-- Page Wrapper -->
+	<div class="page-wrapper">
+		<div class="content">
+			<!-- Breadcrumb -->
+			<div class="d-md-flex d-block align-items-center justify-content-between page-breadcrumb mb-3">
+				<div class="my-auto mb-2">
+					<h2 class="mb-1">User Registration Form</h2>
+					<nav>
+						<ol class="breadcrumb mb-0">
+							<li class="breadcrumb-item">
+								<a href="#"><i class="ti ti-smart-home"></i></a>
+							</li>
+							<li class="breadcrumb-item active">User Registration Form</li>
+						</ol>
+					</nav>
+				</div>
+				<div>
+					<a class="btn btn-primary btn-w-lg rounded-pill" href="/users-list">List</a>
+				</div>
+			</div>
+			<!-- /Breadcrumb -->
+
+			<div class="add-info-fieldset">
+				<form id="registerForm" method="POST" action="/users/register" enctype="multipart/form-data" novalidate>
+					<div class="modal-body">
+						<div class="row">
+							<!-- Full Name -->
+							<div class="col-md-6">
+								<div class="mb-3">
+									<label for="name" class="form-label">Full Name <span
+											class="text-danger">*</span></label>
+									<input type="text" id="name" name="name" class="form-control"
+										placeholder="Enter full name" required>
+								</div>
+							</div>
+
+							<!-- Email -->
+							<div class="col-md-6">
+								<div class="mb-3">
+									<label for="email" class="form-label">Email Address <span
+											class="text-danger">*</span></label>
+									<input type="email" id="email" name="email" class="form-control"
+										placeholder="example@email.com" required>
+								</div>
+							</div>
+
+							<!-- Phone Number -->
+							<div class="col-md-6">
+								<div class="mb-3">
+									<label for="phone_number" class="form-label">Phone Number <span
+											class="text-danger">*</span></label>
+									<input type="tel" id="phone_number" name="phone_number" class="form-control"
+										placeholder="Enter 10-digit phone number" pattern="^[0-9]{10}$" maxlength="10"
+										required oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0,10)">
+								</div>
+							</div>
+
+							<!-- Employee ID -->
+							<div class="col-md-6">
+								<div class="mb-3">
+									<label for="employee_id" class="form-label">Employee ID <span
+											class="text-danger">*</span></label>
+									<input type="text" id="employee_id" name="employee_id" class="form-control"
+										placeholder="Enter Employee ID" required
+										oninput="this.value = this.value.toUpperCase()">
+								</div>
+							</div>
+
+							<!-- Department -->
+							<div class="col-md-6">
+								<div class="mb-3">
+									<label for="department" class="form-label">Department <span
+											class="text-danger">*</span></label>
+									<select id="department" name="department" class="form-select select2" required>
+										<option value="">-- Select Department --</option>
+										<% if (departments && departments.length) { %>
+											<% departments.forEach(dep=> { %>
+												<option value="<%= dep._id %>">
+													<%= dep.name %>
+												</option>
+												<% }) %>
+													<% } else { %>
+														<option disabled>No departments available</option>
+														<% } %>
+									</select>
+								</div>
+							</div>
+
+							<!-- Designation -->
+							<div class="col-md-6">
+								<div class="mb-3">
+									<label for="designation" class="form-label">Designation <span
+											class="text-danger">*</span></label>
+									<select id="designation" name="designation" class="form-select select2" required>
+										<option value="">-- Select Designation --</option>
+										<% if (designations && designations.length) { %>
+											<% designations.forEach(des=> { %>
+												<option value="<%= des._id %>">
+													<%= des.name %>
+												</option>
+												<% }) %>
+													<% } else { %>
+														<option disabled>No designations available</option>
+														<% } %>
+									</select>
+								</div>
+							</div>
+
+							<!-- Address -->
+							<div class="col-md-6">
+								<div class="mb-3">
+									<label for="address" class="form-label">Address <span
+											class="optnl_lbl">(Optional)</span></label>
+									<textarea id="address" name="address" rows="3" class="form-control"
+										placeholder="Enter address"></textarea>
+								</div>
+							</div>
+
+							<!-- Profile Image -->
+							<div class="col-md-6">
+								<div class="mb-3">
+									<label for="fileInput" class="form-label">Profile Image <span
+											class="optnl_lbl">(Optional)</span></label>
+									<div class="upload-profilebox form-control p-2" id="uploadprofileBox">
+										<input type="file" name="profile_image" class="form-control d-none"
+											id="fileInput" accept="image/*">
+										<div class="preview" id="preview"></div>
+										<div class="upload-icon text-center"><i class="ti ti-plus fa-2x mb-2"></i></div>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<!-- Submit -->
+					<div class="d-flex align-items-center justify-content-end mt-4">
+						<button class="btn btn-primary btn-w-lg rounded-pill" type="submit">Register</button>
+					</div>
+				</form>
+			</div>
+		</div>
+
+		<!-- Footer -->
+		<div class="footer mt-4 d-sm-flex align-items-center justify-content-between border-top bg-white p-3">
+			<p class="mb-0">2025 &copy; HLFPPT.</p>
+			<p>Designed & Developed by
+				<a href="https://duplexservices.com" target="_blank" rel="noopener" class="text-primary">Duplex Services
+					& Technology</a>
+			</p>
+		</div>
+	</div>
+	<!-- /Page Wrapper -->
+
+	<!-- Success Modal -->
+	<div id="data-success-register" class="modal fade" tabindex="-1" aria-hidden="true">
+		<div class="modal-dialog modal-dialog-centered modalw620">
+			<div class="modal-content p-4">
+				<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+				<div class="modal-body">
+					<div class="success_mdltxt text-center">
+						<div class="imgscs mb-3">
+							<img src="/img/icons/success.png" alt="Success Icon">
+						</div>
+						<h4 class="fs-24 text-dark fw-medium mb-4">
+							Your Registration has been <br> completed successfully
+						</h4>
+						<div class="mb-3 text-center">
+							<button class="btn btn-primary rounded-pill minw80" data-bs-dismiss="modal">Ok</button>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<%- include('../../partials/footer') %>
+		<script>    // File upload box click triggers file input
+			document.getElementById("uploadprofileBox").addEventListener("click", () => {
+				document.getElementById("fileInput").click();
+			});
+
+			// Show preview when a file is selected
+			document.getElementById("fileInput").addEventListener("change", (e) => {
+				const preview = document.getElementById("preview");
+				preview.innerHTML = "";
+
+				const file = e.target.files[0];
+				if (file) {
+					const img = document.createElement("img");
+					img.src = URL.createObjectURL(file);
+					img.style.maxWidth = "100px";
+					img.classList.add("img-thumbnail");
+					preview.appendChild(img);
+				}
+			});
+		</script>

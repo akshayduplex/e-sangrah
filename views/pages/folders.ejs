@@ -1,0 +1,204 @@
+<%- include('../partials/header') %>
+
+	<!-- Page Wrapper -->
+	<div class="page-wrapper">
+		<div class="content">
+			<!-- Breadcrumb -->
+			<div class="d-flex align-items-center justify-content-between page-breadcrumb mb-3">
+				<div class="my-auto mb-2">
+					<h2 class="mb-1">Folders</h2>
+					<nav>
+						<ol class="breadcrumb mb-0">
+							<li class="breadcrumb-item">
+								<a href="#"><i class="ti ti-smart-home"></i></a>
+							</li>
+							<li class="breadcrumb-item">
+								Dashboard
+							</li>
+							<li class="breadcrumb-item">
+								Add Document
+							</li>
+							<li class="breadcrumb-item">
+								Folder
+							</li>
+						</ol>
+					</nav>
+				</div>
+				<div class="rtbtn">
+					<a href="#" class="btn btn-primary btn-lg rounded-pill me-2 mb-2" data-bs-toggle="modal"
+						data-bs-target="#folder-modal">
+						<i class="ti ti-plus me-1"></i>Create Folder
+					</a>
+				</div>
+			</div>
+			<!-- /Breadcrumb -->
+			<div class="my-4 folderrow">
+				<div class="folderbox">
+					<div class="fldricon">
+						<img src="/img/icons/folder.png">
+					</div>
+					<div class="fldrname">
+						<p>KVP Design </p>
+					</div>
+					<div class="folder_links">
+						<button type="button" class="btn border-0" data-bs-toggle="dropdown" aria-expanded="false">
+							<i class="ti ti-dots"></i> </button>
+						<ul class="dropdown-menu">
+							<li><a class="dropdown-item" href="#"><i class="ti ti-eye"></i> View</a></li>
+							<li><a class="dropdown-item" href="#"><i class="ti ti-pencil-minus"></i> Rename</a></li>
+							<li><a class="dropdown-item" href="#" data-bs-toggle="modal"
+									data-bs-target="#sharedoc-modal">
+									<i class="ti ti-share"></i> Share</a>
+							</li>
+							<li><a class="dropdown-item" href="#" data-bs-toggle="modal"
+									data-bs-target="#versionhistory-modal">
+									<i class="ti ti-history"></i> Version History</a>
+							</li>
+							<li><a class="dropdown-item" href="#" data-bs-toggle="modal"
+									data-bs-target="#downloaddoc-modal">
+									<i class="ti ti-download"></i> Download</a>
+							</li>
+							<li><a class="dropdown-item" href="#" data-bs-toggle="modal"
+									data-bs-target="#trashdoc-modal">
+									<i class="ti ti-trash"></i> Move to Trash</a>
+							</li>
+							<li><a class="dropdown-item" href="#" data-bs-toggle="modal"
+									data-bs-target="#archivedoc-modal">
+									<i class="ti ti-archive"></i> Move to Archive</a>
+							</li>
+						</ul>
+					</div>
+				</div>
+
+
+				<div class="folderbox">
+					<div class="fldricon">
+						<img src="/img/icons/folder.png">
+					</div>
+					<div class="fldrname">
+						<p>DMS Design </p>
+					</div>
+					<div class="folder_links">
+						<button type="button" class="btn border-0" data-bs-toggle="dropdown" aria-expanded="false">
+							<i class="ti ti-dots"></i> </button>
+						<ul class="dropdown-menu">
+							<li><a class="dropdown-item" href="#"><i class="ti ti-eye"></i> View</a></li>
+							<li><a class="dropdown-item" href="#"><i class="ti ti-pencil-minus"></i> Rename</a></li>
+							<li><a class="dropdown-item" href="#" data-bs-toggle="modal"
+									data-bs-target="#sharedoc-modal">
+									<i class="ti ti-share"></i> Share</a>
+							</li>
+							<li><a class="dropdown-item" href="#" data-bs-toggle="modal"
+									data-bs-target="#versionhistory-modal">
+									<i class="ti ti-history"></i> Version History</a>
+							</li>
+							<li><a class="dropdown-item" href="#" data-bs-toggle="modal"
+									data-bs-target="#downloaddoc-modal">
+									<i class="ti ti-download"></i> Download</a>
+							</li>
+							<li><a class="dropdown-item" href="#" data-bs-toggle="modal"
+									data-bs-target="#trashdoc-modal">
+									<i class="ti ti-trash"></i> Move to Trash</a>
+							</li>
+							<li><a class="dropdown-item" href="#" data-bs-toggle="modal"
+									data-bs-target="#archivedoc-modal">
+									<i class="ti ti-archive"></i> Move to Archive</a>
+							</li>
+						</ul>
+					</div>
+				</div>
+
+				<div class="folderbox">
+					<div class="fldricon">
+						<img src="/img/icons/folder.png">
+					</div>
+					<div class="fldrname">
+						<p>New Folder 2</p>
+					</div>
+					<div class="folder_links">
+						<button type="button" class="btn border-0" data-bs-toggle="dropdown" aria-expanded="false">
+							<i class="ti ti-dots"></i> </button>
+						<ul class="dropdown-menu">
+							<li><a class="dropdown-item" href="#"><i class="ti ti-eye"></i> View</a></li>
+							<li><a class="dropdown-item" href="#"><i class="ti ti-pencil-minus"></i> Rename</a></li>
+							<li><a class="dropdown-item" href="#" data-bs-toggle="modal"
+									data-bs-target="#sharedoc-modal">
+									<i class="ti ti-share"></i> Share</a>
+							</li>
+							<li><a class="dropdown-item" href="#" data-bs-toggle="modal"
+									data-bs-target="#versionhistory-modal">
+									<i class="ti ti-history"></i> Version History</a>
+							</li>
+							<li><a class="dropdown-item" href="#" data-bs-toggle="modal"
+									data-bs-target="#downloaddoc-modal">
+									<i class="ti ti-download"></i> Download</a>
+							</li>
+							<li><a class="dropdown-item" href="#" data-bs-toggle="modal"
+									data-bs-target="#trashdoc-modal">
+									<i class="ti ti-trash"></i> Move to Trash</a>
+							</li>
+							<li><a class="dropdown-item" href="#" data-bs-toggle="modal"
+									data-bs-target="#archivedoc-modal">
+									<i class="ti ti-archive"></i> Move to Archive</a>
+							</li>
+						</ul>
+					</div>
+				</div>
+
+
+				<div class="folderbox">
+					<div class="fldricon">
+						<img src="/img/icons/folder.png">
+					</div>
+					<div class="fldrname">
+						<p>New Folder 3</p>
+					</div>
+					<div class="folder_links">
+						<button type="button" class="btn border-0" data-bs-toggle="dropdown" aria-expanded="false">
+							<i class="ti ti-dots"></i> </button>
+						<ul class="dropdown-menu">
+							<li><a class="dropdown-item" href="#"><i class="ti ti-eye"></i> View</a></li>
+							<li><a class="dropdown-item" href="#"><i class="ti ti-pencil-minus"></i> Rename</a></li>
+							<li><a class="dropdown-item" href="#" data-bs-toggle="modal"
+									data-bs-target="#sharedoc-modal">
+									<i class="ti ti-share"></i> Share</a>
+							</li>
+							<li><a class="dropdown-item" href="#" data-bs-toggle="modal"
+									data-bs-target="#versionhistory-modal">
+									<i class="ti ti-history"></i> Version History</a>
+							</li>
+							<li><a class="dropdown-item" href="#" data-bs-toggle="modal"
+									data-bs-target="#downloaddoc-modal">
+									<i class="ti ti-download"></i> Download</a>
+							</li>
+							<li><a class="dropdown-item" href="#" data-bs-toggle="modal"
+									data-bs-target="#trashdoc-modal">
+									<i class="ti ti-trash"></i> Move to Trash</a>
+							</li>
+							<li><a class="dropdown-item" href="#" data-bs-toggle="modal"
+									data-bs-target="#archivedoc-modal">
+									<i class="ti ti-archive"></i> Move to Archive</a>
+							</li>
+						</ul>
+					</div>
+				</div>
+
+
+
+			</div>
+		</div>
+
+		<div class="footer mt-4 d-sm-flex align-items-center justify-content-between border-top bg-white p-3">
+			<p class="mb-0">2025 &copy; HLFPPT.</p>
+			<p>Designed & Developed by <a href="javascript:void(0);" class="text-primary">Duplex services &
+					Technology</a></p>
+		</div>
+
+	</div>
+	<!-- /Page Wrapper -->
+
+	<%- include('../partials/footer') %>
+
+
+
+		<!-- /Modal -->
