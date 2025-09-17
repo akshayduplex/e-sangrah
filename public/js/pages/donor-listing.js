@@ -1,26 +1,26 @@
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     // Show loading spinner initially
     const $table = $('#donorTable');
 
     // console.log($table , 'this is TAble instances why its happening in that to ');
     const $loadingSpinner = $('#loadingSpinner');
-    
+
     // Notification helpers (use showToast if available, else console)
     function notifySuccess(message) {
         if (typeof showToast === 'function') {
-            try { showToast(message, 'success'); return; } catch(e) {}
+            try { showToast(message, 'success'); return; } catch (e) { }
         }
         console.log('SUCCESS:', message);
     }
 
-    
+
     function notifyError(message) {
         if (typeof showToast === 'function') {
-            try { showToast(message, 'error'); return; } catch(e) {}
+            try { showToast(message, 'error'); return; } catch (e) { }
         }
         console.error('ERROR:', message);
     }
-    
+
     // Build header dynamically so EJS doesn't need static columns
     (function buildDynamicHeader() {
         const headers = [
@@ -84,7 +84,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 $table.show();
                 return (json && Array.isArray(json.data)) ? json.data : [];
             },
-            error: function(xhr, error, thrown) {
+            error: function (xhr, error, thrown) {
                 console.error('Error loading data:', error);
                 // if ($loadingSpinner && $loadingSpinner.length) $loadingSpinner.hide();
                 $table.show();
@@ -100,17 +100,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 data: null,
                 orderable: false,
                 searchable: false,
-                render: function(data, type, row, meta) {
+                render: function (data, type, row, meta) {
                     return meta.row + meta.settings._iDisplayStart + 1;
                 },
                 className: 'text-center'
             },
-            { 
+            {
                 data: 'id',
                 orderable: false,
                 searchable: false,
                 className: 'text-center',
-                render: function(data, type, row) {
+                render: function (data, type, row) {
                     return `
                         <div class="btn-group" role="group">
                             <a href="/donor-register?id=${data}" class="btn btn-sm btn-info me-1" data-bs-toggle="tooltip" title="Edit">
@@ -124,31 +124,31 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             },
             { data: 'full_name', name: 'full_name' },
-            { 
-                data: 'email', 
+            {
+                data: 'email',
                 name: 'email',
-                render: function(data) {
+                render: function (data) {
                     return data || '-';
                 }
             },
-            { 
-                data: 'phone', 
+            {
+                data: 'phone',
                 name: 'phone',
-                render: function(data) {
+                render: function (data) {
                     return data || '-';
                 }
             },
-            { 
-                data: 'organization_name', 
+            {
+                data: 'organization_name',
                 name: 'organization_name',
-                render: function(data) {
+                render: function (data) {
                     return data || '-';
                 }
             },
-            { 
-                data: 'donor_type', 
+            {
+                data: 'donor_type',
                 name: 'donor_type',
-                render: function(data) {
+                render: function (data) {
                     const types = {
                         'individual': 'Individual',
                         'corporate': 'Corporate',
@@ -157,36 +157,36 @@ document.addEventListener('DOMContentLoaded', function() {
                     return types[data] || data || '-';
                 }
             },
-            { 
-                data: 'pan_tax_id', 
+            {
+                data: 'pan_tax_id',
                 name: 'pan_tax_id',
-                render: function(data) {
+                render: function (data) {
                     return data || '-';
                 }
             },
-            { 
-                data: 'address', 
+            {
+                data: 'address',
                 name: 'address',
-                render: function(data) {
+                render: function (data) {
                     return data ? (data.length > 50 ? data.substring(0, 50) + '...' : data) : '-';
                 }
             }
         ],
         dom: "<'row'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6'f>>" +
-             "<'row'<'col-sm-12'tr>>" +
-             "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
-        initComplete: function() {
+            "<'row'<'col-sm-12'tr>>" +
+            "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
+        initComplete: function () {
             // Initialize tooltips
             var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
             tooltipTriggerList.map(function (tooltipTriggerEl) {
                 return new bootstrap.Tooltip(tooltipTriggerEl);
             });
-            
+
             // Style search input and length menu
             $('.dataTables_filter input').addClass('form-control form-control-sm').attr('placeholder', 'Search donors...');
             $('.dataTables_length select').addClass('form-select form-select-sm');
         },
-        drawCallback: function() {
+        drawCallback: function () {
             // Re-initialize tooltips after each table draw
             var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
             tooltipTriggerList.map(function (tooltipTriggerEl) {
@@ -201,13 +201,13 @@ document.addEventListener('DOMContentLoaded', function() {
     const $confirmBtn = $('#confirmDeleteBtn');
 
     // Open modal and store the id
-    $(document).on('click', '.delete-btn', function() {
+    $(document).on('click', '.delete-btn', function () {
         pendingDeleteId = $(this).data('id');
         $confirmModal.modal('show');
     });
 
     // Ensure we don't double bind
-    $confirmBtn.off('click').on('click', function() {
+    $confirmBtn.off('click').on('click', function () {
         if (!pendingDeleteId) {
             $confirmModal.modal('hide');
             return;
@@ -219,14 +219,14 @@ document.addEventListener('DOMContentLoaded', function() {
         $.ajax({
             url: `/api/donor-delete/${pendingDeleteId}`,
             type: 'DELETE',
-            success: function() {
+            success: function () {
                 notifySuccess('Donor deleted successfully');
                 table.ajax.reload(null, false); // stay on the same page
             },
-            error: function(xhr) {
+            error: function (xhr) {
                 notifyError('Error deleting donor: ' + (xhr.responseJSON?.message || 'Unknown error'));
             },
-            complete: function() {
+            complete: function () {
                 pendingDeleteId = null;
                 $btn.prop('disabled', false).text('Delete');
                 $confirmModal.modal('hide');
