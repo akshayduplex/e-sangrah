@@ -35,13 +35,22 @@
                         <label><strong>Project Type</strong></label>
                         <% if (viewOnly) { %>
                             <div>
-                                <%= project?.projectType || "N/A" %>
+                                <%= project?.projectType?.name || "N/A" %>
                             </div>
                             <% } else { %>
-                                <input type="text" name="projectType" class="form-control"
-                                    placeholder="Enter Project Type" value="<%= project?.projectType || '' %>">
+                                <select name="projectType" class="form-control select2" required>
+                                    <option value="">-- Select Project Type --</option>
+                                    <% projectTypes.forEach(pt=> { %>
+                                        <option value="<%= pt._id %>"
+                                            <%=project?.projectType?._id?.toString()===pt._id.toString() ? "selected"
+                                            : "" %>>
+                                            <%= pt.name %>
+                                        </option>
+                                        <% }) %>
+                                </select>
                                 <% } %>
                     </div>
+
                 </div>
 
                 <!-- Project Manager, Status, Logo -->
@@ -68,16 +77,19 @@
                     <div class="col-md-4">
                         <label><strong>Project Logo</strong></label>
                         <% if (viewOnly) { %>
-                            <% if (project?.projectLogo) { %>
-                                <img src="<%= project.projectLogo %>" alt="Logo" style="max-height:100px;">
-                                <% } else { %>
-                                    <div>N/A</div>
-                                    <% } %>
-                                        <% } else { %>
-                                            <input type="file" name="projectLogo" class="form-control">
-                                            <% } %>
+                            <div>
+                                <% if (project?.projectLogo) { %>
+                                    <img src="<%= project.projectLogo %>" alt="Logo"
+                                        class="img-fluid border rounded bg-light p-1"
+                                        style="max-height:50px; object-fit:contain;">
+                                    <% } else { %>
+                                        N/A
+                                        <% } %>
+                            </div>
+                            <% } else { %>
+                                <input type="file" name="projectLogo" class="form-control">
+                                <% } %>
                     </div>
-
                     <div class="col-md-4">
                         <label><strong>Status</strong></label>
                         <% if (viewOnly) { %>

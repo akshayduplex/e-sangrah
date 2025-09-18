@@ -23,7 +23,7 @@
 
 			<div class="add-info-fieldset">
 				<fieldset id="first-field-file">
-					<form action="#">
+					<form id="documentForm" action="/api/documents" method="POST" enctype="multipart/form-data">
 						<div class="modal-body">
 							<div class="row">
 								<div class="col-md-4">
@@ -75,7 +75,7 @@
 													</option>
 													<% }) %>
 														<% } else { %>
-															<option disabled>No departments available</option>
+															<option disabled>No users available</option>
 															<% } %>
 										</select>
 									</div>
@@ -84,8 +84,8 @@
 									<div class="mb-3">
 										<label class="form-label">Select Date</label>
 										<div class="input-icon-end position-relative">
-											<input type="text" class="form-control datetimepicker"
-												placeholder="dd/mm/yyyy" value="02-05-2024">
+											<input type="text" name="documentDate" class="form-control datetimepicker"
+												placeholder="dd/mm/yyyy" required>
 											<span class="input-icon-addon">
 												<i class="ti ti-calendar text-gray-7"></i>
 											</span>
@@ -94,16 +94,18 @@
 								</div>
 								<div class="col-md-4">
 									<div class="mb-3">
-										<label class="form-label">Add Tags</label>
-										<input type="text" class="form-control">
+										<label class="form-label">Add Tags (comma separated)</label>
+										<input type="text" name="tags" class="form-control"
+											placeholder="tag1, tag2, tag3">
 									</div>
 								</div>
 								<div class="col-md-4">
 									<div class="mb-3">
 										<label class="form-label">Meta Data</label>
 										<div class="position-relative">
-											<input type="text" class="form-control">
-											<button class="border-0 fieldright_btn" data-bs-toggle="modal"
+											<input type="text" id="metadataDisplay" class="form-control" readonly>
+											<input type="hidden" id="metadataInput" name="metadata">
+											<button type="button" class="border-0 fieldright_btn" data-bs-toggle="modal"
 												data-bs-target="#metadata-modal">
 												<img src="/img/icons/fieldbtn.png">
 											</button>
@@ -113,6 +115,7 @@
 								<div class="col-md-12">
 									<div class="mb-3">
 										<label class="form-label">Description</label>
+										<textarea id="summernote" name="description" style="display: none;"></textarea>
 										<div class="summernote"></div>
 									</div>
 								</div>
@@ -121,29 +124,29 @@
 										<div class="d-flex align-items-center gap-5">
 											<label class="form-label mb-0">Compliance and Retention Document</label>
 											<div class="form-check">
-												<input class="form-check-input" type="radio" name="flexRadioDefault"
-													id="flexRadioDefault4">
-												<label class="form-check-label" for="flexRadioDefault4">
+												<input class="form-check-input" type="radio" name="compliance"
+													value="yes" id="complianceYes">
+												<label class="form-check-label" for="complianceYes">
 													Yes
 												</label>
 											</div>
 											<div class="form-check">
-												<input class="form-check-input" type="radio" name="flexRadioDefault"
-													id="flexRadioDefault30" checked="">
-												<label class="form-check-label" for="flexRadioDefault30">
+												<input class="form-check-input" type="radio" name="compliance"
+													id="complianceNo" value="no" checked>
+												<label class="form-check-label" for="complianceNo">
 													No
 												</label>
 											</div>
 										</div>
 									</div>
 								</div>
-								<div class="col-md-6">
+								<div class="col-md-6" id="expiryDateContainer" style="display: none;">
 									<div class="mb-3">
 										<div class="d-flex align-items-center gap-5">
-											<label class="form-label mb-0">Enter Expriry Date</label>
+											<label class="form-label mb-0">Enter Expiry Date</label>
 											<div class="input-icon-end position-relative">
-												<input type="text" class="form-control datetimepicker"
-													placeholder="dd/mm/yyyy" value="02-05-2024">
+												<input type="text" class="form-control datetimepicker" name="expiryDate"
+													placeholder="dd/mm/yyyy">
 												<span class="input-icon-addon">
 													<i class="ti ti-calendar text-gray-7"></i>
 												</span>
@@ -154,7 +157,7 @@
 								<div class="col-md-12">
 									<div class="mb-3">
 										<label class="form-label">Leave a comment (Optional)</label>
-										<input type="text" class="form-control">
+										<input type="text" class="form-control" name="comment">
 									</div>
 								</div>
 
@@ -163,25 +166,29 @@
 									<div class="upload-box mb-3" id="uploadBox">
 										<i class="ti ti-cloud-upload fa-2x text-primary mb-2"></i>
 										<p class="mb-1"><strong>Click to upload file</strong> or drag and drop</p>
-										<small class="text-muted">Max 10GB total storage. XLSX / ODS / CSV / PDF</small>
-										<input type="file" class="form-control d-none" id="fileInput" multiple>
+										<small class="text-muted">Max 10GB total storage. DOCX / PPTX / CSV /
+											PDF</small>
+										<input type="file" class="form-control d-none" id="fileInput" name="files"
+											multiple required>
 									</div>
 									<div class="crtfoldr_row text-center my-4">
 										<span class="pe-3">or</span>
-										<button class="btn btn-primary rounded-pill" data-bs-toggle="modal"
-											data-bs-target="#folder-modal">Create Folder</button>
+										<button type="button" class="btn btn-primary rounded-pill"
+											data-bs-toggle="modal" data-bs-target="#folder-modal">Create Folder</button>
 									</div>
 									<div id="fileList"></div>
 								</div>
 								<div class="col-md-12">
 									<label class="form-label">Add Your Signature</label>
 									<div class="signtrboxwrp mb-3">
-										<div class="signbox form-control">
-
+										<div class="signbox form-control" id="signaturePreview">
+											<!-- Signature preview will appear here -->
 										</div>
 										<div class="signupld">
-											<input type="file" class="form-control d-none" id="fileSign">
-											<button class="btn btn-primary rounded-pill" id="uploadSignBtn">Browse from
+											<input type="file" class="form-control d-none" id="fileSign"
+												name="signature" accept="image/*">
+											<button type="button" class="btn btn-primary rounded-pill"
+												id="uploadSignBtn">Browse from
 												system</button>
 										</div>
 									</div>
@@ -189,19 +196,18 @@
 								<div class="col-md-12">
 									<div class="mb-3">
 										<label class="form-label">Add Link (if any)</label>
-										<input type="text" class="form-control">
+										<input type="url" class="form-control" name="link"
+											placeholder="https://example.com">
 									</div>
 								</div>
 							</div>
 						</div>
 						<div class="d-flex align-items-center justify-content-end">
-							<button class="btn btn-primary rounded-pill" type="button"
-								data-bs-target="#data-success-modal" data-bs-toggle="modal" data-bs-dismiss="modal">Add
+							<button class="btn btn-primary rounded-pill" type="submit" id="submitBtn">Add
 								Document</button>
 						</div>
 					</form>
 				</fieldset>
-
 			</div>
 		</div>
 
@@ -210,45 +216,46 @@
 			<p>Designed & Developed by <a href="javascript:void(0);" class="text-primary">Duplex services &
 					Technology</a></p>
 		</div>
-
 	</div>
 	<!-- /Page Wrapper -->
+
 	<%- include('../partials/footer') %>
 
-
+		<!-- Metadata Modal -->
 		<div id="metadata-modal" class="modal fade" tabindex="-1" role="dialog" aria-hidden="true">
 			<div class="modal-dialog modal-dialog-centered">
 				<div class="modal-content">
-					<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+					<div class="modal-header">
+						<h5 class="modal-title">Add Metadata</h5>
+						<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+					</div>
 					<div class="modal-body">
-
-						<form class="mt-4 px-3" action="#">
+						<form id="metadataForm">
 							<div class="mb-3">
-								<label for="username" class="form-label">File Name</label>
-								<input class="form-control" type="text" id="username" required=""
+								<label class="form-label">File Name</label>
+								<input class="form-control" type="text" name="fileName" required
 									placeholder="File Name">
 							</div>
 							<div class="mb-3">
-								<label for="emailaddress" class="form-label">File description</label>
-								<input class="form-control" type="text" id="emailaddress" required=""
+								<label class="form-label">File description</label>
+								<input class="form-control" type="text" name="fileDescription" required
 									placeholder="Project about the new KVP app">
 							</div>
 							<div class="mb-3">
-								<label for="password" class="form-label">File main Heading</label>
-								<input type="text" class="form-control">
+								<label class="form-label">File main Heading</label>
+								<input type="text" class="form-control" name="mainHeading" placeholder="Main Heading">
 							</div>
 							<div class="mb-3 text-center">
-								<button class="btn btn-primary rounded-pill" type="submit">Create</button>
+								<button class="btn btn-primary rounded-pill" type="submit">Save Metadata</button>
 							</div>
 						</form>
 					</div>
 				</div>
 			</div>
 		</div>
-		<!-- /Modal -->
+		<!-- /Metadata Modal -->
 
-
-
+		<!-- Success Modal -->
 		<div id="data-success-modal" class="modal fade" tabindex="-1" role="dialog" aria-hidden="true">
 			<div class="modal-dialog modal-dialog-centered modalw620">
 				<div class="modal-content">
@@ -261,25 +268,331 @@
 									<img src="/img/icons/fn1.png">
 								</span>
 								<div class="ms-2">
-									<p class="fs-14 mb-1 fw-normal">Project Proposal v1 </p>
+									<p class="fs-14 mb-1 fw-normal" id="successFileName">Project Proposal v1</p>
 								</div>
 							</div>
 							<h4 class="fs-24 text-dark fw-medium mb-4">Your file Added successfully</h4>
-							<p class="fs-20 fw-normal mb-4">You will be notified soon as your file gets approved </p>
+							<p class="fs-20 fw-normal mb-4">You will be notified soon as your file gets approved</p>
 							<div class="mb-3 text-center">
-								<button class="btn btn-primary rounded-pill minw80" type="submit">Ok</button>
+								<button class="btn btn-primary rounded-pill minw80" type="button"
+									data-bs-dismiss="modal">Ok</button>
 							</div>
 						</div>
 					</div>
 				</div>
 			</div>
 		</div>
-		<!-- /Modal -->
-
-
-
-
+		<!-- /Success Modal -->
 		<script>
+			// Global variable to store uploaded file IDs
+			let uploadedFileIds = [];
+
+			// Initialize Summernote
+			$(document).ready(function () {
+				$('.summernote').summernote({
+					height: 200,
+					callbacks: {
+						onChange: function (contents) {
+							$('#summernote').val(contents);
+						}
+					}
+				});
+			});
+
+			// Initialize datepickers
+			$('.datetimepicker').datetimepicker({
+				format: 'DD-MM-YYYY',
+				useCurrent: false
+			});
+
+			// Compliance radio button handler
+			$('input[name="compliance"]').change(function () {
+				if ($(this).val() === 'yes') {
+					$('#expiryDateContainer').show();
+					$('input[name="expiryDate"]').prop('required', true);
+				} else {
+					$('#expiryDateContainer').hide();
+					$('input[name="expiryDate"]').prop('required', false);
+				}
+			});
+
+			// Metadata modal handling
+			$('#metadataForm').on('submit', function (e) {
+				e.preventDefault();
+				const formData = $(this).serializeArray();
+				const metadata = {};
+
+				formData.forEach(function (item) {
+					metadata[item.name] = item.value;
+				});
+
+				// Store as JSON string in hidden input
+				$('#metadataInput').val(JSON.stringify(metadata));
+
+				// Display in the visible field
+				$('#metadataDisplay').val(metadata.fileName + ' - ' + metadata.fileDescription);
+
+				// Close the modal
+				$('#metadata-modal').modal('hide');
+			});
+
+			// File upload handling
+			const uploadBox = document.getElementById("uploadBox");
+			const fileInput = document.getElementById("fileInput");
+			const fileList = document.getElementById("fileList");
+
+			// Open file dialog on click
+			uploadBox.addEventListener("click", () => fileInput.click());
+
+			// Handle file selection - UPDATED for S3 upload
+			fileInput.addEventListener("change", async (e) => {
+				const files = e.target.files;
+				for (let i = 0; i < files.length; i++) {
+					await handleFileUpload(files[i]);
+				}
+			});
+
+			// Drag and drop events
+			uploadBox.addEventListener("dragover", (e) => {
+				e.preventDefault();
+				uploadBox.classList.add("dragover");
+			});
+
+			uploadBox.addEventListener("dragleave", () => {
+				uploadBox.classList.remove("dragover");
+			});
+
+			uploadBox.addEventListener("drop", async (e) => {
+				e.preventDefault();
+				uploadBox.classList.remove("dragover");
+				const files = e.dataTransfer.files;
+
+				for (let i = 0; i < files.length; i++) {
+					await handleFileUpload(files[i]);
+				}
+			});
+
+			// Handle file upload to S3 - NEW FUNCTION
+			async function handleFileUpload(file) {
+				const fileId = Date.now() + Math.random(); // unique id for UI
+				const fileItem = document.createElement("div");
+				fileItem.classList.add("file-item", "col-sm-5", "mb-3", "p-3", "border", "rounded");
+				fileItem.setAttribute("data-id", fileId);
+
+				// Choose icon based on type
+				let iconClass = "fa-file";
+				if (file.type.includes("word")) iconClass = "fa-file-word text-primary";
+				else if (file.type.includes("pdf")) iconClass = "fa-file-pdf text-danger";
+				else if (file.type.includes("presentation") || file.name.endsWith(".ppt") || file.name.endsWith(".pptx"))
+					iconClass = "fa-file-powerpoint text-warning";
+				else if (file.type.includes("sheet") || file.name.endsWith(".xls") || file.name.endsWith(".xlsx"))
+					iconClass = "fa-file-excel text-success";
+
+				fileItem.innerHTML = `
+            <div class="file-info d-flex align-items-center">
+                <i class="fa-solid ${iconClass} fa-2x me-3"></i>
+                <div class="flex-grow-1">
+                    <h6 class="mb-0 text-truncate">${file.name}</h6>
+                    <small class="text-muted">${(file.size / 1024 / 1024).toFixed(2)} MB</small>
+                </div>
+            </div>
+            <div class="file-progress mt-2">
+                <div class="progress">
+                    <div class="progress-bar bg-success" role="progressbar" style="width: 0%">0%</div>
+                </div>
+            </div>
+            <button class="remove-btn btn btn-sm btn-danger mt-2" data-fileid="${fileId}">
+                <i class="fa-solid fa-xmark"></i> Remove
+            </button>
+        `;
+
+				fileList.appendChild(fileItem);
+
+				const progressBar = fileItem.querySelector(".progress-bar");
+
+				try {
+					// Create FormData for upload
+					const formData = new FormData();
+					formData.append('file', file);
+
+					// Upload to server (which will upload to S3)
+					const response = await fetch('api/files/upload', {
+						method: 'POST',
+						body: formData
+					});
+
+					const data = await response.json();
+
+					if (data.success) {
+						// Update progress to 100%
+						progressBar.style.width = "100%";
+						progressBar.textContent = "100%";
+
+						// Store the file ID for later use
+						uploadedFileIds.push(data.fileId);
+
+						// Update the data attribute with the actual file ID
+						fileItem.setAttribute("data-file-id", data.fileId);
+
+						// Change remove button to use the actual file ID
+						const removeBtn = fileItem.querySelector(".remove-btn");
+						removeBtn.setAttribute("data-file-id", data.fileId);
+					} else {
+						throw new Error(data.message || "Upload failed");
+					}
+				} catch (error) {
+					console.error("Upload error:", error);
+					progressBar.classList.remove("bg-success");
+					progressBar.classList.add("bg-danger");
+					progressBar.textContent = "Error";
+
+					// Show error message
+					const errorMsg = document.createElement("div");
+					errorMsg.className = "text-danger small mt-1";
+					errorMsg.textContent = "Upload failed. Please try again.";
+					fileItem.appendChild(errorMsg);
+				}
+
+				// Remove file handler
+				fileItem.querySelector(".remove-btn").addEventListener("click", function () {
+					const fileIdToRemove = this.getAttribute("data-file-id");
+					if (fileIdToRemove) {
+						// Remove from our stored array
+						uploadedFileIds = uploadedFileIds.filter(id => id !== fileIdToRemove);
+					}
+					fileItem.remove();
+				});
+			}
+
+			// Signature upload handling
+			const fileSign = document.getElementById('fileSign');
+			const uploadSignBtn = document.getElementById('uploadSignBtn');
+			const signaturePreview = document.getElementById('signaturePreview');
+
+			// Open file dialog on button click
+			uploadSignBtn.addEventListener('click', () => {
+				fileSign.click();
+			});
+
+			// Show preview when file is selected
+			fileSign.addEventListener('change', function () {
+				if (this.files && this.files[0]) {
+					const reader = new FileReader();
+					reader.onload = function (e) {
+						signaturePreview.innerHTML = `<img src="${e.target.result}" alt="Signature Preview" 
+                    style="max-height: 100%; max-width: 100%; object-fit: contain;">`;
+						uploadSignBtn.textContent = "Update Signature";
+					};
+					reader.readAsDataURL(this.files[0]);
+				}
+			});
+
+			// Form submission handling - UPDATED for S3 integration
+			$('#documentForm').on('submit', async function (e) {
+				e.preventDefault();
+
+				// Ensure the description textarea has the latest HTML content
+				$('#summernote').val($('.summernote').summernote('code'));
+
+				// Show loading state
+				$('#submitBtn').prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Adding...');
+
+				try {
+					// Add file IDs to form data
+					const fileIdsInput = document.createElement('input');
+					fileIdsInput.type = 'hidden';
+					fileIdsInput.name = 'fileIds';
+					fileIdsInput.value = JSON.stringify(uploadedFileIds);
+					this.appendChild(fileIdsInput);
+
+					// Submit form via AJAX
+					const formData = new FormData(this);
+
+					const response = await fetch('/api/documents', {
+						method: 'POST',
+						body: formData
+					});
+
+					const data = await response.json();
+
+					if (data.success) {
+						// Show success modal
+						if (data.document && data.document.metadata && data.document.metadata.fileName) {
+							$('#successFileName').text(data.document.metadata.fileName);
+						}
+						$('#data-success-modal').modal('show');
+
+						// Reset form and clear uploaded files
+						this.reset();
+						$('.summernote').summernote('code', '');
+						$('#fileList').empty();
+						$('#signaturePreview').empty();
+						$('#metadataDisplay').val('');
+						$('#metadataInput').val('');
+						uploadedFileIds = [];
+					} else {
+						alert('Error: ' + (data.message || 'Unknown error occurred'));
+					}
+				} catch (error) {
+					console.error('Error:', error);
+					alert('An error occurred while submitting the form.');
+				} finally {
+					$('#submitBtn').prop('disabled', false).html('Add Document');
+				}
+			});
+		</script>
+		<!-- <script>
+			// Initialize Summernote
+			$(document).ready(function () {
+				$('.summernote').summernote({
+					height: 200,
+					callbacks: {
+						onChange: function (contents) {
+							$('#summernote').val(contents);
+						}
+					}
+				});
+			});
+
+			// Initialize datepickers
+			// In your frontend script
+			$('.datetimepicker').datetimepicker({
+				format: 'DD-MM-YYYY',
+				useCurrent: false
+			});
+
+			// Compliance radio button handler
+			$('input[name="compliance"]').change(function () {
+				if ($(this).val() === 'yes') {
+					$('#expiryDateContainer').show();
+					$('input[name="expiryDate"]').prop('required', true);
+				} else {
+					$('#expiryDateContainer').hide();
+					$('input[name="expiryDate"]').prop('required', false);
+				}
+			});
+
+			// Metadata modal handling
+			$('#metadataForm').on('submit', function (e) {
+				e.preventDefault();
+				const formData = $(this).serializeArray();
+				const metadata = {};
+
+				formData.forEach(function (item) {
+					metadata[item.name] = item.value;
+				});
+
+				// Store as JSON string in hidden input
+				$('#metadataInput').val(JSON.stringify(metadata));
+
+				// Display in the visible field
+				$('#metadataDisplay').val(metadata.fileName + ' - ' + metadata.fileDescription);
+
+				// Close the modal
+				$('#metadata-modal').modal('hide');
+			});
+
+			// File upload handling
 			const uploadBox = document.getElementById("uploadBox");
 			const fileInput = document.getElementById("fileInput");
 			const fileList = document.getElementById("fileList");
@@ -323,20 +636,20 @@
 					else if (file.type.includes("sheet") || file.name.endsWith(".xls") || file.name.endsWith(".xlsx")) iconClass = "fa-file-excel text-success";
 
 					fileItem.innerHTML = `
-	        <div class="file-info">
-	          <i class="fa-solid ${iconClass} fa-2x"></i>
-	          <div>
-	            <h6 class="mb-0">${file.name}</h6>
-	            <small class="text-muted">${(file.size / 1024 / 1024).toFixed(2)} MB</small>
-	          </div>
-	        </div>
-	        <div class="file-progress">
-	          <div class="progress">
-	            <div class="progress-bar bg-success" role="progressbar" style="width: 0%">0%</div>
-	          </div>
-	        </div>
-	        <button class="remove-btn"><i class="fa-solid fa-xmark"></i></button>
-      `;
+                <div class="file-info d-flex align-items-center">
+                    <i class="fa-solid ${iconClass} fa-2x me-3"></i>
+                    <div>
+                        <h6 class="mb-0">${file.name}</h6>
+                        <small class="text-muted">${(file.size / 1024 / 1024).toFixed(2)} MB</small>
+                    </div>
+                </div>
+                <div class="file-progress mt-2">
+                    <div class="progress">
+                        <div class="progress-bar bg-success" role="progressbar" style="width: 0%">0%</div>
+                    </div>
+                </div>
+                <button class="remove-btn btn btn-sm btn-danger mt-2"><i class="fa-solid fa-xmark"></i> Remove</button>
+            `;
 
 					fileList.appendChild(fileItem);
 
@@ -356,16 +669,15 @@
 					// Remove file
 					fileItem.querySelector(".remove-btn").addEventListener("click", () => {
 						fileItem.remove();
+						// Also remove from file input (this part is more complex)
 					});
 				});
 			}
-		</script>
 
-
-		<script>
+			// Signature upload handling
 			const fileSign = document.getElementById('fileSign');
 			const uploadSignBtn = document.getElementById('uploadSignBtn');
-			const signBox = document.querySelector('.signbox');
+			const signaturePreview = document.getElementById('signaturePreview');
 
 			// Open file dialog on button click
 			uploadSignBtn.addEventListener('click', () => {
@@ -377,11 +689,55 @@
 				if (this.files && this.files[0]) {
 					const reader = new FileReader();
 					reader.onload = function (e) {
-						signBox.innerHTML = `<img src="${e.target.result}" alt="Signature Preview" 
-                              style="max-height: 100%; max-width: 100%; object-fit: contain;">`;
+						signaturePreview.innerHTML = `<img src="${e.target.result}" alt="Signature Preview" 
+                    style="max-height: 100%; max-width: 100%; object-fit: contain;">`;
 						uploadSignBtn.textContent = "Update Signature";
 					};
 					reader.readAsDataURL(this.files[0]);
 				}
 			});
-		</script>
+
+			// Form submission handling
+			$('#documentForm').on('submit', function (e) {
+				e.preventDefault();
+				// Ensure the description textarea has the latest HTML content
+				$('#summernote').val($('.summernote').summernote('code'));
+				// Show loading state
+				$('#submitBtn').prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Adding...');
+
+				// Submit form via AJAX
+				const formData = new FormData(this);
+
+				fetch('/api/documents', {
+					method: 'POST',
+					body: formData
+				})
+					.then(response => response.json())
+					.then(data => {
+						if (data.success) {
+							// Show success modal
+							if (data.document && data.document.metadata && data.document.metadata.fileName) {
+								$('#successFileName').text(data.document.metadata.fileName);
+							}
+							$('#data-success-modal').modal('show');
+
+							// Reset form
+							this.reset();
+							$('.summernote').summernote('code', '');
+							$('#fileList').empty();
+							$('#signaturePreview').empty();
+							$('#metadataDisplay').val('');
+							$('#metadataInput').val('');
+						} else {
+							alert('Error: ' + data.message);
+						}
+					})
+					.catch(error => {
+						console.error('Error:', error);
+						alert('An error occurred while submitting the form.');
+					})
+					.finally(() => {
+						$('#submitBtn').prop('disabled', false).html('Add Document');
+					});
+			});
+		</script> -->

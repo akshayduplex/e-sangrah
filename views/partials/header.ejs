@@ -265,7 +265,7 @@
                                 <a href="javascript:void(0);" class="dropdown-toggle d-flex align-items-center"
                                     data-bs-toggle="dropdown">
                                     <span class="avatar avatar-sm online">
-                                        <img src="/img/profiles/avatar-12.jpg" alt="Img"
+                                        <img src="<%= profile_image || '/img/profiles/avatar-12.jpg' %>" alt="img"
                                             class="img-fluid rounded-circle">
                                     </span>
                                     <span>
@@ -282,7 +282,8 @@
                                         <div class="card-header">
                                             <div class="d-flex align-items-center">
                                                 <span class="avatar avatar-lg me-2 avatar-rounded">
-                                                    <img src="<%= avatar || '/img/profiles/avatar-12.jpg' %>" alt="img">
+                                                    <img src="<%= profile_image || '/img/profiles/avatar-12.jpg' %>"
+                                                        alt="img">
                                                 </span>
                                                 <span>
                                                     <h5 class="mb-0">
@@ -309,6 +310,10 @@
                                                 <i class="ti ti-circle-arrow-up me-1"></i>My Account
                                             </a>
                                             <a class="dropdown-item d-inline-flex align-items-center p-0 py-2"
+                                                href="/reset-password">
+                                                <i class="ti ti-circle-arrow-up me-1"></i>Reset Password
+                                            </a>
+                                            <a class="dropdown-item d-inline-flex align-items-center p-0 py-2"
                                                 href="knowledgebase.html">
                                                 <i class="ti ti-question-mark me-1"></i>Knowledge Base
                                             </a>
@@ -333,8 +338,9 @@
                         <i class="fa fa-ellipsis-v"></i>
                     </a>
                     <div class="dropdown-menu dropdown-menu-end">
-                        <a class="dropdown-item" href="profile.html">My Profile</a>
+                        <a class="dropdown-item" href="/my-profile">My Profile</a>
                         <a class="dropdown-item" href="profile-settings.html">Settings</a>
+                        <a class="dropdown-item" href="/reset-password">Reset Password</a>
                         <a class="dropdown-item" href="login.html">Logout</a>
                     </div>
                 </div>

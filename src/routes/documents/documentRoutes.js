@@ -13,6 +13,7 @@ import {
     searchDocuments
 } from "../../controllers/Document/documentController.js";
 import { authenticate } from "../../middlewares/authMiddleware.js";
+import upload from "../../middlewares/fileUploads.js";
 
 const router = express.Router();
 
@@ -22,7 +23,7 @@ router.use(authenticate);
 // Document routes
 router.get("/", getDocuments);
 router.get("/search", searchDocuments);
-router.post("/", createDocument);
+router.post("/", upload.fields([{ name: "files", maxCount: 10 }, { name: "signature", maxCount: 1 }]), createDocument);
 router.get("/:id", getDocument);
 router.put("/:id", updateDocument);
 router.delete("/:id", deleteDocument);

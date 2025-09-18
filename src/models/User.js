@@ -69,10 +69,6 @@ const userSchema = new mongoose.Schema(
             unique: true,
             lowercase: true,
             trim: true,
-            // match: [
-            //     /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,})+$/,
-            //     "Invalid email format",
-            // ],
         },
         phone_number: { type: Number, trim: true },
         raw_password: {
@@ -94,6 +90,11 @@ const userSchema = new mongoose.Schema(
             type: String,
             enum: ["Active", "Inactive", "Blocked"],
             default: "Active",
+        },
+        passwordVerification: {
+            type: String,
+            enum: ["pending", "verified"],
+            default: "verified"
         },
         lastLogin: { type: Date, default: null },
 

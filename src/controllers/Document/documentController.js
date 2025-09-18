@@ -1,7 +1,9 @@
 // controllers/documentController.js
 import mongoose from "mongoose";
 import Document from "../../models/Document.js";
+import tempFile from "../../models/tempFile.js";
 import { errorResponse, successResponse, failResponse } from "../../utils/responseHandler.js";
+import TempFile from "../../models/tempFile.js";
 
 /**
  * Get all documents with filtering, pagination, and search
@@ -139,66 +141,139 @@ export const getDocument = async (req, res) => {
 export const createDocument = async (req, res) => {
     try {
         const {
-            title,
-            description,
-            project,
+            projectName,
             department,
             projectManager,
-            documentManager,
             documentDate,
-            status,
             tags,
-            category,
             metadata,
+            description,
             compliance,
-            workflow,
-            files,
-            signature,
+            expiryDate,
+            comment,
             link,
-            sharedWith,
-            sharedWithDepartments,
-            isPublic,
-            comment
+            fileIds
         } = req.body;
 
-        // Create document
+        // Parse metadata if it's a JSON string
+        let parsedMetadata = {};
+        if (metadata) {
+            try {
+                parsedMetadata = typeof metadata === "string" ? JSON.parse(metadata) : metadata;
+            } catch (error) {
+                console.error("Error parsing metadata:", error);
+            }
+        }
+
+        // Parse tags if they're comma-separated
+        const parsedTags = tags ? tags.split(",").map(tag => tag.trim()) : [];
+
+        const isCompliance = compliance === "yes";
+
+        // Fix date parsing
+        let parsedDocumentDate;
+        if (documentDate) {
+            if (documentDate.includes("-")) {
+                const [day, month, year] = documentDate.split("-");
+                parsedDocumentDate = new Date(`${year}-${month}-${day}`);
+            } else {
+                parsedDocumentDate = new Date(documentDate);
+            }
+            if (isNaN(parsedDocumentDate.getTime())) {
+                return failResponse(res, "Invalid document date format", 400);
+            }
+        } else {
+            parsedDocumentDate = new Date();
+        }
+
+        // Parse expiry date if needed
+        let parsedExpiryDate = null;
+        if (isCompliance && expiryDate) {
+            if (expiryDate.includes("-")) {
+                const [day, month, year] = expiryDate.split("-");
+                parsedExpiryDate = new Date(`${year}-${month}-${day}`);
+            } else {
+                parsedExpiryDate = new Date(expiryDate);
+            }
+            if (isNaN(parsedExpiryDate.getTime())) {
+                return failResponse(res, "Invalid expiry date format", 400);
+            }
+        }
+        let parsedFileIds = [];
+        if (fileIds) {
+            if (typeof fileIds === "string") {
+                try {
+                    parsedFileIds = JSON.parse(fileIds); // Expect JSON string: '["id1","id2"]'
+                } catch (err) {
+                    console.error("Error parsing fileIds:", err);
+                    parsedFileIds = [fileIds]; // fallback: treat as single id
+                }
+            } else if (Array.isArray(fileIds)) {
+                parsedFileIds = fileIds;
+            }
+        }
+
+        // // Handle uploaded files (using string filenames - Option A)
+        // const uploadedFiles = (req.files?.files || []).map((file, idx) => ({
+        //     file: file.filename, // Store filename as string
+        //     originalName: file.originalname,
+        //     version: 1,
+        //     uploadedAt: new Date(),
+        //     isPrimary: idx === 0
+        // }));
+        // Handle uploaded files from temp file IDs
+        let uploadedFiles = [];
+        for (const fileId of parsedFileIds) {
+            const tempFile = await TempFile.findById(fileId);
+            if (tempFile && tempFile.status === "temp") {
+                tempFile.status = "permanent";
+                await tempFile.save();
+
+                uploadedFiles.push({
+                    file: tempFile.s3Filename,
+                    originalName: tempFile.originalName,
+                    version: 1,
+                    uploadedAt: new Date(),
+                    isPrimary: uploadedFiles.length === 0
+                });
+            }
+        }
+
+        let signature = {};
+        if (req.files?.signature && req.files.signature[0]) {
+            signature = {
+                fileName: req.files.signature[0].originalname,
+                fileUrl: req.files.signature[0].filename
+            };
+        }
+
         const document = new Document({
-            title,
-            description,
-            project: project || null,
+            project: projectName || null,
             department,
             projectManager: projectManager || null,
             owner: req.user._id,
-            documentManager: documentManager || null,
-            documentDate: documentDate || Date.now(),
-            status: status || "Draft",
-            tags: tags ? (Array.isArray(tags) ? tags : [tags]) : [],
-            category,
-            metadata: metadata || {},
-            compliance: compliance || { isCompliance: false },
-            workflow: workflow || { currentStep: 0, steps: [] },
-            files: files || [],
-            signature: signature || {},
+            documentManager: null,
+            documentDate: parsedDocumentDate,
+            status: "Draft",
+            tags: parsedTags,
+            category: null,
+            metadata: parsedMetadata,
+            description,
+            compliance: {
+                isCompliance,
+                expiryDate: parsedExpiryDate
+            },
+            files: uploadedFiles,
+            signature,
             link: link || null,
-            sharedWith: sharedWith || [],
-            sharedWithDepartments: sharedWithDepartments || [],
-            isPublic: isPublic || false,
             comment: comment || null
-        });
-
-        // Add audit log
-        document.auditLog.push({
-            action: "create",
-            performedBy: req.user._id,
-            details: { ...req.body }
         });
 
         await document.save();
 
-        // Populate references
         await document.populate([
             { path: "department", select: "name" },
-            { path: "project", select: "name" },
+            { path: "project", select: "projectName" },
             { path: "owner", select: "firstName lastName email" }
         ]);
 
@@ -208,6 +283,7 @@ export const createDocument = async (req, res) => {
             const errors = Object.values(error.errors).map(err => err.message);
             return failResponse(res, "Validation failed", 400, errors);
         }
+        console.error("Document creation error:", error);
         return errorResponse(res, error, "Failed to create document");
     }
 };

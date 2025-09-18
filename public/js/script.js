@@ -254,18 +254,15 @@ Template Name: Smarthr - Bootstrap Admin Template
 		$('.sidebar-right ul a').on('click', function (e) {
 			if ($(this).parent().hasClass('submenu')) {
 				e.preventDefault();
-				console.log("1");
 			}
 			if (!$(this).hasClass('subdrop')) {
 				$('ul', $(this).parents('ul:first')).slideUp(250);
 				$('a', $(this).parents('ul:first')).removeClass('subdrop');
 				$(this).next('ul').slideDown(350);
 				$(this).addClass('subdrop');
-				console.log("0");
 			} else if ($(this).hasClass('subdrop')) {
 				$(this).removeClass('subdrop');
 				$(this).next('ul').slideUp(350);
-				console.log("3");
 			}
 		});
 		$('.sidebar-right ul li.submenu a.active').parents('li:last').children('a:first').addClass('active').trigger('click');
@@ -427,7 +424,6 @@ Template Name: Smarthr - Bootstrap Admin Template
 	$('ul.tabs li').on('click', function () {
 		var $this = $(this);
 		var $theTab = $(this).attr('id');
-		console.log($theTab);
 		if ($this.hasClass('active')) {
 			// do nothing
 		} else {

@@ -10,7 +10,6 @@ document.addEventListener('DOMContentLoaded', function () {
         if (typeof showToast === 'function') {
             try { showToast(message, 'success'); return; } catch (e) { }
         }
-        console.log('SUCCESS:', message);
     }
 
 

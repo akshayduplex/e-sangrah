@@ -131,6 +131,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 countdownDisplay.style.display = "none"; // Hide OTP countdown
                 otpVerifiedText.style.display = "block";
                 resetForm.style.display = "block";       // show password form
+                document.getElementById("hiddenEmail").value = emailInput.value.trim();
             } else {
                 showToast(data.message || "Invalid OTP, try again.", "error");
                 otpInputs.forEach(inp => inp.value = "");
@@ -143,6 +144,7 @@ document.addEventListener("DOMContentLoaded", function () {
     };
 
     // Submit new password (send verification link)
+    // Submit new password
     resetForm.addEventListener("submit", async function (e) {
         e.preventDefault();
 
@@ -166,13 +168,21 @@ document.addEventListener("DOMContentLoaded", function () {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ email, password, confirmPassword })
             });
+
             const data = await response.json();
 
             if (data.success) {
-                showToast("A verification link has been sent to your email. Please click the link to complete the password reset.", "success");
+                showToast("Verification link sent to your email. Please check your email to complete the process.", "success");
 
-                // Hide reset form but keep email visible
+                // Clear form and hide sections
                 resetForm.style.display = "none";
+                otpSection.style.display = "none";
+                emailInput.value = "";
+
+                // Optionally redirect to login after a delay
+                setTimeout(() => {
+                    window.location.href = "/login?pending=check-email";
+                }, 3000);
             } else {
                 showToast(data.message || "Failed to send verification link.", "error");
             }

@@ -135,24 +135,19 @@ document.addEventListener("DOMContentLoaded", () => {
             e.preventDefault();
             const projectId = document.getElementById("projectDetails").dataset.projectId;
             const formData = new FormData(editForm);
-            appendMultiSelects(formData, ["donor", "vendor", "projectCollaborationTeam"]);
 
-            // Convert FormData to JSON for backend
-            const body = {};
-            formData.forEach((value, key) => {
-                if (body[key]) {
-                    // convert repeated keys to array
-                    body[key] = [].concat(body[key], value);
-                } else {
-                    body[key] = value;
-                }
+            // Multi-select fields
+            ["donor", "vendor", "projectCollaborationTeam"].forEach(field => {
+                const values = formData.getAll(field + "[]");
+                formData.delete(field + "[]");
+                values.forEach(v => formData.append(field, v));
             });
 
             try {
                 const res = await fetch(`/api/projects/${projectId}`, {
                     method: "PATCH",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(body)
+                    body: formData // send as FormData, do NOT stringify
+                    // headers: do NOT set Content-Type; browser will handle it
                 });
                 const result = await res.json();
                 if (res.ok) {
@@ -166,6 +161,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 showToast("Something went wrong while updating the project.", "error");
             }
         });
+
     }
 });
 

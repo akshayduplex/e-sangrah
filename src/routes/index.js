@@ -8,6 +8,7 @@ import permisssionRoutes from "./permisssions/permissionsRoutes.js"
 import userRoutes from "./userRoutes/userRoute.js"
 import vendorDonor from './userRoutes/vendorDonor.js'
 import tempRoutes from "./tempFileRoutes.js"
+import folderRoutes from "./folder/folderRoutes.js"
 const router = express.Router();
 
 router.use('/auth', authRoutes);
@@ -18,6 +19,7 @@ router.use('/notifications', notificationRoutes);
 router.use("/", permisssionRoutes);
 router.use("/user", userRoutes);
 router.use("/files", tempRoutes)
+router.use('/folders', folderRoutes);
 router.use(vendorDonor);
 
 export default router;

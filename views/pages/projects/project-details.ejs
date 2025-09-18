@@ -35,8 +35,8 @@
                 <!-- ADD MODE -->
                 <div class="project-details">
                     <form id="addProjectForm" enctype="multipart/form-data">
-                        <%- include('../../forms/project-form', { users, donors: [], vendors: [], project: null,
-                            viewOnly: false }) %>
+                        <%- include('../../forms/project-form', { users, donors, vendors, project: null, viewOnly: false
+                            }) %>
                     </form>
                 </div>
                 <% } else { %>

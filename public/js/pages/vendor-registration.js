@@ -17,41 +17,10 @@ $(document).ready(function () {
     const $file = $('#fileInput');
     const $preview = $('#preview');
 
-//     /**
-//    * Email validation on input
-//    */
-//     $('#vendor_email').on('input', function () {
-//         const email = $(this).val();
-//         const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-//         if (emailPattern.test(email)) {
-//             $('#vendor_email').removeClass('is-invalid').addClass('is-valid');
-//         } else {
-//             $('#vendor_email').removeClass('is-valid').addClass('is-invalid');
-//         }
-//     });
-
-//     /**
-//      * user mobile number validation on the input 
-//      */
-
-//     $('#vendor_mobile').on('input', function () {
-//         let mobile = $(this).val();
-//         mobile = mobile.replace(/\D/g, ''); // Remove non-digit characters
-//         $(this).val(mobile);
-//         const mobilePattern = /^\d{10}$/; // Example pattern for 10-digit numbers
-
-//         if (mobilePattern.test(mobile)) {
-//             $('#vendor_mobile').removeClass('is-invalid').addClass('is-valid');
-//         } else {
-//             $('#vendor_mobile').removeClass('is-valid').addClass('is-invalid');
-//         }
-//     });
 
     // Notifiers
     function notifySuccess(message) {
         if (typeof showToast === 'function') { try { showToast(message, 'success'); return; } catch (e) { } }
-        console.log('SUCCESS:', message);
     }
     function notifyError(message) {
         if (typeof showToast === 'function') { try { showToast(message, 'error'); return; } catch (e) { } }
@@ -158,28 +127,28 @@ $(document).ready(function () {
         setSubmitting(true);
 
         $.ajax({
-          url: '/api/add-vendor',
-          type: 'POST',
-          data: formData,
-          processData: false,
-          contentType: false,
-          success: function(res){
-            // notifySuccess(res?.message || 'Vendor registered successfully');
-            $('#data-success-register').modal('show');
-            // Reset form only for create flow (no hidden id field)
-            const isEdit = $form.find('input[name="id"]').length > 0;
-            if (!isEdit) {
-                resetVendorForm();
+            url: '/api/add-vendor',
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function (res) {
+                // notifySuccess(res?.message || 'Vendor registered successfully');
+                $('#data-success-register').modal('show');
+                // Reset form only for create flow (no hidden id field)
+                const isEdit = $form.find('input[name="id"]').length > 0;
+                if (!isEdit) {
+                    resetVendorForm();
+                }
+            },
+            error: function (xhr) {
+                const resp = xhr.responseJSON || {};
+                const msg = resp.message || (Array.isArray(resp.errors) && resp.errors[0]?.msg) || 'Unable to register vendor.';
+                notifyError(msg);
+            },
+            complete: function () {
+                setSubmitting(false);
             }
-          },
-          error: function(xhr){
-            const resp = xhr.responseJSON || {};
-            const msg = resp.message || (Array.isArray(resp.errors) && resp.errors[0]?.msg) || 'Unable to register vendor.';
-            notifyError(msg);
-          },
-          complete: function(){
-            setSubmitting(false);
-          }
         });
     });
 });

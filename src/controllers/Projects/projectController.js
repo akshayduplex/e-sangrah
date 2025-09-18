@@ -18,7 +18,8 @@ export const createProject = async (req, res) => {
             "projectCode",
             "projectManager",
             "projectStartDate",
-            "projectEndDate"
+            "projectEndDate",
+            "projectType"
         ];
         body.donor = normalizeToArray(body.donor);
         body.vendor = normalizeToArray(body.vendor);
@@ -30,7 +31,7 @@ export const createProject = async (req, res) => {
         }
 
         // Validate ObjectId fields
-        const objectIdFields = ["projectManager"];
+        const objectIdFields = ["projectManager", "projectType"];
         for (const field of objectIdFields) {
             if (!isValidObjectId(body[field])) {
                 return failResponse(res, `Invalid ${field} ID`, 400);
@@ -67,7 +68,8 @@ export const createProject = async (req, res) => {
         const projectData = {
             projectName: body.projectName.trim(),
             projectCode: body.projectCode.trim().toUpperCase(),
-            projectType: body.projectType,
+            projectType: new mongoose.Types.ObjectId(body.projectType),
+            // projectType: body.projectType,
             projectDescription: body.projectDescription?.trim() || "",
             projectManager: body.projectManager,
             projectCollaborationTeam: body.projectCollaborationTeam || [],
@@ -81,11 +83,10 @@ export const createProject = async (req, res) => {
             tags: body.tags?.map(tag => tag.trim().toLowerCase()) || [],
             isActive: body.isActive !== undefined ? body.isActive : true,
             createdBy: user._id
-        };
+        }
         // Handle project logo if uploaded
-        // Optional logo
         if (req.file && req.file.path) {
-            body.projectLogo = req.file.path; // only assign if file uploaded
+            projectData.projectLogo = req.file.path; // only assign if file uploaded
         } else {
             delete body.projectLogo; // do not overwrite existing logo
         }
@@ -113,9 +114,10 @@ export const getAllProjects = async (req, res) => {
             query.projectName = { $regex: regex };
         }
 
-        // Find projects with only _id and projectName
-        const projects = await Project.find(query, { _id: 1, projectName: 1 }).lean();
-
+        // // Find projects with only _id and projectName
+        // const projects = await Project.find(query, { _id: 1, projectName: 1 }).lean();
+        // Find projects with only projectName
+        const projects = await Project.find(query, { projectName: 1, _id: 0 }).lean();
         return successResponse(res, projects, "Projects fetched successfully");
     } catch (err) {
         return errorResponse(res, err, "Failed to fetch projects");
@@ -125,9 +127,27 @@ export const getAllProjects = async (req, res) => {
 
 // Get a single project by ID
 export const getProject = async (req, res) => {
+    // try {
+    //     const { id } = req.params;
+    //     const project = await Project.findById(id).lean();
+
+    //     if (!project) {
+    //         return failResponse(res, "Project not found", 404);
+    //     }
+
+    //     return successResponse(res, project, "Project fetched successfully");
+    // } catch (err) {
+    //     return errorResponse(res, err, "Failed to fetch project");
+    // }
     try {
         const { id } = req.params;
-        const project = await Project.findById(id).lean();
+        const project = await Project.findById(id)
+            .populate("projectManager", "name")
+            .populate("projectCollaborationTeam", "name")
+            .populate("donor", "name")
+            .populate("vendor", "name")
+            .populate("projectType", "name") // 🔥 Added
+            .lean();
 
         if (!project) {
             return failResponse(res, "Project not found", 404);
@@ -157,7 +177,7 @@ export const updateProject = async (req, res) => {
         }
 
         // Validate single ObjectId fields
-        const singleFields = ["projectManager"];
+        const singleFields = ["projectManager", "projectType"];
         for (const field of singleFields) {
             if (body[field]) {
                 if (!isValidObjectId(body[field])) {
@@ -180,7 +200,7 @@ export const updateProject = async (req, res) => {
         }
         // Optional logo
         if (req.file && req.file.path) {
-            body.projectLogo = req.file.path; // only assign if file uploaded
+            body.projectLogo = req.file.path || body.projectLogo;
         } else {
             delete body.projectLogo; // do not overwrite existing logo
         }

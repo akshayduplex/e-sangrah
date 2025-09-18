@@ -14,7 +14,7 @@ import ApiRoutes from "./routes/index.js";
 import pageRoutes from "./routes/web/index.js";
 import errorHandler from "./middlewares/errorHandler.js";
 import { formatDateDDMMYYYY } from "./utils/formatDate.js";
-// import { startCleanupJob } from "./helper/node-cron.js";
+import { startCleanupJob } from "./helper/node-cron.js";
 
 const app = express();
 
@@ -67,15 +67,14 @@ app.use(express.static(path.resolve("public")));
 
 // Global locals
 app.use((req, res, next) => {
-    const user = req.session.user || {};
+    const user = req.user || req.session.user || {};
     res.locals.BASE_URL = process.env.BASE_URL || "";
-    res.locals.avatar = user.avatar || null;
+    res.locals.profile_image = user.profile_image || null;
     res.locals.profile_type = user.profile_type || null;
     res.locals.email = user.email || null;
     res.locals.name = user.name || null;
     res.locals.formatDateDDMMYYYY = formatDateDDMMYYYY;
 
-    req.user = user;
     next();
 });
 
@@ -84,7 +83,7 @@ app.use("/api", ApiRoutes);
 app.use("/", pageRoutes);
 
 // Start cleanup cron job
-// startCleanupJob();
+startCleanupJob();
 // Error handling
 app.use(errorHandler);
 

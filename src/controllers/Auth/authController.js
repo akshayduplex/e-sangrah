@@ -332,6 +332,14 @@ export const login = async (req, res) => {
         if (!user) {
             return failResponse(res, "User Not Found", 401);
         }
+        // If password change is pending, block login
+        if (user.passwordVerification === "pending") {
+            return failResponse(
+                res,
+                "Your password change is pending verification. Please check your email.",
+                403
+            );
+        }
 
         const isPasswordValid = await bcrypt.compare(password, user.password);
         if (!isPasswordValid) {
@@ -358,22 +366,6 @@ export const login = async (req, res) => {
 // ---------------------------
 // Get Logged-in User
 // ---------------------------
-export const getMe = async (req, res) => {
-    try {
-        const userId = req.user.userId; // from authMiddleware
-        const user = await User.findById(userId)
-            .populate("userDetails.designation")
-            .populate("userDetails.department")
-            .lean();
-
-        if (!user) return res.status(404).send("User not found");
-
-        res.render("profile/my-profile", { user }); // pass user to EJS
-    } catch (err) {
-        console.error(err);
-        res.status(500).send("Server Error");
-    }
-};
 
 // ---------------------------
 // Logout
@@ -483,6 +475,7 @@ export const resetPassword = async (req, res) => {
 // ---------------------------
 // Send Password Reset Link (after password entry)
 // ---------------------------
+
 export const sendResetLink = async (req, res) => {
     try {
         const { email, password, confirmPassword } = req.body;
@@ -496,20 +489,37 @@ export const sendResetLink = async (req, res) => {
             return failResponse(res, "Passwords do not match", 400);
         }
 
-        // Check if user exists
         const user = await User.findOne({ email });
         if (!user) return failResponse(res, "User not found", 404);
 
-        // Generate secure token and store with new password
+        // Generate secure token
         const token = crypto.randomBytes(32).toString("hex");
         const tokenExpiry = Date.now() + 15 * 60 * 1000; // 15 minutes
 
-        // Store token, new password, and expiry (in production, use Redis/DB)
+        // Store token and new password (for demo; use DB or Redis in prod)
         otpStore[email] = {
             resetToken: token,
             newPassword: password,
             expires: tokenExpiry
         };
+
+        user.passwordVerification = "pending";
+        await user.save();
+
+        // Destroy session (wrapped in promise)
+        await new Promise((resolve) => {
+            req.session.destroy((err) => {
+                if (err) console.error("Session destroy error:", err);
+
+                res.clearCookie("connect.sid", {
+                    path: "/",
+                    httpOnly: true,
+                    secure: process.env.NODE_ENV === "production",
+                    sameSite: "lax",
+                });
+                resolve();
+            });
+        });
 
         // Send reset link
         const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:5000'}/api/auth/verify-reset/${token}?email=${encodeURIComponent(email)}`;
@@ -532,75 +542,105 @@ export const sendResetLink = async (req, res) => {
                    <p>If you didn't request this change, please ignore this email.</p>`,
         });
 
-        return successResponse(res, {}, "Verification link sent to your email");
+        return successResponse(res, {}, "Verification link sent to your email. Please check your email to complete the process.");
+
     } catch (err) {
         console.error("Send reset link error:", err);
         return errorResponse(res, err);
     }
 };
 
-// ---------------------------
-// Verify Reset Link and Update Password
-// ---------------------------
 export const verifyResetLink = async (req, res) => {
     try {
         const { token } = req.params;
         const { email } = req.query;
 
-        if (!otpStore[email] || otpStore[email].resetToken !== token) {
+        const otpEntry = otpStore[email];
+        if (!otpEntry || otpEntry.resetToken !== token) {
             return failResponse(res, "Invalid or expired reset link", 400);
         }
 
-        if (otpStore[email].expires < Date.now()) {
+        if (otpEntry.expires < Date.now()) {
             delete otpStore[email];
             return failResponse(res, "Reset link expired", 400);
         }
 
-        // Update password with the stored new password
         const user = await User.findOne({ email });
         if (!user) return failResponse(res, "User not found", 404);
 
-        user.raw_password = otpStore[email].newPassword;
+        user.raw_password = otpEntry.newPassword; // Ideally hash this!
+        user.passwordVerification = "verified";
         await user.save();
 
-        // Clean up
         delete otpStore[email];
 
-        // return successResponse(res, {}, "Password successfully updated");
+        // Destroy session and clear cookie
+        await new Promise((resolve) => {
+            req.session.destroy((err) => {
+                if (err) console.error("Session destroy error:", err);
+
+                res.clearCookie("connect.sid", {
+                    path: "/",
+                    httpOnly: true,
+                    secure: process.env.NODE_ENV === "production",
+                    sameSite: "lax",
+                });
+                resolve();
+            });
+        });
+
         return res.redirect("/login?success=Password+updated");
+
     } catch (err) {
         console.error("Verify reset link error:", err);
         return errorResponse(res, err);
     }
 };
 
-
 // POST update profile
-export const updateProfile = async (req, res) => {
+export const getProfile = async (req, res) => {
     try {
-        const userId = req.user.userId;
-        const { name, email, phone_number, department } = req.body;
-
-        const updateFields = {
-            name,
-            email,
-            phone_number,
-            "userDetails.department": department,
-        };
-
-        // Optional: handle profile image upload here
-        if (req.file) {
-            updateFields.profile_image = `/uploads/${req.file.filename}`;
-        }
-
-        const updatedUser = await User.findByIdAndUpdate(userId, updateFields, { new: true })
+        const userId = req.user._id;
+        const user = await User.findById(userId)
             .populate("userDetails.designation")
             .populate("userDetails.department")
             .lean();
 
-        res.redirect("/profile"); // reload profile page with updated data
+        if (!user) {
+            return res.status(404).json({ success: false, message: "User not found" });
+        }
+
+        res.json({ success: true, user });
     } catch (err) {
         console.error(err);
-        res.status(500).send("Server Error");
+        res.status(500).json({ success: false, message: "Server Error" });
     }
 };
+
+export const updateProfile = async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const { name, email, phone_number, department } = req.body;
+
+        const updateFields = { name, email, phone_number };
+
+        if (department) updateFields["userDetails.department"] = department;
+        if (req.file) updateFields.profile_image = req.file.path; // store file path
+
+        const updatedUser = await User.findByIdAndUpdate(
+            userId,
+            { $set: updateFields },
+            { new: true }
+        )
+            .populate("userDetails.designation")
+            .populate("userDetails.department")
+            .lean();
+
+        res.json({ success: true, user: updatedUser });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: "Server Error" });
+    }
+};
+
+
