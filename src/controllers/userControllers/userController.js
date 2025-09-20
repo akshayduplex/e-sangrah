@@ -75,13 +75,20 @@ export const registerUser = async (req, res) => {
 // Get all users with profile type 'user'
 export const getAllUsers = async (req, res) => {
     try {
-        let { page = 1, limit = 10, search = "", department, status } = req.query;
+        let { page = 1, limit = 10, search = "", department, designation, status, profile_type } = req.query;
 
         page = parseInt(page, 10);
         limit = parseInt(limit, 10);
 
-        const filter = { profile_type: "user" };
+        // default filter
+        const filter = {};
 
+        if (profile_type) {
+            filter.profile_type = profile_type;
+        } else {
+            filter.profile_type = "user"; // fallback
+        }
+        // 🔎 search filter
         if (search) {
             filter.$or = [
                 { name: { $regex: search, $options: "i" } },
@@ -90,10 +97,17 @@ export const getAllUsers = async (req, res) => {
             ];
         }
 
+        // 🏢 filter by department ID
         if (department) {
             filter["userDetails.department"] = department;
         }
 
+        // 📌 filter by designation ID
+        if (designation) {
+            filter["userDetails.designation"] = designation;
+        }
+
+        // ✅ filter by status
         if (status) {
             filter.status = status;
         }
@@ -115,7 +129,6 @@ export const getAllUsers = async (req, res) => {
             totalPages: Math.ceil(total / limit),
             currentPage: page,
             total,
-
         });
     } catch (error) {
         console.error("Get users error:", error);

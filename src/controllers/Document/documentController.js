@@ -4,6 +4,7 @@ import Document from "../../models/Document.js";
 import tempFile from "../../models/tempFile.js";
 import { errorResponse, successResponse, failResponse } from "../../utils/responseHandler.js";
 import TempFile from "../../models/tempFile.js";
+import Notification from "../../models/notification.js";
 
 /**
  * Get all documents with filtering, pagination, and search
@@ -27,72 +28,59 @@ export const getDocuments = async (req, res) => {
         // Build filter object
         const filter = {};
 
-        // Text search
+        // Text search (only if index exists)
         if (search) {
             filter.$text = { $search: search };
         }
 
-        // Filter by status
-        if (status) {
-            filter.status = { $in: Array.isArray(status) ? status : [status] };
-        }
+        // Utility to handle single or array values
+        const toArray = val => (Array.isArray(val) ? val : [val]);
 
-        // Filter by department
-        if (department) {
-            filter.department = { $in: Array.isArray(department) ? department : [department] };
-        }
+        if (status) filter.status = { $in: toArray(status) };
+        if (department) filter.department = { $in: toArray(department).filter(id => mongoose.Types.ObjectId.isValid(id)) };
+        if (project) filter.project = { $in: toArray(project).filter(id => mongoose.Types.ObjectId.isValid(id)) };
+        if (owner) filter.owner = { $in: toArray(owner).filter(id => mongoose.Types.ObjectId.isValid(id)) };
+        if (tags) filter.tags = { $in: toArray(tags) };
+        if (category) filter.category = category;
 
-        // Filter by project
-        if (project) {
-            filter.project = { $in: Array.isArray(project) ? project : [project] };
-        }
-
-        // Filter by owner
-        if (owner) {
-            filter.owner = { $in: Array.isArray(owner) ? owner : [owner] };
-        }
-
-        // Filter by tags
-        if (tags) {
-            filter.tags = { $in: Array.isArray(tags) ? tags : [tags] };
-        }
-
-        // Filter by category
-        if (category) {
-            filter.category = category;
-        }
-
-        // Build sort object
+        // Sorting
         const sort = {};
         sort[sortBy] = sortOrder === "desc" ? -1 : 1;
 
-        // Execute query with pagination
+        // Pagination
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+        const limitNum = parseInt(limit);
+
+        // Fetch documents
         const documents = await Document.find(filter)
             .populate("department", "name")
             .populate("project", "name")
             .populate("owner", "firstName lastName email")
             .populate("projectManager", "firstName lastName email")
-            .populate("documentManager", "firstName lastName email")
             .sort(sort)
-            .limit(limit * 1)
-            .skip((page - 1) * limit);
+            .skip(skip)
+            .limit(limitNum);
 
-        // Get total count for pagination
-        const total = await Document.countDocuments(filter);
+        // Total count
+        const totalDocuments = await Document.countDocuments(filter);
 
+        // Return response
         return successResponse(res, {
             documents,
             pagination: {
                 currentPage: parseInt(page),
-                totalPages: Math.ceil(total / limit),
-                totalDocuments: total,
-                hasNext: page * limit < total,
+                totalPages: Math.ceil(totalDocuments / limitNum),
+                totalDocuments,
+                hasNext: page * limitNum < totalDocuments,
                 hasPrev: page > 1
             }
         }, "Documents retrieved successfully");
+
     } catch (error) {
+        console.error("Error fetching documents:", error);
         return errorResponse(res, error, "Failed to retrieve documents");
     }
+
 };
 
 /**
@@ -203,16 +191,20 @@ export const createDocument = async (req, res) => {
         if (fileIds) {
             if (typeof fileIds === "string") {
                 try {
-                    parsedFileIds = JSON.parse(fileIds); // Expect JSON string: '["id1","id2"]'
+                    parsedFileIds = JSON.parse(fileIds);
+                    if (!Array.isArray(parsedFileIds)) parsedFileIds = [parsedFileIds];
                 } catch (err) {
-                    console.error("Error parsing fileIds:", err);
-                    parsedFileIds = [fileIds]; // fallback: treat as single id
+                    parsedFileIds = [fileIds]; // fallback single id
                 }
             } else if (Array.isArray(fileIds)) {
                 parsedFileIds = fileIds;
             }
-        }
 
+            // Convert to ObjectId and filter invalid ones
+            parsedFileIds = parsedFileIds
+                .filter(id => mongoose.Types.ObjectId.isValid(id))
+                .map(id => mongoose.Types.ObjectId(id));
+        }
         // // Handle uploaded files (using string filenames - Option A)
         // const uploadedFiles = (req.files?.files || []).map((file, idx) => ({
         //     file: file.filename, // Store filename as string
@@ -224,28 +216,38 @@ export const createDocument = async (req, res) => {
         // Handle uploaded files from temp file IDs
         let uploadedFiles = [];
         for (const fileId of parsedFileIds) {
-            const tempFile = await TempFile.findById(fileId);
-            if (tempFile && tempFile.status === "temp") {
-                tempFile.status = "permanent";
-                await tempFile.save();
+            try {
+                const tempFile = await TempFile.findById(fileId);
+                if (tempFile && tempFile.status === "temp") {
+                    tempFile.status = "permanent";
+                    await tempFile.save();
 
-                uploadedFiles.push({
-                    file: tempFile.s3Filename,
-                    originalName: tempFile.originalName,
-                    version: 1,
-                    uploadedAt: new Date(),
-                    isPrimary: uploadedFiles.length === 0
-                });
+                    uploadedFiles.push({
+                        file: tempFile.s3Filename,
+                        originalName: tempFile.originalName,
+                        version: 1,
+                        uploadedAt: new Date(),
+                        isPrimary: uploadedFiles.length === 0
+                    });
+                }
+            } catch (err) {
+                console.warn(`Skipping invalid file ID: ${fileId}`, err);
             }
         }
 
+
         let signature = {};
-        if (req.files?.signature && req.files.signature[0]) {
+        if (req.files?.signature?.[0]) {
+            const file = req.files.signature[0];
+            if (!file.mimetype.startsWith("image/")) {
+                return failResponse(res, "Signature must be an image", 400);
+            }
             signature = {
-                fileName: req.files.signature[0].originalname,
-                fileUrl: req.files.signature[0].filename
+                fileName: file.originalname,
+                fileUrl: file.filename
             };
         }
+
 
         const document = new Document({
             project: projectName || null,
@@ -268,7 +270,19 @@ export const createDocument = async (req, res) => {
             link: link || null,
             comment: comment || null
         });
-
+        // ------------------- Create Notification -------------------
+        if (projectManager) {
+            await Notification.create({
+                recipient: projectManager,
+                sender: req.user._id,
+                type: "document_shared",
+                title: "New Document Assigned",
+                message: `A new document "${description || "Untitled"}" has been shared with you.`,
+                relatedDocument: document._id,
+                priority: "medium",
+                actionUrl: `/documents/${document._id}`
+            });
+        }
         await document.save();
 
         await document.populate([
@@ -306,10 +320,10 @@ export const updateDocument = async (req, res) => {
         }
 
         // Check permissions - only owner or users with edit permission can update
-        const permission = document.getUserPermission(req.user._id, req.user.department);
-        if (!permission || permission === "view") {
-            return failResponse(res, "Insufficient permissions", 403);
-        }
+        // const permission = document.getUserPermission(req.user._id, req.user.department);
+        // if (!permission || permission === "view") {
+        //     return failResponse(res, "Insufficient permissions", 403);
+        // }
 
         // Remove immutable fields
         delete updateData.owner;
@@ -323,11 +337,11 @@ export const updateDocument = async (req, res) => {
         Object.assign(document, updateData);
 
         // Add audit log
-        document.auditLog.push({
-            action: "update",
-            performedBy: req.user._id,
-            details: updateData
-        });
+        // document.auditLog.push({
+        //     action: "update",
+        //     performedBy: req.user._id,
+        //     details: updateData
+        // });
 
         await document.save();
 
@@ -337,6 +351,32 @@ export const updateDocument = async (req, res) => {
             { path: "project", select: "name" },
             { path: "owner", select: "firstName lastName email" }
         ]);
+        // ------------------- Create Notification -------------------
+        const recipients = [];
+
+        // Notify the document owner if not the updater
+        if (document.owner.toString() !== req.user._id.toString()) {
+            recipients.push(document.owner);
+        }
+
+        // Notify project manager if assigned and not the updater
+        if (document.projectManager && document.projectManager.toString() !== req.user._id.toString()) {
+            recipients.push(document.projectManager);
+        }
+
+        // Send notifications
+        for (const recipientId of recipients) {
+            await Notification.create({
+                recipient: recipientId,
+                sender: req.user._id,
+                type: "document_updated",
+                title: "Document Updated",
+                message: `The document "${document.description || "Untitled"}" has been updated.`,
+                relatedDocument: document._id,
+                priority: "medium",
+                actionUrl: `/documents/${document._id}`
+            });
+        }
 
         return successResponse(res, { document }, "Document updated successfully");
     } catch (error) {

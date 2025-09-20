@@ -317,7 +317,6 @@ const documentSchema = new mongoose.Schema({
     department: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Department",
-        required: true
     },
     projectManager: {
         type: mongoose.Schema.Types.ObjectId,

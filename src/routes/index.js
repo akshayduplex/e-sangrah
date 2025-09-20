@@ -9,11 +9,13 @@ import userRoutes from "./userRoutes/userRoute.js"
 import vendorDonor from './userRoutes/vendorDonor.js'
 import tempRoutes from "./tempFileRoutes.js"
 import folderRoutes from "./folder/folderRoutes.js"
+import designationRoutes from "./designation/designationRoutes.js"
 const router = express.Router();
 
 router.use('/auth', authRoutes);
 router.use('/documents', documentRoutes);
 router.use('/departments', departmentRoutes);
+router.use('/designations', designationRoutes);
 router.use('/projects', projectRoutes);
 router.use('/notifications', notificationRoutes);
 router.use("/", permisssionRoutes);

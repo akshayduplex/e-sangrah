@@ -29,6 +29,7 @@ const tempFileSchema = new mongoose.Schema({
     },
 });
 
-const TempFile = mongoose.model("TempFile", tempFileSchema);
+// ✅ Prevent OverwriteModelError in dev with hot reloads
+const TempFile = mongoose.models.TempFile || mongoose.model("TempFile", tempFileSchema);
 
 export default TempFile;

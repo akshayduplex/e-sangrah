@@ -289,6 +289,7 @@ import {
 import { getOtpEmailHtml } from "../../emailTemplates/otpEmailTemplate.js";
 // Configure multer for file uploads
 import crypto from "crypto"
+import Designation from "../../models/Designation.js";
 // In-memory OTP store (⚠️ replace with Redis/DB in production)
 const otpStore = {};
 
@@ -351,6 +352,9 @@ export const login = async (req, res) => {
 
         req.session.user = {
             _id: user._id,
+            designation_id: user.userDetails?.designation,
+            department: user.userDetails?.department,
+            email: user.email,
             profile_type: user.profile_type,
             name: user.name,
         };

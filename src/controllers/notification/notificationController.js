@@ -26,22 +26,67 @@ export const createNotification = async (req, res) => {
 // ------------------- Get User Notifications -------------------
 export const getUserNotifications = async (req, res) => {
     try {
-        const { page = 1, limit = 20 } = req.query;
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        const limit = Math.min(50, parseInt(req.query.limit) || 10);
         const skip = (page - 1) * limit;
 
-        const notifications = await Notification.find({ recipient: req.user._id })
-            .populate("sender", "name email")
-            .populate("relatedDocument", "title")
-            .populate("relatedProject", "name")
-            .sort({ createdAt: -1 })
-            .skip(parseInt(skip))
-            .limit(parseInt(limit));
+        const filter = { recipient: req.user._id };
+        if (req.query.unread === "true") filter.isRead = false;
 
-        const total = await Notification.countDocuments({ recipient: req.user._id });
+        const [notifications, total] = await Promise.all([
+            Notification.find(filter)
+                .populate("sender", "_id email name")
+                .populate("relatedDocument", "_id title")
+                .populate("relatedProject", "_id name")
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit)
+                .lean(),
+            Notification.countDocuments(filter)
+        ]);
 
-        return successResponse(res, { notifications, total, page: parseInt(page), limit: parseInt(limit) });
+        const totalPages = Math.ceil(total / limit);
+
+        const formattedNotifications = notifications.map(n => ({
+            _id: n._id,
+            recipient: n.recipient,
+            sender: n.sender ? {
+                _id: n.sender._id,
+                email: n.sender.email,
+                name: n.sender.name || `${n.sender.firstName || ''} ${n.sender.lastName || ''}`.trim() || undefined
+            } : null,
+            type: n.type,
+            title: n.title,
+            message: n.message,
+            relatedDocument: n.relatedDocument ? { _id: n.relatedDocument._id, title: n.relatedDocument.title } : null,
+            relatedProject: n.relatedProject ? { _id: n.relatedProject._id, name: n.relatedProject.name } : null,
+            isRead: n.isRead,
+            priority: n.priority,
+            actionUrl: n.actionUrl,
+            expiresAt: n.expiresAt,
+            createdAt: n.createdAt,
+            updatedAt: n.updatedAt
+        }));
+
+        return res.status(200).json({
+            success: true,
+            message: "Notifications fetched successfully",
+            data: {
+                notifications: formattedNotifications,
+                pagination: {
+                    total,
+                    page,
+                    limit,
+                    totalPages,
+                    hasNextPage: page < totalPages,
+                    hasPrevPage: page > 1
+                }
+            }
+        });
+
     } catch (error) {
-        return errorResponse(res, error);
+        console.error("Error fetching notifications:", error);
+        return errorResponse(res, error, "Failed to fetch notifications");
     }
 };
 

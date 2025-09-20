@@ -119,7 +119,7 @@ export const authorize = (...allowedProfiles) => {
         if (!req.session.user || !allowedProfiles.includes(req.session.user.profile_type)) {
             return res.status(403).json({
                 success: false,
-                message: `User type "${req.session?.user?.profile_type || "unknown"}" is not authorized`,
+                message: `Prifle Type : "${req.session?.user?.profile_type || "unknown"}" is not authorized`,
             });
         }
         next();

@@ -14,6 +14,17 @@ router.get("/unread-count", notificationController.getUnreadCount);
 router.patch("/:id/read", notificationController.markAsRead);
 router.patch("/mark-all-read", notificationController.markAllAsRead);
 router.delete("/:id", notificationController.deleteNotification);
+router.post("/notify", (req, res) => {
+    const io = req.app.get("io"); // get Socket.IO instance
+    const { message } = req.body;
+
+    io.emit("notification", {
+        message,
+        timestamp: new Date(),
+    });
+
+    res.json({ success: true, message: "Notification sent" });
+});
 
 // Export router as default
 export default router;

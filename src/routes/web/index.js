@@ -21,15 +21,18 @@ import {
 } from "../../middlewares/validation/permissionValidator.js";
 
 // --- Middlewares ---
-import { authenticate } from "../../middlewares/authMiddleware.js";
-import checkPermissions from "../../middlewares/checkPermission.js";
+import { authenticate, authorize } from "../../middlewares/authMiddleware.js";
 
 // --- Models ---
 import Designation from "../../models/Designation.js";
 import Project, { ProjectType } from "../../models/Project.js";
 import User from "../../models/User.js";
 import Department from "../../models/Departments.js";
-import { name } from "ejs";
+import { profile_type } from "../../constant/constant.js";
+import Menu from "../../models/Menu.js";
+import UserPermission from "../../models/UserPermission.js";
+import { buildMenuTree } from "../../utils/buildMenuTree.js";
+import checkUserPermission from "../../middlewares/checkPermission.js";
 
 const router = express.Router();
 
@@ -189,6 +192,57 @@ router.get("/vendor-list", authenticate, async (req, res) => {
 /* ===========================
    Misc Pages
 =========================== */
+
+// Render "Add Designation" page
+router.get('/designation', authenticate, authorize('admin'), async (req, res) => {
+    res.render('pages/designation/designation', { designation: null });
+});
+
+// Render "Edit Designation" page
+router.get('/designation/edit/:id', authenticate, authorize('admin'), async (req, res) => {
+    try {
+        const designation = await Designation.findById(req.params.id);
+        if (!designation) {
+            req.flash('error', 'Designation not found');
+            return res.redirect('/designations-list');
+        }
+        res.render('pages/designation/designation', { designation });
+    } catch (err) {
+        console.error(err);
+        req.flash('error', 'Something went wrong');
+        res.redirect('/designations-list');
+    }
+});
+
+// Render "Designation List" page
+router.get('/designations-list', authenticate, authorize('admin'), (req, res) => {
+    res.render('pages/designation/designations-list', { title: 'Designation List' });
+});
+// Add Department Form
+router.get("/department", authenticate, (req, res) => {
+    res.render("pages/department/department", {
+        title: "E-Sangrah - Department",
+        department: null  // For Add form, no existing data
+    });
+});
+
+// Department List Page
+router.get("/departments-list", authenticate, (req, res) => {
+    res.render("pages/department/departments-list", {
+        title: "E-Sangrah - Departments-List"
+    });
+});
+
+// Edit Department Form
+router.get("/department/edit/:id", authenticate, async (req, res) => {
+    const department = await Department.findById(req.params.id).lean();
+    if (!department) return res.redirect("/departments-list");
+
+    res.render("pages/department/department", {
+        title: "E-Sangrah - Edit Department",
+        department
+    });
+});
 router.get("/upload-folder", authenticate, (req, res) => {
     res.render("pages/upload-folder", { title: "E-Sangrah - Upload-Folder" });
 });
@@ -236,6 +290,31 @@ router.get("/add-document", authenticate, async (req, res) => {
         res.status(500).send("Server Error");
     }
 });
+
+
+/* ===========================
+   Documents
+=========================== */
+router.get("/document/documents-list", authenticate, async (req, res) => {
+    try {
+        const designations = await Designation.find({ status: "Active" })
+            .sort({ name: 1 })
+            .lean();
+
+        res.render("pages/document/document-list", {
+            title: "E-Sangrah - Documents-List",
+            designations,
+        });
+    } catch (err) {
+        console.error("Error loading project list:", err);
+        res.status(500).render("pages/error", {
+            title: "Error",
+            message: "Unable to load project list",
+        });
+    }
+});
+
+
 
 /* ===========================
    Projects
@@ -311,15 +390,15 @@ async function renderProjectDetails(res, projectId = null) {
     }
 }
 
-router.get("/projects/project-details", authenticate, (req, res) =>
+router.get("/projects/project-details", authenticate, checkUserPermission, (req, res) =>
     renderProjectDetails(res)
 );
 
-router.get("/projects/:id/project-details", authenticate, (req, res) =>
+router.get("/projects/:id/project-details", authenticate, checkUserPermission, (req, res) =>
     renderProjectDetails(res, req.params.id)
 );
 
-router.get("/projects", authenticate, (req, res) => {
+router.get("/projects", authenticate, checkUserPermission, (req, res) => {
     try {
         res.render("pages/projects/projects", {
             user: req.user,
@@ -353,9 +432,166 @@ router.get("/dashboard", authenticate, (req, res) => {
 });
 
 /* ===========================
-   Menu Assignment
+   Role and Permmissions Assignment
 =========================== */
-router.get("/assign-menu", authenticate, getAssignMenuPage);
+// Render assign-permissions page
+router.get("/assign-permissions", authenticate, async (req, res) => {
+    try {
+        const departments = await Department.find({ status: "Active" }, "name").lean();
+        const designations = await Designation.find({ status: "Active" })
+            .sort({ name: 1 })
+            .lean();
+        res.render("pages/permissions/assign-permissions", {
+            user: req.user,
+            Roles: profile_type,
+            designations,
+            departments,
+            profile_type
+        });
+    } catch (err) {
+        console.error("Dashboard render error:", err);
+        res.status(500).render("pages/error", {
+            user: req.user,
+            message: "Something went wrong while loading the dashboard",
+        });
+    }
+});
+
+// Get user permissions page
+router.get("/user-permissions/:id", authenticate, async (req, res) => {
+    try {
+        const userId = req.params.id;
+        const user = await User.findById(userId)
+            .populate("userDetails.designation")
+            .populate("userDetails.department")
+            .lean();
+
+        if (!user) {
+            return res.status(404).render("pages/error", {
+                user: req.user,
+                message: "User not found",
+            });
+        }
+
+        // Get all menus
+        const menus = await Menu.find({ is_show: true })
+            .sort({ priority: 1, add_date: -1 })
+            .lean();
+
+        // Build menu tree
+        const masterMenus = buildMenuTree(menus);
+
+        // Get user's existing permissions
+        const userPermissions = await UserPermission.find({ user_id: userId })
+            .populate("menu_id")
+            .lean();
+
+        // Create a map of menu permissions for easy access
+        const permissionMap = {};
+        userPermissions.forEach(perm => {
+            if (perm.menu_id) {
+                permissionMap[perm.menu_id._id.toString()] = perm.permissions;
+            } else {
+                console.warn(`Missing menu for permission ID: ${perm._id}`);
+            }
+        });
+
+        res.render("pages/permissions/assign-user-permissions", {
+            user: req.user,
+            targetUser: user,
+            masterMenus,
+            permissionMap
+        });
+    } catch (err) {
+        console.error("Error loading user permissions page:", err);
+        res.status(500).render("error", {
+            user: req.user,
+            message: "Something went wrong while loading user permissions",
+        });
+    }
+});
+
+// Get user permissions API
+router.get("/user/:id/permissions", authenticate, async (req, res) => {
+    try {
+        const userId = req.params.id;
+        const userPermissions = await UserPermission.find({ user_id: userId })
+            .populate("menu_id", "name type master_id")
+            .lean();
+
+        res.json({ success: true, data: userPermissions });
+    } catch (error) {
+        console.error("Error fetching user permissions:", error);
+        res.status(500).json({ success: false, message: "Error fetching user permissions" });
+    }
+});
+
+// Save user permissions
+router.post("/user/permissions", authenticate, async (req, res) => {
+    try {
+        const { user_id, permissions } = req.body; // permissions now only contains checked menus/submenus
+        const assigned_by = req.user;
+
+        if (!user_id || !permissions || Object.keys(permissions).length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: "User ID and permissions are required"
+            });
+        }
+
+        // Delete existing permissions for the user
+        await UserPermission.deleteMany({ user_id });
+
+        // Prepare new permission documents
+        const permissionDocs = [];
+
+        for (const [menuId, permData] of Object.entries(permissions)) {
+            permissionDocs.push({
+                user_id,
+                menu_id: menuId,
+                permissions: {
+                    read: !!permData.read,
+                    write: !!permData.write,
+                    delete: !!permData.delete
+                },
+                assigned_by: {
+                    user_id: assigned_by._id,
+                    name: assigned_by.name,
+                    email: assigned_by.email
+                }
+            });
+        }
+
+        // Insert all new permissions at once
+        if (permissionDocs.length > 0) {
+            await UserPermission.insertMany(permissionDocs);
+        }
+
+        res.json({
+            success: true,
+            message: "User permissions saved successfully"
+        });
+    } catch (error) {
+        console.error("Error saving user permissions:", error);
+        res.status(500).json({ success: false, message: "Error saving user permissions" });
+    }
+});
+
+
+router.get("/role-permissions", authenticate, (req, res) => {
+    try {
+        res.render("pages/permissions/roles-permissions", { user: req.user });
+    } catch (err) {
+        console.error("Dashboard render error:", err);
+        res.status(500).render("pages/error", {
+            user: req.user,
+            message: "Something went wrong while loading the dashboard",
+        });
+    }
+});
+
+
+router.get("/assign-menu", authenticate, checkUserPermission, getAssignMenuPage);
 router.get(
     "/assign-menu/designation/:designation_id/menus",
     authenticate,
@@ -365,6 +601,7 @@ router.get(
 router.post(
     "/assign-menu/assign",
     authenticate,
+    checkUserPermission,
     assignMenusValidator,
     assignMenusToDesignation
 );
@@ -372,8 +609,8 @@ router.post(
 /* ===========================
    Menu Management
 =========================== */
-router.get("/menu/list", authenticate, getMenuListValidator, getMenuList);
+router.get("/menu/list", authenticate, checkUserPermission, getMenuListValidator, getMenuList);
 router.get("/menu/add", authenticate, getAddMenu);
-router.get("/menu/add/:id", authenticate, menuIdParamValidator, getEditMenu);
+router.get("/menu/add/:id", authenticate, checkUserPermission, menuIdParamValidator, getEditMenu);
 
 export default router;

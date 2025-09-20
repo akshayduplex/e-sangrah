@@ -5,7 +5,7 @@ import { successResponse, failResponse, errorResponse } from "../../utils/respon
 // Get all active departments
 export const getAllDepartments = async (req, res) => {
     try {
-        const departments = await Department.find({ status: "Active" })
+        const departments = await Department.find({})
             .select('name priority status addedBy add_date')
             .lean();
         return successResponse(res, departments, 'Departments fetched successfully');
@@ -32,11 +32,23 @@ export const getDepartmentById = async (req, res) => {
 // Create new department
 export const createDepartment = async (req, res) => {
     try {
-        const department = new Department(req.body);
+        if (!req.user) return failResponse(res, 'Unauthorized', 401);
+
+        const departmentData = {
+            ...req.body,
+            addedBy: {
+                user_id: req.user._id,
+                name: req.user.name,
+                email: req.user.email
+            }
+        };
+
+        const department = new Department(departmentData);
         await department.save();
-        return successResponse(res, department, 'Department created successfully', 201);
+        res.redirect('/departments-list?message=' + encodeURIComponent('Department added!') + '&type=success');
     } catch (err) {
-        return errorResponse(res, err);
+        console.error(err); // Log for production
+        res.redirect('/departments-list?message=' + encodeURIComponent('Failed to add department') + '&type=error');
     }
 };
 
@@ -45,8 +57,19 @@ export const updateDepartment = async (req, res) => {
     try {
         const { id } = req.params;
         if (!mongoose.Types.ObjectId.isValid(id)) return failResponse(res, 'Invalid department ID', 400);
+        if (!req.user) return failResponse(res, 'Unauthorized', 401);
 
-        const department = await Department.findByIdAndUpdate(id, req.body, {
+        const updateData = {
+            ...req.body,
+            updatedBy: {
+                user_id: req.user._id,
+                name: req.user.name,
+                email: req.user.email
+            },
+            updated_date: Date.now()
+        };
+
+        const department = await Department.findByIdAndUpdate(id, updateData, {
             new: true,
             runValidators: true
         });
@@ -54,6 +77,7 @@ export const updateDepartment = async (req, res) => {
         if (!department) return failResponse(res, 'Department not found', 404);
         return successResponse(res, department, 'Department updated successfully');
     } catch (err) {
+        console.error(err);
         return errorResponse(res, err);
     }
 };

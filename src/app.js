@@ -69,6 +69,8 @@ app.use(express.static(path.resolve("public")));
 app.use((req, res, next) => {
     const user = req.user || req.session.user || {};
     res.locals.BASE_URL = process.env.BASE_URL || "";
+    res.locals.designation_id = user.designation_id || null;
+    res.locals.department = user.department || null;
     res.locals.profile_image = user.profile_image || null;
     res.locals.profile_type = user.profile_type || null;
     res.locals.email = user.email || null;

@@ -18,6 +18,7 @@ const notificationSchema = new mongoose.Schema({
         enum: [
             "document_shared",
             "document_approved",
+            "document_updated",
             "document_rejected",
             "document_commented",
             "approval_requested",

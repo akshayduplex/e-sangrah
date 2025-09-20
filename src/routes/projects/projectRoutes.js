@@ -38,7 +38,7 @@ router.use(authenticate);
 // Basic CRUD routes
 router.route('/')
     .get(
-        authorize('superadmin', 'admin', 'manager', 'employee', 'viewer'),
+        authorize('superadmin', 'admin', 'manager', 'employee', 'viewer', "user"),
         getAllProjects
     )
     .post(

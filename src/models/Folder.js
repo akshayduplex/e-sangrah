@@ -1,31 +1,285 @@
-// models/Folder.js
+
 import mongoose from 'mongoose';
 
-const folderSchema = new mongoose.Schema({
-    name: { type: String, required: true },
-    parent: { type: mongoose.Schema.Types.ObjectId, ref: 'Folder', default: null },
-    path: { type: String }, // e.g., '/root/documents/project1'
-    owner: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    permissions: {
-        type: Map,
-        of: String,
-        default: {} // e.g., {"userId": "read"}
+const { Schema } = mongoose;
+
+/**
+ * Permission schema for ACL (Access Control List).
+ * Supports User, Group, or Role principals.
+ */
+const PermissionSchema = new Schema({
+    principal: { type: Schema.Types.ObjectId, required: true, refPath: 'permissions.principalModel' },
+    principalModel: { type: String, required: true, enum: ['User', 'Group', 'Role'] },
+    access: {
+        type: [String],
+        enum: ['read', 'write', 'delete', 'share', 'owner'],
+        default: ['read']
     },
-    deleted: { type: Boolean, default: false },
-    createdAt: { type: Date, default: Date.now },
-    updatedAt: { type: Date, default: Date.now }
+    inherited: { type: Boolean, default: false }
+}, { _id: false });
+
+/**
+ * Folder schema with materialized path hierarchy.
+ * Supports ACL, soft-delete, and metadata.
+ */
+const folderSchema = new Schema({
+    name: { type: String, required: true, trim: true },
+    slug: { type: String, trim: true }, // URL-friendly identifier
+    owner: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    parent: { type: Schema.Types.ObjectId, ref: 'Folder', default: null, index: true },
+    path: { type: String, index: true }, // materialized path, e.g., /root/documents/project1
+    ancestors: [{ type: Schema.Types.ObjectId, ref: 'Folder', index: true }], // ancestor references
+    depth: { type: Number, default: 0, index: true },
+    permissions: { type: [PermissionSchema], default: [] },
+    isDeleted: { type: Boolean, default: false, index: true },
+    deletedAt: { type: Date, default: null },
+    size: { type: Number, default: 0 }, // aggregate size (bytes) of contents
+    metadata: { type: Schema.Types.Mixed, default: {} },
+    createdBy: { type: Schema.Types.ObjectId, ref: 'User' },
+    updatedBy: { type: Schema.Types.ObjectId, ref: 'User' }
+}, {
+    timestamps: true,
+    versionKey: '__v'
 });
 
-// Pre-save hook to update path automatically
+// Enable optimistic concurrency
+folderSchema.set('optimisticConcurrency', true);
+
+// Indexes
+folderSchema.index({ owner: 1, parent: 1, name: 1 }, { unique: true }); // prevent duplicate sibling names
+folderSchema.index({ name: 'text' }); // text search on folder name
+
+/**
+ * Pre-save middleware:
+ * - Generates slug if not present.
+ * - Computes path, ancestors, and depth.
+ */
 folderSchema.pre('save', async function (next) {
-    if (this.parent) {
-        const parentFolder = await this.constructor.findById(this.parent);
-        this.path = parentFolder.path + '/' + this.name;
-    } else {
-        this.path = '/' + this.name;
+    try {
+        if (!this.slug) {
+            this.slug = this.name
+                .toLowerCase()
+                .replace(/\s+/g, '-')       // spaces → dashes
+                .replace(/[^a-z0-9\-]/g, ''); // remove non-url-safe chars
+        }
+
+        if (this.parent) {
+            const parentFolder = await this.constructor.findById(this.parent).lean();
+            if (!parentFolder) {
+                return next(new Error('Parent folder not found'));
+            }
+
+            this.ancestors = [...(parentFolder.ancestors || []), parentFolder._id];
+            this.path = (parentFolder.path === '/' ? '' : parentFolder.path) + '/' + this.slug;
+            this.depth = this.ancestors.length;
+        } else {
+            this.ancestors = [];
+            this.path = '/' + this.slug;
+            this.depth = 0;
+        }
+
+        next();
+    } catch (err) {
+        next(err);
     }
-    next();
 });
+
+/**
+ * Post-save middleware:
+ * Currently only a placeholder. For path updates during moves,
+ * prefer using `moveFolder` static method which handles old/new path diffing.
+ */
+folderSchema.post('save', async function () {
+    if (this.isModified && this.isModified('path')) {
+        // Future hook: handle descendant updates on path change
+    }
+});
+
+/* ---------- Static Methods ---------- */
+
+/**
+ * Create a new folder with unique slug among siblings.
+ */
+folderSchema.statics.createFolder = async function (owner, parent, name, createdBy = null) {
+    const Folder = this;
+    const slugBase = name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '');
+    let slug = slugBase;
+    let counter = 0;
+
+    while (true) {
+        try {
+            const folder = new Folder({
+                owner,
+                parent: parent || null,
+                name,
+                slug,
+                createdBy,
+                updatedBy: createdBy
+            });
+
+            // ✅ path, ancestors, depth will be computed automatically in pre('save')
+            await folder.save();
+            return folder;
+        } catch (err) {
+            if (err.code === 11000) {
+                counter += 1;
+                slug = `${slugBase}-${counter}`;
+                continue; // retry with new slug
+            }
+            throw err;
+        }
+    }
+};
+
+
+/**
+ * Get all non-deleted descendants of a folder.
+ */
+folderSchema.statics.getDescendants = async function (folderId) {
+    const Folder = this;
+    const root = await Folder.findById(folderId).lean();
+    if (!root) return [];
+    return Folder.find({ ancestors: root._id, isDeleted: false }).sort({ depth: 1 }).lean();
+};
+
+/**
+ * Move a folder to a new parent (updates paths + ancestors recursively).
+ */
+folderSchema.statics.moveFolder = async function (folderId, newParentId, updatedBy = null) {
+    const Folder = this;
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+        const folder = await Folder.findById(folderId).session(session);
+        if (!folder) throw new Error('Folder not found');
+
+        const oldPath = folder.path;
+        const oldAncestors = [...(folder.ancestors || [])];
+
+        let newAncestors = [];
+        let newPath;
+
+        if (newParentId) {
+            const newParent = await Folder.findById(newParentId).session(session);
+            if (!newParent) throw new Error('New parent not found');
+
+            if (String(newParent._id) === String(folder._id) || (newParent.ancestors || []).includes(folder._id)) {
+                throw new Error('Cannot move folder into itself or its descendants');
+            }
+
+            newAncestors = [...(newParent.ancestors || []), newParent._id];
+            newPath = (newParent.path === '/' ? '' : newParent.path) + '/' + folder.slug;
+            folder.parent = newParentId;
+        } else {
+            newAncestors = [];
+            newPath = '/' + folder.slug;
+            folder.parent = null;
+        }
+
+        folder.ancestors = newAncestors;
+        folder.depth = newAncestors.length;
+        folder.path = newPath;
+        folder.updatedBy = updatedBy;
+        await folder.save({ session });
+
+        // Update descendants
+        const descendants = await Folder.find({ ancestors: folder._id }).session(session);
+
+        for (const desc of descendants) {
+            const oldPrefix = [...oldAncestors, folder._id].map(id => String(id));
+            const newPrefix = [...newAncestors, folder._id].map(id => String(id));
+            const currentAnc = (desc.ancestors || []).map(id => String(id));
+
+            // Replace old ancestors prefix with new
+            if (JSON.stringify(currentAnc.slice(0, oldPrefix.length)) === JSON.stringify(oldPrefix)) {
+                const rest = currentAnc.slice(oldPrefix.length);
+                desc.ancestors = [...newPrefix, ...rest];
+                desc.depth = desc.ancestors.length;
+            }
+
+            // Update path prefix
+            if (desc.path?.startsWith(oldPath)) {
+                desc.path = desc.path.replace(oldPath, newPath);
+            }
+
+            desc.updatedBy = updatedBy;
+            await desc.save({ session });
+        }
+
+        await session.commitTransaction();
+        return folder;
+    } catch (err) {
+        await session.abortTransaction();
+        throw err;
+    } finally {
+        session.endSession();
+    }
+};
+
+/**
+ * Soft delete a folder (and optionally cascade to descendants).
+ */
+folderSchema.statics.markDeleted = async function (folderId, cascade = true, deletedBy = null) {
+    const Folder = this;
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+        const root = await Folder.findById(folderId).session(session);
+        if (!root) throw new Error('Folder not found');
+
+        root.isDeleted = true;
+        root.deletedAt = new Date();
+        root.updatedBy = deletedBy;
+        await root.save({ session });
+
+        if (cascade) {
+            await Folder.updateMany(
+                { ancestors: root._id },
+                { $set: { isDeleted: true, deletedAt: new Date(), updatedBy: deletedBy } }
+            ).session(session);
+        }
+
+        await session.commitTransaction();
+        return true;
+    } catch (err) {
+        await session.abortTransaction();
+        throw err;
+    } finally {
+        session.endSession();
+    }
+};
+
+/* ---------- Instance Methods ---------- */
+
+/**
+ * Check if a principal (user, group, or role) has required access.
+ * @param {Array} principals - Array of { id, model } representing user/groups/roles.
+ * @param {String} required - Access type required (default: "read").
+ */
+folderSchema.methods.checkAccess = async function (principals = [], required = 'read') {
+    const matches = (ace, pid) => String(ace.principal) === String(pid) && ace.access.includes(required);
+
+    // Check direct permissions
+    for (const p of principals) {
+        if (this.permissions?.some(ace => matches(ace, p.id))) return true;
+    }
+
+    // Check inherited permissions
+    if (this.ancestors?.length) {
+        const Folder = this.constructor;
+        const ancestors = await Folder.find({ _id: { $in: this.ancestors } }).sort({ depth: -1 }).lean();
+
+        for (const anc of ancestors) {
+            for (const p of principals) {
+                if ((anc.permissions || []).some(ace => matches(ace, p.id))) return true;
+            }
+        }
+    }
+
+    return false;
+};
 
 const Folder = mongoose.model('Folder', folderSchema);
 export default Folder;

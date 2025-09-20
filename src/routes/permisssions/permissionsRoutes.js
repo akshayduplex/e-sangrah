@@ -5,6 +5,7 @@ import DesignationMenu from "../../models/menuAssignment.js";
 import { assignMenusToDesignation, getAssignedMenus, getSidebarForUser, unAssignMenu } from "../../controllers/permissions/permisssions.js";
 import { authenticate } from "../../middlewares/authMiddleware.js";
 import { assignMenusValidator, getAssignedMenusValidator, unAssignMenusValidator } from "../../middlewares/validation/permissionValidator.js";
+import checkUserPermission from "../../middlewares/checkPermission.js";
 
 const router = express.Router();
 
@@ -240,7 +241,7 @@ router.patch("/menu/:id/toggle-status", authenticate, async (req, res) => {
 // ---------------------------
 
 // Assign menus to a designation
-router.post("/menu/assign", authenticate, async (req, res) => {
+router.post("/menu/assign", authenticate, checkUserPermission, async (req, res) => {
     try {
         const { designation_id, menu_ids } = req.body;
 
@@ -270,11 +271,45 @@ router.post("/menu/assign", authenticate, async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 });
-router.delete("/assign-menu/unselect", authenticate, unAssignMenusValidator, unAssignMenu)
+router.delete("/assign-menu/unselect", authenticate, checkUserPermission, unAssignMenusValidator, unAssignMenu)
 // For logged-in user’s sidebar
 router.get("/sidebar", authenticate, getSidebarForUser);
 // Get assigned menus for a designation
-router.get("/assign-menu/designation/:designation_id/menus", authenticate, getAssignedMenusValidator, getAssignedMenus);
-router.post("/assign-menu/assign", authenticate, assignMenusValidator, assignMenusToDesignation);
+router.get("/assign-menu/designation/:designation_id/menus", authenticate, checkUserPermission, getAssignedMenusValidator, getAssignedMenus);
+router.post("/assign-menu/assign", authenticate, assignMenusValidator, checkUserPermission, assignMenusToDesignation);
 
+// Save user permissions
+router.post("permisssions/user/permissions/:userId", authenticate, checkUserPermission, async (req, res) => {
+    try {
+        const { permissions } = req.body; // permissions = [{ menu_id, read, write, delete }]
+        const userId = req.params.userId;
+
+        for (const perm of permissions) {
+            await UserPermission.findOneAndUpdate(
+                { user_id: userId, menu_id: perm.menu_id },
+                {
+                    $set: {
+                        permissions: {
+                            read: perm.read || false,
+                            write: perm.write || false,
+                            delete: perm.delete || false
+                        },
+                        assigned_by: {
+                            user_id: req.user._id,
+                            name: req.user.name,
+                            email: req.user.email
+                        },
+                        assigned_date: new Date()
+                    }
+                },
+                { upsert: true, new: true }
+            );
+        }
+
+        res.json({ success: true, message: "Permissions assigned successfully." });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: "Failed to assign permissions." });
+    }
+});
 export default router;

@@ -125,114 +125,23 @@
                                 <a href="#" class="btn btn-menubar position-relative me-1" id="notification_popup"
                                     data-bs-toggle="dropdown">
                                     <i class="ti ti-bell"></i>
-                                    <span class="notification-status-dot"></span>
+                                    <span class="notification-status-dot" id="notification_dot"></span>
                                 </a>
                                 <div class="dropdown-menu dropdown-menu-end notification-dropdown p-4">
                                     <div
                                         class="d-flex align-items-center justify-content-between border-bottom p-0 pb-3 mb-3">
-                                        <h4 class="notification-title">Notifications (2)</h4>
+                                        <h4 class="notification-title">Notifications (<span
+                                                id="notification_count">0</span>)</h4>
                                         <a href="/notifications" class="fs-16">View All</a>
                                     </div>
                                     <div class="noti-content">
-                                        <div class="d-flex flex-column">
-                                            <div class="border-bottom mb-3 unread_notf">
-                                                <a href="#">
-                                                    <div class="dflexbtwn">
-                                                        <div class="d-flex">
-                                                            <span class="avatar rounded bg-light mb-2">
-                                                                <img src="/img/icons/fn1.png">
-                                                            </span>
-                                                            <div class="flex-grow-1 ms-2">
-                                                                <p class="mb-1">
-                                                                    <span class="text-dark fw-semibold">Arun </span>has
-                                                                    added a new document.
-                                                                </p>
-                                                                <span>Just Now</span>
-                                                            </div>
-                                                        </div>
-                                                        <a href="#" class="fs-16 notflinkarrow"><i
-                                                                class="ti ti-chevron-right"></i></a>
-                                                    </div>
-                                                </a>
-                                            </div>
-                                            <div class="border-bottom mb-3 unread_notf">
-                                                <a href="#">
-                                                    <div class="dflexbtwn">
-                                                        <div class="d-flex">
-                                                            <span class="avatar rounded bg-light mb-2">
-                                                                <img src="/img/icons/fn3.png">
-                                                            </span>
-                                                            <div class="flex-grow-1 ms-2">
-                                                                <p class="mb-1">
-                                                                    <span class="text-dark fw-semibold">Arun </span>has
-                                                                    added a new document.
-                                                                </p>
-                                                                <span>09:45 AM</span>
-                                                            </div>
-                                                        </div>
-                                                        <a href="#" class="fs-16 notflinkarrow"><i
-                                                                class="ti ti-chevron-right"></i></a>
-                                                    </div>
-                                                </a>
-                                            </div>
-                                            <div class="border-bottom mb-3">
-                                                <a href="#">
-                                                    <div class="dflexbtwn">
-                                                        <div class="d-flex">
-                                                            <span class="avatar rounded bg-light mb-2">
-                                                                <img src="/img/icons/fn4.png">
-                                                            </span>
-                                                            <div class="flex-grow-1 ms-2">
-                                                                <p class="mb-1">
-                                                                    <span class="text-dark fw-semibold">Arun </span>has
-                                                                    added a new document.
-                                                                </p>
-                                                                <span>09:45 AM</span>
-                                                            </div>
-                                                        </div>
-                                                        <a href="#" class="fs-16 notflinkarrow"><i
-                                                                class="ti ti-chevron-right"></i></a>
-                                                    </div>
-                                                </a>
-                                            </div>
-                                            <div class="border-bottom mb-3">
-                                                <a href="#">
-                                                    <div class="dflexbtwn">
-                                                        <div class="d-flex">
-                                                            <span class="avatar rounded bg-light mb-2">
-                                                                <img src="/img/icons/fn1.png">
-                                                            </span>
-                                                            <div class="flex-grow-1 ms-2">
-                                                                <p class="mb-1">
-                                                                    <span class="text-dark fw-semibold">Arun </span>has
-                                                                    added a new document.
-                                                                </p>
-                                                                <span>Just Now</span>
-                                                            </div>
-                                                        </div>
-                                                        <a href="#" class="fs-16 notflinkarrow"><i
-                                                                class="ti ti-chevron-right"></i></a>
-                                                    </div>
-                                                </a>
-                                            </div>
-                                            <div class="border-0 mb-3">
-                                                <a href="activity.html">
-                                                    <div class="d-flex">
-                                                        <span class="avatar rounded bg-light mb-2">
-                                                            <img src="/img/icons/fn2.png">
-                                                        </span>
-                                                        <div class="flex-grow-1 ms-2">
-                                                            <p class="mb-1"><span class="text-dark fw-semibold">Arun
-                                                                </span>has added a new document.</p>
-                                                            <span>09:45 AM</span>
-                                                        </div>
-                                                    </div>
-                                                </a>
-                                            </div>
+                                        <div class="d-flex flex-column" id="notification_list">
+                                            <!-- Notifications will be injected here -->
                                         </div>
                                     </div>
                                 </div>
                             </div>
+
                             <div class="input-group d-inline-flex me-1">
                                 <select id="projectSelect" class="form-select" style="width: 200px;">
                                     <option></option>
@@ -304,14 +213,9 @@
                                                 href="bussiness-settings.html">
                                                 <i class="ti ti-settings me-1"></i>Settings
                                             </a>
-
-                                            <a class="dropdown-item d-inline-flex align-items-center p-0 py-2"
-                                                href="profile-settings.html">
-                                                <i class="ti ti-circle-arrow-up me-1"></i>My Account
-                                            </a>
                                             <a class="dropdown-item d-inline-flex align-items-center p-0 py-2"
                                                 href="/reset-password">
-                                                <i class="ti ti-circle-arrow-up me-1"></i>Reset Password
+                                                <i class="ti ti ti-lock-open me-1"></i>Reset Password
                                             </a>
                                             <a class="dropdown-item d-inline-flex align-items-center p-0 py-2"
                                                 href="knowledgebase.html">
@@ -377,6 +281,116 @@
     </div>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="/plugins/select2/js/select2.min.js"></script>
+    <script>
+        $(document).ready(function () {
+            const $notificationDot = $("#notification_dot");
+            const $notificationCount = $("#notification_count");
+            const $notificationList = $("#notification_list");
+
+            /**
+             * Load notifications from the backend
+             */
+            function loadNotifications() {
+                $.ajax({
+                    url: "/api/notifications?page=1&limit=5", // Adjust the limit if needed
+                    method: "GET",
+                    success: function (res) {
+                        if (!res.success) return;
+
+                        const notifications = res.data.notifications || [];
+
+                        // Update notification count
+                        $notificationCount.text(notifications.length);
+
+                        // Show or hide the notification dot based on unread notifications
+                        const hasUnread = notifications.some(n => !n.isRead);
+                        $notificationDot.toggle(hasUnread);
+
+                        // Clear current notifications
+                        $notificationList.empty();
+
+                        // Render notifications
+                        notifications.forEach(notification => {
+                            const unreadClass = notification.isRead ? "" : "unread_notf border-bottom mb-3";
+                            const iconSrc = getNotificationIcon(notification.type);
+                            const timeAgo = formatTimeAgo(new Date(notification.createdAt));
+
+                            const notificationHtml = `
+                        <div class="${unreadClass}">
+                            <a href="${notification.actionUrl || '#'}">
+                                <div class="dflexbtwn">
+                                    <div class="d-flex">
+                                        <span class="avatar rounded bg-light">
+                                            <img src="${iconSrc}" alt="icon" style="width:32px;height:32px;">
+                                        </span>
+                                        <div class="flex-grow-1 ms-2">
+                                            <p class="mb-1">
+                                                ${notification.message} by 
+                                                <span class="text-dark fw-semibold">
+                                                    ${notification.sender?.name || 'System'}
+                                                </span>
+                                            </p>
+                                            <span>${timeAgo}</span>
+                                        </div>
+                                    </div>
+                                    <a href="${notification.actionUrl || '#'}" class="fs-16 notflinkarrow">
+                                        <i class="ti ti-chevron-right"></i>
+                                    </a>
+                                </div>
+                            </a>
+                        </div>`;
+
+                            $notificationList.append(notificationHtml);
+                        });
+                    },
+                    error: function (err) {
+                        console.error("Failed to load notifications:", err);
+                    }
+                });
+            }
+
+            /**
+             * Get notification icon based on type
+             * @param {string} type 
+             * @returns {string} icon path
+             */
+            function getNotificationIcon(type) {
+                const icons = {
+                    document_shared: "/img/icons/fn1.png",
+                    document_updated: "/img/icons/fn2.png",
+                    document_approved: "/img/icons/fn3.png",
+                    document_rejected: "/img/icons/fn4.png"
+                };
+                return icons[type] || "/img/icons/fn1.png";
+            }
+
+            /**
+             * Format date as "time ago"
+             * @param {Date} date 
+             * @returns {string}
+             */
+            function formatTimeAgo(date) {
+                const seconds = Math.floor((new Date() - date) / 1000);
+                const intervals = [
+                    { label: "hour(s)", seconds: 3600 },
+                    { label: "min(s)", seconds: 60 }
+                ];
+
+                for (const interval of intervals) {
+                    const count = Math.floor(seconds / interval.seconds);
+                    if (count >= 1) return `${count} ${interval.label} ago`;
+                }
+
+                return "Just now";
+            }
+
+            // Initial load
+            loadNotifications();
+
+            // Auto-refresh every 60 seconds
+            setInterval(loadNotifications, 60000);
+        });
+    </script>
 
     <script>
         $(document).ready(function () {

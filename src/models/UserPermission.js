@@ -1,12 +1,11 @@
-// models/MenuAssignment.js
+// models/UserPermission.js
 import mongoose from "mongoose";
 
-
-const menuAssignmentSchema = new mongoose.Schema(
+const userPermissionSchema = new mongoose.Schema(
     {
-        designation_id: {
+        user_id: {
             type: mongoose.Schema.Types.ObjectId,
-            ref: 'Designation',
+            ref: 'User',
             required: true,
         },
         menu_id: {
@@ -17,7 +16,12 @@ const menuAssignmentSchema = new mongoose.Schema(
         permissions: {
             read: { type: Boolean, default: true },
             write: { type: Boolean, default: true },
-            delete: { type: Boolean, default: true },
+            delete: { type: Boolean, default: true }
+        },
+        assigned_by: {
+            user_id: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+            name: { type: String, required: true },
+            email: { type: String, required: true }
         },
         assigned_date: {
             type: Date,
@@ -30,9 +34,7 @@ const menuAssignmentSchema = new mongoose.Schema(
 );
 
 // Compound index to ensure unique assignment
-menuAssignmentSchema.index({ designation_id: 1, menu_id: 1 }, { unique: true });
+userPermissionSchema.index({ user_id: 1, menu_id: 1 }, { unique: true });
 
-
-const MenuAssignment = mongoose.model('MenuAssignment', menuAssignmentSchema);
-
-export default MenuAssignment;
+const UserPermission = mongoose.model('UserPermission', userPermissionSchema);
+export default UserPermission;

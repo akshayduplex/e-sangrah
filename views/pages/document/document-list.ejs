@@ -1,0 +1,192 @@
+<%- include('../../partials/header') %>
+
+    <!-- Page Wrapper -->
+    <div class="page-wrapper">
+        <div class="content">
+            <!-- Breadcrumb -->
+            <div class="d-flex align-items-center justify-content-between page-breadcrumb mb-3">
+                <div class="my-auto mb-2">
+                    <h2 class="mb-1">DMS Project Files</h2>
+                    <nav>
+                        <ol class="breadcrumb mb-0">
+                            <li class="breadcrumb-item">
+                                <a href="#"><i class="ti ti-smart-home"></i></a>
+                            </li>
+                            <li class="breadcrumb-item">DMS Project Files</li>
+                        </ol>
+                    </nav>
+                </div>
+                <div class="rtbtn">
+                    <a href="add-document.php" class="btn btn-primary btn-lg rounded-pill me-2 mb-2">
+                        <i class="ti ti-plus me-1"></i>Add New Project
+                    </a>
+                </div>
+            </div>
+            <!-- /Breadcrumb -->
+
+            <!-- Filter Section -->
+            <div class="row mb-3">
+                <div class="col-xxl-12">
+                    <div class="card p-3">
+                        <div class="row g-2 align-items-end">
+                            <div class="col-md-3">
+                                <label>Status</label>
+                                <select id="filter_status" class="form-select">
+                                    <option value="">All</option>
+                                    <option value="Draft">Draft</option>
+                                    <option value="Pending">Pending</option>
+                                    <option value="UnderReview">UnderReview</option>
+                                    <option value="Approved">Approved</option>
+                                    <option value="Rejected">Rejected</option>
+                                    <option value="Archived">Archived</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label>Department</label>
+                                <input type="text" id="filter_department" class="form-control"
+                                    placeholder="Department ID">
+                            </div>
+                            <div class="col-md-2">
+                                <button id="apply_filters" class="btn btn-primary w-100">Apply Filters</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- /Filter Section -->
+
+            <!-- Documents Table -->
+            <div class="row">
+                <div class="col-xxl-12 col-xl-12">
+                    <div class="card flex-fill">
+                        <div class="card-body p-0">
+                            <div class="custom-datatable-filter table-responsive">
+                                <table class="table datatable" id="documents_table">
+                                    <thead>
+                                        <tr>
+                                            <th></th>
+                                            <th>File Name</th>
+                                            <th>Last Modified on</th>
+                                            <th>Owner</th>
+                                            <th>Department</th>
+                                            <th>Project</th>
+                                            <th>Tags</th>
+                                            <th>Meta data</th>
+                                            <th>Created on</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="documents_table_body"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- /Documents Table -->
+        </div>
+
+        <div class="footer mt-4 d-sm-flex align-items-center justify-content-between border-top bg-white p-3">
+            <p class="mb-0">2025 &copy; HLFPPT.</p>
+            <p>Designed & Developed by <a href="javascript:void(0);" class="text-primary">Duplex services &
+                    Technology</a></p>
+        </div>
+    </div>
+    <!-- /Page Wrapper -->
+
+    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+
+    <script>
+        $(document).ready(function () {
+            const $tableBody = $("#documents_table_body");
+            let table;
+
+            function fetchDocuments(filters = {}) {
+                const query = $.param(filters);
+                $.ajax({
+                    url: `/api/documents?${query}`,
+                    method: 'GET',
+                    success: function (res) {
+                        if (!res.success) return;
+                        const documents = res.data.documents || [];
+                        $tableBody.empty();
+
+                        documents.forEach(doc => {
+                            const files = doc.files || [];
+                            const fileNames = files.map(f => f.originalName).join(", ") || "-";
+                            const tags = (doc.tags || []).join(", ") || "-";
+                            const metaData = doc.metadata ? Object.values(doc.metadata).filter(v => v).join(", ") : "-";
+                            const owner = doc.owner?.email || "-";
+                            const department = doc.department?.name || "-";
+                            const project = doc.project?._id || "-";
+                            const statusClass = {
+                                'Draft': 'bg-soft-info',
+                                'Pending': 'bg-soft-warning',
+                                'Approved': 'bg-soft-success',
+                                'Rejected': 'bg-soft-danger',
+                                'UnderReview': 'bg-soft-warning'
+                            }[doc.status] || 'bg-soft-secondary';
+
+                            const rowHtml = `
+<tr>
+    <td>
+        <div class="btn-group" role="group">
+            <button type="button" class="btn border-0" data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="ti ti-settings"></i>
+            </button>
+            <ul class="dropdown-menu">
+                <li><a class="dropdown-item" href="${doc.link || '#'}"><i class="ti ti-eye"></i> View</a></li>
+                <li><a class="dropdown-item" href="add-document.php?id=${doc._id}"><i class="ti ti-pencil-minus"></i> Edit</a></li>
+                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#sharedoc-modal">
+                        <i class="ti ti-share"></i> Share</a></li>
+                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#versionhistory-modal">
+                        <i class="ti ti-history"></i> Version History</a></li>
+                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#downloaddoc-modal">
+                        <i class="ti ti-download"></i> Download</a></li>
+                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#trashdoc-modal">
+                        <i class="ti ti-trash"></i> Move to Trash</a></li>
+                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#archivedoc-modal">
+                        <i class="ti ti-archive"></i> Move to Archive</a></li>
+            </ul>
+        </div>
+    </td>
+    <td>${fileNames}</td>
+    <td>${new Date(doc.updatedAt).toLocaleString()}</td>
+    <td>${owner}</td>
+    <td>${department}</td>
+    <td>${project}</td>
+    <td>${tags}</td>
+    <td>${metaData}</td>
+    <td>${new Date(doc.createdAt).toLocaleString()}</td>
+    <td><span class="badge badge-md ${statusClass}">${doc.status}</span></td>
+</tr>`;
+                            $tableBody.append(rowHtml);
+                        });
+
+                        if (table) {
+                            table.destroy();
+                        }
+                        table = $('#documents_table').DataTable();
+                    },
+                    error: function (err) {
+                        console.error("Error fetching documents:", err);
+                    }
+                });
+            }
+
+            // Initial load
+            fetchDocuments();
+
+            // Apply filters
+            $("#apply_filters").click(function () {
+                const filters = {
+                    status: $("#filter_status").val(),
+                    department: $("#filter_department").val()
+                };
+                fetchDocuments(filters);
+            });
+        });
+    </script>
+
+    <%- include('../../partials/footer') %>
