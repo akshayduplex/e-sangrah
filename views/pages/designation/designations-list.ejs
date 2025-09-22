@@ -16,7 +16,7 @@
                     </nav>
                 </div>
                 <div>
-                    <a href="/designation" class="btn btn-primary">
+                    <a href="/designations" class="btn btn-primary">
                         <i class="ti ti-plus me-1"></i> Add Designation
                     </a>
                 </div>
@@ -87,7 +87,7 @@
        <td>${updatedBy}</td>
     <td>${createdAt}</td>
     <td>
-        <a href="/designation/edit/${desig._id}" class="text-primary me-2" title="Edit"><i class="ti ti-edit"></i></a>
+        <a href="/designations/edit/${desig._id}" class="text-primary me-2" title="Edit"><i class="ti ti-edit"></i></a>
         <a href="#" class="text-danger btn-delete" data-id="${desig._id}" title="Delete"><i class="ti ti-trash"></i></a>
     </td>
 </tr>
@@ -123,7 +123,7 @@
                                 $('#confirmDeleteModal').modal('hide');
                                 if (res.success) {
                                     showToast(res.message || 'Designation deleted successfully!', 'success');
-                                    setTimeout(() => { window.location.href = '/designations-list'; }, 1000);
+                                    setTimeout(() => { window.location.href = '/designations/list'; }, 1000);
                                 } else {
                                     showToast(res.message || 'Failed to delete designation', 'danger');
                                 }

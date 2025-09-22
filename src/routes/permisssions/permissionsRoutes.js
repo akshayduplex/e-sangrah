@@ -241,7 +241,7 @@ router.patch("/menu/:id/toggle-status", authenticate, async (req, res) => {
 // ---------------------------
 
 // Assign menus to a designation
-router.post("/menu/assign", authenticate, checkUserPermission, async (req, res) => {
+router.post("/menu/assign", authenticate, async (req, res) => {
     try {
         const { designation_id, menu_ids } = req.body;
 
@@ -271,15 +271,15 @@ router.post("/menu/assign", authenticate, checkUserPermission, async (req, res) 
         res.status(500).json({ success: false, message: error.message });
     }
 });
-router.delete("/assign-menu/unselect", authenticate, checkUserPermission, unAssignMenusValidator, unAssignMenu)
+router.delete("/assign-menu/unselect", authenticate, unAssignMenusValidator, unAssignMenu)
 // For logged-in user’s sidebar
 router.get("/sidebar", authenticate, getSidebarForUser);
 // Get assigned menus for a designation
-router.get("/assign-menu/designation/:designation_id/menus", authenticate, checkUserPermission, getAssignedMenusValidator, getAssignedMenus);
-router.post("/assign-menu/assign", authenticate, assignMenusValidator, checkUserPermission, assignMenusToDesignation);
+router.get("/assign-menu/designation/:designation_id/menus", authenticate, getAssignedMenusValidator, getAssignedMenus);
+router.post("/assign-menu/assign", authenticate, assignMenusValidator, assignMenusToDesignation);
 
 // Save user permissions
-router.post("permisssions/user/permissions/:userId", authenticate, checkUserPermission, async (req, res) => {
+router.post("permisssions/user/permissions/:userId", authenticate, async (req, res) => {
     try {
         const { permissions } = req.body; // permissions = [{ menu_id, read, write, delete }]
         const userId = req.params.userId;

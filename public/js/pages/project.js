@@ -48,7 +48,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 <div class="card projectcard position-relative w-100">
                     <div class="card-body pjcrdbody">
                         <h5 class="fs-20 fw-normal mb-2">${project.projectName ?? 'Unnamed Project'}</h5>
-                        <a href="/projects/${project._id}/project-details" 
+                        <a href="/projects/${project._id}/details" 
                            class="position-absolute top-0 end-0 mt-2 me-4 text-primary fs-12 fw-light text-decoration-none">
                            View
                         </a>

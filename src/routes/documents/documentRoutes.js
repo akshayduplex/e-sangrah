@@ -25,7 +25,7 @@ router.get("/", getDocuments);
 router.get("/search", searchDocuments);
 router.post("/", upload.fields([{ name: "files", maxCount: 10 }, { name: "signature", maxCount: 1 }]), createDocument);
 router.get("/:id", getDocument);
-router.put("/:id", updateDocument);
+router.patch("/:id", upload.fields([{ name: "files", maxCount: 10 }, { name: "signature", maxCount: 1 }]), updateDocument);
 router.delete("/:id", deleteDocument);
 router.patch("/:id/status", updateDocumentStatus);
 router.post("/:id/share", shareDocument);

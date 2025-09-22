@@ -20,7 +20,7 @@
                     </nav>
                 </div>
                 <div>
-                    <a class="btn btn-primary btn-w-lg rounded-pill" href="/designations-list">List</a>
+                    <a class="btn btn-primary btn-w-lg rounded-pill" href="/designations/list">List</a>
                 </div>
             </div>
 
@@ -109,7 +109,7 @@
 
                 if (res.ok) {
                     showToast(result.message || 'Designation saved successfully!', 'success');
-                    setTimeout(() => { window.location.href = '/designations-list'; }, 1000);
+                    setTimeout(() => { window.location.href = '/designations/list'; }, 1000);
                 } else {
                     showToast(result.message || 'Failed to save designation.', 'danger');
                 }

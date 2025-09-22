@@ -141,7 +141,7 @@
                             if (res.success) {
                                 showToast('User updated successfully!', 'success');
                                 setTimeout(() => {
-                                    window.location.href = '/users-list';
+                                    window.location.href = '/users/list';
                                 }, 1500); // delay redirect so user sees toast
                             } else {
                                 showToast(res.message || 'Update failed', 'error');

@@ -308,82 +308,93 @@ export const createDocument = async (req, res) => {
 export const updateDocument = async (req, res) => {
     try {
         const { id } = req.params;
-        const updateData = { ...req.body };
-
-        if (!mongoose.Types.ObjectId.isValid(id)) {
-            return failResponse(res, "Invalid document ID", 400);
-        }
-
         const document = await Document.findById(id);
-        if (!document) {
-            return failResponse(res, "Document not found", 404);
+        if (!document) return failResponse(res, "Document not found", 404);
+
+        const {
+            projectName,
+            department,
+            projectManager,
+            documentDate,
+            tags,
+            metadata,
+            description,
+            compliance,
+            expiryDate,
+            comment,
+            link,
+            fileIds
+        } = req.body;
+
+        // Parse metadata
+        let parsedMetadata = {};
+        if (metadata) {
+            try { parsedMetadata = typeof metadata === "string" ? JSON.parse(metadata) : metadata; }
+            catch (err) { console.warn("Invalid metadata", err); }
         }
 
-        // Check permissions - only owner or users with edit permission can update
-        // const permission = document.getUserPermission(req.user._id, req.user.department);
-        // if (!permission || permission === "view") {
-        //     return failResponse(res, "Insufficient permissions", 403);
-        // }
+        // Parse tags
+        const parsedTags = tags ? tags.split(",").map(tag => tag.trim()) : [];
 
-        // Remove immutable fields
-        delete updateData.owner;
-        delete updateData.createdAt;
-        delete updateData.auditLog;
-        delete updateData.accessLog;
-        delete updateData.viewCount;
-        delete updateData.downloadCount;
+        // Update top-level fields
+        if (projectName) document.project = projectName;
+        if (department) document.department = department;
+        if (projectManager) document.projectManager = projectManager;
+        if (description) document.description = description;
+        if (comment) document.comment = comment;
+        if (link) document.link = link;
+        if (parsedTags.length) document.tags = parsedTags;
+        if (Object.keys(parsedMetadata).length) document.metadata = parsedMetadata;
 
-        // Update document
-        Object.assign(document, updateData);
+        // Update dates
+        if (documentDate) {
+            const [day, month, year] = documentDate.split("-");
+            document.documentDate = new Date(`${year}-${month}-${day}`);
+        }
 
-        // Add audit log
-        // document.auditLog.push({
-        //     action: "update",
-        //     performedBy: req.user._id,
-        //     details: updateData
-        // });
+        // Compliance
+        if (compliance) {
+            document.compliance.isCompliance = compliance === "yes";
+            if (expiryDate) {
+                const [day, month, year] = expiryDate.split("-");
+                document.compliance.expiryDate = new Date(`${year}-${month}-${day}`);
+            }
+        }
+
+        // Handle files (like createDocument)
+        if (fileIds) {
+            let parsedFileIds = typeof fileIds === "string" ? JSON.parse(fileIds) : fileIds;
+            const uploadedFiles = [];
+            for (const fileId of parsedFileIds) {
+                const tempFile = await TempFile.findById(fileId);
+                if (tempFile && tempFile.status === "temp") {
+                    tempFile.status = "permanent";
+                    await tempFile.save();
+                    uploadedFiles.push({
+                        file: tempFile.s3Filename,
+                        originalName: tempFile.originalName,
+                        version: 1,
+                        uploadedAt: new Date(),
+                        isPrimary: uploadedFiles.length === 0
+                    });
+                }
+            }
+            if (uploadedFiles.length) document.files = uploadedFiles;
+        }
+
+        // Signature
+        if (req.files?.signature?.[0]) {
+            const file = req.files.signature[0];
+            if (!file.mimetype.startsWith("image/")) return failResponse(res, "Signature must be an image", 400);
+            document.signature = { fileName: file.originalname, fileUrl: file.filename };
+        }
 
         await document.save();
 
-        // Populate references
-        await document.populate([
-            { path: "department", select: "name" },
-            { path: "project", select: "name" },
-            { path: "owner", select: "firstName lastName email" }
-        ]);
-        // ------------------- Create Notification -------------------
-        const recipients = [];
-
-        // Notify the document owner if not the updater
-        if (document.owner.toString() !== req.user._id.toString()) {
-            recipients.push(document.owner);
-        }
-
-        // Notify project manager if assigned and not the updater
-        if (document.projectManager && document.projectManager.toString() !== req.user._id.toString()) {
-            recipients.push(document.projectManager);
-        }
-
-        // Send notifications
-        for (const recipientId of recipients) {
-            await Notification.create({
-                recipient: recipientId,
-                sender: req.user._id,
-                type: "document_updated",
-                title: "Document Updated",
-                message: `The document "${document.description || "Untitled"}" has been updated.`,
-                relatedDocument: document._id,
-                priority: "medium",
-                actionUrl: `/documents/${document._id}`
-            });
-        }
-
         return successResponse(res, { document }, "Document updated successfully");
+
     } catch (error) {
-        if (error.name === "ValidationError") {
-            const errors = Object.values(error.errors).map(err => err.message);
-            return failResponse(res, "Validation failed", 400, errors);
-        }
+        console.error("Update error:", error);
         return errorResponse(res, error, "Failed to update document");
     }
 };

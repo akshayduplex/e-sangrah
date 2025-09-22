@@ -19,7 +19,7 @@
                     </nav>
                 </div>
                 <div>
-                    <a href="/department" class="btn btn-primary">
+                    <a href="/departments" class="btn btn-primary">
                         <i class="ti ti-plus me-1"></i> Add Department
                     </a>
                 </div>
@@ -88,7 +88,7 @@
                         <td>${addedBy}</td>
                         <td>${createdAt}</td>
                         <td>
-                            <a href="/department/edit/${dept._id}" class="text-primary me-2" title="Edit">
+                            <a href="/departments/edit/${dept._id}" class="text-primary me-2" title="Edit">
                                 <i class="ti ti-edit"></i>
                             </a>
                             <a href="#" class="text-danger btn-delete" data-id="${dept._id}" title="Delete">
@@ -136,7 +136,7 @@
 
                                 if (res.success) {
                                     showToast(res.message || 'Department deleted successfully!', 'success');
-                                    setTimeout(() => { window.location.href = '/departments-list'; }, 1000);
+                                    setTimeout(() => { window.location.href = '/departments/list'; }, 1000);
                                 } else {
                                     showToast(res.message || 'Failed to delete department', 'danger');
                                 }

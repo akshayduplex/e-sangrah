@@ -6,14 +6,14 @@
 			<!-- Breadcrumb -->
 			<div class="d-md-flex d-block align-items-center justify-content-between page-breadcrumb mb-3">
 				<div class="my-auto mb-2">
-					<h2 class="mb-1">Add Document</h2>
+					<h2 class="mb-1">
+						<%= isEdit ? "Edit Document" : "Add Document" %>
+					</h2>
 					<nav>
 						<ol class="breadcrumb mb-0">
+							<li class="breadcrumb-item"><a href="#"><i class="ti ti-smart-home"></i></a></li>
 							<li class="breadcrumb-item">
-								<a href="#"><i class="ti ti-smart-home"></i></a>
-							</li>
-							<li class="breadcrumb-item">
-								Add Document
+								<%= isEdit ? "Edit Document" : "Add Document" %>
 							</li>
 						</ol>
 					</nav>
@@ -22,195 +22,289 @@
 			<!-- /Breadcrumb -->
 
 			<div class="add-info-fieldset">
-				<fieldset id="first-field-file">
-					<form id="documentForm" action="/api/documents" method="POST" enctype="multipart/form-data">
-						<div class="modal-body">
-							<div class="row">
-								<div class="col-md-4">
-									<div class="mb-3">
-										<label class="form-label">Project Name</label>
-										<select id="projectName" name="projectName" class="form-select select2"
-											required>
-											<option value="">-- Select Project Name --</option>
-											<% if (projectNames && projectNames.length) { %>
-												<% projectNames.forEach(project=> { %>
-													<option value="<%= project._id %>">
-														<%= project.projectName %>
-													</option>
-													<% }) %>
-														<% } else { %>
-															<option disabled>No projects available</option>
-															<% } %>
-										</select>
-									</div>
-								</div>
-								<div class="col-md-4">
-									<div class="mb-3">
-										<label for="department" class="form-label">Department <span
-												class="text-danger">*</span></label>
-										<select id="department" name="department" class="form-select select2" required>
-											<option value="">-- Select Department --</option>
-											<% if (departments && departments.length) { %>
-												<% departments.forEach(dep=> { %>
-													<option value="<%= dep._id %>">
-														<%= dep.name %>
-													</option>
-													<% }) %>
-														<% } else { %>
-															<option disabled>No departments available</option>
-															<% } %>
-										</select>
-									</div>
-								</div>
-								<div class="col-md-4">
-									<div class="mb-3">
-										<label class="form-label">Project Manager</label>
-										<select id="projectManager" name="projectManager" class="form-select select2"
-											required>
-											<option value="">-- Select Project Manager --</option>
-											<% if (users && users.length) { %>
-												<% users.forEach(user=> { %>
-													<option value="<%= user._id %>">
-														<%= user.name %>
-													</option>
-													<% }) %>
-														<% } else { %>
-															<option disabled>No users available</option>
-															<% } %>
-										</select>
-									</div>
-								</div>
-								<div class="col-md-4">
-									<div class="mb-3">
-										<label class="form-label">Select Date</label>
-										<div class="input-icon-end position-relative">
-											<input type="text" name="documentDate" class="form-control datetimepicker"
-												placeholder="dd/mm/yyyy" required>
-											<span class="input-icon-addon">
-												<i class="ti ti-calendar text-gray-7"></i>
-											</span>
-										</div>
-									</div>
-								</div>
-								<div class="col-md-4">
-									<div class="mb-3">
-										<label class="form-label">Add Tags (comma separated)</label>
-										<input type="text" name="tags" class="form-control"
-											placeholder="tag1, tag2, tag3">
-									</div>
-								</div>
-								<div class="col-md-4">
-									<div class="mb-3">
-										<label class="form-label">Meta Data</label>
-										<div class="position-relative">
-											<input type="text" id="metadataDisplay" class="form-control" readonly>
-											<input type="hidden" id="metadataInput" name="metadata">
-											<button type="button" class="border-0 fieldright_btn" data-bs-toggle="modal"
-												data-bs-target="#metadata-modal">
-												<img src="/img/icons/fieldbtn.png">
-											</button>
-										</div>
-									</div>
-								</div>
-								<div class="col-md-12">
-									<div class="mb-3">
-										<label class="form-label">Description</label>
-										<textarea id="summernote" name="description" style="display: none;"></textarea>
-										<div class="summernote"></div>
-									</div>
-								</div>
-								<div class="col-md-6">
-									<div class="mb-3">
-										<div class="d-flex align-items-center gap-5">
-											<label class="form-label mb-0">Compliance and Retention Document</label>
-											<div class="form-check">
-												<input class="form-check-input" type="radio" name="compliance"
-													value="yes" id="complianceYes">
-												<label class="form-check-label" for="complianceYes">
-													Yes
-												</label>
-											</div>
-											<div class="form-check">
-												<input class="form-check-input" type="radio" name="compliance"
-													id="complianceNo" value="no" checked>
-												<label class="form-check-label" for="complianceNo">
-													No
-												</label>
-											</div>
-										</div>
-									</div>
-								</div>
-								<div class="col-md-6" id="expiryDateContainer" style="display: none;">
-									<div class="mb-3">
-										<div class="d-flex align-items-center gap-5">
-											<label class="form-label mb-0">Enter Expiry Date</label>
-											<div class="input-icon-end position-relative">
-												<input type="text" class="form-control datetimepicker" name="expiryDate"
-													placeholder="dd/mm/yyyy">
-												<span class="input-icon-addon">
-													<i class="ti ti-calendar text-gray-7"></i>
-												</span>
-											</div>
-										</div>
-									</div>
-								</div>
-								<div class="col-md-12">
-									<div class="mb-3">
-										<label class="form-label">Leave a comment (Optional)</label>
-										<input type="text" class="form-control" name="comment">
-									</div>
-								</div>
+				<form id="documentForm" action="<%= isEdit ? '/api/documents/' + document._id : '/api/documents' %>"
+					method="POST" enctype="multipart/form-data">
+					<% if (isEdit) { %>
+						<input type="hidden" name="_method" value="PATCH">
+						<% } %>
 
-								<div class="col-md-12">
-									<label class="form-label">File Uploads</label>
-									<div class="upload-box mb-3" id="uploadBox">
-										<i class="ti ti-cloud-upload fa-2x text-primary mb-2"></i>
-										<p class="mb-1"><strong>Click to upload file</strong> or drag and drop</p>
-										<small class="text-muted">Max 10GB total storage. DOCX / PPTX / CSV /
-											PDF</small>
-										<input type="file" class="form-control d-none" id="fileInput" name="files"
-											multiple required>
-									</div>
-									<div class="crtfoldr_row text-center my-4">
-										<span class="pe-3">or</span>
-										<button type="button" class="btn btn-primary rounded-pill"
-											data-bs-toggle="modal" data-bs-target="#folder-modal">Create Folder</button>
-									</div>
-									<div id="fileList"></div>
-								</div>
-								<div class="col-md-12">
-									<label class="form-label">Add Your Signature</label>
-									<div class="signtrboxwrp mb-3">
-										<div class="signbox form-control" id="signaturePreview">
-											<!-- Signature preview will appear here -->
-										</div>
-										<div class="signupld">
-											<input type="file" class="form-control d-none" id="fileSign"
-												name="signature" accept="image/*">
-											<button type="button" class="btn btn-primary rounded-pill"
-												id="uploadSignBtn">Browse from
-												system</button>
+
+							<div class="modal-body">
+								<div class="row">
+									<!-- Project Name -->
+									<div class="col-md-4">
+										<div class="mb-3">
+											<label class="form-label">Project Name</label>
+											<select id="projectName" name="projectName" class="form-select select2"
+												required>
+												<option value="">-- Select Project Name --</option>
+												<% if (projectNames && projectNames.length) { %>
+													<% projectNames.forEach(project=> { %>
+														<option value="<%= project._id %>" <%=isEdit && document.project
+															&& document.project._id.toString()===project._id.toString()
+															? "selected" : "" %>>
+															<%= project.projectName %>
+														</option>
+														<% }) %>
+															<% } else { %>
+																<option disabled>No projects available</option>
+																<% } %>
+											</select>
 										</div>
 									</div>
-								</div>
-								<div class="col-md-12">
-									<div class="mb-3">
-										<label class="form-label">Add Link (if any)</label>
-										<input type="url" class="form-control" name="link"
-											placeholder="https://example.com">
+
+									<!-- Department -->
+									<div class="col-md-4">
+										<div class="mb-3">
+											<label class="form-label">Department <span
+													class="text-danger">*</span></label>
+											<select id="department" name="department" class="form-select select2"
+												required>
+												<option value="">-- Select Department --</option>
+												<% if (departments && departments.length) { %>
+													<% departments.forEach(dep=> { %>
+														<option value="<%= dep._id %>" <%=isEdit && document.department
+															&& document.department.toString()===dep._id.toString()
+															? "selected" : "" %>>
+															<%= dep.name %>
+														</option>
+														<% }) %>
+															<% } else { %>
+																<option disabled>No departments available</option>
+																<% } %>
+											</select>
+										</div>
+									</div>
+
+									<!-- Project Manager -->
+									<div class="col-md-4">
+										<div class="mb-3">
+											<label class="form-label">Project Manager</label>
+											<select id="projectManager" name="projectManager"
+												class="form-select select2" required>
+												<option value="">-- Select Project Manager --</option>
+												<% if (users && users.length) { %>
+													<% users.forEach(user=> { %>
+														<option value="<%= user._id %>" <%=isEdit &&
+															document.projectManager &&
+															document.projectManager.toString()===user._id.toString()
+															? "selected" : "" %>>
+															<%= user.name %>
+														</option>
+														<% }) %>
+															<% } else { %>
+																<option disabled>No users available</option>
+																<% } %>
+											</select>
+										</div>
+									</div>
+
+									<!-- Document Date -->
+									<div class="col-md-4">
+										<div class="mb-3">
+											<label class="form-label">Select Date</label>
+											<div class="input-icon-end position-relative">
+												<input type="text" name="documentDate"
+													class="form-control datetimepicker" placeholder="dd/mm/yyyy"
+													value="<%= isEdit && document.documentDate ? new Date(document.documentDate).toLocaleDateString('en-GB') : '' %>"
+													required>
+												<span class="input-icon-addon"><i
+														class="ti ti-calendar text-gray-7"></i></span>
+											</div>
+										</div>
+									</div>
+
+									<!-- Tags -->
+									<div class="col-md-4">
+										<div class="mb-3">
+											<label class="form-label">Add Tags (comma separated)</label>
+											<input type="text" name="tags" class="form-control"
+												placeholder="tag1, tag2, tag3"
+												value="<%= isEdit && document.tags ? document.tags.join(', ') : '' %>">
+										</div>
+									</div>
+
+									<!-- Metadata -->
+									<div class="col-md-4">
+										<div class="mb-3">
+											<label class="form-label">Meta Data</label>
+											<div class="position-relative">
+												<input type="text" id="metadataDisplay" class="form-control" readonly
+													value="<%= isEdit && document.metadata ? document.metadata.fileName + ' - ' + document.metadata.fileDescription : '' %>">
+												<input type="hidden" id="metadataInput" name="metadata"
+													value="<%= isEdit && document.metadata ? JSON.stringify(document.metadata) : '' %>">
+												<button type="button" class="border-0 fieldright_btn"
+													data-bs-toggle="modal" data-bs-target="#metadata-modal">
+													<img src="/img/icons/fieldbtn.png">
+												</button>
+											</div>
+										</div>
+									</div>
+
+									<!-- Description -->
+									<div class="col-md-12">
+										<div class="mb-3">
+											<label class="form-label">Description</label>
+											<textarea id="summernote" name="description"
+												style="display: none;"><%= isEdit && document.description ? document.description : '' %></textarea>
+											<div class="summernote">
+												<%= isEdit && document.description ? document.description : '' %>
+											</div>
+										</div>
+									</div>
+
+									<!-- Compliance -->
+									<div class="col-md-6">
+										<div class="mb-3">
+											<div class="d-flex align-items-center gap-5">
+												<label class="form-label mb-0">Compliance and Retention Document</label>
+												<div class="form-check">
+													<input class="form-check-input" type="radio" name="compliance"
+														value="yes" id="complianceYes" <%=isEdit &&
+														document.compliance==='yes' ? 'checked' : '' %>>
+													<label class="form-check-label" for="complianceYes">Yes</label>
+												</div>
+												<div class="form-check">
+													<input class="form-check-input" type="radio" name="compliance"
+														id="complianceNo" value="no" <%=!isEdit ||
+														document.compliance==='no' ? 'checked' : '' %>>
+													<label class="form-check-label" for="complianceNo">No</label>
+												</div>
+											</div>
+										</div>
+									</div>
+
+									<!-- Expiry Date -->
+									<div class="col-md-6" id="expiryDateContainer"
+										style="display: <%= isEdit && document.compliance === 'yes' ? 'block' : 'none' %>;">
+										<div class="mb-3">
+											<div class="d-flex align-items-center gap-5">
+												<label class="form-label mb-0">Enter Expiry Date</label>
+												<div class="input-icon-end position-relative">
+													<input type="text" class="form-control datetimepicker"
+														name="expiryDate" placeholder="dd/mm/yyyy"
+														value="<%= isEdit && document.expiryDate ? new Date(document.expiryDate).toLocaleDateString('en-GB') : '' %>"
+														<%=isEdit && document.compliance==='yes' ? 'required' : '' %>>
+													<span class="input-icon-addon"><i
+															class="ti ti-calendar text-gray-7"></i></span>
+												</div>
+											</div>
+										</div>
+									</div>
+
+									<!-- Comment -->
+									<div class="col-md-12">
+										<div class="mb-3">
+											<label class="form-label">Leave a comment (Optional)</label>
+											<input type="text" class="form-control" name="comment"
+												value="<%= isEdit && document.comment ? document.comment : '' %>">
+										</div>
+									</div>
+
+									<!-- File Upload -->
+									<div class="col-md-12">
+										<label class="form-label">File Uploads</label>
+										<div class="upload-box mb-3" id="uploadBox">
+											<i class="ti ti-cloud-upload fa-2x text-primary mb-2"></i>
+											<p class="mb-1"><strong>Click to upload file</strong> or drag and drop</p>
+											<small class="text-muted">Max 10GB total storage. DOCX / PPTX / CSV /
+												PDF</small>
+											<input type="file" class="form-control d-none" id="fileInput" name="files"
+												multiple <%=!isEdit ? 'required' : '' %>>
+										</div>
+
+										<% if (!isEdit) { %>
+											<div class="crtfoldr_row text-center my-4">
+												<span class="pe-3">or</span>
+												<button type="button" class="btn btn-primary rounded-pill"
+													data-bs-toggle="modal" data-bs-target="#folder-modal">Create
+													Folder</button>
+											</div>
+											<% } %>
+
+												<div id="fileList">
+													<% if (isEdit && document.files && document.files.length) { %>
+														<% document.files.forEach(file=> { %>
+															<div class="file-item col-sm-5 mb-3 p-3 border rounded"
+																data-file-id="<%= file._id %>">
+																<div class="file-info d-flex align-items-center">
+																	<i class="fa-solid fa-file fa-2x me-3"></i>
+																	<div class="flex-grow-1">
+																		<h6 class="mb-0 text-truncate">
+																			<%= file.originalName %>
+																		</h6>
+																		<small class="text-muted">
+																			<%= (file.size / 1024 / 1024).toFixed(2) %>
+																				MB
+																		</small>
+																	</div>
+																</div>
+																<div class="file-progress mt-2">
+																	<div class="progress">
+																		<div class="progress-bar bg-success"
+																			role="progressbar" style="width: 100%">
+																			Uploaded</div>
+																	</div>
+																</div>
+																<a href="<%= file.url || '/uploads/' + file.filename %>"
+																	target="_blank"
+																	class="btn btn-sm btn-info mt-2 me-2">
+																	<i class="fa-solid fa-eye"></i> View
+																</a>
+																<button class="remove-btn btn btn-sm btn-danger mt-2"
+																	data-file-id="<%= file._id %>">
+																	<i class="fa-solid fa-xmark"></i> Remove
+																</button>
+															</div>
+															<% }) %>
+																<% } %>
+												</div>
+									</div>
+
+									<!-- Signature -->
+									<div class="col-md-12">
+										<label class="form-label">Add Your Signature</label>
+										<div class="signtrboxwrp mb-3">
+											<div class="signbox form-control" id="signaturePreview">
+												<% if (isEdit && document.signature) { %>
+													<img src="<%= document.signature %>" alt="Signature"
+														style="max-height:100%; max-width:100%; object-fit:contain;">
+													<% } %>
+											</div>
+											<div class="signupld">
+												<input type="file" class="form-control d-none" id="fileSign"
+													name="signature" accept="image/*">
+												<button type="button" class="btn btn-primary rounded-pill"
+													id="uploadSignBtn">
+													<%= isEdit && document.signature ? 'Update Signature'
+														: 'Browse from system' %>
+												</button>
+											</div>
+										</div>
+									</div>
+
+									<!-- Link -->
+									<div class="col-md-12">
+										<div class="mb-3">
+											<label class="form-label">Add Link (if any)</label>
+											<input type="url" class="form-control" name="link"
+												placeholder="https://example.com"
+												value="<%= isEdit && document.link ? document.link : '' %>">
+										</div>
 									</div>
 								</div>
 							</div>
-						</div>
-						<div class="d-flex align-items-center justify-content-end">
-							<button class="btn btn-primary rounded-pill" type="submit" id="submitBtn">Add
-								Document</button>
-						</div>
-					</form>
-				</fieldset>
+
+							<div class="d-flex align-items-center justify-content-end">
+								<button class="btn btn-primary rounded-pill" type="submit" id="submitBtn">
+									<%= isEdit ? "Update Document" : "Add Document" %>
+								</button>
+							</div>
+				</form>
 			</div>
 		</div>
 
+		<!-- Footer -->
 		<div class="footer mt-4 d-sm-flex align-items-center justify-content-between border-top bg-white p-3">
 			<p class="mb-0">2025 &copy; HLFPPT.</p>
 			<p>Designed & Developed by <a href="javascript:void(0);" class="text-primary">Duplex services &
@@ -220,6 +314,7 @@
 	<!-- /Page Wrapper -->
 
 	<%- include('../partials/footer') %>
+
 
 		<!-- Metadata Modal -->
 		<div id="metadata-modal" class="modal fade" tabindex="-1" role="dialog" aria-hidden="true">
@@ -233,17 +328,19 @@
 						<form id="metadataForm">
 							<div class="mb-3">
 								<label class="form-label">File Name</label>
-								<input class="form-control" type="text" name="fileName" required
-									placeholder="File Name">
+								<input class="form-control" type="text" name="fileName" required placeholder="File Name"
+									value="<%= isEdit && document.metadata && document.metadata.fileName ? document.metadata.fileName : '' %>">
 							</div>
 							<div class="mb-3">
 								<label class="form-label">File description</label>
 								<input class="form-control" type="text" name="fileDescription" required
-									placeholder="Project about the new KVP app">
+									placeholder="Project about the new KVP app"
+									value="<%= isEdit && document.metadata && document.metadata.fileDescription ? document.metadata.fileDescription : '' %>">
 							</div>
 							<div class="mb-3">
 								<label class="form-label">File main Heading</label>
-								<input type="text" class="form-control" name="mainHeading" placeholder="Main Heading">
+								<input type="text" class="form-control" name="mainHeading" placeholder="Main Heading"
+									value="<%= isEdit && document.metadata && document.metadata.mainHeading ? document.metadata.mainHeading : '' %>">
 							</div>
 							<div class="mb-3 text-center">
 								<button class="btn btn-primary rounded-pill" type="submit">Save Metadata</button>
@@ -271,7 +368,8 @@
 									<p class="fs-14 mb-1 fw-normal" id="successFileName">Project Proposal v1</p>
 								</div>
 							</div>
-							<h4 class="fs-24 text-dark fw-medium mb-4">Your File Added Successfully</h4>
+							<h4 class="fs-24 text-dark fw-medium mb-4">Your File <%= isEdit ? "Updated" : "Added" %>
+									Successfully</h4>
 							<p class="fs-20 fw-normal mb-4">You will be notified soon as your file gets approved</p>
 							<div class="mb-3 text-center">
 								<button class="btn btn-primary rounded-pill minw80" type="button"
@@ -283,12 +381,19 @@
 			</div>
 		</div>
 		<!-- /Success Modal -->
+
 		<script>
-			// Global variable to store uploaded file IDs
+			// EJS variables converted to JS
+			const isEdit = <%= isEdit ? 'true' : 'false' %>;
+			const documentId = "<%= isEdit && document ? document._id : '' %>";
+
+			// Store uploaded file IDs
 			let uploadedFileIds = [];
 
-			// Initialize Summernote
 			$(document).ready(function () {
+				// --------------------------
+				// Summernote
+				// --------------------------
 				$('.summernote').summernote({
 					height: 200,
 					callbacks: {
@@ -297,338 +402,88 @@
 						}
 					}
 				});
-			});
 
-			// Initialize datepickers
-			$('.datetimepicker').datetimepicker({
-				format: 'DD-MM-YYYY',
-				useCurrent: false
-			});
+				// --------------------------
+				// Select2
+				// --------------------------
+				$('.select2').select2();
 
-			// Compliance radio button handler
-			$('input[name="compliance"]').change(function () {
-				if ($(this).val() === 'yes') {
-					$('#expiryDateContainer').show();
-					$('input[name="expiryDate"]').prop('required', true);
-				} else {
-					$('#expiryDateContainer').hide();
-					$('input[name="expiryDate"]').prop('required', false);
-				}
-			});
-
-			// Metadata modal handling
-			$('#metadataForm').on('submit', function (e) {
-				e.preventDefault();
-				const formData = $(this).serializeArray();
-				const metadata = {};
-
-				formData.forEach(function (item) {
-					metadata[item.name] = item.value;
+				// --------------------------
+				// Datepicker
+				// --------------------------
+				$('.datetimepicker').datetimepicker({
+					format: 'DD-MM-YYYY',
+					useCurrent: false
 				});
 
-				// Store as JSON string in hidden input
-				$('#metadataInput').val(JSON.stringify(metadata));
-
-				// Display in the visible field
-				$('#metadataDisplay').val(metadata.fileName + ' - ' + metadata.fileDescription);
-
-				// Close the modal
-				$('#metadata-modal').modal('hide');
-			});
-
-			// File upload handling
-			const uploadBox = document.getElementById("uploadBox");
-			const fileInput = document.getElementById("fileInput");
-			const fileList = document.getElementById("fileList");
-
-			// Open file dialog on click
-			uploadBox.addEventListener("click", () => fileInput.click());
-
-			// Handle file selection - UPDATED for S3 upload
-			fileInput.addEventListener("change", async (e) => {
-				const files = e.target.files;
-				for (let i = 0; i < files.length; i++) {
-					await handleFileUpload(files[i]);
-				}
-			});
-
-			// Drag and drop events
-			uploadBox.addEventListener("dragover", (e) => {
-				e.preventDefault();
-				uploadBox.classList.add("dragover");
-			});
-
-			uploadBox.addEventListener("dragleave", () => {
-				uploadBox.classList.remove("dragover");
-			});
-
-			uploadBox.addEventListener("drop", async (e) => {
-				e.preventDefault();
-				uploadBox.classList.remove("dragover");
-				const files = e.dataTransfer.files;
-
-				for (let i = 0; i < files.length; i++) {
-					await handleFileUpload(files[i]);
-				}
-			});
-
-			// Handle file upload to S3 - NEW FUNCTION
-			async function handleFileUpload(file) {
-				const fileId = Date.now() + Math.random(); // unique id for UI
-				const fileItem = document.createElement("div");
-				fileItem.classList.add("file-item", "col-sm-5", "mb-3", "p-3", "border", "rounded");
-				fileItem.setAttribute("data-id", fileId);
-
-				// Choose icon based on type
-				let iconClass = "fa-file";
-				if (file.type.includes("word")) iconClass = "fa-file-word text-primary";
-				else if (file.type.includes("pdf")) iconClass = "fa-file-pdf text-danger";
-				else if (file.type.includes("presentation") || file.name.endsWith(".ppt") || file.name.endsWith(".pptx"))
-					iconClass = "fa-file-powerpoint text-warning";
-				else if (file.type.includes("sheet") || file.name.endsWith(".xls") || file.name.endsWith(".xlsx"))
-					iconClass = "fa-file-excel text-success";
-
-				fileItem.innerHTML = `
-            <div class="file-info d-flex align-items-center">
-                <i class="fa-solid ${iconClass} fa-2x me-3"></i>
-                <div class="flex-grow-1">
-                    <h6 class="mb-0 text-truncate">${file.name}</h6>
-                    <small class="text-muted">${(file.size / 1024 / 1024).toFixed(2)} MB</small>
-                </div>
-            </div>
-            <div class="file-progress mt-2">
-                <div class="progress">
-                    <div class="progress-bar bg-success" role="progressbar" style="width: 0%">0%</div>
-                </div>
-            </div>
-            <button class="remove-btn btn btn-sm btn-danger mt-2" data-fileid="${fileId}">
-                <i class="fa-solid fa-xmark"></i> Remove
-            </button>
-        `;
-
-				fileList.appendChild(fileItem);
-
-				const progressBar = fileItem.querySelector(".progress-bar");
-
-				try {
-					// Create FormData for upload
-					const formData = new FormData();
-					formData.append('file', file);
-
-					// Upload to server (which will upload to S3)
-					const response = await fetch('api/files/upload', {
-						method: 'POST',
-						body: formData
-					});
-
-					const data = await response.json();
-
-					if (data.success) {
-						// Update progress to 100%
-						progressBar.style.width = "100%";
-						progressBar.textContent = "100%";
-
-						// Store the file ID for later use
-						uploadedFileIds.push(data.fileId);
-
-						// Update the data attribute with the actual file ID
-						fileItem.setAttribute("data-file-id", data.fileId);
-
-						// Change remove button to use the actual file ID
-						const removeBtn = fileItem.querySelector(".remove-btn");
-						removeBtn.setAttribute("data-file-id", data.fileId);
+				// --------------------------
+				// Compliance radio buttons
+				// --------------------------
+				$('input[name="compliance"]').change(function () {
+					if ($(this).val() === 'yes') {
+						$('#expiryDateContainer').show();
+						$('input[name="expiryDate"]').prop('required', true);
 					} else {
-						throw new Error(data.message || "Upload failed");
-					}
-				} catch (error) {
-					console.error("Upload error:", error);
-					progressBar.classList.remove("bg-success");
-					progressBar.classList.add("bg-danger");
-					progressBar.textContent = "Error";
-
-					// Show error message
-					const errorMsg = document.createElement("div");
-					errorMsg.className = "text-danger small mt-1";
-					errorMsg.textContent = "Upload failed. Please try again.";
-					fileItem.appendChild(errorMsg);
-				}
-
-				// Remove file handler
-				fileItem.querySelector(".remove-btn").addEventListener("click", function () {
-					const fileIdToRemove = this.getAttribute("data-file-id");
-					if (fileIdToRemove) {
-						// Remove from our stored array
-						uploadedFileIds = uploadedFileIds.filter(id => id !== fileIdToRemove);
-					}
-					fileItem.remove();
-				});
-			}
-
-			// Signature upload handling
-			const fileSign = document.getElementById('fileSign');
-			const uploadSignBtn = document.getElementById('uploadSignBtn');
-			const signaturePreview = document.getElementById('signaturePreview');
-
-			// Open file dialog on button click
-			uploadSignBtn.addEventListener('click', () => {
-				fileSign.click();
-			});
-
-			// Show preview when file is selected
-			fileSign.addEventListener('change', function () {
-				if (this.files && this.files[0]) {
-					const reader = new FileReader();
-					reader.onload = function (e) {
-						signaturePreview.innerHTML = `<img src="${e.target.result}" alt="Signature Preview" 
-                    style="max-height: 100%; max-width: 100%; object-fit: contain;">`;
-						uploadSignBtn.textContent = "Update Signature";
-					};
-					reader.readAsDataURL(this.files[0]);
-				}
-			});
-
-			// Form submission handling - UPDATED for S3 integration
-			$('#documentForm').on('submit', async function (e) {
-				e.preventDefault();
-
-				// Ensure the description textarea has the latest HTML content
-				$('#summernote').val($('.summernote').summernote('code'));
-
-				// Show loading state
-				$('#submitBtn').prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Adding...');
-
-				try {
-					// Add file IDs to form data
-					const fileIdsInput = document.createElement('input');
-					fileIdsInput.type = 'hidden';
-					fileIdsInput.name = 'fileIds';
-					fileIdsInput.value = JSON.stringify(uploadedFileIds);
-					this.appendChild(fileIdsInput);
-
-					// Submit form via AJAX
-					const formData = new FormData(this);
-
-					const response = await fetch('/api/documents', {
-						method: 'POST',
-						body: formData
-					});
-
-					const data = await response.json();
-
-					if (data.success) {
-						// Show success modal
-						if (data.document && data.document.metadata && data.document.metadata.fileName) {
-							$('#successFileName').text(data.document.metadata.fileName);
-						}
-						$('#data-success-modal').modal('show');
-
-						// Reset form and clear uploaded files
-						this.reset();
-						$('.summernote').summernote('code', '');
-						$('#fileList').empty();
-						$('#signaturePreview').empty();
-						$('#metadataDisplay').val('');
-						$('#metadataInput').val('');
-						uploadedFileIds = [];
-					} else {
-						alert('Error: ' + (data.message || 'Unknown error occurred'));
-					}
-				} catch (error) {
-					console.error('Error:', error);
-					alert('An error occurred while submitting the form.');
-				} finally {
-					$('#submitBtn').prop('disabled', false).html('Add Document');
-				}
-			});
-		</script>
-		<!-- <script>
-			// Initialize Summernote
-			$(document).ready(function () {
-				$('.summernote').summernote({
-					height: 200,
-					callbacks: {
-						onChange: function (contents) {
-							$('#summernote').val(contents);
-						}
+						$('#expiryDateContainer').hide();
+						$('input[name="expiryDate"]').prop('required', false);
 					}
 				});
-			});
 
-			// Initialize datepickers
-			// In your frontend script
-			$('.datetimepicker').datetimepicker({
-				format: 'DD-MM-YYYY',
-				useCurrent: false
-			});
+				// --------------------------
+				// Metadata modal
+				// --------------------------
+				$('#metadataForm').on('submit', function (e) {
+					e.preventDefault();
+					const formData = $(this).serializeArray();
+					const metadata = {};
+					formData.forEach(item => metadata[item.name] = item.value);
 
-			// Compliance radio button handler
-			$('input[name="compliance"]').change(function () {
-				if ($(this).val() === 'yes') {
-					$('#expiryDateContainer').show();
-					$('input[name="expiryDate"]').prop('required', true);
-				} else {
-					$('#expiryDateContainer').hide();
-					$('input[name="expiryDate"]').prop('required', false);
-				}
-			});
-
-			// Metadata modal handling
-			$('#metadataForm').on('submit', function (e) {
-				e.preventDefault();
-				const formData = $(this).serializeArray();
-				const metadata = {};
-
-				formData.forEach(function (item) {
-					metadata[item.name] = item.value;
+					$('#metadataInput').val(JSON.stringify(metadata));
+					$('#metadataDisplay').val(metadata.fileName + ' - ' + metadata.fileDescription);
+					$('#metadata-modal').modal('hide');
 				});
 
-				// Store as JSON string in hidden input
-				$('#metadataInput').val(JSON.stringify(metadata));
+				// --------------------------
+				// File upload handling
+				// --------------------------
+				const uploadBox = document.getElementById("uploadBox");
+				const fileInput = document.getElementById("fileInput");
+				const fileList = document.getElementById("fileList");
 
-				// Display in the visible field
-				$('#metadataDisplay').val(metadata.fileName + ' - ' + metadata.fileDescription);
+				uploadBox.addEventListener("click", () => fileInput.click());
 
-				// Close the modal
-				$('#metadata-modal').modal('hide');
-			});
+				fileInput.addEventListener("change", async (e) => {
+					const files = e.target.files;
+					for (let i = 0; i < files.length; i++) {
+						await handleFileUpload(files[i]);
+					}
+				});
 
-			// File upload handling
-			const uploadBox = document.getElementById("uploadBox");
-			const fileInput = document.getElementById("fileInput");
-			const fileList = document.getElementById("fileList");
+				uploadBox.addEventListener("dragover", e => {
+					e.preventDefault();
+					uploadBox.classList.add("dragover");
+				});
 
-			// Open file dialog on click
-			uploadBox.addEventListener("click", () => fileInput.click());
+				uploadBox.addEventListener("dragleave", () => {
+					uploadBox.classList.remove("dragover");
+				});
 
-			// Handle file selection
-			fileInput.addEventListener("change", () => handleFiles(fileInput.files));
+				uploadBox.addEventListener("drop", async e => {
+					e.preventDefault();
+					uploadBox.classList.remove("dragover");
+					const files = e.dataTransfer.files;
+					for (let i = 0; i < files.length; i++) {
+						await handleFileUpload(files[i]);
+					}
+				});
 
-			// Drag and drop events
-			uploadBox.addEventListener("dragover", (e) => {
-				e.preventDefault();
-				uploadBox.classList.add("dragover");
-			});
-
-			uploadBox.addEventListener("dragleave", () => {
-				uploadBox.classList.remove("dragover");
-			});
-
-			uploadBox.addEventListener("drop", (e) => {
-				e.preventDefault();
-				uploadBox.classList.remove("dragover");
-				handleFiles(e.dataTransfer.files);
-			});
-
-			// Handle uploaded files
-			function handleFiles(files) {
-				[...files].forEach((file) => {
-					const fileId = Date.now() + Math.random(); // unique id
+				async function handleFileUpload(file) {
+					const fileId = Date.now() + Math.random();
 					const fileItem = document.createElement("div");
-					fileItem.classList.add("file-item");
-					fileItem.classList.add("col-sm-5");
+					fileItem.className = "file-item col-sm-5 mb-3 p-3 border rounded";
 					fileItem.setAttribute("data-id", fileId);
 
-					// Choose icon based on type
+					// Choose icon based on file type
 					let iconClass = "fa-file";
 					if (file.type.includes("word")) iconClass = "fa-file-word text-primary";
 					else if (file.type.includes("pdf")) iconClass = "fa-file-pdf text-danger";
@@ -636,108 +491,140 @@
 					else if (file.type.includes("sheet") || file.name.endsWith(".xls") || file.name.endsWith(".xlsx")) iconClass = "fa-file-excel text-success";
 
 					fileItem.innerHTML = `
-                <div class="file-info d-flex align-items-center">
-                    <i class="fa-solid ${iconClass} fa-2x me-3"></i>
-                    <div>
-                        <h6 class="mb-0">${file.name}</h6>
-                        <small class="text-muted">${(file.size / 1024 / 1024).toFixed(2)} MB</small>
-                    </div>
-                </div>
-                <div class="file-progress mt-2">
-                    <div class="progress">
-                        <div class="progress-bar bg-success" role="progressbar" style="width: 0%">0%</div>
-                    </div>
-                </div>
-                <button class="remove-btn btn btn-sm btn-danger mt-2"><i class="fa-solid fa-xmark"></i> Remove</button>
-            `;
-
+					<div class="file-info d-flex align-items-center">
+						<i class="fa-solid ${iconClass} fa-2x me-3"></i>
+						<div class="flex-grow-1">
+							<h6 class="mb-0 text-truncate">${file.name}</h6>
+							<small class="text-muted">${(file.size / 1024 / 1024).toFixed(2)} MB</small>
+						</div>
+					</div>
+					<div class="file-progress mt-2">
+						<div class="progress">
+							<div class="progress-bar bg-success" role="progressbar" style="width: 0%">0%</div>
+						</div>
+					</div>
+					<button class="remove-btn btn btn-sm btn-danger mt-2" data-fileid="${fileId}">
+						<i class="fa-solid fa-xmark"></i> Remove
+					</button>
+				`;
 					fileList.appendChild(fileItem);
 
-					// Fake progress animation
-					let progress = 0;
-					const interval = setInterval(() => {
-						if (progress >= 100) {
-							clearInterval(interval);
-						} else {
-							progress += 10;
-							const progressBar = fileItem.querySelector(".progress-bar");
-							progressBar.style.width = progress + "%";
-							progressBar.textContent = progress + "%";
-						}
-					}, 200);
+					const progressBar = fileItem.querySelector(".progress-bar");
 
-					// Remove file
-					fileItem.querySelector(".remove-btn").addEventListener("click", () => {
+					try {
+						const formData = new FormData();
+						formData.append('file', file);
+
+						const response = await fetch('/api/files/upload', { method: 'POST', body: formData });
+						const data = await response.json();
+
+						if (data.success) {
+							progressBar.style.width = "100%";
+							progressBar.textContent = "100%";
+							uploadedFileIds.push(data.fileId);
+							fileItem.setAttribute("data-file-id", data.fileId);
+							fileItem.querySelector(".remove-btn").setAttribute("data-file-id", data.fileId);
+						} else throw new Error(data.message || "Upload failed");
+
+					} catch (error) {
+						console.error("Upload error:", error);
+						progressBar.classList.remove("bg-success");
+						progressBar.classList.add("bg-danger");
+						progressBar.textContent = "Error";
+
+						const errorMsg = document.createElement("div");
+						errorMsg.className = "text-danger small mt-1";
+						errorMsg.textContent = "Upload failed. Please try again.";
+						fileItem.appendChild(errorMsg);
+					}
+
+					fileItem.querySelector(".remove-btn").addEventListener("click", function () {
+						const fileIdToRemove = this.getAttribute("data-file-id");
+						if (fileIdToRemove) {
+							uploadedFileIds = uploadedFileIds.filter(id => id !== fileIdToRemove);
+							fetch(`/api/files/${fileIdToRemove}`, { method: 'DELETE' }).catch(err => console.error(err));
+						}
 						fileItem.remove();
-						// Also remove from file input (this part is more complex)
+					});
+				}
+
+				// Remove existing files in edit mode
+				document.querySelectorAll('.remove-btn[data-file-id]').forEach(btn => {
+					btn.addEventListener('click', function () {
+						const fileId = this.getAttribute('data-file-id');
+						const fileItem = this.closest('.file-item');
+						fetch(`/api/files/${fileId}`, { method: 'DELETE' })
+							.then(res => res.json())
+							.then(data => data.success ? fileItem.remove() : alert('Error deleting file: ' + data.message))
+							.catch(err => { console.error(err); alert('Error deleting file'); });
 					});
 				});
-			}
 
-			// Signature upload handling
-			const fileSign = document.getElementById('fileSign');
-			const uploadSignBtn = document.getElementById('uploadSignBtn');
-			const signaturePreview = document.getElementById('signaturePreview');
+				// --------------------------
+				// Signature upload
+				// --------------------------
+				const fileSign = document.getElementById('fileSign');
+				const uploadSignBtn = document.getElementById('uploadSignBtn');
+				const signaturePreview = document.getElementById('signaturePreview');
 
-			// Open file dialog on button click
-			uploadSignBtn.addEventListener('click', () => {
-				fileSign.click();
-			});
+				uploadSignBtn.addEventListener('click', () => fileSign.click());
 
-			// Show preview when file is selected
-			fileSign.addEventListener('change', function () {
-				if (this.files && this.files[0]) {
-					const reader = new FileReader();
-					reader.onload = function (e) {
-						signaturePreview.innerHTML = `<img src="${e.target.result}" alt="Signature Preview" 
-                    style="max-height: 100%; max-width: 100%; object-fit: contain;">`;
-						uploadSignBtn.textContent = "Update Signature";
-					};
-					reader.readAsDataURL(this.files[0]);
-				}
-			});
+				fileSign.addEventListener('change', function () {
+					if (this.files && this.files[0]) {
+						const reader = new FileReader();
+						reader.onload = function (e) {
+							signaturePreview.innerHTML = `<img src="${e.target.result}" alt="Signature Preview" style="max-height:100%; max-width:100%; object-fit:contain;">`;
+							uploadSignBtn.textContent = "Update Signature";
+						};
+						reader.readAsDataURL(this.files[0]);
+					}
+				});
 
-			// Form submission handling
-			$('#documentForm').on('submit', function (e) {
-				e.preventDefault();
-				// Ensure the description textarea has the latest HTML content
-				$('#summernote').val($('.summernote').summernote('code'));
-				// Show loading state
-				$('#submitBtn').prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Adding...');
+				// --------------------------
+				// Form submission
+				// --------------------------
+				$('#documentForm').on('submit', async function (e) {
+					e.preventDefault();
+					$('#summernote').val($('.summernote').summernote('code'));
 
-				// Submit form via AJAX
-				const formData = new FormData(this);
+					$('#submitBtn').prop('disabled', true).html(
+						'<span class="spinner-border spinner-border-sm" role="status"></span> ' + (isEdit ? "Updating..." : "Adding...")
+					);
 
-				fetch('/api/documents', {
-					method: 'POST',
-					body: formData
-				})
-					.then(response => response.json())
-					.then(data => {
+					try {
+						const fileIdsInput = document.createElement('input');
+						fileIdsInput.type = 'hidden';
+						fileIdsInput.name = 'fileIds';
+						fileIdsInput.value = JSON.stringify(uploadedFileIds);
+						this.appendChild(fileIdsInput);
+
+						const formData = new FormData(this);
+						const url = isEdit ? '/api/documents/' + documentId : '/api/documents';
+						const method = isEdit ? 'PATCH' : 'POST';
+
+						const response = await fetch(url, { method, body: formData });
+						const data = await response.json();
+
 						if (data.success) {
-							// Show success modal
-							if (data.document && data.document.metadata && data.document.metadata.fileName) {
+							if (data.document?.metadata?.fileName) {
 								$('#successFileName').text(data.document.metadata.fileName);
 							}
 							$('#data-success-modal').modal('show');
 
-							// Reset form
-							this.reset();
-							$('.summernote').summernote('code', '');
-							$('#fileList').empty();
-							$('#signaturePreview').empty();
-							$('#metadataDisplay').val('');
-							$('#metadataInput').val('');
+							if (!isEdit) {
+								$('#data-success-modal').on('hidden.bs.modal', function () {
+									window.location.href = '/documents/add';
+								});
+							}
 						} else {
-							alert('Error: ' + data.message);
+							alert('Error: ' + (data.message || 'Unknown error occurred'));
 						}
-					})
-					.catch(error => {
+					} catch (error) {
 						console.error('Error:', error);
 						alert('An error occurred while submitting the form.');
-					})
-					.finally(() => {
-						$('#submitBtn').prop('disabled', false).html('Add Document');
-					});
+					} finally {
+						$('#submitBtn').prop('disabled', false).html(isEdit ? "Update Document" : "Add Document");
+					}
+				});
 			});
-		</script> -->
+		</script>

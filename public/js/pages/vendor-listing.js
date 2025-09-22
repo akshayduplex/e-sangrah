@@ -90,7 +90,7 @@
             render: function (data) {
               return `
                 <div class="btn-group" role="group">
-                  <a href="/vendor-register?id=${data}" class="btn btn-sm btn-info me-1" data-bs-toggle="tooltip" title="Edit">
+                  <a href="/vendors/register?id=${data}" class="btn btn-sm btn-info me-1" data-bs-toggle="tooltip" title="Edit">
                     <i class="ti ti-edit"></i>
                   </a>
                   <button class="btn btn-sm btn-danger delete-btn" data-id="${data}" data-bs-toggle="tooltip" title="Delete">

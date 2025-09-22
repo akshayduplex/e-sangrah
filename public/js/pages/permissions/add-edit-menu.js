@@ -61,7 +61,7 @@ $(function () {
             const result = await response.json();
             if (result.success) {
                 showToast(method === 'PUT' ? 'Menu updated successfully' : 'Menu added successfully', 'success');
-                setTimeout(() => { window.location.href = '/menu/list'; }, 1000);
+                setTimeout(() => { window.location.href = '/permissions/menu/list'; }, 1000);
             } else {
                 showToast(result.message || 'Something went wrong', 'error');
             }

@@ -1,26 +1,38 @@
-
+let menuIdToDelete = null; // Global variable to track which menu to delete
 // Delete confirmation
 function confirmDelete(menuId) {
-    if (confirm('Are you sure you want to delete this menu?')) {
-        fetch(`/api/menu/${menuId}`, {
-            method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' }
-        })
-            .then(res => res.json())
-            .then(data => {
-                if (data.success) {
-                    showToast('Menu deleted successfully', "success");
-                    location.reload();
-                } else {
-                    showToast('Error deleting menu: ' + data.message, "error");
-                }
-            })
-            .catch(err => {
-                console.error('Error:', err);
-                showToast('Error deleting menu', "error");
-            });
-    }
+    menuIdToDelete = menuId;
+    // Show the Bootstrap modal
+    const deleteModal = new bootstrap.Modal(document.getElementById('confirmDeleteModal'));
+    deleteModal.show();
 }
+document.getElementById('confirmDeleteBtn').addEventListener('click', function () {
+    if (!menuIdToDelete) return;
+
+    fetch(`/api/menu/${menuIdToDelete}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' }
+    })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                showToast('Menu deleted successfully', "success");
+                location.reload(); // Or remove row from DataTable without reload
+            } else {
+                showToast('Error deleting menu: ' + data.message, "error");
+            }
+        })
+        .catch(err => {
+            console.error('Error:', err);
+            showToast('Error deleting menu', "error");
+        })
+        .finally(() => {
+            // Hide modal after action
+            const deleteModal = bootstrap.Modal.getInstance(document.getElementById('confirmDeleteModal'));
+            deleteModal.hide();
+            menuIdToDelete = null;
+        });
+});
 
 let menuTable;
 
@@ -100,7 +112,7 @@ $(document).ready(function () {
                     orderable: false,
                     render: id => `
                         <div class="action-icon d-inline-flex">
-                          <a href="/menu/add/${id}" class="me-2"><i class="ti ti-edit"></i></a>
+                          <a href="/permissions/menu/add/${id}" class="me-2"><i class="ti ti-edit"></i></a>
                           <a href="javascript:void(0);" onclick="confirmDelete('${id}')">
                               <i class="ti ti-trash"></i>
                           </a>

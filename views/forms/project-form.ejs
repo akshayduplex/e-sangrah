@@ -115,25 +115,24 @@
                         <label><strong>Start Date</strong></label>
                         <% if (viewOnly) { %>
                             <div>
-                                <%= project?.projectStartDate ? project.projectStartDate.toISOString().split('T')[0]
-                                    : "N/A" %>
+                                <%= project?.projectStartDateFormatted || "N/A" %>
                             </div>
                             <% } else { %>
                                 <input type="date" name="projectStartDate" class="form-control"
-                                    value="<%= project?.projectStartDate ? project.projectStartDate.toISOString().split('T')[0] : '' %>">
+                                    value="<%= project?.projectStartDateISO || '' %>">
                                 <% } %>
                     </div>
+
 
                     <div class="col-md-4">
                         <label><strong>End Date</strong></label>
                         <% if (viewOnly) { %>
                             <div>
-                                <%= project?.projectEndDate ? project.projectEndDate.toISOString().split('T')[0] : "N/A"
-                                    %>
+                                <%= project?.projectEndDateFormatted || "N/A" %>
                             </div>
                             <% } else { %>
                                 <input type="date" name="projectEndDate" class="form-control"
-                                    value="<%= project?.projectEndDate ? project.projectEndDate.toISOString().split('T')[0] : '' %>">
+                                    value="<%= project?.projectEndDateISO || '' %>">
                                 <% } %>
                     </div>
 
@@ -238,7 +237,6 @@
                                 <% } %>
                     </div>
                     <% } %>
-
             </div>
 
             <% if (!viewOnly) { %>
