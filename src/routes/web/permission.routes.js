@@ -22,11 +22,12 @@ import Menu from "../../models/Menu.js";
 import UserPermission from "../../models/UserPermission.js";
 import { profile_type } from "../../constant/constant.js";
 import { buildMenuTree } from "../../utils/buildMenuTree.js";
+import checkPermissions from "../../middlewares/checkPermission.js";
 
 const router = express.Router();
 
 // Assign Permissions page
-router.get("/assign", authenticate, async (req, res) => {
+router.get("/assign", authenticate, checkPermissions, async (req, res) => {
     try {
         const departments = await Department.find({ status: "Active" }, "name").lean();
         const designations = await Designation.find({ status: "Active" }).sort({ name: 1 }).lean();
@@ -50,7 +51,7 @@ router.get("/assign-menu/designation/:designation_id/menus", authenticate, getAs
 router.post("/assign-menu/assign", authenticate, assignMenusValidator, assignMenusToDesignation);
 
 // User Permissions Page
-router.get("/user/:id", authenticate, async (req, res) => {
+router.get("/user/:id", authenticate, checkPermissions, async (req, res) => {
     try {
         const userId = req.params.id;
         const user = await User.findById(userId)
@@ -86,7 +87,7 @@ router.get("/user/:id", authenticate, async (req, res) => {
 });
 
 // Get user permissions API
-router.get("/user/:id/permissions", authenticate, async (req, res) => {
+router.get("/user/:id/permissions", authenticate, checkPermissions, async (req, res) => {
     try {
         const userPermissions = await UserPermission.find({ user_id: req.params.id })
             .populate("menu_id", "name type master_id")
@@ -99,7 +100,7 @@ router.get("/user/:id/permissions", authenticate, async (req, res) => {
 });
 
 // Save user permissions
-router.post("/user/save", authenticate, async (req, res) => {
+router.post("/user/save", authenticate, checkPermissions, async (req, res) => {
     try {
         const { user_id, permissions } = req.body;
         const assigned_by = req.user;
@@ -138,13 +139,13 @@ router.post("/user/save", authenticate, async (req, res) => {
 });
 
 // Role Permissions Page
-router.get("/roles", authenticate, (req, res) => {
+router.get("/roles", authenticate, checkPermissions, (req, res) => {
     res.render("pages/permissions/roles-permissions", { user: req.user });
 });
 
 // Menu Management
 router.get("/menu/list", authenticate, getMenuListValidator, getMenuList);
-router.get("/menu/add", authenticate, getAddMenu);
-router.get("/menu/add/:id", authenticate, menuIdParamValidator, getEditMenu);
+router.get("/menu/add", authenticate, checkPermissions, getAddMenu);
+router.get("/menu/add/:id", authenticate, checkPermissions, menuIdParamValidator, getEditMenu);
 
 export default router;

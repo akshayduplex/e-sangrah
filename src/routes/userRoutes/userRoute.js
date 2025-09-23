@@ -6,6 +6,7 @@ import {
     getUserById,
     updateUser,
     deleteUser,
+    searchUsers,
 } from "../../controllers/userControllers/userController.js";
 import upload from "../../middlewares/fileUploads.js";
 import { registrationValidation, updateValidation } from "../../middlewares/validation/userValidator.js";
@@ -17,6 +18,7 @@ router.use(authenticate);
 // Routes
 router.post("/register", upload.single("profile_image"), registerUser);
 router.get("/", getAllUsers);
+router.get("/search", searchUsers);
 router.get("/:id", getUserById);
 router.put("/:id", updateUser);
 router.delete("/:id", deleteUser);

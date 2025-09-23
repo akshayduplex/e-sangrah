@@ -5,6 +5,7 @@ import {
     submitForm,
     deleteFile,
     getFileStatus,
+    download,
 } from "../controllers/tempFileController.js";
 
 const router = express.Router();
@@ -17,6 +18,7 @@ const upload = multer({
 
 // Routes
 router.post("/upload", upload.single("file"), uploadFile);
+router.get("/download/:fileName", download);
 router.post("/submit-form", submitForm);
 router.delete("/:fileId", deleteFile);
 router.get("/:fileId/status", getFileStatus);

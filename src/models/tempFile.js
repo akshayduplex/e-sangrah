@@ -14,14 +14,27 @@ const tempFileSchema = new mongoose.Schema({
         required: true,
         unique: true,
     },
+    s3Url: {
+        type: String,
+        required: true,
+    },
     fileType: {
         type: String,
         required: true,
+    },
+    folder: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Folder",
+        required: false,
     },
     status: {
         type: String,
         enum: ["temp", "permanent", "deleted"],
         default: "temp",
+    },
+    size: {
+        type: Number,
+        required: true,
     },
     addDate: {
         type: Date,

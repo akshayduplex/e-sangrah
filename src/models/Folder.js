@@ -31,10 +31,19 @@ const folderSchema = new Schema({
     ancestors: [{ type: Schema.Types.ObjectId, ref: 'Folder', index: true }], // ancestor references
     depth: { type: Number, default: 0, index: true },
     permissions: { type: [PermissionSchema], default: [] },
-    isDeleted: { type: Boolean, default: false, index: true },
     deletedAt: { type: Date, default: null },
+    status: {
+        type: String,
+        enum: ["active", "inactive"],
+        default: "active"
+    },
+    isArchived: {
+        type: Boolean,
+        default: false
+    },
     size: { type: Number, default: 0 }, // aggregate size (bytes) of contents
     metadata: { type: Schema.Types.Mixed, default: {} },
+
     createdBy: { type: Schema.Types.ObjectId, ref: 'User' },
     updatedBy: { type: Schema.Types.ObjectId, ref: 'User' }
 }, {

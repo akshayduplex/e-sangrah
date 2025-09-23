@@ -64,78 +64,54 @@ import Menu from '../models/Menu.js';
 const checkPermissions = async (req, res, next) => {
     try {
         const user = req.user;
-        console.log('🔹 RBAC Middleware Start');
-        console.log('User from request:', user);
-
         if (!user) {
-            console.log('❌ No user found, redirecting to /login');
             return res.redirect('/login');
         }
 
         // Superadmin/Admin bypass
         if (user.profile_type === 'superadmin' || user.profile_type === 'admin') {
-            console.log('✅ User is superadmin/admin, bypassing RBAC');
             return next();
         }
 
-        // Normalize URL: remove leading and trailing slash
+        // Normalize URL
         let url = (req.baseUrl + req.path).replace(/\/+$/, '');
         if (url.startsWith('/')) url = url.slice(1);
-        console.log('Normalized URL for menu search:', url);
 
         // Find menu
         const menu = await Menu.findOne({ url, is_show: true });
         if (!menu) {
-            console.log('❌ Menu not found for URL:', url);
             return res.status(404).render('error', {
                 title: 'Menu Not Found',
                 message: 'Menu not found or inactive'
             });
         }
-        console.log('✅ Menu found:', menu.name, menu._id);
 
         // Determine required permission
         const methodMap = { GET: 'read', POST: 'write', PUT: 'write', PATCH: 'write', DELETE: 'delete' };
         const requiredPermission = methodMap[req.method] || 'read';
-        console.log('Required permission for this request:', requiredPermission);
 
-        // 1️⃣ Check designation permission (highest priority)
+        // Fetch both designation & user-specific permissions
         let designationPermission = null;
-        if (user.userDetails && user.userDetails.designation) {
+        if (user.userDetails?.designation) {
             designationPermission = await MenuAssignment.findOne({
                 designation_id: user.userDetails.designation,
                 menu_id: menu._id
             });
-            console.log('DesignationPermission found:', designationPermission);
-
-            if (designationPermission) {
-                if (designationPermission.permissions[requiredPermission] === true) {
-                    console.log('✅ Access granted by designation permission');
-                    return next();
-                } else {
-                    console.log('❌ Access denied by designation permission (highest priority)');
-                    return res.status(403).render('no-permission', {
-                        title: '403 - Forbidden',
-                        message: 'You don\'t have permission to access this resource.'
-                    });
-                }
-            }
         }
 
-        // 2️⃣ If no designation permission exists, check user-specific permission
         const userPermission = await UserPermission.findOne({
             user_id: user._id,
             menu_id: menu._id
         });
-        console.log('UserPermission found:', userPermission);
 
-        if (userPermission?.permissions?.[requiredPermission] === true) {
-            console.log('✅ Access granted by user-specific permission');
+        // ✅ Enforce AND condition
+        if (
+            designationPermission?.permissions?.[requiredPermission] === true &&
+            userPermission?.permissions?.[requiredPermission] === true
+        ) {
             return next();
         }
 
-        // 3️⃣ If neither grants access
-        console.log('❌ No permission found for user on this menu');
         return res.status(403).render('no-permission', {
             title: '403 - Forbidden',
             message: 'You don\'t have permission to access this resource.'
@@ -151,6 +127,7 @@ const checkPermissions = async (req, res, next) => {
         console.log('🔹 RBAC Middleware End\n');
     }
 };
+
 
 
 

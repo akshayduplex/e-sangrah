@@ -14,6 +14,35 @@ export const getAllDepartments = async (req, res) => {
     }
 };
 
+// Get all active departments
+export const searchDepartments = async (req, res) => {
+    try {
+        const { search = '', page = 1, limit = 10 } = req.query;
+
+        const query = { status: "Active" };
+        if (search) {
+            query.name = { $regex: search, $options: 'i' };
+        }
+
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+
+        const [data, total] = await Promise.all([
+            Department.find(query).select('name priority').skip(skip).limit(parseInt(limit)).lean(),
+            Department.countDocuments(query)
+        ]);
+
+        res.json({
+            success: true,
+            data,
+            pagination: {
+                more: skip + data.length < total // tells Select2 if more pages exist
+            }
+        });
+    } catch (err) {
+        return errorResponse(res, err);
+    }
+};
+
 // Get department by ID
 export const getDepartmentById = async (req, res) => {
     try {
@@ -45,10 +74,10 @@ export const createDepartment = async (req, res) => {
 
         const department = new Department(departmentData);
         await department.save();
-        res.redirect('/departments-list?message=' + encodeURIComponent('Department added!') + '&type=success');
+        res.redirect('/departments/list?message=' + encodeURIComponent('Department added!') + '&type=success');
     } catch (err) {
         console.error(err); // Log for production
-        res.redirect('/departments-list?message=' + encodeURIComponent('Failed to add department') + '&type=error');
+        res.redirect('/departments/list?message=' + encodeURIComponent('Failed to add department') + '&type=error');
     }
 };
 

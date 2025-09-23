@@ -1,204 +1,255 @@
 <%- include('../partials/header') %>
 
-	<!-- Page Wrapper -->
 	<div class="page-wrapper">
 		<div class="content">
+
 			<!-- Breadcrumb -->
 			<div class="d-flex align-items-center justify-content-between page-breadcrumb mb-3">
 				<div class="my-auto mb-2">
 					<h2 class="mb-1">Folders</h2>
 					<nav>
 						<ol class="breadcrumb mb-0">
-							<li class="breadcrumb-item">
-								<a href="#"><i class="ti ti-smart-home"></i></a>
-							</li>
-							<li class="breadcrumb-item">
-								Dashboard
-							</li>
-							<li class="breadcrumb-item">
-								Add Document
-							</li>
-							<li class="breadcrumb-item">
-								Folder
-							</li>
+							<li class="breadcrumb-item"><a href="#"><i class="ti ti-smart-home"></i></a></li>
+							<li class="breadcrumb-item">Dashboard</li>
+							<li class="breadcrumb-item">Add Document</li>
+							<li class="breadcrumb-item">Folder</li>
 						</ol>
 					</nav>
 				</div>
 				<div class="rtbtn">
-					<a href="#" class="btn btn-primary btn-lg rounded-pill me-2 mb-2" data-bs-toggle="modal"
-						data-bs-target="#folder-modal">
-						<i class="ti ti-plus me-1"></i>Create Folder
-					</a>
+					<div class="rtbtn">
+						<a href="#" class="btn btn-primary btn-lg rounded-pill me-2 mb-2 btn-add-folder">
+							<i class="ti ti-plus me-1"></i> Create Folder
+						</a>
+					</div>
 				</div>
 			</div>
-			<!-- /Breadcrumb -->
-			<div class="my-4 folderrow">
-				<div class="folderbox">
-					<div class="fldricon">
-						<img src="/img/icons/folder.png">
-					</div>
-					<div class="fldrname">
-						<p>KVP Design </p>
-					</div>
-					<div class="folder_links">
-						<button type="button" class="btn border-0" data-bs-toggle="dropdown" aria-expanded="false">
-							<i class="ti ti-dots"></i> </button>
-						<ul class="dropdown-menu">
-							<li><a class="dropdown-item" href="#"><i class="ti ti-eye"></i> View</a></li>
-							<li><a class="dropdown-item" href="#"><i class="ti ti-pencil-minus"></i> Rename</a></li>
-							<li><a class="dropdown-item" href="#" data-bs-toggle="modal"
-									data-bs-target="#sharedoc-modal">
-									<i class="ti ti-share"></i> Share</a>
-							</li>
-							<li><a class="dropdown-item" href="#" data-bs-toggle="modal"
-									data-bs-target="#versionhistory-modal">
-									<i class="ti ti-history"></i> Version History</a>
-							</li>
-							<li><a class="dropdown-item" href="#" data-bs-toggle="modal"
-									data-bs-target="#downloaddoc-modal">
-									<i class="ti ti-download"></i> Download</a>
-							</li>
-							<li><a class="dropdown-item" href="#" data-bs-toggle="modal"
-									data-bs-target="#trashdoc-modal">
-									<i class="ti ti-trash"></i> Move to Trash</a>
-							</li>
-							<li><a class="dropdown-item" href="#" data-bs-toggle="modal"
-									data-bs-target="#archivedoc-modal">
-									<i class="ti ti-archive"></i> Move to Archive</a>
-							</li>
-						</ul>
-					</div>
-				</div>
 
-
-				<div class="folderbox">
-					<div class="fldricon">
-						<img src="/img/icons/folder.png">
-					</div>
-					<div class="fldrname">
-						<p>DMS Design </p>
-					</div>
-					<div class="folder_links">
-						<button type="button" class="btn border-0" data-bs-toggle="dropdown" aria-expanded="false">
-							<i class="ti ti-dots"></i> </button>
-						<ul class="dropdown-menu">
-							<li><a class="dropdown-item" href="#"><i class="ti ti-eye"></i> View</a></li>
-							<li><a class="dropdown-item" href="#"><i class="ti ti-pencil-minus"></i> Rename</a></li>
-							<li><a class="dropdown-item" href="#" data-bs-toggle="modal"
-									data-bs-target="#sharedoc-modal">
-									<i class="ti ti-share"></i> Share</a>
-							</li>
-							<li><a class="dropdown-item" href="#" data-bs-toggle="modal"
-									data-bs-target="#versionhistory-modal">
-									<i class="ti ti-history"></i> Version History</a>
-							</li>
-							<li><a class="dropdown-item" href="#" data-bs-toggle="modal"
-									data-bs-target="#downloaddoc-modal">
-									<i class="ti ti-download"></i> Download</a>
-							</li>
-							<li><a class="dropdown-item" href="#" data-bs-toggle="modal"
-									data-bs-target="#trashdoc-modal">
-									<i class="ti ti-trash"></i> Move to Trash</a>
-							</li>
-							<li><a class="dropdown-item" href="#" data-bs-toggle="modal"
-									data-bs-target="#archivedoc-modal">
-									<i class="ti ti-archive"></i> Move to Archive</a>
-							</li>
-						</ul>
-					</div>
-				</div>
-
-				<div class="folderbox">
-					<div class="fldricon">
-						<img src="/img/icons/folder.png">
-					</div>
-					<div class="fldrname">
-						<p>New Folder 2</p>
-					</div>
-					<div class="folder_links">
-						<button type="button" class="btn border-0" data-bs-toggle="dropdown" aria-expanded="false">
-							<i class="ti ti-dots"></i> </button>
-						<ul class="dropdown-menu">
-							<li><a class="dropdown-item" href="#"><i class="ti ti-eye"></i> View</a></li>
-							<li><a class="dropdown-item" href="#"><i class="ti ti-pencil-minus"></i> Rename</a></li>
-							<li><a class="dropdown-item" href="#" data-bs-toggle="modal"
-									data-bs-target="#sharedoc-modal">
-									<i class="ti ti-share"></i> Share</a>
-							</li>
-							<li><a class="dropdown-item" href="#" data-bs-toggle="modal"
-									data-bs-target="#versionhistory-modal">
-									<i class="ti ti-history"></i> Version History</a>
-							</li>
-							<li><a class="dropdown-item" href="#" data-bs-toggle="modal"
-									data-bs-target="#downloaddoc-modal">
-									<i class="ti ti-download"></i> Download</a>
-							</li>
-							<li><a class="dropdown-item" href="#" data-bs-toggle="modal"
-									data-bs-target="#trashdoc-modal">
-									<i class="ti ti-trash"></i> Move to Trash</a>
-							</li>
-							<li><a class="dropdown-item" href="#" data-bs-toggle="modal"
-									data-bs-target="#archivedoc-modal">
-									<i class="ti ti-archive"></i> Move to Archive</a>
-							</li>
-						</ul>
-					</div>
-				</div>
-
-
-				<div class="folderbox">
-					<div class="fldricon">
-						<img src="/img/icons/folder.png">
-					</div>
-					<div class="fldrname">
-						<p>New Folder 3</p>
-					</div>
-					<div class="folder_links">
-						<button type="button" class="btn border-0" data-bs-toggle="dropdown" aria-expanded="false">
-							<i class="ti ti-dots"></i> </button>
-						<ul class="dropdown-menu">
-							<li><a class="dropdown-item" href="#"><i class="ti ti-eye"></i> View</a></li>
-							<li><a class="dropdown-item" href="#"><i class="ti ti-pencil-minus"></i> Rename</a></li>
-							<li><a class="dropdown-item" href="#" data-bs-toggle="modal"
-									data-bs-target="#sharedoc-modal">
-									<i class="ti ti-share"></i> Share</a>
-							</li>
-							<li><a class="dropdown-item" href="#" data-bs-toggle="modal"
-									data-bs-target="#versionhistory-modal">
-									<i class="ti ti-history"></i> Version History</a>
-							</li>
-							<li><a class="dropdown-item" href="#" data-bs-toggle="modal"
-									data-bs-target="#downloaddoc-modal">
-									<i class="ti ti-download"></i> Download</a>
-							</li>
-							<li><a class="dropdown-item" href="#" data-bs-toggle="modal"
-									data-bs-target="#trashdoc-modal">
-									<i class="ti ti-trash"></i> Move to Trash</a>
-							</li>
-							<li><a class="dropdown-item" href="#" data-bs-toggle="modal"
-									data-bs-target="#archivedoc-modal">
-									<i class="ti ti-archive"></i> Move to Archive</a>
-							</li>
-						</ul>
-					</div>
-				</div>
-
-
-
+			<!-- Folder Container -->
+			<div class="my-4 folderrow" id="folder-container">
+				<!-- Folders will be loaded dynamically -->
 			</div>
 		</div>
 
+		<!-- Footer -->
 		<div class="footer mt-4 d-sm-flex align-items-center justify-content-between border-top bg-white p-3">
 			<p class="mb-0">2025 &copy; HLFPPT.</p>
 			<p>Designed & Developed by <a href="javascript:void(0);" class="text-primary">Duplex services &
 					Technology</a></p>
 		</div>
-
 	</div>
-	<!-- /Page Wrapper -->
 
-	<%- include('../partials/footer') %>
+	<!-- Create Folder Modal -->
+	<%- include('../modals/addFolder') %>
+		<!-- Footer -->
+		<%- include('../partials/footer') %>
+			<script>
+				document.addEventListener("DOMContentLoaded", () => {
+					const folderContainer = document.getElementById("folder-container");
+					const folderModalEl = document.getElementById("folder-modal");
+					const folderModal = new bootstrap.Modal(folderModalEl);
+					const folderForm = document.getElementById("folderForm");
+					const folderNameInput = document.getElementById("folderName");
+					const folderModalTitle = document.getElementById("folder-modal-title");
+					const folderFormSubmit = document.getElementById("folderFormSubmit");
+					const trashConfirmBtn = document.getElementById("confirm-trash-folder");
+					const trashModalEl = document.getElementById("trashdoc-modal");
+					const archiveModalEl = document.getElementById("archivedoc-modal");
+					const archiveModal = new bootstrap.Modal(archiveModalEl);
+					const archiveConfirmBtn = archiveModalEl.querySelector("button[type='submit']");
+					const trashModal = bootstrap.Modal.getInstance(trashModalEl) || new bootstrap.Modal(trashModalEl);
+					let folderToArchiveId = null;
+					let editingFolderId = null; // Tracks folder being edited
 
+					// Render folder HTML
+					function folderHTML(folder) {
+						return `
+        <div class="folderbox" data-folder-id="${folder._id}">
+            <div class="fldricon"><img src="/img/icons/folder.png"></div>
+            <div class="fldrname"><p>${folder.name}</p></div>
+            <div class="folder_links">
+                <button type="button" class="btn border-0" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="ti ti-dots"></i>
+                </button>
+                <ul class="dropdown-menu" data-bs-auto-close="outside">
+                    <li><a class="dropdown-item" href="/folders/${folder._id}"><i class="ti ti-eye"></i> View</a></li>
+                    <li><a class="dropdown-item rename-folder" href="#"><i class="ti ti-pencil-minus"></i> Edit</a></li>
+                    <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#sharedoc-modal"><i class="ti ti-share"></i> Share</a></li>
+                    <li><a class="dropdown-item delete-folder" href="#" data-bs-toggle="modal" data-bs-target="#trashdoc-modal"><i class="ti ti-trash"></i> Move to Trash</a></li>
+                    <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#versionhistory-modal"><i class="ti ti-history"></i> Version History</a></li>
+                    <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#downloaddoc-modal"><i class="ti ti-download"></i> Download</a></li>
+                    <li><a class="dropdown-item archive-folder" href="#" data-bs-toggle="modal" data-bs-target="#archivedoc-modal"><i class="ti ti-archive"></i> Move to Archive</a></li>
+                </ul>
+            </div>
+        </div>`;
+					}
 
+					// Load all folders
+					async function loadFolders() {
+						try {
+							const res = await fetch("/api/folders/all");
+							const data = await res.json();
+							if (data.success && data.folders.length) {
+								folderContainer.innerHTML = data.folders.map(folder => folderHTML(folder)).join('');
+							} else {
+								folderContainer.innerHTML = "<p class='text-muted'>No folders found.</p>";
+							}
+						} catch (err) {
+							console.error("Error loading folders:", err);
+							folderContainer.innerHTML = "<p class='text-danger'>Error loading folders.</p>";
+						}
+					}
 
-		<!-- /Modal -->
+					// Open modal for adding folder (Create Folder button)
+					document.querySelectorAll(".btn-add-folder").forEach(btn => {
+						btn.addEventListener("click", () => {
+							editingFolderId = null;
+							folderModalTitle.textContent = "Add Folder";
+							folderFormSubmit.textContent = "Create";
+							folderForm.reset();
+							folderModal.show();
+						});
+					});
+
+					// Open modal for editing folder (from dropdown)
+					folderContainer.addEventListener("click", (e) => {
+						const btn = e.target.closest(".rename-folder");
+						if (!btn) return;
+
+						const folderBox = btn.closest(".folderbox");
+						editingFolderId = folderBox.dataset.folderId;
+						const currentName = folderBox.querySelector(".fldrname p").textContent;
+
+						folderModalTitle.textContent = "Edit Folder";
+						folderFormSubmit.textContent = "Save";
+						folderNameInput.value = currentName;
+
+						folderModal.show();
+					});
+
+					// Handle form submit (add or edit)
+					folderForm.addEventListener("submit", async (e) => {
+						e.preventDefault();
+						const name = folderNameInput.value.trim();
+						if (!name) return alert("Please enter a folder name");
+
+						try {
+							if (editingFolderId) {
+								// Edit folder
+								const res = await fetch(`/api/folders/${editingFolderId}/rename`, {
+									method: "PATCH",
+									headers: { "Content-Type": "application/json" },
+									body: JSON.stringify({ name })
+								});
+								const data = await res.json();
+								if (data.success) {
+									const folderBox = folderContainer.querySelector(`.folderbox[data-folder-id="${editingFolderId}"]`);
+									folderBox.querySelector(".fldrname p").textContent = name;
+									folderModal.hide();
+								} else {
+									showToast(data.message || "Error editing folder");
+								}
+							} else {
+								// Add folder
+								const res = await fetch("/api/folders", {
+									method: "POST",
+									headers: { "Content-Type": "application/json" },
+									body: JSON.stringify({ name })
+								});
+								const data = await res.json();
+								if (data.success) {
+									folderContainer.insertAdjacentHTML("beforeend", folderHTML(data.folder));
+									folderModal.hide();
+								} else {
+									showToast(data.message || "Error creating folder");
+								}
+							}
+						} catch (err) {
+							console.error(err);
+							showToast("Server error");
+						}
+					});
+					// Set folder ID when user clicks "Move to Trash" (this should be set elsewhere)
+					folderContainer.addEventListener("click", (e) => {
+						const btn = e.target.closest(".delete-folder");
+						if (!btn) return;
+
+						const folderBox = btn.closest(".folderbox");
+						folderToTrashId = folderBox.dataset.folderId;
+					});
+
+					// Call API and delete folder on confirmation
+					trashConfirmBtn.addEventListener("click", async () => {
+						if (!folderToTrashId) return;
+
+						try {
+							const res = await fetch(`/api/folders/${folderToTrashId}`, {
+								method: "DELETE"
+							});
+							const data = await res.json();
+
+							if (data.success) {
+								// Remove folder from DOM
+								const folderBox = folderContainer.querySelector(`.folderbox[data-folder-id="${folderToTrashId}"]`);
+								if (folderBox) folderBox.remove();
+
+								// Reset selected folder
+								folderToTrashId = null;
+
+								// ✅ Close the modal
+								trashModal.hide();
+							} else {
+								showToast(data.message || "Error deleting folder");
+							}
+						} catch (err) {
+							console.error(err);
+							showToast("Server error while deleting folder");
+						}
+					});
+
+					// When user clicks "Archive" in dropdown
+					folderContainer.addEventListener("click", (e) => {
+						const btn = e.target.closest(".archive-folder");
+						if (!btn) return;
+
+						const folderBox = btn.closest(".folderbox");
+						folderToArchiveId = folderBox.dataset.folderId;
+
+						// Update modal text if needed
+						const folderName = folderBox.querySelector(".fldrname p").textContent;
+						archiveModalEl.querySelector(".modal-body").textContent =
+							`Are you sure you want to archive "${folderName}"?`;
+
+						archiveModal.show();
+					});
+
+					// When user confirms archive
+					archiveConfirmBtn.addEventListener("click", async () => {
+						if (!folderToArchiveId) return;
+
+						try {
+							const res = await fetch(`/api/folders/${folderToArchiveId}/archive`, {
+								method: "PATCH"
+							});
+							const data = await res.json();
+
+							if (data.success) {
+								// Remove folder from active list
+								const folderBox = folderContainer.querySelector(`.folderbox[data-folder-id="${folderToArchiveId}"]`);
+								if (folderBox) folderBox.remove();
+
+								folderToArchiveId = null;
+								archiveModal.hide();
+								showToast(data.message);
+							} else {
+								showToast(data.message || "Error archiving folder");
+							}
+						} catch (err) {
+							console.error(err);
+							showToast("Server error while archiving folder");
+						}
+					});
+					// Initialize
+					loadFolders();
+				});
+			</script>

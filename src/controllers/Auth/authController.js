@@ -298,23 +298,54 @@ const otpStore = {};
 // ---------------------------
 export const register = async (req, res) => {
     try {
-        const { name, email, password, raw_password, role, department, position } = req.body;
+        const {
+            name,
+            email,
+            raw_password,
+            password,
+            profile_type = "user",
+            status = "Active",
+            phone_number,
+            address,
+            userDetails,
+            vendorDetails,
+            donorDetails
+        } = req.body;
 
-        if (!name || !email || !password) {
+        // Required fields
+        if (!name || !email || !raw_password) {
             return failResponse(res, "Name, email, and password are required", 400);
         }
 
+        // Check if user already exists
         const existingUser = await User.findOne({ email });
         if (existingUser) return failResponse(res, "User already exists with this email", 409);
 
-        const user = new User({ name, email, password, raw_password, role: role || "employee", department, position });
+        // Create user
+        const user = new User({
+            name,
+            email,
+            raw_password,
+            password,
+            profile_type,
+            status,
+            phone_number,
+            address,
+            userDetails: userDetails || undefined,
+            vendorDetails: vendorDetails || undefined,
+            donorDetails: donorDetails || undefined
+        });
+
         await user.save();
 
+        // Convert to object and remove sensitive fields
         const userResponse = user.toObject();
         delete userResponse.password;
+        delete userResponse.raw_password;
 
         return successResponse(res, userResponse, "User registered successfully", 201);
     } catch (err) {
+        console.error("Register error:", err);
         return errorResponse(res, err);
     }
 };
@@ -606,8 +637,8 @@ export const getProfile = async (req, res) => {
     try {
         const userId = req.user._id;
         const user = await User.findById(userId)
-            .populate("userDetails.designation")
-            .populate("userDetails.department")
+            .populate("userDetails.designation", "name") // populate only name
+            .populate("userDetails.department", "name")  // populate only name
             .lean();
 
         if (!user) {
@@ -621,14 +652,18 @@ export const getProfile = async (req, res) => {
     }
 };
 
+
 export const updateProfile = async (req, res) => {
     try {
         const userId = req.user._id;
-        const { name, email, phone_number, department } = req.body;
+        const { name, email, phone_number, department, designation, address } = req.body;
 
-        const updateFields = { name, email, phone_number };
+        // Include address in updateFields
+        const updateFields = { name, email, phone_number, address };
 
+        // Set department and designation if provided
         if (department) updateFields["userDetails.department"] = department;
+        if (designation) updateFields["userDetails.designation"] = designation;
         if (req.file) updateFields.profile_image = req.file.path; // store file path
 
         const updatedUser = await User.findByIdAndUpdate(
@@ -636,8 +671,8 @@ export const updateProfile = async (req, res) => {
             { $set: updateFields },
             { new: true }
         )
-            .populate("userDetails.designation")
-            .populate("userDetails.department")
+            .populate("userDetails.designation", "name")
+            .populate("userDetails.department", "name")
             .lean();
 
         res.json({ success: true, user: updatedUser });
@@ -646,5 +681,6 @@ export const updateProfile = async (req, res) => {
         res.status(500).json({ success: false, message: "Server Error" });
     }
 };
+
 
 

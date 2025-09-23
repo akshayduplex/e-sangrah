@@ -1,0 +1,116 @@
+<input type="hidden" id="userId" value="<%= user?._id %>">
+
+<div class="row">
+    <!-- Full Name -->
+    <div class="col-md-6 mb-3">
+        <label class="form-label">Full Name</label>
+        <% if (!viewOnly) { %>
+            <input type="text" id="name" class="form-control" value="<%= user?.name || '' %>">
+            <% } else { %>
+                <p id="name" class="form-control-plaintext">
+                    <%= user?.name %>
+                </p>
+                <% } %>
+    </div>
+
+    <!-- Email -->
+    <div class="col-md-6 mb-3">
+        <label class="form-label">Email</label>
+        <% if (!viewOnly) { %>
+            <input type="email" id="email" class="form-control" value="<%= user?.email %>" readonly>
+            <% } else { %>
+                <p id="email" class="form-control-plaintext">
+                    <%= user?.email %>
+                </p>
+                <% } %>
+    </div>
+
+    <!-- Phone Number -->
+    <div class="col-md-6 mb-3">
+        <label class="form-label">Phone Number</label>
+        <% if (!viewOnly) { %>
+            <input type="tel" id="phone_number" class="form-control" value="<%= user?.phone_number || '' %>"
+                oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,10)">
+            <% } else { %>
+                <p id="phone_number" class="form-control-plaintext">
+                    <%= user?.phone_number || '-' %>
+                </p>
+                <% } %>
+    </div>
+
+    <!-- Employee ID -->
+    <div class="col-md-6 mb-3">
+        <label class="form-label">Employee ID</label>
+        <% if (!viewOnly) { %>
+            <input type="text" id="employee_id" class="form-control" value="<%= user?.userDetails?.employee_id || '' %>"
+                oninput="this.value=this.value.toUpperCase()">
+            <% } else { %>
+                <p id="employee_id" class="form-control-plaintext">
+                    <%= user?.userDetails?.employee_id || '-' %>
+                </p>
+                <% } %>
+    </div>
+
+    <!-- Department -->
+    <div class="col-md-6 mb-3">
+        <label class="form-label">Department</label>
+        <% if (!viewOnly) { %>
+            <select id="department" class="form-select select2" required>
+                <option value="">-- Select Department --</option>
+                <% departments.forEach(dep=> { %>
+                    <option value="<%= dep._id %>"
+                        <%=(user?.userDetails?.department?._id?.toString()===dep._id.toString()) ? 'selected' : '' %>>
+                        <%= dep.name %>
+                    </option>
+                    <% }) %>
+            </select>
+            <% } else { %>
+                <p id="department" class="form-control-plaintext">
+                    <%= user?.userDetails?.department?.name || '-' %>
+                </p>
+                <% } %>
+    </div>
+
+    <!-- Designation -->
+    <div class="col-md-6 mb-3">
+        <label class="form-label">Designation</label>
+        <% if (!viewOnly) { %>
+            <select id="designation_id" class="form-select select2" required>
+                <option value="">-- Select Designation --</option>
+                <% designations.forEach(des=> { %>
+                    <option value="<%= des._id %>"
+                        <%=(user?.userDetails?.designation?._id?.toString()===des._id.toString()) ? 'selected' : '' %>>
+                        <%= des.name %>
+                    </option>
+                    <% }) %>
+            </select>
+            <% } else { %>
+                <p id="designation_id" class="form-control-plaintext">
+                    <%= user?.userDetails?.designation?.name || '-' %>
+                </p>
+                <% } %>
+    </div>
+
+
+    <!-- Status -->
+    <div class="col-md-6 mb-3">
+        <label class="form-label">Status</label>
+        <% if (!viewOnly) { %>
+            <select id="status" class="form-select">
+                <option value="Active" <%=user?.status==='Active' ? 'selected' : '' %>>Active</option>
+                <option value="Inactive" <%=user?.status==='Inactive' ? 'selected' : '' %>>Inactive</option>
+                <option value="Blocked" <%=user?.status==='Blocked' ? 'selected' : '' %>>Blocked</option>
+            </select>
+            <% } else { %>
+                <p id="status" class="form-control-plaintext">
+                    <%= user?.status %>
+                </p>
+                <% } %>
+    </div>
+</div>
+
+<% if (!viewOnly) { %>
+    <div class="d-flex align-items-center justify-content-end mt-4">
+        <button type="submit" class="btn btn-primary btn-w-lg rounded-pill">Update</button>
+    </div>
+    <% } %>

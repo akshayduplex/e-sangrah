@@ -71,6 +71,7 @@ const userSchema = new mongoose.Schema(
             trim: true,
         },
         phone_number: { type: Number, trim: true },
+        address: { type: String, trim: true },
         raw_password: {
             type: String,
             minlength: 8,

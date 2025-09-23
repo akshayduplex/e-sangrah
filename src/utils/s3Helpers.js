@@ -1,10 +1,11 @@
-import { PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { s3Client } from "../config/s3Client.js";
 
-export const putObject = async (fileBuffer, fileName, contentType) => {
+export const putObject = async (fileBuffer, fileName, contentType, folderName) => {
+    const s3Key = `folders/${folderName}/${fileName}`;
     const params = {
         Bucket: process.env.AWS_BUCKET,
-        Key: `file-temp-uploads/${fileName}`, // 👈 upload inside folder
+        Key: s3Key,
         Body: fileBuffer,
         ContentType: contentType,
     };
@@ -16,8 +17,9 @@ export const putObject = async (fileBuffer, fileName, contentType) => {
         throw new Error("S3 upload failed");
     }
 
-    const url = `${process.env.AWS_URL}file-temp-uploads/${fileName}`;
-    return { url, key: `file-temp-uploads/${fileName}` };
+    // URL should also reflect the folder name
+    const url = `${process.env.AWS_URL}${s3Key}`;
+    return { url, key: s3Key };
 };
 
 
@@ -36,3 +38,13 @@ export const deleteObject = async (key) => {
     return { status: 204 };
 };
 
+export const getObjectUrl = async (key, expiresIn = 300) => {
+    const command = new GetObjectCommand({
+        Bucket: process.env.AWS_BUCKET,
+        Key: key,
+    });
+
+    // Expires in 300 seconds (5 minutes) by default
+    const url = await getSignedUrl(s3Client, command, { expiresIn });
+    return url;
+};

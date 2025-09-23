@@ -8,12 +8,15 @@ import Designation from "../../models/Designation.js";
 import { formatDateDDMMYYYY } from "../../utils/formatDate.js";
 
 const router = express.Router();
+
+// Helper: format date as ISO YYYY-MM-DD
 function formatDateISO(date) {
     if (!date) return null;
     return new Date(date).toISOString().split("T")[0];
 }
-// Helper for Project Details Page
-async function renderProjectDetails(res, projectId = null) {
+
+// Helper: render Project Details page
+async function renderProjectDetails(res, projectId = null, userDetails) {
     try {
         const project = projectId
             ? await Project.findById(projectId)
@@ -32,12 +35,13 @@ async function renderProjectDetails(res, projectId = null) {
             project.projectStartDateISO = formatDateISO(project.projectStartDate);
             project.projectEndDateISO = formatDateISO(project.projectEndDate);
         }
+
         const [users, departments, donors, vendors, projectTypes] = await Promise.all([
             User.find({ profile_type: "user", status: "Active" }, "name").lean(),
             Department.find({ status: "Active" }, "name").lean(),
             User.find({ profile_type: "donor" }, "name").lean(),
             User.find({ profile_type: "vendor" }, "name").lean(),
-            ProjectType.find({ status: "Active", isActive: true }, "name")
+            ProjectType.find({ status: "Active", isActive: true }, "name").lean()
         ]);
 
         res.render("pages/projects/project-details", {
@@ -48,7 +52,7 @@ async function renderProjectDetails(res, projectId = null) {
             donors,
             vendors,
             projectTypes,
-            user: res.locals.user
+            user: userDetails
         });
     } catch (err) {
         console.error("Error loading project:", err);
@@ -60,12 +64,13 @@ async function renderProjectDetails(res, projectId = null) {
             donors: [],
             vendors: [],
             projectTypes: [],
+            user: userDetails,
             error: "Unable to load project details."
         });
     }
 }
 
-// Project list
+// Projects list page
 router.get("/list", authenticate, async (req, res) => {
     try {
         const designations = await Designation.find({ status: "Active" })
@@ -73,37 +78,42 @@ router.get("/list", authenticate, async (req, res) => {
             .lean();
 
         res.render("pages/projects/projectList", {
-            title: "E-Sangrah - Projects-List",
+            title: "E-Sangrah - Projects List",
             designations,
+            user: req.user
         });
     } catch (err) {
         console.error("Error loading project list:", err);
-        res.status(500).render("pages/error", { title: "Error", message: "Unable to load project list" });
+        res.status(500).render("pages/error", {
+            title: "Error",
+            message: "Unable to load project list"
+        });
     }
 });
 
-// Project details
-router.get("/details", authenticate, checkUserPermission, (req, res) =>
-    renderProjectDetails(res)
-);
+// Project details without ID
+router.get("/details", authenticate, checkUserPermission, async (req, res) => {
+    await renderProjectDetails(res, null, req.user);
+});
 
-router.get("/:id/details", authenticate, checkUserPermission, (req, res) =>
-    renderProjectDetails(res, req.params.id)
-);
+// Project details with ID
+router.get("/:id/details", authenticate, checkUserPermission, async (req, res) => {
+    await renderProjectDetails(res, req.params.id, req.user);
+});
 
-// Projects page
-router.get("/", authenticate, checkUserPermission, (req, res) => {
+// Main Projects page
+router.get("/", authenticate, checkUserPermission, async (req, res) => {
     try {
         res.render("pages/projects/projects", {
             user: req.user,
-            title: "E-Sangrah - ProjectList",
+            title: "E-Sangrah - Project List",
             messages: req.flash(),
         });
     } catch (err) {
         console.error("Error loading projects page:", err);
         res.render("pages/projects/projects", {
             user: req.user,
-            title: "E-Sangrah - ProjectList",
+            title: "E-Sangrah - Project List",
             messages: { error: "Unable to load projects" },
             projects: [],
         });

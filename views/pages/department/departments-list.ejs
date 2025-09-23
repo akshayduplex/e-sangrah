@@ -57,7 +57,7 @@
     </div>
 
     <!-- Delete Confirmation Modal -->
-    <%- include('../../models/deleteModal') %>
+    <%- include('../../modals/deleteModal') %>
         <%- include('../../partials/footer') %>
 
             <link href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" rel="stylesheet">
@@ -67,6 +67,7 @@
             <script>
                 $(document).ready(function () {
                     let deleteDeptId = null;
+                    let table;
 
                     // Fetch departments via API
                     $.ajax({
@@ -98,9 +99,11 @@
                     </tr>
                 `;
                             });
+
                             $('#departmentTableBody').html(tbody);
 
-                            $('#departmentTable').DataTable({
+                            // Initialize DataTable
+                            table = $('#departmentTable').DataTable({
                                 "columnDefs": [
                                     { "orderable": false, "targets": [0, 6] },
                                     { "orderable": true, "targets": [1, 2, 3, 4, 5] }
@@ -111,20 +114,14 @@
                         error: function (err) { console.error(err); }
                     });
 
-                    // Delete department
+                    // Open delete confirmation modal
                     $(document).on('click', '.btn-delete', function (e) {
                         e.preventDefault();
                         deleteDeptId = $(this).data('id');
                         $('#confirmDeleteModal').modal('show');
                     });
 
-                    // Delete department
-                    $(document).on('click', '.btn-delete', function (e) {
-                        e.preventDefault();
-                        deleteDeptId = $(this).data('id');
-                        $('#confirmDeleteModal').modal('show');
-                    });
-
+                    // Handle delete confirmation
                     $('#confirmDeleteBtn').click(function () {
                         if (!deleteDeptId) return;
 
@@ -136,7 +133,12 @@
 
                                 if (res.success) {
                                     showToast(res.message || 'Department deleted successfully!', 'success');
-                                    setTimeout(() => { window.location.href = '/departments/list'; }, 1000);
+
+                                    // Remove the row from DataTable
+                                    const row = $(`.btn-delete[data-id="${deleteDeptId}"]`).closest('tr');
+                                    table.row(row).remove().draw(false); // redraw table without page reload
+
+                                    deleteDeptId = null;
                                 } else {
                                     showToast(res.message || 'Failed to delete department', 'danger');
                                 }
@@ -151,4 +153,6 @@
                         });
                     });
                 });
+
+
             </script>

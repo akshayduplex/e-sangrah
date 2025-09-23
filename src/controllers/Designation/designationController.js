@@ -14,6 +14,33 @@ export const getAllDesignations = async (req, res) => {
     }
 };
 
+export const searchDesignations = async (req, res) => {
+    try {
+        const { search = '', page = 1, limit = 10 } = req.query;
+
+        const query = { status: "Active" };
+        if (search) {
+            query.name = { $regex: search, $options: 'i' }; // case-insensitive search
+        }
+
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+
+        const [data, total] = await Promise.all([
+            Designation.find(query).select('name priority').skip(skip).limit(parseInt(limit)).lean(),
+            Designation.countDocuments(query)
+        ]);
+
+        res.json({
+            success: true,
+            data,
+            pagination: {
+                more: skip + data.length < total // tells Select2 if more pages exist
+            }
+        });
+    } catch (err) {
+        return errorResponse(res, err);
+    }
+};
 // Get designation by ID
 export const getDesignationById = async (req, res) => {
     try {

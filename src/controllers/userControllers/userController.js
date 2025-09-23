@@ -139,6 +139,48 @@ export const getAllUsers = async (req, res) => {
     }
 };
 
+export const searchUsers = async (req, res) => {
+    try {
+        let { page = 1, limit = 10, search = "" } = req.query;
+
+        page = parseInt(page, 10);
+        limit = parseInt(limit, 10);
+
+        const filter = { profile_type: "user" }; // only users
+
+        // Search by name
+        if (search) {
+            filter.name = { $regex: search, $options: "i" }; // case-insensitive
+        }
+
+        // Fetch only name
+        const users = await User.find(filter)
+            .select('name') // only name field
+            .limit(limit)
+            .skip((page - 1) * limit)
+            .sort({ name: 1 }) // alphabetical
+            .lean();
+
+        const total = await User.countDocuments(filter);
+
+        res.status(200).json({
+            success: true,
+            message: "Users fetched successfully",
+            users,
+            pagination: {
+                total,
+                currentPage: page,
+                totalPages: Math.ceil(total / limit)
+            }
+        });
+    } catch (error) {
+        console.error("Get users error:", error);
+        res.status(500).json({
+            success: false,
+            message: "Internal server error",
+        });
+    }
+};
 
 // Get single user by ID
 export const getUserById = async (req, res) => {

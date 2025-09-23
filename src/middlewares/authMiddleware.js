@@ -117,9 +117,13 @@ export const authenticate = async (req, res, next) => {
 export const authorize = (...allowedProfiles) => {
     return (req, res, next) => {
         if (!req.session.user || !allowedProfiles.includes(req.session.user.profile_type)) {
-            return res.status(403).json({
-                success: false,
-                message: `Prifle Type : "${req.session?.user?.profile_type || "unknown"}" is not authorized`,
+            // return res.status(403).json({
+            //     success: false,
+            //     message: `Prifle Type : "${req.session?.user?.profile_type || "unknown"}" is not authorized`,
+            // });
+            return res.status(403).render('no-permission', {
+                title: '403 - Forbidden',
+                message: 'You don\'t have permission to access this resource.'
             });
         }
         next();

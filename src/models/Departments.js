@@ -6,7 +6,7 @@ const departmentSchema = new mongoose.Schema({
         required: true,
         trim: true,
         unique: true,
-        maxlength: 100
+        maxlength: 250
     },
     priority: {
         type: Number,

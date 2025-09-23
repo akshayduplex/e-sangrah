@@ -6,6 +6,7 @@ const router = express.Router();
 
 // Publicly exposed API routes
 router.get('/', departmentController.getAllDepartments);
+router.get('/search', departmentController.searchDepartments);
 router.get('/:id', authenticate, departmentController.getDepartmentById);
 
 // Admin-only routes (CRUD)

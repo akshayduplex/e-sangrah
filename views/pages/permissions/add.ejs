@@ -84,9 +84,9 @@
                                     </div>
                                     <div class="col-md-4">
                                         <label for="priority" class="form-label">Priority</label>
-                                        <input type="number" class="form-control" id="priority" name="priority"
+                                        <input type="text" class="form-control" id="priority" name="priority"
                                             placeholder="Enter Priority" value="<%= menu?.priority || 1 %>" required
-                                            min="1">
+                                            oninput="this.value = this.value.replace(/[^0-9]/g, '')" min="1">
                                     </div>
                                 </div>
 

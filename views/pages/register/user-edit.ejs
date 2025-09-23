@@ -67,12 +67,14 @@
                                 <select id="department" name="department" class="form-select select2" required>
                                     <option value="">-- Select Department --</option>
                                     <% departments.forEach(dep=> { %>
-                                        <option value="<%= dep._id %>" <%=user.userDetails?.department?._id==dep._id
+                                        <option value="<%= dep._id %>"
+                                            <%=user.userDetails?.department?._id?.toString()===dep._id.toString()
                                             ? "selected" : "" %>>
                                             <%= dep.name %>
                                         </option>
                                         <% }) %>
                                 </select>
+
                             </div>
                         </div>
 
@@ -83,7 +85,8 @@
                                 <select id="designation_id" name="designation_id" class="form-select select2" required>
                                     <option value="">-- Select Designation --</option>
                                     <% designations.forEach(des=> { %>
-                                        <option value="<%= des._id %>" <%=user.userDetails?.designation?._id==des._id
+                                        <option value="<%= des._id %>"
+                                            <%=user.userDetails?.designation?._id.toString()==des._id.toString()
                                             ? "selected" : "" %>>
                                             <%= des.name %>
                                         </option>

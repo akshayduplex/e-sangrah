@@ -45,8 +45,9 @@
                         <!-- Priority -->
                         <div class="col-md-3 mb-3">
                             <label for="priority" class="form-label">Priority</label>
-                            <input type="number" id="priority" name="priority" class="form-control"
-                                placeholder="Enter priority" value="<%= designation ? designation.priority : 0 %>">
+                            <input type="text" id="priority" name="priority" class="form-control"
+                                oninput="this.value = this.value.replace(/[^0-9]/g, '')" placeholder="Enter priority"
+                                value="<%= designation ? designation.priority : 0 %>">
                         </div>
 
                         <!-- Status -->

@@ -86,41 +86,41 @@
         <div class="header">
             <div class="main-header">
                 <div class="header-left">
-                    <a href="index.html" class="logo">
-                        <img src="/img/logo.png" alt="Logo">
+                    <a href="/" class="logo">
+                        <img src="/img/logo.png" alt="Company Logo">
                     </a>
-                    <a href="index.html" class="dark-logo">
-                        <img src="/img/logo-white.svg" alt="Logo">
+                    <a href="/" class="dark-logo">
+                        <img src="/img/logo-white.svg" alt="Company Logo (dark)">
                     </a>
                 </div>
 
                 <a id="mobile_btn" class="mobile_btn" href="#sidebar">
                     <span class="bar-icon">
-                        <span></span>
-                        <span></span>
-                        <span></span>
+                        <span></span><span></span><span></span>
                     </span>
                 </a>
 
                 <div class="header-user">
                     <div class="nav user-menu nav-list">
 
+                        <!-- Search -->
                         <div class="me-auto d-flex align-items-center" id="header-search">
                             <a id="toggle_btn" href="javascript:void(0);" class="btn btn-menubar me-1">
                                 <i class="ti ti-arrow-bar-to-left"></i>
                             </a>
-                            <!-- Search -->
-                            <div class="input-group d-inline-flex me-1">
-                                <input type="text" class="form-control" placeholder="Search by doc, tag, metadata..">
+                            <form action="/search" method="get" class="input-group d-inline-flex me-1">
+                                <input type="text" name="q" class="form-control"
+                                    placeholder="Search by doc, tag, metadata..">
                                 <span class="input-icon-addon">
                                     <i class="ti ti-search"></i>
                                 </span>
-                            </div>
-                            <!-- /Search -->
+                            </form>
                         </div>
+                        <!-- /Search -->
 
                         <div class="d-flex align-items-center">
 
+                            <!-- Notifications -->
                             <div class="me-1 notification_item">
                                 <a href="#" class="btn btn-menubar position-relative me-1" id="notification_popup"
                                     data-bs-toggle="dropdown">
@@ -130,59 +130,65 @@
                                 <div class="dropdown-menu dropdown-menu-end notification-dropdown p-4">
                                     <div
                                         class="d-flex align-items-center justify-content-between border-bottom p-0 pb-3 mb-3">
-                                        <h4 class="notification-title">Notifications (<span
-                                                id="notification_count">0</span>)</h4>
+                                        <!-- <h4 class="notification-title">
+                                            Notifications (<span id="notification_count">0</span>)
+                                        </h4> -->
                                         <a href="/notifications" class="fs-16">View All</a>
                                     </div>
                                     <div class="noti-content">
-                                        <div class="d-flex flex-column" id="notification_list">
-                                            <!-- Notifications will be injected here -->
-                                        </div>
+                                        <div class="d-flex flex-column" id="notification_list"></div>
                                     </div>
                                 </div>
                             </div>
+                            <!-- /Notifications -->
 
+                            <!-- Project Select -->
                             <div class="input-group d-inline-flex me-1">
-                                <select id="projectSelect" class="form-select" style="width: 200px;">
+                                <select id="projectSelect" class="form-select" style="width:200px;">
                                     <option></option>
                                 </select>
-                                <span class="input-icon-addon">
-                                    <i class="ti ti-search"></i>
-                                </span>
+                                <span class="input-icon-addon"><i class="ti ti-search"></i></span>
                             </div>
+                            <!-- /Project Select -->
+
+                            <!-- Upload Dropdown -->
                             <div class="dropdown me-1">
-                                <a href="#" class="btn sm_btnsite" data-bs-toggle="dropdown">Upload <i
-                                        class="ti ti-chevron-down"></i></a>
+                                <a href="#" class="btn sm_btnsite" data-bs-toggle="dropdown">
+                                    Upload <i class="ti ti-chevron-down"></i>
+                                </a>
                                 <div class="dropdown-menu dropdown-menu-end">
                                     <div class="card mb-0 border-0 shadow-none">
                                         <div class="card-body">
                                             <a href="/upload-folder" class="d-block pb-2">
                                                 <span class="avatar avatar-md bg-transparent-dark me-2">
-                                                    <i class="ti ti-folder-filled text-gray-9"></i></span>New Folder
+                                                    <i class="ti ti-folder-filled text-gray-9"></i>
+                                                </span>
+                                                New Folder
                                             </a>
-                                            <a href="/documents/add" class="d-block py-2">
-                                                Upload Document
-                                            </a>
-                                            <a href="#" class="d-block py-2">
-                                                Link
-                                            </a>
+                                            <a href="/documents/add" class="d-block py-2">Upload Document</a>
+                                            <a href="/links/add" class="d-block py-2">Link</a>
                                         </div>
                                     </div>
                                 </div>
                             </div>
+                            <!-- /Upload Dropdown -->
+
+                            <!-- Profile Dropdown -->
                             <div class="dropdown profile-dropdown">
                                 <a href="javascript:void(0);" class="dropdown-toggle d-flex align-items-center"
                                     data-bs-toggle="dropdown">
                                     <span class="avatar avatar-sm online">
-                                        <img src="<%= profile_image || '/img/profiles/avatar-12.jpg' %>" alt="img"
-                                            class="img-fluid rounded-circle">
+                                        <img src="<%= user.profile_image || '/img/profiles/avatar-12.jpg' %>"
+                                            alt="<%= name || 'User' %>" width="50" height="50"
+                                            style="object-fit: cover; border-radius: 50%;">
+
                                     </span>
                                     <span>
                                         <h5 class="mb-0">
-                                            <%=name %>
+                                            <%= name || "User" %>
                                         </h5>
                                         <p class="subtxt">
-                                            <%= profile_type %>
+                                            <%= profile_type || "Guest" %>
                                         </p>
                                     </span>
                                 </a>
@@ -191,14 +197,16 @@
                                         <div class="card-header">
                                             <div class="d-flex align-items-center">
                                                 <span class="avatar avatar-lg me-2 avatar-rounded">
-                                                    <img src="<%= profile_image || '/img/profiles/avatar-12.jpg' %>"
-                                                        alt="img">
+                                                    <img src="<%= user.profile_image || '/img/profiles/avatar-12.jpg' %>"
+                                                        alt="<%= name || 'User' %>" width="50" height="50"
+                                                        style="object-fit: cover; border-radius: 50%;">
+
                                                 </span>
                                                 <span>
                                                     <h5 class="mb-0">
                                                         <%= name || "User" %>
                                                     </h5>
-                                                    <p class=" subtxt">
+                                                    <p class="subtxt">
                                                         <%= profile_type || "Guest" %>
                                                     </p>
                                                 </span>
@@ -210,20 +218,20 @@
                                                 <i class="ti ti-user-circle me-1"></i>My Profile
                                             </a>
                                             <a class="dropdown-item d-inline-flex align-items-center p-0 py-2"
-                                                href="bussiness-settings.html">
+                                                href="/settings">
                                                 <i class="ti ti-settings me-1"></i>Settings
                                             </a>
                                             <a class="dropdown-item d-inline-flex align-items-center p-0 py-2"
                                                 href="/reset-password">
-                                                <i class="ti ti ti-lock-open me-1"></i>Reset Password
+                                                <i class="ti ti-lock-open me-1"></i>Reset Password
                                             </a>
                                             <a class="dropdown-item d-inline-flex align-items-center p-0 py-2"
-                                                href="knowledgebase.html">
+                                                href="/knowledgebase">
                                                 <i class="ti ti-question-mark me-1"></i>Knowledge Base
                                             </a>
                                         </div>
                                         <div class="card-footer">
-                                            <a id="logoutLink" href="#"
+                                            <a id="logoutLink" href="/logout"
                                                 class="dropdown-item d-inline-flex align-items-center p-0 py-2">
                                                 <i class="ti ti-login me-2"></i>Logout
                                             </a>
@@ -231,27 +239,26 @@
                                     </div>
                                 </div>
                             </div>
+                            <!-- /Profile Dropdown -->
                         </div>
                     </div>
                 </div>
 
                 <!-- Mobile Menu -->
                 <div class="dropdown mobile-user-menu">
-                    <a href="javascript:void(0);" class="nav-link dropdown-toggle" data-bs-toggle="dropdown"
-                        aria-expanded="false">
+                    <a href="javascript:void(0);" class="nav-link dropdown-toggle" data-bs-toggle="dropdown">
                         <i class="fa fa-ellipsis-v"></i>
                     </a>
                     <div class="dropdown-menu dropdown-menu-end">
                         <a class="dropdown-item" href="/my-profile">My Profile</a>
-                        <a class="dropdown-item" href="profile-settings.html">Settings</a>
+                        <a class="dropdown-item" href="/settings">Settings</a>
                         <a class="dropdown-item" href="/reset-password">Reset Password</a>
-                        <a class="dropdown-item" href="login.html">Logout</a>
+                        <a class="dropdown-item" href="/logout">Logout</a>
                     </div>
                 </div>
                 <!-- /Mobile Menu -->
 
             </div>
-
         </div>
         <!-- /Header -->
 
@@ -259,14 +266,14 @@
         <div class="sidebar" id="sidebar">
             <!-- Logo -->
             <div class="sidebar-logo">
-                <a href="index.html" class="logo logo-normal">
-                    <img src="/img/logo.png" alt="Logo">
+                <a href="/" class="logo logo-normal">
+                    <img src="/img/logo.png" alt="Company Logo">
                 </a>
-                <a href="index.html" class="logo-small">
-                    <img src="/img/logo-small.svg" alt="Logo">
+                <a href="/" class="logo-small">
+                    <img src="/img/logo-small.svg" alt="Company Small Logo">
                 </a>
-                <a href="index.html" class="dark-logo">
-                    <img src="/img/logo-white.svg" alt="Logo">
+                <a href="/" class="dark-logo">
+                    <img src="/img/logo-white.svg" alt="Company Dark Logo">
                 </a>
             </div>
             <!-- /Logo -->
@@ -279,9 +286,10 @@
         </div>
         <!-- /Sidebar -->
     </div>
+
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="/plugins/select2/js/select2.min.js"></script>
-    <script>
+    <!-- <script>
         $(document).ready(function () {
             const $notificationDot = $("#notification_dot");
             const $notificationCount = $("#notification_count");
@@ -390,7 +398,7 @@
             // Auto-refresh every 60 seconds
             setInterval(loadNotifications, 60000);
         });
-    </script>
+    </script> -->
 
     <script>
         $(document).ready(function () {

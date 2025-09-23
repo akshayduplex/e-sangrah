@@ -15,9 +15,8 @@
 					</nav>
 				</div>
 				<div class="rtbtn">
-					<a href="#" class="btn btn-primary btn-lg rounded-pill me-2 mb-2" data-bs-toggle="modal"
-						data-bs-target="#roleuser-modal">
-						<i class="ti ti-plus me-1"></i>Add Role User
+					<a href="/users/register" class="btn btn-primary btn-lg rounded-pill me-2 mb-2">
+						<i class="ti ti-plus me-1"></i>Add User
 					</a>
 				</div>
 			</div>
@@ -57,7 +56,6 @@
 										<th></th> <!-- Settings column -->
 										<th>Name</th>
 										<th>Email</th>
-										<th>Designation</th>
 										<th>Department</th>
 										<th>Created on</th>
 										<th>Assign Permission</th>
@@ -79,78 +77,14 @@
 		</div>
 	</div>
 
-	<!-- ✅ Role User Modal -->
-	<div id="roleuser-modal" class="modal fade" tabindex="-1" role="dialog" aria-hidden="true">
-		<div class="modal-dialog modal-dialog-centered modal-lg">
-			<div class="modal-content">
-				<div class="modal-header border-0 pb-0">
-					<h5 class="modal-title fw-medium fs-24 text-black">Add Role User</h5>
-					<button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-				</div>
-				<div class="modal-body pt-0">
-					<form class="row mt-4 px-3" action="#">
-						<div class="col-sm-6 mb-3">
-							<label for="username" class="form-label">Name</label>
-							<input class="form-control" type="text" id="username" required placeholder="Enter name">
-						</div>
-						<div class="col-sm-6 mb-3">
-							<label for="userType" class="form-label">Choose User Type</label>
-							<select id="userType" class="form-select">
-								<% profile_type.forEach(type=> { %>
-									<option value="<%= type %>">
-										<%= type.charAt(0).toUpperCase() + type.slice(1).toLowerCase() %>
-									</option>
-									<% }) %>
-							</select>
-						</div>
-						<div class="col-sm-6 mb-3">
-							<label class="form-label">Designation</label>
-							<select id="designation" name="designation" class="form-select select2" required>
-								<option value="">-- Select Designation --</option>
-								<% if (designations && designations.length) { %>
-									<% designations.forEach(des=> { %>
-										<option value="<%= des._id %>">
-											<%= des.name %>
-										</option>
-										<% }) %>
-											<% } else { %>
-												<option disabled>No designations available</option>
-												<% } %>
-							</select>
-						</div>
-						<div class="col-sm-6 mb-3">
-							<label class="form-label">Department</label>
-							<select id="department" name="department" class="form-select select2" required>
-								<option value="">-- Select Department --</option>
-								<% if (departments && departments.length) { %>
-									<% departments.forEach(dep=> { %>
-										<option value="<%= dep._id %>">
-											<%= dep.name %>
-										</option>
-										<% }) %>
-											<% } else { %>
-												<option disabled>No departments available</option>
-												<% } %>
-							</select>
-						</div>
-						<div class="col-sm-6 mb-3">
-							<button class="btn btn-primary rounded-pill px-4" type="submit">Save</button>
-						</div>
-					</form>
-				</div>
-			</div>
-		</div>
-	</div>
-
 	<%- include('../../partials/footer') %>
 		<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css" />
 		<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 		<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
-		<script>
-			$(document).ready(function () {
-				// ✅ Default role = "user"
+		<script>$(document).ready(function () {
+				// Default role = "user"
 				let selectedRole = "user";
-				$("#roleFilter").val("user"); // preselect dropdown
+				$("#roleFilter").val(selectedRole); // preselect dropdown
 
 				const table = $('#usersTable').DataTable({
 					processing: true,
@@ -165,23 +99,28 @@
 					columns: [
 						{
 							data: "_id",
+							orderable: false,
 							render: function (id) {
 								return `
-							<div class="btn-group" role="group">
-								<button type="button" class="btn border-0" data-bs-toggle="dropdown" aria-expanded="false">
-									<i class="ti ti-settings"></i>
-								</button>
-								<ul class="dropdown-menu">
-									<li><a class="dropdown-item" href="/user/${id}"><i class="ti ti-eye"></i> View</a></li>
-									<li><a class="dropdown-item" href="/user/edit/${id}"><i class="ti ti-pencil-minus"></i> Edit</a></li>
-								</ul>
-							</div>`;
+                    <div class="btn-group" role="group">
+                        <button type="button" class="btn border-0" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="ti ti-settings"></i>
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="/users/view/${id}"><i class="ti ti-eye"></i> View</a></li>
+                            <li><a class="dropdown-item" href="/users/edit/${id}"><i class="ti ti-pencil-minus"></i> Edit</a></li>
+                        </ul>
+                    </div>`;
 							}
 						},
-						{ data: "name" },
-						{ data: "email" },
-						{ data: "userDetails.designation.name", defaultContent: "-" },
-						{ data: "userDetails.department.name", defaultContent: "-" },
+						{ data: "name", defaultContent: "-" },
+						{ data: "email", defaultContent: "-" },
+						{
+							data: "userDetails",
+							render: function (ud) {
+								return ud && ud.department ? ud.department.name : "-";
+							}
+						},
 						{
 							data: "createdAt",
 							render: function (data) {
@@ -195,6 +134,7 @@
 						},
 						{
 							data: "_id",
+							orderable: false,
 							render: function (id) {
 								return `<a href="/user-permissions/${id}" class="btn btn-sm btn-primary">Assign</a>`;
 							}
@@ -202,7 +142,7 @@
 					]
 				});
 
-				// ✅ Role filter change event
+				// Role filter change event
 				$("#roleFilter").on("change", function () {
 					selectedRole = $(this).val() || "user";
 					table.ajax.url(`/api/user?profile_type=${selectedRole}`).load();

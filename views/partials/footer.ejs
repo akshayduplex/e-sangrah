@@ -431,6 +431,7 @@
 <script> const BASE_URL = "<%= BASE_URL %>";</script>
 <script src="/js/todo.js"></script>
 <script src="/js/toast.js"></script>
+<script src="/js/components/formatDate.js"></script>
 <script src="/js/components/notification.js"></script>
 <script src="/js/theme-colorpicker.js"></script>
 <script src="/js/script.js"></script>
@@ -686,10 +687,11 @@
 <div class="modal fade" id="downloaddoc-modal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content" style="border-radius:20px;">
+
             <!-- Header -->
             <div class="modal-header border-0">
-                <h5 class="modal-title fw-medium fs-24 text-black">
-                    Download: Word Document.docx
+                <h5 class="modal-title fw-medium fs-24 text-black" id="downloadModalTitle">
+                    Download File
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
@@ -697,29 +699,32 @@
             <!-- Body -->
             <div class="modal-body">
                 <div class="border rounded-3 p-3 d-flex">
+
                     <!-- File Icon -->
                     <span class="avatar avatar-xxxl rounded bg-light mb-2 p-2 me-4">
-                        <img src="/img/icons/fn2big.png">
+                        <img src="/img/icons/fn2big.png" id="downloadFileIcon">
                     </span>
 
                     <!-- File Info -->
                     <div class="flex-grow-1">
                         <div class="form-check mb-3">
                             <input class="form-check-input" type="radio" name="fileOption" id="originalFile" checked>
-                            <label class="form-check-label" for="originalFile">
-                                Original File <span class="text-muted d-block">(250KB)</span>
+                            <label class="form-check-label" for="originalFile" id="downloadFileLabel">
+                                Original File <span class="text-muted d-block" id="downloadFileSize">(—)</span>
                             </label>
                         </div>
-                        <button class="btn btn-primary px-4 fw-normal rounded-pill">
+                        <button id="confirmDownload" class="btn btn-primary px-4 fw-normal rounded-pill">
                             Download
                         </button>
                     </div>
+
                 </div>
             </div>
 
         </div>
     </div>
 </div>
+
 
 <!-- Thrashdoc modal -->
 
@@ -729,7 +734,7 @@
             <!-- Header -->
             <div class="modal-header border-0 pb-0">
                 <h5 class="modal-title fw-bold" id="trashdocLabel">
-                    <img class="" src="/img/icons/bin.png"> <br>
+                    <img src="/img/icons/bin.png"> <br>
                     Move to Recycle Bin
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -743,11 +748,13 @@
             <!-- Footer -->
             <div class="modal-footer border-0">
                 <button type="button" class="btn btn-light px-4 rounded-pill" data-bs-dismiss="modal">Cancel</button>
-                <button type="submit" class="btn btn-primary px-4 rounded-pill">Yes, Move</button>
+                <button type="button" id="confirm-trash-folder" class="btn btn-primary px-4 rounded-pill">Yes,
+                    Move</button>
             </div>
         </div>
     </div>
 </div>
+
 
 <!-- Archivedoc modal -->
 
@@ -787,10 +794,10 @@
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             <div class="modal-body">
                 <h5>Folder Name</h5>
-                <form class="mt-4 px-3" action="#">
+                <form id="createFolderForm" class="mt-4 px-3">
                     <div class="mb-3">
-                        <label for="username" class="form-label">Folder Name</label>
-                        <input class="form-control" type="text" id="username" required=""
+                        <label for="folderName" class="form-label">Folder Name</label>
+                        <input class="form-control" type="text" id="folderName" name="name" required
                             placeholder="Enter Folder Name">
                     </div>
                     <div class="mb-3 text-center">
@@ -802,6 +809,88 @@
     </div>
 </div>
 <!-- /Modal -->
+<!-- <script>
+    document.getElementById("createFolderForm").addEventListener("submit", async function (e) {
+        e.preventDefault();
+
+        const folderName = document.getElementById("folderName").value.trim();
+        if (!folderName) {
+            alert("Please enter a folder name");
+            return;
+        }
+
+        try {
+            const res = await fetch("/api/folders", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ name: folderName })
+            });
+
+            const data = await res.json();
+
+            if (data.success) {
+                // ✅ Close modal
+                const modalEl = document.getElementById("folder-modal");
+                const modal = bootstrap.Modal.getInstance(modalEl);
+                modal.hide();
+
+                // ✅ Reset form
+                e.target.reset();
+
+                // ✅ Add new folder dynamically to the folder list
+                const folderRow = document.querySelector(".folderrow");
+                const newFolder = document.createElement("div");
+                newFolder.classList.add("folderbox");
+                newFolder.innerHTML = `
+                <div class="fldricon">
+                    <img src="/img/icons/folder.png">
+                </div>
+                <div class="fldrname">
+                    <p>${data.folder.name}</p>
+                </div>
+                <div class="folder_links">
+<button type="button" class="btn border-0" data-bs-toggle="dropdown" aria-expanded="false">
+							<i class="ti ti-dots"></i> </button>
+						<ul class="dropdown-menu">
+							<li><a class="dropdown-item" href="#"><i class="ti ti-eye"></i> View</a></li>
+							<li><a class="dropdown-item" href="#"><i class="ti ti-pencil-minus"></i> Rename</a></li>
+							<li><a class="dropdown-item" href="#" data-bs-toggle="modal"
+									data-bs-target="#sharedoc-modal">
+									<i class="ti ti-share"></i> Share</a>
+							</li>
+							<li><a class="dropdown-item" href="#" data-bs-toggle="modal"
+									data-bs-target="#versionhistory-modal">
+									<i class="ti ti-history"></i> Version History</a>
+							</li>
+							<li><a class="dropdown-item" href="#" data-bs-toggle="modal"
+									data-bs-target="#downloaddoc-modal">
+									<i class="ti ti-download"></i> Download</a>
+							</li>
+							<li><a class="dropdown-item" href="#" data-bs-toggle="modal"
+									data-bs-target="#trashdoc-modal">
+									<i class="ti ti-trash"></i> Move to Trash</a>
+							</li>
+							<li><a class="dropdown-item" href="#" data-bs-toggle="modal"
+									data-bs-target="#archivedoc-modal">
+									<i class="ti ti-archive"></i> Move to Archive</a>
+							</li>
+						</ul>
+                </div>
+            `;
+
+                folderRow.appendChild(newFolder);
+
+            } else {
+                alert(data.message || "Error creating folder");
+            }
+        } catch (err) {
+            console.error("Create folder error:", err);
+            alert("Server error while creating folder");
+        }
+    });
+</script> -->
 
 <script>
     document.querySelectorAll('input[name="time"]').forEach(radio => {

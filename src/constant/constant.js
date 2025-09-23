@@ -29,4 +29,4 @@ export const FILTER_PERIODS = {
     YEARLY: "yearly"
 };
 
-export const profile_type = ["donor", "vendor", "user", "admin", "superadmin"]
+export const profile_type = ["user"]

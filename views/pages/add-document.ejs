@@ -59,43 +59,17 @@
 											<label class="form-label">Department <span
 													class="text-danger">*</span></label>
 											<select id="department" name="department" class="form-select select2"
-												required>
-												<option value="">-- Select Department --</option>
-												<% if (departments && departments.length) { %>
-													<% departments.forEach(dep=> { %>
-														<option value="<%= dep._id %>" <%=isEdit && document.department
-															&& document.department.toString()===dep._id.toString()
-															? "selected" : "" %>>
-															<%= dep.name %>
-														</option>
-														<% }) %>
-															<% } else { %>
-																<option disabled>No departments available</option>
-																<% } %>
-											</select>
+												required></select>
 										</div>
 									</div>
+
 
 									<!-- Project Manager -->
 									<div class="col-md-4">
 										<div class="mb-3">
 											<label class="form-label">Project Manager</label>
 											<select id="projectManager" name="projectManager"
-												class="form-select select2" required>
-												<option value="">-- Select Project Manager --</option>
-												<% if (users && users.length) { %>
-													<% users.forEach(user=> { %>
-														<option value="<%= user._id %>" <%=isEdit &&
-															document.projectManager &&
-															document.projectManager.toString()===user._id.toString()
-															? "selected" : "" %>>
-															<%= user.name %>
-														</option>
-														<% }) %>
-															<% } else { %>
-																<option disabled>No users available</option>
-																<% } %>
-											</select>
+												class="form-select select2" required></select>
 										</div>
 									</div>
 
@@ -161,13 +135,13 @@
 												<div class="form-check">
 													<input class="form-check-input" type="radio" name="compliance"
 														value="yes" id="complianceYes" <%=isEdit &&
-														document.compliance==='yes' ? 'checked' : '' %>>
+														document.compliance?.isCompliance ? 'checked' : '' %>>
 													<label class="form-check-label" for="complianceYes">Yes</label>
 												</div>
 												<div class="form-check">
 													<input class="form-check-input" type="radio" name="compliance"
-														id="complianceNo" value="no" <%=!isEdit ||
-														document.compliance==='no' ? 'checked' : '' %>>
+														value="no" id="complianceNo" <%=isEdit &&
+														!document.compliance?.isCompliance ? 'checked' : '' %>>
 													<label class="form-check-label" for="complianceNo">No</label>
 												</div>
 											</div>
@@ -183,8 +157,10 @@
 												<div class="input-icon-end position-relative">
 													<input type="text" class="form-control datetimepicker"
 														name="expiryDate" placeholder="dd/mm/yyyy"
-														value="<%= isEdit && document.expiryDate ? new Date(document.expiryDate).toLocaleDateString('en-GB') : '' %>"
-														<%=isEdit && document.compliance==='yes' ? 'required' : '' %>>
+														value="<%= isEdit && document.compliance?.expiryDate ? new Date(document.compliance.expiryDate).toLocaleDateString('en-GB') : '' %>"
+														<%=isEdit && document.compliance?.isCompliance ? 'required' : ''
+														%>>
+
 													<span class="input-icon-addon"><i
 															class="ti ti-calendar text-gray-7"></i></span>
 												</div>
@@ -198,6 +174,15 @@
 											<label class="form-label">Leave a comment (Optional)</label>
 											<input type="text" class="form-control" name="comment"
 												value="<%= isEdit && document.comment ? document.comment : '' %>">
+										</div>
+									</div>
+
+									<!-- Display Directory Path -->
+									<div class="mb-2" id="uploadDirectoryWrapper">
+										<h6 class="mb-1" style="font-weight: 600; color: #333;">Directory</h6>
+										<div id="uploadDirectoryPath" class="text-truncate"
+											style="font-size: 0.9rem; color: #555; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+											<!-- will be filled dynamically -->
 										</div>
 									</div>
 
@@ -217,12 +202,13 @@
 											<div class="crtfoldr_row text-center my-4">
 												<span class="pe-3">or</span>
 												<button type="button" class="btn btn-primary rounded-pill"
-													data-bs-toggle="modal" data-bs-target="#folder-modal">Create
+													data-bs-toggle="modal" data-bs-target="#folder-modal"
+													id="createFolderBtn" disabled>Create
 													Folder</button>
 											</div>
 											<% } %>
 
-												<div id="fileList">
+												<!-- <div id="fileList">
 													<% if (isEdit && document.files && document.files.length) { %>
 														<% document.files.forEach(file=> { %>
 															<div class="file-item col-sm-5 mb-3 p-3 border rounded"
@@ -258,27 +244,87 @@
 															</div>
 															<% }) %>
 																<% } %>
+												</div> -->
+												<div id="fileList">
+													<% if (isEdit && document.files && document.files.length) { %>
+														<% document.files.forEach(file=> { %>
+															<div class="file-item col-sm-5 mb-3 p-3 border rounded"
+																data-file-id="<%= file._id %>">
+																<div class="file-info d-flex align-items-center">
+																	<i class="fa-solid fa-file fa-2x me-3"></i>
+																	<div class="flex-grow-1">
+																		<h6 class="mb-0 text-truncate">
+																			<%= file.originalName || "Unnamed file" %>
+																		</h6>
+																	</div>
+																</div>
+																<a href="<%= file.file %>" target="_blank"
+																	class="btn btn-sm btn-info mt-2 me-2">
+																	<i class="fa-solid fa-eye"></i> View
+																</a>
+																<button class="remove-btn btn btn-sm btn-danger mt-2"
+																	data-file-id="<%= file._id %>">
+																	<i class="fa-solid fa-xmark"></i> Remove
+																</button>
+															</div>
+															<% }) %>
+																<% } %>
 												</div>
+
 									</div>
 
 									<!-- Signature -->
 									<div class="col-md-12">
 										<label class="form-label">Add Your Signature</label>
 										<div class="signtrboxwrp mb-3">
-											<div class="signbox form-control" id="signaturePreview">
-												<% if (isEdit && document.signature) { %>
-													<img src="<%= document.signature %>" alt="Signature"
+											<div class="signbox form-control" id="signaturePreview" style="width:70%;">
+												<% if (isEdit && document.signature?.fileUrl) { %>
+													<img src="<%= document.signature.fileUrl %>" alt="Signature"
 														style="max-height:100%; max-width:100%; object-fit:contain;">
 													<% } %>
+
 											</div>
-											<div class="signupld">
+											<div class="signupld d-flex gap-2">
+												<!-- Upload from system -->
 												<input type="file" class="form-control d-none" id="fileSign"
-													name="signature" accept="image/*">
+													name="signatureFile" accept="image/*">
 												<button type="button" class="btn btn-primary rounded-pill"
 													id="uploadSignBtn">
 													<%= isEdit && document.signature ? 'Update Signature'
 														: 'Browse from system' %>
 												</button>
+
+												<!-- Open canvas modal -->
+												<button type="button" class="btn btn-secondary rounded-pill"
+													id="drawSignBtn">
+													Draw Signature
+												</button>
+											</div>
+											<input type="hidden" name="signature" id="signatureData">
+										</div>
+									</div>
+
+									<!-- Signature Modal -->
+									<div class="modal fade" id="signatureModal" tabindex="-1">
+										<div class="modal-dialog modal-dialog-centered">
+											<div class="modal-content">
+												<div class="modal-header">
+													<h5 class="modal-title">Draw Signature</h5>
+													<button type="button" class="btn-close"
+														data-bs-dismiss="modal"></button>
+												</div>
+												<div class="modal-body text-center">
+													<canvas id="sigCanvas"
+														style="border:1px solid #ccc; width:100%; height:200px;"></canvas>
+												</div>
+												<div class="modal-footer">
+													<button type="button" class="btn btn-warning"
+														id="undoSignBtn">Undo</button>
+													<button type="button" class="btn btn-danger"
+														id="clearSignBtn">Clear</button>
+													<button type="button" class="btn btn-success"
+														id="saveSignBtn">Save</button>
+												</div>
 											</div>
 										</div>
 									</div>
@@ -381,12 +427,33 @@
 			</div>
 		</div>
 		<!-- /Success Modal -->
+		<div class="modal fade" id="signatureModal" tabindex="-1" aria-hidden="true">
+			<div class="modal-dialog modal-dialog-centered">
+				<div class="modal-content p-3">
+					<div class="modal-header">
+						<h5 class="modal-title">Draw Your Signature</h5>
+						<button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+					</div>
+					<div class="modal-body">
+						<div class="canvas-wrap"
+							style="border:1px solid #ccc; border-radius:8px; height:200px; position:relative;">
+							<canvas id="sigCanvas" style="width:100%; height:100%; touch-action:none;"></canvas>
+						</div>
+						<div class="mt-2 text-end">
+							<button type="button" id="undoSignBtn" class="btn btn-secondary btn-sm">Undo</button>
+							<button type="button" id="clearSignBtn" class="btn btn-secondary btn-sm">Clear</button>
+							<button type="button" id="saveSignBtn" class="btn btn-primary btn-sm">Save</button>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
 
 		<script>
 			// EJS variables converted to JS
 			const isEdit = <%= isEdit ? 'true' : 'false' %>;
 			const documentId = "<%= isEdit && document ? document._id : '' %>";
-
+			window.selectedFolders = [];
 			// Store uploaded file IDs
 			let uploadedFileIds = [];
 
@@ -442,6 +509,22 @@
 					$('#metadataDisplay').val(metadata.fileName + ' - ' + metadata.fileDescription);
 					$('#metadata-modal').modal('hide');
 				});
+				function toggleCreateFolderBtn() {
+					const projectSelected = !!$('#projectName').val();
+					const departmentSelected = !!$('#department').val();
+					$('#createFolderBtn').prop('disabled', !(projectSelected && departmentSelected));
+				}
+
+				function addFolder(folderName) {
+					window.selectedFolders.push(folderName);
+					updateDirectoryPath();
+				}
+				// Run on page load
+				toggleCreateFolderBtn();
+
+				// Run whenever either Project Name or Department changes
+				$('#projectName, #department').on('change select2:select select2:clear', toggleCreateFolderBtn);
+
 
 				// --------------------------
 				// File upload handling
@@ -491,22 +574,22 @@
 					else if (file.type.includes("sheet") || file.name.endsWith(".xls") || file.name.endsWith(".xlsx")) iconClass = "fa-file-excel text-success";
 
 					fileItem.innerHTML = `
-					<div class="file-info d-flex align-items-center">
-						<i class="fa-solid ${iconClass} fa-2x me-3"></i>
-						<div class="flex-grow-1">
-							<h6 class="mb-0 text-truncate">${file.name}</h6>
-							<small class="text-muted">${(file.size / 1024 / 1024).toFixed(2)} MB</small>
-						</div>
-					</div>
-					<div class="file-progress mt-2">
-						<div class="progress">
-							<div class="progress-bar bg-success" role="progressbar" style="width: 0%">0%</div>
-						</div>
-					</div>
-					<button class="remove-btn btn btn-sm btn-danger mt-2" data-fileid="${fileId}">
-						<i class="fa-solid fa-xmark"></i> Remove
-					</button>
-				`;
+        <div class="file-info d-flex align-items-center">
+          <i class="fa-solid ${iconClass} fa-2x me-3"></i>
+          <div class="flex-grow-1">
+            <h6 class="mb-0 text-truncate">${file.name}</h6>
+            <small class="text-muted">${(file.size / 1024 / 1024).toFixed(2)} MB</small>
+          </div>
+        </div>
+        <div class="file-progress mt-2">
+          <div class="progress">
+            <div class="progress-bar bg-success" role="progressbar" style="width: 0%">0%</div>
+          </div>
+        </div>
+        <button class="remove-btn btn btn-sm btn-danger mt-2" data-fileid="${fileId}">
+          <i class="fa-solid fa-xmark"></i> Remove
+        </button>
+      `;
 					fileList.appendChild(fileItem);
 
 					const progressBar = fileItem.querySelector(".progress-bar");
@@ -548,6 +631,67 @@
 					});
 				}
 
+				$('#projectManager').select2({
+					placeholder: '-- Select Project Manager --',
+					allowClear: true,
+					ajax: {
+						url: '/api/user/search', // your API endpoint
+						dataType: 'json',
+						delay: 250, // debounce
+						data: function (params) {
+							return {
+								search: params.term || '', // search term
+								page: params.page || 1,
+								limit: 10,
+								profile_type: 'user' // only users
+							};
+						},
+						processResults: function (data, params) {
+							params.page = params.page || 1;
+							return {
+								results: data.users.map(u => ({
+									id: u._id,
+									text: u.name
+								})),
+								pagination: { more: params.page * 10 < data.pagination.total } // infinite scroll
+							};
+						},
+						cache: true
+					},
+					minimumInputLength: 0 // show first 10 results immediately
+				});
+
+
+				$('#department').select2({
+					placeholder: '-- Select Department --',
+					allowClear: true,
+					ajax: {
+						url: '/api/departments/search', // your API endpoint
+						dataType: 'json',
+						delay: 250, // debounce
+						data: function (params) {
+							return {
+								search: params.term || '', // search term typed by user
+								page: params.page || 1,    // page number
+								limit: 10                   // items per request
+							};
+						},
+						processResults: function (data, params) {
+							params.page = params.page || 1;
+
+							return {
+								results: data.data.map(dep => ({
+									id: dep._id,
+									text: dep.name
+								})),
+								pagination: { more: data.pagination.more }
+							};
+						},
+						cache: true
+					},
+					minimumInputLength: 0 // show initial 10 results on click
+				});
+
 				// Remove existing files in edit mode
 				document.querySelectorAll('.remove-btn[data-file-id]').forEach(btn => {
 					btn.addEventListener('click', function () {
@@ -559,26 +703,118 @@
 							.catch(err => { console.error(err); alert('Error deleting file'); });
 					});
 				});
+				function updateDirectoryPath() {
+					const projectText = $('#projectName option:selected').text();
+					const departmentText = $('#department option:selected').text();
+					const folders = window.selectedFolders || [];
+
+					// Function to remove spaces from text
+					const sanitize = text => text.replace(/\s+/g, '');
+
+					// Start with base URL as first segment
+					let segments = [BASE_URL];
+					if (projectText && projectText !== '-- Select Project Name --') segments.push(sanitize(projectText));
+					if (departmentText && departmentText !== '-- Select Department --') segments.push(sanitize(departmentText));
+					segments.push(...folders.map(sanitize)); // sanitize folder names too
+
+					// Build real links
+					let path = '';
+					const breadcrumb = segments.map((seg, i) => {
+						path += (i === 0 ? seg : '/' + seg); // first segment = baseURL, no extra slash
+						return `<a href="${path}" class="dir-link">${i === 0 ? seg + '' : '/' + seg}</a>`;
+					}).join(' ');
+
+					$('#uploadDirectoryPath').html(breadcrumb);
+				}
+
+				// Call on page load and on select change
+				updateDirectoryPath();
+				$('#projectName, #department').on('change select2:select select2:clear', updateDirectoryPath);
 
 				// --------------------------
-				// Signature upload
+				// Signature handling (Upload + Draw)
 				// --------------------------
 				const fileSign = document.getElementById('fileSign');
 				const uploadSignBtn = document.getElementById('uploadSignBtn');
+				const drawSignBtn = document.getElementById('drawSignBtn');
 				const signaturePreview = document.getElementById('signaturePreview');
+				const signatureData = document.getElementById('signatureData');
 
+				// 1. Upload signature from system
 				uploadSignBtn.addEventListener('click', () => fileSign.click());
-
 				fileSign.addEventListener('change', function () {
 					if (this.files && this.files[0]) {
 						const reader = new FileReader();
 						reader.onload = function (e) {
-							signaturePreview.innerHTML = `<img src="${e.target.result}" alt="Signature Preview" style="max-height:100%; max-width:100%; object-fit:contain;">`;
+							signaturePreview.innerHTML = `<img src="${e.target.result}" alt="Signature" style="max-height:100%; max-width:100%; object-fit:contain;">`;
+							signatureData.value = e.target.result; // save base64
 							uploadSignBtn.textContent = "Update Signature";
 						};
 						reader.readAsDataURL(this.files[0]);
 					}
 				});
+
+				// 2. Draw signature on canvas
+				const modalEl = document.getElementById('signatureModal');
+				const modal = new bootstrap.Modal(modalEl);
+				const canvas = document.getElementById('sigCanvas');
+				const ctx = canvas.getContext('2d');
+				let drawing = false, paths = [], currentPath = [];
+
+				function resizeCanvas() {
+					canvas.width = canvas.offsetWidth;
+					canvas.height = canvas.offsetHeight;
+					redraw();
+				}
+				function redraw() {
+					ctx.clearRect(0, 0, canvas.width, canvas.height);
+					ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+					ctx.lineWidth = 2; ctx.strokeStyle = '#000';
+					paths.forEach(path => {
+						ctx.beginPath();
+						ctx.moveTo(path[0].x, path[0].y);
+						path.forEach(p => ctx.lineTo(p.x, p.y));
+						ctx.stroke();
+					});
+					if (currentPath.length > 1) {
+						ctx.beginPath();
+						ctx.moveTo(currentPath[0].x, currentPath[0].y);
+						currentPath.forEach(p => ctx.lineTo(p.x, p.y));
+						ctx.stroke();
+					}
+				}
+				function addPoint(e) {
+					const rect = canvas.getBoundingClientRect();
+					const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+					const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+					currentPath.push({ x, y });
+				}
+				function startDraw(e) { e.preventDefault(); drawing = true; currentPath = []; addPoint(e); }
+				function draw(e) { if (!drawing) return; e.preventDefault(); addPoint(e); redraw(); }
+				function endDraw(e) { if (!drawing) return; drawing = false; if (currentPath.length > 0) paths.push([...currentPath]); currentPath = []; redraw(); }
+
+				canvas.addEventListener('mousedown', startDraw);
+				canvas.addEventListener('mousemove', draw);
+				canvas.addEventListener('mouseup', endDraw);
+				canvas.addEventListener('mouseleave', endDraw);
+				canvas.addEventListener('touchstart', startDraw);
+				canvas.addEventListener('touchmove', draw);
+				canvas.addEventListener('touchend', endDraw);
+
+				$('#undoSignBtn').on('click', () => { paths.pop(); redraw(); });
+				$('#clearSignBtn').on('click', () => { paths = []; redraw(); });
+
+				$('#saveSignBtn').on('click', () => {
+					if (paths.length === 0) { alert('Please draw a signature first.'); return; }
+					const dataURL = canvas.toDataURL('image/png');
+					signaturePreview.innerHTML = `<img src="${dataURL}" style="max-height:100%; max-width:100%; object-fit:contain;">`;
+					signatureData.value = dataURL; // save base64
+					modal.hide();
+				});
+
+				drawSignBtn.addEventListener('click', () => modal.show());
+				modalEl.addEventListener('shown.bs.modal', resizeCanvas);
+				$(window).on('resize', resizeCanvas);
 
 				// --------------------------
 				// Form submission

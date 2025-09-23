@@ -2,6 +2,9 @@
 import Folder from '../../models/Folder.js';
 import Document from '../../models/Document.js';
 import TempFile from '../../models/TempFile.js';
+import mongoose from 'mongoose';
+import { generateUniqueFileName } from '../../helper/generateUniquename.js';
+import { putObject } from '../../utils/s3Helpers.js';
 
 // Helper function to generate folder path
 const generatePath = async (folderId) => {
@@ -64,6 +67,33 @@ export const createFolder = async (req, res) => {
         });
     }
 };
+
+// List all folders for a user (ignoring parent)
+export const getAllFolders = async (req, res) => {
+    try {
+        const ownerId = req.user._id;
+
+        const folders = await Folder.find({
+            owner: ownerId,
+            deletedAt: null,  // or isDeleted: false if you add that field
+            isArchived: false
+        }).populate('parent')
+            .select('name slug path parent createdAt updatedAt size depth')
+            .sort({ path: 1 }); // order by hierarchy path
+
+        res.json({
+            success: true,
+            folders
+        });
+    } catch (err) {
+        console.error('Get all folders error:', err);
+        res.status(500).json({
+            success: false,
+            message: 'Server error while fetching all folders'
+        });
+    }
+};
+
 
 // List folders with optional content (files/documents)
 export const listFolders = async (req, res) => {
@@ -162,8 +192,8 @@ export const renameFolder = async (req, res) => {
         const { name } = req.body;
         const ownerId = req.user._id;
 
-        const folder = await Folder.findOne({ _id: id, owner: ownerId, isDeleted: false });
-
+        // Find the folder that is not deleted
+        const folder = await Folder.findOne({ _id: id, owner: ownerId, deletedAt: null });
         if (!folder) {
             return res.status(404).json({
                 success: false,
@@ -171,12 +201,12 @@ export const renameFolder = async (req, res) => {
             });
         }
 
-        // Check if new name already exists in the same location
+        // Check for duplicate name in the same parent
         const existingFolder = await Folder.findOne({
             name,
             parent: folder.parent,
             owner: ownerId,
-            isDeleted: false,
+            deletedAt: null,
             _id: { $ne: id }
         });
 
@@ -187,10 +217,10 @@ export const renameFolder = async (req, res) => {
             });
         }
 
+        // Rename
         folder.name = name;
-        folder.updatedAt = Date.now();
         folder.updatedBy = ownerId;
-        await folder.save();
+        await folder.save(); // updatedAt auto-updated
 
         res.json({
             success: true,
@@ -253,106 +283,95 @@ export const moveFolder = async (req, res) => {
 export const deleteFolder = async (req, res) => {
     try {
         const { id } = req.params;
-        const ownerId = req.user._id;
-        const { cascade } = req.query;
+        const ownerId = req.user._id; // assuming you have req.user
 
-        const folder = await Folder.findOne({ _id: id, owner: ownerId, isDeleted: false });
-
+        // Find the folder
+        const folder = await Folder.findOne({ _id: id, owner: ownerId });
         if (!folder) {
-            return res.status(404).json({
-                success: false,
-                message: 'Folder not found'
-            });
+            return res.status(404).json({ success: false, message: "Folder not found" });
         }
 
-        // Use the static method to soft delete (optionally cascade)
-        await Folder.markDeleted(id, cascade === 'true', ownerId);
+        // Check if the folder has any files
+        const fileCount = await TempFile.countDocuments({ folder: id, status: { $ne: "deleted" } });
 
-        res.json({
-            success: true,
-            message: `Folder ${cascade === 'true' ? 'and its contents' : ''} deleted successfully`
-        });
+        if (fileCount > 0) {
+            // Folder has files → mark as inactive
+            folder.isDeleted = true; // or folder.status = "inactive" if you have a status field
+            await folder.save();
+            return res.json({ success: true, message: "Folder contains files, marked as inactive" });
+        }
+
+        // No files → delete permanently
+        await Folder.deleteOne({ _id: id, owner: ownerId });
+        return res.json({ success: true, message: "Folder permanently deleted" });
     } catch (err) {
-        console.error('Delete folder error:', err);
-        res.status(500).json({
-            success: false,
-            message: err.message || 'Server error while deleting folder'
-        });
+        console.error("Error deleting folder:", err);
+        res.status(500).json({ success: false, message: err.message || "Server error while deleting folder" });
     }
 };
 
 // Upload files to folder
 export const uploadToFolder = async (req, res) => {
     try {
-        const { id } = req.params;
+        const { folderId } = req.params;
         const ownerId = req.user._id;
-        const { tempFileIds, documentData } = req.body;
 
-        const folder = await Folder.findOne({ _id: id, owner: ownerId, isDeleted: false });
+        if (!mongoose.Types.ObjectId.isValid(folderId)) {
+            return res.status(400).json({ success: false, message: "Invalid folder ID" });
+        }
 
+        const folder = await Folder.findOne({ _id: folderId, owner: ownerId });
         if (!folder) {
-            return res.status(404).json({
-                success: false,
-                message: 'Folder not found'
+            return res.status(404).json({ success: false, message: "Folder not found" });
+        }
+
+        if (!req.files || req.files.length === 0) {
+            return res.status(400).json({ success: false, message: "No files uploaded" });
+        }
+
+        const uploadedFiles = [];
+
+        for (const file of req.files) {
+            const { originalname, mimetype, buffer } = file;
+            const s3Filename = generateUniqueFileName(originalname);
+
+            // Upload to S3 under the folder name
+            const { url, key } = await putObject(buffer, s3Filename, mimetype, folder.name);
+
+            // Save as TempFile
+            const tempFile = await TempFile.create({
+                fileName: originalname,
+                originalName: originalname,
+                s3Filename: key,
+                s3Url: url,
+                fileType: mimetype,
+                folder: folder._id, // still link to folder in DB
+                status: "permanent",
+                size: buffer.length
+            });
+
+            uploadedFiles.push({
+                fileId: tempFile._id,
+                originalName: originalname,
+                s3Filename: key,
+                s3Url: url,
             });
         }
 
-        // Get temp files
-        const tempFiles = await TempFile.find({
-            _id: { $in: tempFileIds },
-            status: 'temp'
-        });
-
-        if (tempFiles.length === 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'No valid temporary files found'
-            });
-        }
-
-        // Create document with files
-        const document = new Document({
-            ...documentData,
-            status: "Pending",
-            folder: id,
-            owner: ownerId,
-            files: tempFiles.map(tempFile => ({
-                file: tempFile.s3Filename,
-                originalName: tempFile.originalName,
-                version: 1,
-                uploadedAt: new Date(),
-                isPrimary: false
-            }))
-        });
-
-        // Set first file as primary
-        if (document.files.length > 0) {
-            document.files[0].isPrimary = true;
-        }
-
-        await document.save();
-
-        // Update temp files status to permanent
-        await TempFile.updateMany(
-            { _id: { $in: tempFileIds } },
-            { status: 'permanent' }
-        );
-
-        // Update folder size (optional - you might want to calculate this differently)
-        folder.size += tempFiles.reduce((total, file) => total + (file.size || 0), 0);
+        // Update folder size
+        const totalSize = uploadedFiles.reduce((sum, f) => sum + (f.size || 0), 0);
+        folder.size += totalSize;
         await folder.save();
 
         res.status(201).json({
             success: true,
-            message: 'Files uploaded to folder successfully',
-            document
+            message: "Files uploaded successfully",
+            folderId: folder._id,
+            files: uploadedFiles,
         });
     } catch (err) {
-        console.error('Upload to folder error:', err);
-        res.status(500).json({
-            success: false,
-            message: 'Server error while uploading files to folder'
-        });
+        console.error("Upload to folder error:", err);
+        res.status(500).json({ success: false, message: "File upload failed" });
     }
 };
 
@@ -395,5 +414,72 @@ export const getFolderTree = async (req, res) => {
             success: false,
             message: 'Server error while fetching folder tree'
         });
+    }
+};
+
+export const archiveFolder = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const ownerId = req.user._id;
+
+        const folder = await Folder.findOne({ _id: id, owner: ownerId, deletedAt: null });
+        if (!folder) {
+            return res.status(404).json({ success: false, message: "Folder not found" });
+        }
+
+        folder.isArchived = true; // or folder.status = "archived"
+        folder.updatedBy = ownerId;
+        await folder.save();
+
+        res.json({
+            success: true,
+            message: "Folder archived successfully",
+            folder: {
+                _id: folder._id,
+                name: folder.name,
+                path: folder.path,
+                isArchived: folder.isArchived
+            }
+        });
+    } catch (err) {
+        console.error("Archive folder error:", err);
+        res.status(500).json({ success: false, message: "Server error while archiving folder" });
+    }
+};
+export const getArchivedFolders = async (req, res) => {
+    try {
+        const ownerId = req.user._id;
+
+        // Find all folders that are archived and not deleted
+        const folders = await Folder.find({ owner: ownerId, isArchived: true, deletedAt: null })
+            .sort({ updatedAt: -1 }).select('name slug')
+            .lean();
+
+        res.json({
+            success: true,
+            folders
+        });
+    } catch (err) {
+        console.error("Error fetching archived folders:", err);
+        res.status(500).json({ success: false, message: "Server error while fetching archived folders" });
+    }
+};
+
+export const restoreFolder = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const ownerId = req.user._id;
+
+        const folder = await Folder.findOne({ _id: id, owner: ownerId });
+        if (!folder) return res.status(404).json({ success: false, message: "Folder not found" });
+
+        folder.isArchived = false; // restore
+        folder.updatedBy = ownerId;
+        await folder.save();
+
+        res.json({ success: true, message: "Folder restored successfully", folder });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: "Server error while restoring folder" });
     }
 };

@@ -5,6 +5,7 @@ import tempFile from "../../models/tempFile.js";
 import { errorResponse, successResponse, failResponse } from "../../utils/responseHandler.js";
 import TempFile from "../../models/tempFile.js";
 import Notification from "../../models/notification.js";
+import { cloudinary } from "../../middlewares/fileUploads.js";
 
 /**
  * Get all documents with filtering, pagination, and search
@@ -202,8 +203,9 @@ export const createDocument = async (req, res) => {
 
             // Convert to ObjectId and filter invalid ones
             parsedFileIds = parsedFileIds
-                .filter(id => mongoose.Types.ObjectId.isValid(id))
-                .map(id => mongoose.Types.ObjectId(id));
+                .filter(id => mongoose.Types.ObjectId.isValid(id))   // ✅ just call it
+                .map(id => new mongoose.Types.ObjectId(id));         // ✅ only wrap here
+
         }
         // // Handle uploaded files (using string filenames - Option A)
         // const uploadedFiles = (req.files?.files || []).map((file, idx) => ({
@@ -235,16 +237,38 @@ export const createDocument = async (req, res) => {
             }
         }
 
-
         let signature = {};
-        if (req.files?.signature?.[0]) {
-            const file = req.files.signature[0];
+
+        // Case 1: Signature uploaded as file
+        if (req.files?.signatureFile?.[0]) {
+            const file = req.files.signatureFile[0];
             if (!file.mimetype.startsWith("image/")) {
                 return failResponse(res, "Signature must be an image", 400);
             }
             signature = {
                 fileName: file.originalname,
-                fileUrl: file.filename
+                fileUrl: file.path || file.filename, // Cloudinary gives .path (URL)
+            };
+        }
+
+        // Case 2: Signature drawn on canvas (base64 string)
+        else if (req.body.signature) {
+            const base64Data = req.body.signature;
+
+            if (!base64Data.startsWith("data:image/")) {
+                return failResponse(res, "Invalid signature format", 400);
+            }
+
+            // Upload base64 to Cloudinary
+            const uploaded = await cloudinary.uploader.upload(base64Data, {
+                folder: "signatures",
+                public_id: `signature-${Date.now()}`,
+                overwrite: true,
+            });
+
+            signature = {
+                fileName: uploaded.original_filename,
+                fileUrl: uploaded.secure_url,
             };
         }
 
@@ -337,14 +361,15 @@ export const updateDocument = async (req, res) => {
         const parsedTags = tags ? tags.split(",").map(tag => tag.trim()) : [];
 
         // Update top-level fields
-        if (projectName) document.project = projectName;
-        if (department) document.department = department;
-        if (projectManager) document.projectManager = projectManager;
-        if (description) document.description = description;
-        if (comment) document.comment = comment;
-        if (link) document.link = link;
-        if (parsedTags.length) document.tags = parsedTags;
-        if (Object.keys(parsedMetadata).length) document.metadata = parsedMetadata;
+        document.project = projectName || document.project;
+        document.department = department || document.department;
+        document.projectManager = projectManager || document.projectManager;
+        document.description = description ?? document.description;
+        document.comment = comment ?? document.comment;
+        document.link = link ?? document.link;
+        document.tags = parsedTags;
+        document.metadata = parsedMetadata;
+
 
         // Update dates
         if (documentDate) {
@@ -382,12 +407,38 @@ export const updateDocument = async (req, res) => {
             if (uploadedFiles.length) document.files = uploadedFiles;
         }
 
-        // Signature
+        // Signature (file upload or base64 canvas)
         if (req.files?.signature?.[0]) {
+            // Case 1: Signature uploaded as image file
             const file = req.files.signature[0];
-            if (!file.mimetype.startsWith("image/")) return failResponse(res, "Signature must be an image", 400);
-            document.signature = { fileName: file.originalname, fileUrl: file.filename };
+            if (!file.mimetype.startsWith("image/")) {
+                return failResponse(res, "Signature must be an image", 400);
+            }
+            document.signature = {
+                fileName: file.originalname,
+                fileUrl: file.path || file.filename, // depending on Cloudinary/disk
+            };
+        } else if (req.body.signature) {
+            // Case 2: Signature drawn on canvas (base64 string)
+            const base64Data = req.body.signature;
+
+            if (!base64Data.startsWith("data:image/")) {
+                return failResponse(res, "Invalid signature format", 400);
+            }
+
+            // Upload to Cloudinary
+            const uploaded = await cloudinary.uploader.upload(base64Data, {
+                folder: "signatures",
+                public_id: `signature-${Date.now()}`,
+                overwrite: true,
+            });
+
+            document.signature = {
+                fileName: uploaded.original_filename,
+                fileUrl: uploaded.secure_url,
+            };
         }
+
 
         await document.save();
 

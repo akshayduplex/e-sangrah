@@ -8,9 +8,19 @@ import {
     renameFolder,
     getFolder,
     uploadToFolder,
-    getFolderTree
+    getFolderTree,
+    getAllFolders,
+    archiveFolder,
+    restoreFolder,
+    getArchivedFolders
 } from '../../controllers/Folder/folderController.js';
 import { authenticate } from '../../middlewares/authMiddleware.js';
+import multer from 'multer';
+// Multer memory storage (for direct S3 upload)
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: {}, // 10MB
+});
 
 const router = express.Router();
 
@@ -22,6 +32,7 @@ router.post('/', createFolder);
 
 // List folders (optionally by parent)
 router.get('/', listFolders);
+router.get('/all', getAllFolders);
 
 // Get folder details with contents
 router.get('/details/:id', getFolder);
@@ -36,10 +47,16 @@ router.patch('/:id/move', moveFolder);
 router.delete('/:id', deleteFolder);
 
 // Upload files to folder
-router.post('/:id/upload', uploadToFolder);
+router.post('/:folderId/upload', upload.array("files"), uploadToFolder);
 
 // Get folder tree structure
 router.get('/tree/structure', getFolderTree);
+
+router.patch('/:id/archive', archiveFolder);
+// Get all archived folders for the current user
+router.get('/archived', getArchivedFolders);
+
+router.patch('/:id/restore', restoreFolder);
 
 // Export router as default
 export default router;

@@ -3,51 +3,94 @@ import { putObject, deleteObject } from "../utils/s3Helpers.js";
 import TempFile from "../models/tempFile.js";
 import crypto from "crypto";
 import path from "path";
+import Folder from "../models/Folder.js";
+import { generateUniqueFileName } from "../helper/generateUniquename.js";
 // Unique filename generator
-function generateUniqueFileName(originalName) {
-    const ext = path.extname(originalName);
-    const base = path.basename(originalName, ext);
-    const id = crypto.randomBytes(8).toString("hex");
-    return `${base}_${id}${ext}`;
-}
 
+export const download = async (req, res) => {
+    try {
+        const key = `file-temp-uploads/${req.params.fileName}`;
+        const url = await getObjectUrl(key, 300); // 5 minutes expiry
+        res.json({ url });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+
+}
 // Upload temporary file
 export const uploadFile = async (req, res) => {
     try {
-        if (!req.file) {
-            return res.status(400).json({ error: "No file uploaded" });
+        const { folderId } = req.params;
+        const ownerId = req.user._id;
+
+        if (!mongoose.Types.ObjectId.isValid(folderId)) {
+            return res.status(400).json({ success: false, message: "Invalid folder ID" });
         }
 
-        const { originalname, mimetype, buffer, path: localPath } = req.file;
-        const s3Filename = generateUniqueFileName(originalname);
-
-        // Upload to S3
-        const { url, key } = await putObject(buffer, s3Filename, mimetype);
-        // Delete local file if using diskStorage
-        if (localPath && fs.existsSync(localPath)) {
-            fs.unlinkSync(localPath);
+        const folder = await Folder.findOne({ _id: folderId, owner: ownerId });
+        if (!folder) {
+            return res.status(404).json({ success: false, message: "Folder not found" });
         }
 
-        // Save in DB
-        const tempFile = await TempFile.create({
-            fileName: originalname,
-            originalName: originalname,
-            s3Filename: key,
-            fileType: mimetype,
-            status: "temp",
-        });
+        if (!req.files || req.files.length === 0) {
+            return res.status(400).json({ success: false, message: "No files uploaded" });
+        }
 
-        res.json({
+        let totalSize = 0;
+        const uploadedFiles = [];
+
+        for (const file of req.files) {
+            const { originalname, mimetype, buffer, size, path: localPath } = file;
+            const s3Filename = generateUniqueFileName(originalname);
+
+            // Upload to S3
+            const { url, key } = await putObject(buffer, s3Filename, mimetype);
+
+            // Delete local file if exists
+            if (localPath && fs.existsSync(localPath)) {
+                fs.unlinkSync(localPath);
+            }
+
+            // Save in TempFile
+            const tempFile = await TempFile.create({
+                fileName: originalname,
+                originalName: originalname,
+                s3Filename: key,
+                fileType: mimetype,
+                status: "permanent",
+            });
+
+            // Add to folder's files array
+            folder.files.push({
+                file: key,
+                originalName: originalname,
+                fileType: mimetype,
+                size: size || 0,
+                uploadedBy: ownerId,
+            });
+
+            totalSize += size || 0;
+
+            uploadedFiles.push({
+                fileId: tempFile._id,
+                originalName: originalname,
+                s3Filename: key,
+                s3Url: url,
+            });
+        }
+
+        folder.size += totalSize;
+        await folder.save();
+
+        res.status(201).json({
             success: true,
-            message: "File uploaded temporarily",
-            fileId: tempFile._id,
-            s3Filename: key,
-            s3Url: url,
-            temp: true,
+            message: "Files uploaded successfully",
+            folderId: folder._id,
+            files: uploadedFiles,
         });
     } catch (err) {
-        console.error("Upload error:", err);
-        res.status(500).json({ error: "File upload failed" });
+        console.error("Upload to folder error:", err);
+        res.status(500).json({ success: false, message: "File upload failed" });
     }
 };
 

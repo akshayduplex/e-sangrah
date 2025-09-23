@@ -7,11 +7,12 @@ import Menu from "../../models/Menu.js";
 import UserPermission from "../../models/UserPermission.js";
 import { profile_type } from "../../constant/constant.js";
 import { buildMenuTree } from "../../utils/buildMenuTree.js";
+import checkPermissions from "../../middlewares/checkPermission.js";
 
 const router = express.Router();
 
 // Dashboard
-router.get("/dashboard", authenticate, (req, res) => {
+router.get("/dashboard", authenticate, checkPermissions, (req, res) => {
     try {
         res.render("pages/dashboard", { user: req.user });
     } catch (err) {
@@ -21,17 +22,22 @@ router.get("/dashboard", authenticate, (req, res) => {
 });
 
 // Upload folder
-router.get("/upload-folder", authenticate, (req, res) => {
-    res.render("pages/upload-folder", { title: "E-Sangrah - Upload-Folder" });
+router.get("/upload-folder", authenticate, checkPermissions, (req, res) => {
+    res.render("pages/upload-folder", { title: "E-Sangrah - Upload-Folder", user: req.user });
+});
+
+// Upload folder
+router.get("/folders", authenticate, checkPermissions, (req, res) => {
+    res.render("pages/folders", { title: "E-Sangrah - Folders", user: req.user });
 });
 
 // Notifications
 router.get("/notifications", authenticate, (req, res) => {
-    res.render("pages/notifications", { title: "E-Sangrah - Notifications" });
+    res.render("pages/notifications", { title: "E-Sangrah - Notifications", user: req.user });
 });
 
 // My Profile
-router.get("/my-profile", authenticate, async (req, res) => {
+router.get("/my-profile", authenticate, checkPermissions, async (req, res) => {
     try {
         const user = await User.findById(req.session.user._id)
             .populate("userDetails.designation")
@@ -50,7 +56,7 @@ router.get("/my-profile", authenticate, async (req, res) => {
    Role and Permmissions Assignment
 =========================== */
 // Render assign-permissions page
-router.get("/assign-permissions", authenticate, async (req, res) => {
+router.get("/assign-permissions", authenticate, checkPermissions, async (req, res) => {
     try {
         const departments = await Department.find({ status: "Active" }, "name").lean();
         const designations = await Designation.find({ status: "Active" })
@@ -73,7 +79,7 @@ router.get("/assign-permissions", authenticate, async (req, res) => {
 });
 
 // Get user permissions page
-router.get("/user-permissions/:id", authenticate, async (req, res) => {
+router.get("/user-permissions/:id", authenticate, checkPermissions, async (req, res) => {
     try {
         const userId = req.params.id;
         const user = await User.findById(userId)
@@ -127,7 +133,7 @@ router.get("/user-permissions/:id", authenticate, async (req, res) => {
 });
 
 // Get user permissions API
-router.get("/user/:id/permissions", authenticate, async (req, res) => {
+router.get("/user/:id/permissions", authenticate, checkPermissions, async (req, res) => {
     try {
         const userId = req.params.id;
         const userPermissions = await UserPermission.find({ user_id: userId })
@@ -142,7 +148,7 @@ router.get("/user/:id/permissions", authenticate, async (req, res) => {
 });
 
 // Save user permissions
-router.post("/user/permissions", authenticate, async (req, res) => {
+router.post("/user/permissions", authenticate, checkPermissions, async (req, res) => {
     try {
         const { user_id, permissions } = req.body; // permissions now only contains checked menus/submenus
         const assigned_by = req.user;
@@ -191,18 +197,4 @@ router.post("/user/permissions", authenticate, async (req, res) => {
         res.status(500).json({ success: false, message: "Error saving user permissions" });
     }
 });
-
-
-router.get("/role-permissions", authenticate, (req, res) => {
-    try {
-        res.render("pages/permissions/roles-permissions", { user: req.user });
-    } catch (err) {
-        console.error("Dashboard render error:", err);
-        res.status(500).render("pages/error", {
-            user: req.user,
-            message: "Something went wrong while loading the dashboard",
-        });
-    }
-});
-
 export default router;

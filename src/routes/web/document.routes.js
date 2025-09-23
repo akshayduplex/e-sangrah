@@ -6,10 +6,11 @@ import Document from "../../models/Document.js";
 import Project from "../../models/Project.js";
 import User from "../../models/User.js";
 import mongoose from "mongoose";
+import checkPermissions from "../../middlewares/checkPermission.js";
 const router = express.Router();
 
 // Document List Page
-router.get("/list", authenticate, async (req, res) => {
+router.get("/list", authenticate, checkPermissions, async (req, res) => {
     try {
         const designations = await Designation.find({ status: "Active" })
             .sort({ name: 1 })
@@ -18,6 +19,7 @@ router.get("/list", authenticate, async (req, res) => {
         res.render("pages/document/document-list", {
             title: "E-Sangrah - Documents-List",
             designations,
+            user: req.user
         });
     } catch (err) {
         console.error("Error loading document list:", err);
@@ -28,7 +30,7 @@ router.get("/list", authenticate, async (req, res) => {
     }
 });
 // Add Document Page
-router.get("/add", authenticate, async (req, res) => {
+router.get("/add", authenticate, checkPermissions, async (req, res) => {
     try {
         const departments = await Department.find({ status: "Active" }, "name").lean();
         const users = await User.find({ profile_type: "user" }, "name").sort({ name: 1 }).lean();
@@ -37,6 +39,7 @@ router.get("/add", authenticate, async (req, res) => {
         res.render("pages/add-document", {
             title: "E-Sangrah - Add-Document",
             departments,
+            user: req.user,
             users,
             projectNames,
             isEdit: false
@@ -47,7 +50,7 @@ router.get("/add", authenticate, async (req, res) => {
     }
 });
 
-router.get("/edit/:id", authenticate, async (req, res) => {
+router.get("/edit/:id", authenticate, checkPermissions, async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -73,6 +76,7 @@ router.get("/edit/:id", authenticate, async (req, res) => {
         res.render("pages/add-document", {
             title: "E-Sangrah - Edit Document",
             departments,
+            user: req.user,
             users,
             projectNames,
             document,  // <-- pass existing document for prefill

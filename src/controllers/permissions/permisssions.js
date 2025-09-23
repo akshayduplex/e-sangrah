@@ -25,7 +25,8 @@ export const getAssignMenuPage = async (req, res) => {
         // 4️⃣ Render page
         res.render("pages/permissions/assign-menu", {
             masterMenus,
-            designations
+            designations,
+            user: req.user
         });
     } catch (error) {
         console.error("Error in getAssignMenuPage:", error);
@@ -371,6 +372,7 @@ export const getMenuList = async (req, res) => {
             menus,
             currentPage: page,
             totalPages,
+            user: req.user,
             total,
             limit,
             layout: !req.xhr
@@ -388,7 +390,7 @@ export const getAddMenu = async (req, res) => {
 
 
         // Render the unified form, menu is null for Add
-        res.render("pages/permissions/add", { masters, menu: null });
+        res.render("pages/permissions/add", { masters, menu: null, user: req.user });
     } catch (error) {
         res.status(500).render("error", { message: error.message });
     }
@@ -407,7 +409,7 @@ export const getEditMenu = async (req, res) => {
 
 
         // Render the unified form, passing the existing menu
-        res.render("pages/permissions/add", { masters, menu });
+        res.render("pages/permissions/add", { masters, menu, user: req.user });
     } catch (error) {
         res.status(500).render("error", { message: error.message });
     }

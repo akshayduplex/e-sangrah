@@ -9,35 +9,35 @@ const PORT = process.env.PORT || 5000;
 const server = http.createServer(app);
 
 // Attach Socket.IO
-const io = new Server(server, {
-    cors: {
-        origin: "*", // for development, restrict in production
-        methods: ["GET", "POST"],
-    },
-});
+// const io = new Server(server, {
+//     cors: {
+//         origin: "*", // for development, restrict in production
+//         methods: ["GET", "POST"],
+//     },
+// });
 
 // Handle socket connections
-io.on("connection", (socket) => {
-    console.log("✅ New client connected:", socket.id);
+// io.on("connection", (socket) => {
+//     console.log("✅ New client connected:", socket.id);
 
-    // Example event listener
-    socket.on("send-notification", (data) => {
-        console.log("📩 Notification received from client:", data);
+//     // Example event listener
+//     socket.on("send-notification", (data) => {
+//         console.log("📩 Notification received from client:", data);
 
-        // Broadcast notification to everyone
-        io.emit("notification", {
-            message: data.message,
-            timestamp: new Date(),
-        });
-    });
+//         // Broadcast notification to everyone
+//         io.emit("notification", {
+//             message: data.message,
+//             timestamp: new Date(),
+//         });
+//     });
 
-    socket.on("disconnect", () => {
-        console.log("❌ Client disconnected:", socket.id);
-    });
-});
+//     socket.on("disconnect", () => {
+//         console.log("❌ Client disconnected:", socket.id);
+//     });
+// });
 
 // Make `io` available in routes/controllers
-app.set("io", io);
+//app.set("io", io);
 
 // Start server
 server.listen(PORT, () => {

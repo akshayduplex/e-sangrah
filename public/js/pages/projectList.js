@@ -38,7 +38,7 @@ document.addEventListener("DOMContentLoaded", () => {
                             </button>
                             <ul class="dropdown-menu">
                                 <li><a class="dropdown-item" href="#"><i class="ti ti-eye"></i> View</a></li>
-                                <li><a class="dropdown-item" href="add-document.php"><i class="ti ti-pencil-minus"></i> Edit</a></li>
+                                <li><a class="dropdown-item" href="/documents/add"><i class="ti ti-pencil-minus"></i> Edit</a></li>
                             </ul>
                         </div>
                     </td>
