@@ -432,16 +432,20 @@ export const uploadToFolder = async (req, res) => {
 // Get folder tree structure
 export const getFolderTree = async (req, res) => {
     try {
-        const ownerId = req.user._id;
-        const { rootId } = req.query;
+        const { rootId, departmentId, projectId } = req.query;
 
         const buildTree = async (parentId = null) => {
-            const folders = await Folder.find({
-                parent: parentId,
-                owner: ownerId,
-                isDeleted: false
-            }).select('name slug path createdAt updatedAt projectId departmentId').populate('projectId', 'name').populate('departmentId', 'name').sort({ name: 1 });
+            // Build query dynamically
+            const query = { parent: parentId };
 
+            if (departmentId && departmentId !== 'all') query.departmentId = departmentId;
+            if (projectId && projectId !== 'all') query.projectId = projectId;
+
+            const folders = await Folder.find(query)
+                .select('name slug path createdAt updatedAt projectId departmentId')
+                .populate('projectId', 'name')
+                .populate('departmentId', 'name')
+                .sort({ name: 1 });
 
             const tree = await Promise.all(folders.map(async (folder) => {
                 const children = await buildTree(folder._id);
@@ -450,6 +454,8 @@ export const getFolderTree = async (req, res) => {
                     name: folder.name,
                     slug: folder.slug,
                     path: folder.path,
+                    projectId: folder.projectId,
+                    departmentId: folder.departmentId,
                     children: children.length > 0 ? children : null
                 };
             }));

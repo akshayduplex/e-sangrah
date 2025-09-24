@@ -29,6 +29,25 @@ router.get("/list", authenticate, checkPermissions, async (req, res) => {
         });
     }
 });
+
+router.get("/:folderId/list", authenticate, async (req, res) => {
+    try {
+        const { folderId } = req.params;
+        res.render("pages/document/documentFolderList", {
+            title: "E-Sangrah - Documents-List",
+            user: req.user,
+            folderId
+        });
+    } catch (err) {
+        console.error("Error loading document list:", err);
+        res.status(500).render("pages/error", {
+            title: "Error",
+            message: "Unable to load documents",
+        });
+    }
+});
+
+
 // Add Document Page
 router.get("/add", authenticate, checkPermissions, async (req, res) => {
     try {

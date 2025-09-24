@@ -10,7 +10,8 @@ import {
     shareDocument,
     getDocumentAuditLogs,
     getDocumentAccessLogs,
-    searchDocuments
+    searchDocuments,
+    getDocumentsByFolder
 } from "../../controllers/Document/documentController.js";
 import { authenticate } from "../../middlewares/authMiddleware.js";
 import upload from "../../middlewares/fileUploads.js";
@@ -23,6 +24,7 @@ router.use(authenticate);
 // Document routes
 router.get("/", getDocuments);
 router.get("/search", searchDocuments);
+router.get("/folder/:folderId", authenticate, getDocumentsByFolder);
 router.post("/", upload.fields([{ name: "files", maxCount: 10 }, { name: "signatureFile", maxCount: 1 }]), createDocument);
 router.get("/:id", getDocument);
 router.patch("/:id", upload.fields([{ name: "files", maxCount: 10 }, { name: "signature", maxCount: 1 }]), updateDocument);

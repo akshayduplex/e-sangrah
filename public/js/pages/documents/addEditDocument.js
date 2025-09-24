@@ -70,7 +70,7 @@ $(document).ready(function () {
         const departmentSelected = !!$('#department').val();
         $('#createFolderBtn').prop('disabled', !(projectSelected && departmentSelected));
     }
-    async function loadFolders() {
+    async function loadFolders(rootId = null, parentPath = []) {
         try {
             const departmentId = $('#department').val() || '';
             const projectId = $('#projectName').val() || '';
@@ -78,66 +78,75 @@ $(document).ready(function () {
             const query = new URLSearchParams();
             if (departmentId && departmentId !== 'all') query.append('departmentId', departmentId);
             if (projectId && projectId !== 'all') query.append('projectId', projectId);
+            if (rootId) query.append('rootId', rootId);
 
-            const res = await fetch(`/api/folders/all?${query.toString()}`);
+            const res = await fetch(`/api/folders/tree/structure?${query.toString()}`);
             const data = await res.json();
-
             if (!data.success) return;
 
             const container = $('#folderContainer');
             container.empty();
 
-            data.folders.forEach(folder => {
-                const btn = $('<button/>', {
-                    type: 'button',
-                    class: 'btn btn-outline-primary folder-btn text-center d-flex flex-column align-items-center justify-content-center p-2 m-1'
-                });
+            const folders = data.tree || [];
 
-                btn.append(`<i class="bi bi-folder-fill fs-2 mb-1"></i>`);
-                btn.append(`<span>${folder.name}</span>`);
+            folders.forEach(folder => {
+                const subCount = folder.children ? folder.children.length : 0;
 
-                btn.data('id', folder._id);
-                btn.data('name', folder.name);
-                btn.data('path', folder.path);
+                const folderCard = $(`
+    <div class="folder-card position-relative p-2 m-1 border rounded shadow-sm cursor-pointer text-center d-flex flex-column align-items-center justify-content-center"
+     style="width: 80px; transition: transform 0.2s;">
+    <!-- Custom folder icon -->
+    <div class="fldricon mb-1" style="width: 40px; height: 40px;">
+        <img src="/img/icons/folder.png" alt="folder" style="width: 100%; height: 100%; object-fit: contain;">
+    </div>
 
-                // Toggle selection
-                btn.on('click', function () {
-                    const folderName = $(this).data('name');
+    <!-- Folder name -->
+    <div class="fldrname text-truncate" style="font-size: 0.8rem;">${folder.name}</div>
 
-                    if ($(this).hasClass('active')) {
-                        // Deselect
-                        $(this).removeClass('active');
-                        window.selectedFolders = window.selectedFolders.filter(f => f !== folderName);
-                    } else {
-                        // Select
-                        $(this).addClass('active');
-                        window.selectedFolders.push(folderName);
-                    }
+    <!-- Optional badge for subfolders/files -->
+ ${subCount > 0 ? `<span class="badge bg-primary position-absolute top-0 end-0 mt-1 me-1" style="font-size:0.6rem;">${subCount}</span>` : ''}
+</div>
 
-                    // Update hidden input with selected folder IDs
-                    const selectedIds = $('.folder-btn.active').map((i, el) => $(el).data('id')).get();
-                    $('#selectedFolderId').val(selectedIds.join(','));
+    `);
 
-                    // Update directory path (folders added at the end)
+                folderCard.data('id', folder._id);
+                folderCard.data('name', folder.name);
+                folderCard.data('children', folder.children || null);
+
+                folderCard.hover(
+                    () => folderCard.css('transform', 'scale(1.05)'),
+                    () => folderCard.css('transform', 'scale(1)')
+                );
+
+                folderCard.on('click', async function () {
+                    $('.folder-card').removeClass('active border-primary').addClass('border');
+                    folderCard.addClass('active border-primary');
+
+                    const currentPath = [...parentPath, folderCard.data('name')];
+                    window.selectedFolders = currentPath;
+                    $('#selectedFolderId').val(folderCard.data('id'));
                     updateDirectoryPath();
+
+                    if (folderCard.data('children') && folderCard.data('children').length > 0) {
+                        await loadFolders(folderCard.data('id'), currentPath);
+                    }
                 });
 
-                container.append(btn);
+                container.append(folderCard);
             });
 
-            // Pre-select folders if editing
-            if (isEdit && document.folderId) {
-                const folderIds = Array.isArray(document.folderId) ? document.folderId : [document.folderId._id];
-                folderIds.forEach(fid => {
-                    const btn = container.find('.folder-btn').filter((i, el) => $(el).data('id') === fid);
-                    if (btn.length) btn.click();
-                });
-            }
 
         } catch (error) {
             console.error('Error loading folders:', error);
         }
     }
+
+
+
+    $('#folder-modal').on('show.bs.modal', function () {
+        const selectedFolderName = window.selectedFolders.join(' / ') || 'Root';
+        $('#parentFolder').val(selectedFolderName);
+    });
     // Run on page load
     // toggleCreateFolderBtn();
     // --------------------------
@@ -148,10 +157,10 @@ $(document).ready(function () {
         const folderName = $('#folderName').val().trim();
         const projectId = $('#projectName').val();
         const departmentId = $('#department').val();
-        const parentId = null; // Or set dynamically if you allow nested folders
+        const parentId = $('#selectedFolderId').val() || null;
 
         if (!folderName || !projectId || !departmentId) {
-            alert('Please select Project, Department and provide folder name.');
+            alert('Please select Project, Department, and provide folder name.');
             return;
         }
 
@@ -163,30 +172,21 @@ $(document).ready(function () {
             });
 
             const data = await response.json();
+            if (!data.success) throw new Error(data.message || 'Could not create folder');
 
-            if (data.success) {
-                // Close modal and reset form
-                $('#folder-modal').modal('hide');
-                $('#createFolderForm')[0].reset();
+            $('#folder-modal').modal('hide');
+            $('#createFolderForm')[0].reset();
 
-                // Refresh folder list
-                await loadFolders();
+            // Reload current folder to show new folder at the end
+            await loadFolders(parentId, window.selectedFolders.slice(0, -1));
 
-                // Optional: auto-select newly created folder
-                if (data.folder && data.folder._id) {
-                    const btn = $('#folderContainer').find(`.folder-btn`).filter((i, el) => $(el).data('id') === data.folder._id);
-                    if (btn.length) btn.click();
-                }
-
-                showToast('Folder created successfully!', 'success');
-            } else {
-                showToast('Error: ' + (data.message || 'Could not create folder'), 'error');
-            }
+            showToast('Folder created successfully!', 'success');
         } catch (err) {
             console.error(err);
-            showToast('Something went wrong while creating the folder.', 'error');
+            showToast(err.message || 'Something went wrong while creating the folder.', 'error');
         }
     });
+
 
     // --------------------------
     // File upload handling
@@ -410,11 +410,10 @@ $(document).ready(function () {
         const folders = window.selectedFolders || [];
 
         const sanitize = text => text.replace(/\s+/g, '');
-
         let segments = [BASE_URL];
         if (projectText && projectText !== '-- Select Project Name --') segments.push(sanitize(projectText));
         if (departmentText && departmentText !== '-- Select Department --') segments.push(sanitize(departmentText));
-        segments.push(...folders.map(sanitize)); // folders added at the end
+        segments.push(...folders.map(sanitize));
 
         let path = '';
         const breadcrumb = segments.map((seg, i) => {
@@ -430,6 +429,8 @@ $(document).ready(function () {
     loadFolders();
     updateDirectoryPath();
     $('#projectName, #department').on('change select2:select select2:clear', function () {
+        window.selectedFolders = [];
+        $('#selectedFolderId').val('');
         toggleCreateFolderBtn();
         loadFolders();
         updateDirectoryPath();

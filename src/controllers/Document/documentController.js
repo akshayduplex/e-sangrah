@@ -86,6 +86,55 @@ export const getDocuments = async (req, res) => {
 };
 
 /**
+ * @desc Get all documents by folderId
+ * @route GET /api/documents/folder/:folderId
+ * @access Private
+ */
+export const getDocumentsByFolder = async (req, res) => {
+    try {
+        const { folderId } = req.params;
+        const { page = 1, limit = 20, sortBy = "createdAt", order = "desc", search = "" } = req.query;
+
+        if (!mongoose.Types.ObjectId.isValid(folderId)) {
+            return res.status(400).json({ success: false, message: "Invalid folder ID" });
+        }
+
+        // Build query
+        let query = { folderId: folderId };
+
+        // Text search
+        if (search) {
+            query.$text = { $search: search };
+        }
+
+        // Count total documents
+        const total = await Document.countDocuments(query);
+
+        // Fetch documents with pagination
+        const documents = await Document.find(query)
+            .populate("project", "projectName")
+            .populate("department", "name")
+            .populate("owner", "name email")
+            .populate("projectManager", "name email")
+            .sort({ [sortBy]: order === "desc" ? -1 : 1 })
+            .skip((page - 1) * limit)
+            .limit(parseInt(limit));
+
+        res.json({
+            success: true,
+            total,
+            page: parseInt(page),
+            limit: parseInt(limit),
+            documents
+        });
+
+    } catch (err) {
+        console.error("Error fetching documents by folder:", err);
+        res.status(500).json({ success: false, message: "Server Error" });
+    }
+};
+
+/**
  * Get single document by ID
  */
 export const getDocument = async (req, res) => {
