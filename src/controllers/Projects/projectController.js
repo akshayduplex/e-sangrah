@@ -105,21 +105,25 @@ export const createProject = async (req, res) => {
 // Get all projects with search
 export const getAllProjects = async (req, res) => {
     try {
-        const { search } = req.query; // Get search keyword from query params
+        const { search } = req.query;
 
-        // Build search query
         let query = {};
         if (search) {
-            const regex = new RegExp(search, "i"); // case-insensitive search
-            query.projectName = { $regex: regex };
+            // Case-insensitive search on projectName
+            query.projectName = { $regex: new RegExp(search, "i") };
         }
 
-        // // Find projects with only _id and projectName
-        // const projects = await Project.find(query, { _id: 1, projectName: 1 }).lean();
-        // Find projects with only projectName
-        const projects = await Project.find(query, { projectName: 1, _id: 0 }).lean();
+        // If no search term, limit results to 10
+        const limit = search ? 0 : 10;
+
+        const projects = await Project.find(query, { _id: 1, projectName: 1 })
+            .limit(limit) // 0 means no limit in Mongo
+            .sort({ projectName: 1 }) // optional: alphabetical sorting
+            .lean();
+
         return successResponse(res, projects, "Projects fetched successfully");
     } catch (err) {
+        console.error("Error fetching projects:", err);
         return errorResponse(res, err, "Failed to fetch projects");
     }
 };

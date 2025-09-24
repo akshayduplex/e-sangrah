@@ -26,6 +26,8 @@ const folderSchema = new Schema({
     name: { type: String, required: true, trim: true },
     slug: { type: String, trim: true }, // URL-friendly identifier
     owner: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    projectId: { type: mongoose.Schema.Types.ObjectId, ref: "Project", default: null },
+    departmentId: { type: mongoose.Schema.Types.ObjectId, ref: "Department", default: null },
     parent: { type: Schema.Types.ObjectId, ref: 'Folder', default: null, index: true },
     path: { type: String, index: true }, // materialized path, e.g., /root/documents/project1
     ancestors: [{ type: Schema.Types.ObjectId, ref: 'Folder', index: true }], // ancestor references

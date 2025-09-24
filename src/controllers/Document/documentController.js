@@ -58,6 +58,7 @@ export const getDocuments = async (req, res) => {
             .populate("project", "name")
             .populate("owner", "firstName lastName email")
             .populate("projectManager", "firstName lastName email")
+            .populate("folderId", "name")
             .sort(sort)
             .skip(skip)
             .limit(limitNum);
@@ -103,7 +104,8 @@ export const getDocument = async (req, res) => {
             .populate("documentManager", "firstName lastName email")
             .populate("sharedWith.user", "firstName lastName email")
             .populate("sharedWithDepartments.department", "name")
-            .populate("files.file", "filename originalName size mimetype url");
+            .populate("files.file", "filename originalName size mimetype url")
+            .populate("folderId", "name");
 
         if (!document) {
             return failResponse(res, "Document not found", 404);
@@ -139,11 +141,16 @@ export const createDocument = async (req, res) => {
             description,
             compliance,
             expiryDate,
+            folderId,
             comment,
             link,
             fileIds
         } = req.body;
-
+        // Validate folderId if provided
+        let validFolderId = null;
+        if (folderId && mongoose.Types.ObjectId.isValid(folderId)) {
+            validFolderId = folderId;
+        }
         // Parse metadata if it's a JSON string
         let parsedMetadata = {};
         if (metadata) {
@@ -277,6 +284,7 @@ export const createDocument = async (req, res) => {
             project: projectName || null,
             department,
             projectManager: projectManager || null,
+            folderId: validFolderId,
             owner: req.user._id,
             documentManager: null,
             documentDate: parsedDocumentDate,
@@ -334,6 +342,9 @@ export const updateDocument = async (req, res) => {
         const { id } = req.params;
         const document = await Document.findById(id);
         if (!document) return failResponse(res, "Document not found", 404);
+        if (req.body.folderId && mongoose.Types.ObjectId.isValid(req.body.folderId)) {
+            document.folderId = req.body.folderId;
+        }
 
         const {
             projectName,

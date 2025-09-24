@@ -12,7 +12,8 @@ import {
     getAllFolders,
     archiveFolder,
     restoreFolder,
-    getArchivedFolders
+    getArchivedFolders,
+    getFoldersProjectDepartment
 } from '../../controllers/Folder/folderController.js';
 import { authenticate } from '../../middlewares/authMiddleware.js';
 import multer from 'multer';
@@ -36,6 +37,8 @@ router.get('/all', getAllFolders);
 
 // Get folder details with contents
 router.get('/details/:id', getFolder);
+
+// router.get('', getFoldersProjectDepartment)
 
 // Rename folder
 router.patch('/:id/rename', renameFolder);

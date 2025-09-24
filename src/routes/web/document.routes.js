@@ -32,16 +32,9 @@ router.get("/list", authenticate, checkPermissions, async (req, res) => {
 // Add Document Page
 router.get("/add", authenticate, checkPermissions, async (req, res) => {
     try {
-        const departments = await Department.find({ status: "Active" }, "name").lean();
-        const users = await User.find({ profile_type: "user" }, "name").sort({ name: 1 }).lean();
-        const projectNames = await Project.find({ isActive: true, projectStatus: "Active" }, "projectName").lean();
-
         res.render("pages/add-document", {
             title: "E-Sangrah - Add-Document",
-            departments,
             user: req.user,
-            users,
-            projectNames,
             isEdit: false
         });
     } catch (err) {
@@ -68,19 +61,13 @@ router.get("/edit/:id", authenticate, checkPermissions, async (req, res) => {
             return res.status(404).send("Document not found");
         }
 
-        // Fetch dropdown data (same as add page)
-        const departments = await Department.find({ status: "Active" }, "name").lean();
-        const users = await User.find({ profile_type: "user" }, "name").sort({ name: 1 }).lean();
-        const projectNames = await Project.find({ isActive: true, projectStatus: "Active" }, "projectName").lean();
-
         res.render("pages/add-document", {
             title: "E-Sangrah - Edit Document",
-            departments,
             user: req.user,
-            users,
-            projectNames,
-            document,  // <-- pass existing document for prefill
-            isEdit: true  // <-- flag to differentiate add vs edit
+            document,
+            isEdit: true,
+            projectManager: document.projectManager, // send explicitly
+            department: document.department // send explicitly
         });
     } catch (err) {
         console.error("Error loading edit-document page:", err);

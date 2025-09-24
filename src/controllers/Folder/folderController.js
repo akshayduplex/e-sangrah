@@ -24,7 +24,7 @@ const generatePath = async (folderId) => {
 // Create folder
 export const createFolder = async (req, res) => {
     try {
-        const { name, parentId } = req.body;
+        const { name, parentId, projectId, departmentId } = req.body;
         const ownerId = req.user._id;
 
         // Check if folder with same name already exists in the same location
@@ -43,7 +43,16 @@ export const createFolder = async (req, res) => {
         }
 
         // Use the static method to create folder with unique slug
-        const folder = await Folder.createFolder(ownerId, parentId, name, ownerId);
+        const folder = new Folder({
+            owner: ownerId,
+            parent: parentId || null,
+            name,
+            projectId: projectId || null,
+            departmentId: departmentId || null,
+            createdBy: ownerId,
+            updatedBy: ownerId
+        });
+        await folder.save();
 
         res.status(201).json({
             success: true,
@@ -71,25 +80,36 @@ export const createFolder = async (req, res) => {
 // List all folders for a user (ignoring parent)
 export const getAllFolders = async (req, res) => {
     try {
-        const ownerId = req.user._id;
+        const { departmentId, projectId } = req.query;
 
-        const folders = await Folder.find({
-            owner: ownerId,
-            deletedAt: null,  // or isDeleted: false if you add that field
-            isArchived: false
-        }).populate('parent')
-            .select('name slug path parent createdAt updatedAt size depth')
-            .sort({ path: 1 }); // order by hierarchy path
+        const filter = { status: "active", deletedAt: null };
 
-        res.json({
+        if (departmentId && mongoose.Types.ObjectId.isValid(departmentId)) {
+            filter.departmentId = departmentId;
+        }
+
+        if (projectId && mongoose.Types.ObjectId.isValid(projectId)) {
+            filter.projectId = projectId;
+        }
+
+        const folders = await Folder.find(filter)
+            .select("_id name slug size path createdAt updatedAt departmentId projectId")
+            .populate("departmentId", "name") // department name
+            .populate("projectId", "projectName") // project name
+            .sort({ name: 1 })
+            .lean();
+
+        return res.json({
             success: true,
+            message: "Folders retrieved successfully",
             folders
         });
-    } catch (err) {
-        console.error('Get all folders error:', err);
-        res.status(500).json({
+    } catch (error) {
+        console.error("Error fetching folders:", error);
+        return res.status(500).json({
             success: false,
-            message: 'Server error while fetching all folders'
+            message: "Failed to retrieve folders",
+            error: error.message
         });
     }
 };
@@ -106,7 +126,9 @@ export const listFolders = async (req, res) => {
             parent: parentId,
             owner: ownerId,
             isDeleted: false
-        }).select('name slug path createdAt updatedAt size').sort({ name: 1 });
+        }).select('name slug path createdAt updatedAt size projectId departmentId').sort({ name: 1 })
+            .populate('projectId', 'name')
+            .populate('departmentId', 'name');;
 
         let content = [];
 
@@ -136,6 +158,33 @@ export const listFolders = async (req, res) => {
     }
 };
 
+export const getFoldersProjectDepartment = async (req, res) => {
+    try {
+        const { departmentId } = req.params;
+        const { projectId } = req.query;
+
+        const filter = { status: "active", deletedAt: null };
+
+        if (departmentId && mongoose.Types.ObjectId.isValid(departmentId)) {
+            filter.departmentId = departmentId;
+        }
+
+        if (projectId && mongoose.Types.ObjectId.isValid(projectId)) {
+            filter.projectId = projectId;
+        }
+
+        const folders = await Folder.find(filter)
+            .select("_id name") // only id and name
+            .sort({ name: 1 })  // optional: alphabetical
+            .lean();
+
+        return successResponse(res, { folders }, "Folders retrieved successfully");
+    } catch (error) {
+        console.error("Error fetching folders:", error);
+        return errorResponse(res, error, "Failed to retrieve folders");
+    }
+};
+
 // Get folder details with contents
 export const getFolder = async (req, res) => {
     try {
@@ -144,7 +193,9 @@ export const getFolder = async (req, res) => {
 
         const folder = await Folder.findOne({ _id: id, owner: ownerId, isDeleted: false })
             .populate('parent', 'name path')
-            .populate('owner', 'name email');
+            .populate('owner', 'name email')
+            .populate('projectId', 'name')
+            .populate('departmentId', 'name');
 
         if (!folder) {
             return res.status(404).json({
@@ -158,7 +209,7 @@ export const getFolder = async (req, res) => {
             parent: id,
             owner: ownerId,
             isDeleted: false
-        }).select('name slug path createdAt updatedAt size').sort({ name: 1 });
+        }).select('name slug path createdAt updatedAt size projectId departmentId').populate('projectId', 'name').populate('departmentId', 'name').sort({ name: 1 });
 
         // Get documents/files in this folder
         const documents = await Document.find({
@@ -256,6 +307,8 @@ export const moveFolder = async (req, res) => {
                 message: 'Folder not found'
             });
         }
+        const isCircular = await Folder.isDescendant(newParentId, folder._id);
+        if (isCircular) throw new Error("Cannot move folder into its own subfolder");
 
         // Use the static method to move folder (handles path updates recursively)
         const updatedFolder = await Folder.moveFolder(id, newParentId, ownerId);
@@ -296,7 +349,7 @@ export const deleteFolder = async (req, res) => {
 
         if (fileCount > 0) {
             // Folder has files → mark as inactive
-            folder.isDeleted = true; // or folder.status = "inactive" if you have a status field
+            folder.status = 'inactive';
             await folder.save();
             return res.json({ success: true, message: "Folder contains files, marked as inactive" });
         }
@@ -355,6 +408,7 @@ export const uploadToFolder = async (req, res) => {
                 originalName: originalname,
                 s3Filename: key,
                 s3Url: url,
+                size: buffer.length
             });
         }
 
@@ -386,7 +440,8 @@ export const getFolderTree = async (req, res) => {
                 parent: parentId,
                 owner: ownerId,
                 isDeleted: false
-            }).select('name slug path createdAt updatedAt').sort({ name: 1 });
+            }).select('name slug path createdAt updatedAt projectId departmentId').populate('projectId', 'name').populate('departmentId', 'name').sort({ name: 1 });
+
 
             const tree = await Promise.all(folders.map(async (folder) => {
                 const children = await buildTree(folder._id);
