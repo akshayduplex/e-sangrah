@@ -1,6 +1,5 @@
 <%- include('../../partials/header') %>
 
-    <!-- Page Wrapper -->
     <div class="page-wrapper">
         <div class="content">
             <!-- Breadcrumb -->
@@ -9,9 +8,7 @@
                     <h2 class="mb-1">Documents List</h2>
                     <nav>
                         <ol class="breadcrumb mb-0">
-                            <li class="breadcrumb-item">
-                                <a href="#"><i class="ti ti-smart-home"></i></a>
-                            </li>
+                            <li class="breadcrumb-item"><a href="#"><i class="ti ti-smart-home"></i></a></li>
                             <li class="breadcrumb-item">Documents List</li>
                         </ol>
                     </nav>
@@ -22,244 +19,128 @@
                     </a>
                 </div>
             </div>
-            <!-- /Breadcrumb -->
-
-            <!-- Filter Section -->
-            <div class="row mb-3">
-                <div class="col-xxl-12">
-                    <div class="card p-3">
-                        <div class="row g-2 align-items-end">
-                            <div class="col-md-3">
-                                <label>Status</label>
-                                <select id="filter_status" class="form-select">
-                                    <option value="">All</option>
-                                    <option value="Draft">Draft</option>
-                                    <option value="Pending">Pending</option>
-                                    <option value="UnderReview">UnderReview</option>
-                                    <option value="Approved">Approved</option>
-                                    <option value="Rejected">Rejected</option>
-                                    <option value="Archived">Archived</option>
-                                </select>
-                            </div>
-                            <div class="col-md-3">
-                                <label>Department</label>
-                                <input type="text" id="filter_department" class="form-control"
-                                    placeholder="Department ID">
-                            </div>
-                            <div class="col-md-2">
-                                <button id="apply_filters" class="btn btn-primary w-100">Apply Filters</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <!-- /Filter Section -->
 
             <!-- Documents Table -->
             <div class="row">
                 <div class="col-xxl-12 col-xl-12">
                     <div class="card flex-fill">
                         <div class="card-body p-0">
-                            <div class="custom-datatable-filter table-responsive">
-                                <table class="table datatable" id="documents_tables">
+                            <div class="table-responsive">
+                                <table class="table datatable" id="documents_table_new">
                                     <thead>
                                         <tr>
                                             <th>Actions</th>
                                             <th>File Name</th>
-                                            <th>Last Modified</th>
-                                            <th>Owner</th>
+                                            <th>Owner Name</th>
+                                            <th>Owner Email</th>
                                             <th>Department</th>
                                             <th>Project</th>
                                             <th>Tags</th>
-                                            <th>Meta data</th>
-                                            <th>Created on</th>
                                             <th>Status</th>
+                                            <th>Created On</th>
+                                            <th>Last Modified</th>
                                         </tr>
                                     </thead>
-                                    <tbody id="documents_folder"></tbody>
+                                    <tbody id="documents_table_body_new"></tbody>
                                 </table>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
-            <!-- /Documents Table -->
-        </div>
 
-        <div class="footer mt-4 d-sm-flex align-items-center justify-content-between border-top bg-white p-3">
-            <p class="mb-0">2025 &copy; HLFPPT.</p>
-            <p>Designed & Developed by <a href="javascript:void(0);" class="text-primary">Duplex services &
-                    Technology</a></p>
         </div>
     </div>
-    <!-- /Page Wrapper -->
-
-    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
-    <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
-
-    <script>
-        $(document).ready(function () {
-            // -----------------------------
-            // Extract folderId from URL
-            // -----------------------------
-            const urlParts = window.location.pathname.split('/');
-            let folderId = '';
-            if (urlParts.length >= 3) {
-                folderId = urlParts[2]; // 0: '', 1: 'documents', 2: folderId, 3: 'list'
-            }
-            console.log('Detected folderId:', folderId);
-
-            // -----------------------------
-            // Initialize DataTable
-            // -----------------------------
-            let table;
-
-            function initializeDataTable() {
-                if ($.fn.DataTable.isDataTable('#documents_tables')) {
-                    table.destroy();
-                    $('#documents_folder').empty();
-                }
-
-                table = $('#documents_tables').DataTable({
-                    processing: true,
-                    serverSide: false,
-                    searching: true,
-                    paging: true,
-                    lengthChange: true,
-                    info: true,
-                    autoWidth: false,
-                    columns: [
-                        { data: 'actions', orderable: false, searchable: false, className: 'text-center' },
-                        { data: 'fileNames' },
-                        { data: 'updatedAt' },
-                        { data: 'owner' },
-                        { data: 'department' },
-                        { data: 'project' },
-                        { data: 'tags' },
-                        { data: 'metaData' },
-                        { data: 'createdAt' },
-                        { data: 'status', orderable: false, searchable: false }
-                    ],
-                    language: {
-                        emptyTable: "No documents found",
-                        zeroRecords: "No matching documents found"
-                    }
-                });
-            }
-
-            // -----------------------------
-            // Fetch documents from API
-            // -----------------------------
-            function fetchDocuments(filters = {}) {
-                $('#documents_folder').html('<tr><td colspan="10" class="text-center">Loading...</td></tr>');
-
-                const queryParams = new URLSearchParams(filters).toString();
-                const url = folderId ? `/api/documents/folder/${folderId}?${queryParams}` : `/api/documents?${queryParams}`;
-                console.log('Fetching documents from:', url);
-
-                $.ajax({
-                    url: url,
-                    method: 'GET',
-                    success: function (res) {
-                        if (!res || !res.success) {
-                            showError('Failed to load documents');
-                            return;
-                        }
-
-                        const tableData = (res.documents || []).map(doc => {
-                            const files = doc.files || [];
-                            const fileNames = files.map(f => f.originalName).join(", ") || "-";
-                            const tags = Array.isArray(doc.tags) ? doc.tags.join(", ") : "-";
-                            const metaData = doc.metadata ? Object.values(doc.metadata).filter(v => v).join(", ") || "-" : "-";
-                            const owner = doc.owner ? (doc.owner.email || doc.owner.name || "-") : "-";
-                            const department = doc.department ? (doc.department.name || "-") : "-";
-                            const project = doc.project ? (doc.project.projectName || "-") : "-";
-                            const statusClass = {
-                                'Draft': 'bg-soft-info',
-                                'Pending': 'bg-soft-warning',
-                                'Approved': 'bg-soft-success',
-                                'Rejected': 'bg-soft-danger',
-                                'UnderReview': 'bg-soft-warning',
-                                'Archived': 'bg-soft-secondary'
-                            }[doc.status] || 'bg-soft-secondary';
-                            const statusBadge = `<span class="badge badge-md ${statusClass}">${doc.status || 'Unknown'}</span>`;
-
-                            const actions = `
-<div class="btn-group" role="group">
-    <button type="button" class="btn border-0" data-bs-toggle="dropdown" aria-expanded="false">
-        <i class="ti ti-settings"></i>
-    </button>
-    <ul class="dropdown-menu">
-        <li><a class="dropdown-item" href="${doc.link || '#'}"><i class="ti ti-eye"></i> View</a></li>
-        <li><a class="dropdown-item" href="/documents/edit/${doc._id}"><i class="ti ti-pencil-minus"></i> Edit</a></li>
-        <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#sharedoc-modal">
-            <i class="ti ti-share"></i> Share</a></li>
-        <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#versionhistory-modal">
-            <i class="ti ti-history"></i> Version History</a></li>
-        <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#downloaddoc-modal">
-            <i class="ti ti-download"></i> Download</a></li>
-        <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#trashdoc-modal">
-            <i class="ti ti-trash"></i> Move to Trash</a></li>
-        <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#archivedoc-modal">
-            <i class="ti ti-archive"></i> Move to Archive</a></li>
-    </ul>
-</div>`;
-
-                            return {
-                                actions,
-                                fileNames,
-                                updatedAt: doc.updatedAt ? new Date(doc.updatedAt).toLocaleString() : '-',
-                                owner,
-                                department,
-                                project,
-                                tags,
-                                metaData,
-                                createdAt: doc.createdAt ? new Date(doc.createdAt).toLocaleString() : '-',
-                                status: statusBadge
-                            };
-                        });
-
-                        // Initialize DataTable if not yet
-                        if (!$.fn.DataTable.isDataTable('#documents_tables')) {
-                            initializeDataTable();
-                        }
-
-                        table.clear().rows.add(tableData).draw();
-                    },
-                    error: function (xhr, status, error) {
-                        console.error("Error fetching documents:", error, xhr.responseText);
-                        showError('Error loading documents');
-                    }
-                });
-            }
-
-            function showError(message) {
-                $('#documents_folder').html(`<tr><td colspan="10" class="text-center text-danger">${message}</td></tr>`);
-            }
-
-            // -----------------------------
-            // Initialize table & fetch
-            // -----------------------------
-            initializeDataTable();
-            fetchDocuments();
-
-            // -----------------------------
-            // Filter functionality
-            // -----------------------------
-            $("#apply_filters").click(function () {
-                const filters = {
-                    status: $("#filter_status").val(),
-                    department: $("#filter_department").val()
-                };
-                fetchDocuments(filters);
-            });
-
-            // Enter key support for department filter
-            $("#filter_department").keypress(function (e) {
-                if (e.which === 13) $("#apply_filters").click();
-            });
-        });
-    </script>
-
 
     <%- include('../../partials/footer') %>
+        <link href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+        <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+        <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+
+        <script>
+            $(document).ready(function () {
+                const $tableBody = $("#documents_table_body_new");
+
+                // Extract folder ID from URL
+                const urlParts = window.location.pathname.split('/');
+                const folderId = urlParts[1] || '';
+                console.log("Detected folder ID:", folderId);
+
+                function fetchDocuments() {
+                    $.ajax({
+                        url: `/api/documents/folder/${folderId}`,
+                        method: 'GET',
+                        success: function (res) {
+                            if (!res.success) return;
+                            const documents = res.documents || [];
+                            $tableBody.empty();
+
+                            documents.forEach(doc => {
+                                const fileName = doc.signature?.fileName || "-";
+                                const ownerName = doc.owner?.name || "-";
+                                const ownerEmail = doc.owner?.email || "-";
+                                const department = doc.department?.name || "-";
+                                const project = doc.project?.projectName || "-";
+                                const tags = (doc.tags || []).join(", ") || "-";
+                                const statusClass = {
+                                    'Draft': 'bg-soft-info',
+                                    'Pending': 'bg-soft-warning',
+                                    'Approved': 'bg-soft-success',
+                                    'Rejected': 'bg-soft-danger',
+                                    'UnderReview': 'bg-soft-warning',
+                                    'Archived': 'bg-soft-secondary'
+                                }[doc.status] || 'bg-soft-secondary';
+                                const createdAt = doc.createdAt ? new Date(doc.createdAt).toLocaleString() : '-';
+                                const updatedAt = doc.updatedAt ? new Date(doc.updatedAt).toLocaleString() : '-';
+
+                                const rowHtml = `
+<tr>
+    <td>
+        <div class="btn-group" role="group">
+            <button type="button" class="btn border-0" data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="ti ti-settings"></i>
+            </button>
+            <ul class="dropdown-menu">
+                <li><a class="dropdown-item" href="${doc.link || '#'}" target="_blank"><i class="ti ti-eye"></i> View</a></li>
+                <li><a class="dropdown-item" href="/documents/edit/${doc._id}"><i class="ti ti-pencil-minus"></i> Edit</a></li>
+                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#share-doc-modal-${doc._id}"><i class="ti ti-share"></i> Share</a></li>
+                <li><a class="dropdown-item" href="${doc.signature?.fileUrl || '#'}" download><i class="ti ti-download"></i> Download</a></li>
+                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#trash-doc-modal-${doc._id}"><i class="ti ti-trash"></i> Move to Trash</a></li>
+                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#archive-doc-modal-${doc._id}"><i class="ti ti-archive"></i> Archive</a></li>
+            </ul>
+        </div>
+    </td>
+    <td>${fileName}</td>
+    <td>${ownerName}</td>
+    <td>${ownerEmail}</td>
+    <td>${department}</td>
+    <td>${project}</td>
+    <td>${tags}</td>
+    <td><span class="badge badge-md ${statusClass}">${doc.status}</span></td>
+    <td>${createdAt}</td>
+    <td>${updatedAt}</td>
+</tr>`;
+
+                                $tableBody.append(rowHtml);
+                            });
+
+                            // Initialize DataTable with options
+                            $('#documents_table_new').DataTable({
+                                destroy: true,
+                                paging: true,
+                                searching: true,
+                                ordering: true,
+                                info: true,
+                                autoWidth: false,
+                                order: [[8, 'desc']] // default order by Created On descending
+                            });
+                        },
+                        error: function (err) {
+                            console.error("Error fetching documents:", err);
+                        }
+                    });
+                }
+
+                fetchDocuments();
+            });
+        </script>

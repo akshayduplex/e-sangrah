@@ -513,7 +513,7 @@ export const getArchivedFolders = async (req, res) => {
 
         // Find all folders that are archived and not deleted
         const folders = await Folder.find({ owner: ownerId, isArchived: true, deletedAt: null })
-            .sort({ updatedAt: -1 }).select('name slug')
+            .sort({ updatedAt: -1 }).select('name owner departmentId parent status createdBy updatedBy slug').populate('departmentId', 'name').populate('parent', 'name').populate('createdBy', 'name').populate('updatedBy', 'name').populate('owner', 'name email').populate('projectId', 'name')
             .lean();
 
         res.json({

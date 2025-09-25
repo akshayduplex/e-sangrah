@@ -71,75 +71,53 @@ $(document).ready(function () {
         $('#createFolderBtn').prop('disabled', !(projectSelected && departmentSelected));
     }
     async function loadFolders(rootId = null, parentPath = []) {
-        try {
-            const departmentId = $('#department').val() || '';
-            const projectId = $('#projectName').val() || '';
+        const departmentId = $('#department').val() || '';
+        const projectId = $('#projectName').val() || '';
+        const query = new URLSearchParams();
 
-            const query = new URLSearchParams();
-            if (departmentId && departmentId !== 'all') query.append('departmentId', departmentId);
-            if (projectId && projectId !== 'all') query.append('projectId', projectId);
-            if (rootId) query.append('rootId', rootId);
+        if (departmentId && departmentId !== 'all') query.append('departmentId', departmentId);
+        if (projectId && projectId !== 'all') query.append('projectId', projectId);
+        if (rootId) query.append('rootId', rootId);
 
-            const res = await fetch(`/api/folders/tree/structure?${query.toString()}`);
-            const data = await res.json();
-            if (!data.success) return;
+        const res = await fetch(`/api/folders/tree/structure?${query.toString()}`);
+        const data = await res.json();
+        if (!data.success) return;
 
-            const container = $('#folderContainer');
-            container.empty();
+        const container = $('#folderContainer').empty();
+        const folders = data.tree || [];
 
-            const folders = data.tree || [];
+        folders.forEach(folder => {
+            const subCount = folder.children ? folder.children.length : 0;
+            const folderCard = $(`
+            <div class="folder-card" style="width:80px;">
+                <div class="fldricon"><img src="/img/icons/folder.png"></div>
+                <div class="fldrname text-truncate">${folder.name}</div>
+                ${subCount ? `<span class="badge">${subCount}</span>` : ''}
+            </div>
+        `);
+            folderCard.data('id', folder._id);
+            folderCard.data('name', folder.name);
+            folderCard.data('children', folder.children || null);
 
-            folders.forEach(folder => {
-                const subCount = folder.children ? folder.children.length : 0;
+            folderCard.on('click', async function () {
+                $('.folder-card').removeClass('active border-primary').addClass('border');
+                folderCard.addClass('active border-primary');
 
-                const folderCard = $(`
-    <div class="folder-card position-relative p-2 m-1 border rounded shadow-sm cursor-pointer text-center d-flex flex-column align-items-center justify-content-center"
-     style="width: 80px; transition: transform 0.2s;">
-    <!-- Custom folder icon -->
-    <div class="fldricon mb-1" style="width: 40px; height: 40px;">
-        <img src="/img/icons/folder.png" alt="folder" style="width: 100%; height: 100%; object-fit: contain;">
-    </div>
+                const currentPath = [...parentPath, folderCard.data('name')];
+                window.selectedFolders = currentPath;
+                $('#selectedFolderId').val(folderCard.data('id'));
+                updateDirectoryPath();
 
-    <!-- Folder name -->
-    <div class="fldrname text-truncate" style="font-size: 0.8rem;">${folder.name}</div>
-
-    <!-- Optional badge for subfolders/files -->
- ${subCount > 0 ? `<span class="badge bg-primary position-absolute top-0 end-0 mt-1 me-1" style="font-size:0.6rem;">${subCount}</span>` : ''}
-</div>
-
-    `);
-
-                folderCard.data('id', folder._id);
-                folderCard.data('name', folder.name);
-                folderCard.data('children', folder.children || null);
-
-                folderCard.hover(
-                    () => folderCard.css('transform', 'scale(1.05)'),
-                    () => folderCard.css('transform', 'scale(1)')
-                );
-
-                folderCard.on('click', async function () {
-                    $('.folder-card').removeClass('active border-primary').addClass('border');
-                    folderCard.addClass('active border-primary');
-
-                    const currentPath = [...parentPath, folderCard.data('name')];
-                    window.selectedFolders = currentPath;
-                    $('#selectedFolderId').val(folderCard.data('id'));
-                    updateDirectoryPath();
-
-                    if (folderCard.data('children') && folderCard.data('children').length > 0) {
-                        await loadFolders(folderCard.data('id'), currentPath);
-                    }
-                });
-
-                container.append(folderCard);
+                // Lazy load children
+                if (folderCard.data('children') && folderCard.data('children').length > 0) {
+                    await loadFolders(folderCard.data('id'), currentPath);
+                }
             });
 
-
-        } catch (error) {
-            console.error('Error loading folders:', error);
-        }
+            container.append(folderCard);
+        });
     }
+
 
 
 
