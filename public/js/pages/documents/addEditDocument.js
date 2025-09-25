@@ -80,12 +80,11 @@ $(document).ready(function () {
         }
     }
 
-
     async function loadFolders(rootId = null, parentPath = []) {
         const departmentId = $('#department').val();
         const projectId = $('#projectName').val();
 
-        // If nothing selected, reset
+        // Reset if nothing selected
         if ((!projectId || projectId === 'all') && (!departmentId || departmentId === 'all')) {
             $('#folderContainer').empty();
             window.selectedFolders = [];
@@ -105,43 +104,44 @@ $(document).ready(function () {
             if (!data.success) return;
 
             const folders = data.tree || [];
-            const container = $('#folderContainer').empty();
+            const container = $('#folderContainer').empty(); // Clear old children
 
             folders.forEach((folder, index) => {
                 const subCount = folder.children?.length || 0;
                 const folderCard = $(`
-        <div class="folder-card" style="width:80px;">
-            <div class="fldricon"><img src="/img/icons/folder.png"></div>
-            <div class="fldrname text-truncate">${folder.name}</div>
-            ${subCount ? `<span class="badge">${subCount}</span>` : ''}
-        </div>
-    `);
+                <div class="folder-card" style="width:80px;">
+                    <div class="fldricon"><img src="/img/icons/folder.png"></div>
+                    <div class="fldrname text-truncate">${folder.name}</div>
+                    ${subCount ? `<span class="badge">${subCount}</span>` : ''}
+                </div>
+            `);
 
-                folderCard.data('folder', folder); // store full folder object
+                folderCard.data('folder', folder);
 
-                // ----------- SINGLE CLICK HANDLER -----------
+                // Single click: select folder
                 folderCard.on('click', function () {
                     $('.folder-card').removeClass('active border-primary').addClass('border');
                     folderCard.addClass('active border-primary');
 
-                    // <--- REPLACE HERE WITH FIXED CODE --->
+                    // Replace selectedFolders with new path up to this folder
                     window.selectedFolders = [...parentPath, { id: folder._id, name: folder.name }];
                     $('#selectedFolderId').val(folder._id);
                     updateDirectoryPath();
                 });
 
-                // ----------- DOUBLE CLICK HANDLER -----------
-                folderCard.on('dblclick', async function () {
-                    const newPath = [...parentPath, { id: folder._id, name: folder.name }];
-                    await loadFolders(folder._id, newPath);
-                });
+                // Double click: open folder
+                if (subCount > 0) {
+                    folderCard.on('dblclick', async function () {
+                        const newPath = [...parentPath, { id: folder._id, name: folder.name }];
+                        await loadFolders(folder._id, newPath); // pass new path
+                    });
+                }
 
                 container.append(folderCard);
 
                 // Auto-select first folder at root
                 if (index === 0 && !rootId) folderCard.trigger('click');
             });
-
 
             updateDirectoryPath();
         } catch (err) {
@@ -150,36 +150,45 @@ $(document).ready(function () {
     }
 
 
+
     $('#folder-modal').on('show.bs.modal', function () {
         const projectText = $('#projectName option:selected').text();
+        const projectId = $('#projectName').val();
         const departmentText = $('#department option:selected').text();
+        const departmentId = $('#department').val();
         const folders = window.selectedFolders || [];
-
-        const pathSegments = [];
-
-        if (projectText && projectText !== '-- Select Project Name --') {
-            pathSegments.push(projectText);
-        }
-        if (departmentText && departmentText !== '-- Select Department --') {
-            pathSegments.push(departmentText);
-        }
 
         const parentFolderSelect = $('#parentFolder');
         parentFolderSelect.empty();
 
-        // Root option
+        // ---------------------------
+        // 1. Top-Level (no parent)
+        // ---------------------------
         parentFolderSelect.append(
-            new Option(`-- Root (${pathSegments.join(' / ') || 'No Selection'}) --`, '', true, false)
+            new Option('-- Top-Level (No Parent) --', '', false, false)
         );
 
-        // Add current folder chain
+        // ---------------------------
+        // 2. Project / Department
+        // ---------------------------
+        if (projectId && projectId !== 'all' && departmentId && departmentId !== 'all') {
+            const isSelected = folders.length === 0; // select if no folder selected
+            parentFolderSelect.append(
+                new Option(`${projectText} / ${departmentText}`, 'root', false, isSelected)
+            );
+        }
+
+        // ---------------------------
+        // 3. Existing folder chain
+        // ---------------------------
         folders.forEach((f, i) => {
-            const fullPath = [...pathSegments, ...folders.slice(0, i + 1).map(ff => ff.name)].join(' / ');
-            parentFolderSelect.append(new Option(fullPath, f.id, false, false));
+            const fullPath = `${projectText} / ${departmentText} /${folders.slice(0, i + 1).map(ff => ff.name).join(' / ')}`;
+            const isSelected = i === folders.length - 1; // last folder selected by default
+            parentFolderSelect.append(new Option(fullPath, f.id, false, isSelected));
         });
 
-        // Refresh Select2
-        parentFolderSelect.val(folders.length ? folders[folders.length - 1].id : '').trigger('change');
+        // Trigger change for select2
+        parentFolderSelect.trigger('change');
     });
 
 
@@ -199,13 +208,18 @@ $(document).ready(function () {
         const departmentId = $('#department').val();
         // const parentId = $('#selectedFolderId').val() || null;
         let parentId = $('#parentFolder').val();
-        if (!parentId) {
-            parentId = $('#selectedFolderId').val() || null;
+
+        // If the user selected "Root" or no parent, set null for top-level
+        if (!parentId || parentId === '') {
+            parentId = null;
         }
+        else if (parentId === 'root') parentId = null;
+        // Validation
         if (!folderName || !projectId || !departmentId) {
             showToast('Please select Project, Department, and provide folder name.', 'error');
             return;
         }
+
 
         try {
             const response = await fetch('/api/folders', {
@@ -221,7 +235,41 @@ $(document).ready(function () {
             $('#createFolderForm')[0].reset();
 
             // Reload current folder to show new folder at the end
-            await loadFolders(parentId, window.selectedFolders.slice(0, -1));
+            // Determine new path to reload the parent folder
+            let newPath = [];
+
+            if (parentId) {
+                // If creating inside a subfolder, find the path to parent
+                const parentIndex = window.selectedFolders.findIndex(f => f.id === parentId);
+                if (parentIndex >= 0) {
+                    newPath = window.selectedFolders.slice(0, parentIndex + 1);
+                } else {
+                    // If parent is selected from modal but not in selectedFolders
+                    newPath = [...window.selectedFolders];
+                    const parentName = $('#parentFolder option:selected').text();
+                    if (parentName) {
+                        newPath.push({ id: parentId, name: parentName });
+                    }
+                }
+            }
+
+            // Reload the parent folder and auto-select it
+            await loadFolders(parentId, newPath);
+            // Inside the success block, after loadFolders
+            const container = $('#folderContainer');
+            const newFolderCard = container.find('.folder-card').filter(function () {
+                return $(this).find('.fldrname').text() === folderName;
+            }).first();
+
+            if (newFolderCard.length) {
+                newFolderCard.trigger('click');
+            }
+
+            // Update selected folder to parent folder
+            window.selectedFolders = newPath;
+            $('#selectedFolderId').val(parentId);
+            updateDirectoryPath();
+
 
             showToast('Folder created successfully!', 'success');
         } catch (err) {
@@ -378,115 +426,110 @@ $(document).ready(function () {
         });
     });
 
+    $('#parentFolder').select2({
+        dropdownParent: $('#folder-modal'), // ensures it stays inside modal
+        width: '100%',
+        placeholder: "-- Root (No Parent) --",
+        allowClear: true
+    });
 
-
-
-
-    $(document).ready(function () {
-        $('#parentFolder').select2({
-            dropdownParent: $('#folder-modal'), // ensures it stays inside modal
-            width: '100%',
-            placeholder: "-- Root (No Parent) --",
-            allowClear: true
-        });
-
-        // --------------------------
-        // Project Name Select2
-        // --------------------------
-        $("#projectName").select2({
-            placeholder: "-- Select Project Name --",
-            allowClear: false,
-            ajax: {
-                delay: 300,
-                transport: function (params, success, failure) {
-                    const search = params.data.term || "";
-                    $.ajax({
-                        url: `/api/projects?search=${encodeURIComponent(search)}`,
-                        type: "GET",
-                        success: function (res) {
-                            let data = res.data || [];
-                            data.unshift({ _id: "all", projectName: "-- Select Project Name --" });
-                            success(data);
-                        },
-                        error: failure
-                    });
-                },
-                processResults: function (data) {
-                    return {
-                        results: data.map(project => ({
-                            id: project._id,
-                            text: project.projectName
-                        }))
-                    };
-                }
-            }
-        });
-
-        // Pre-select projectName if editing
-        if (isEdit && document.projectName) {
-            const projectOption = new Option(document.projectName.name || document.projectName.projectName, document.projectName._id, true, true);
-            $('#projectName').append(projectOption).trigger('change');
-        }
-
-        // --------------------------
-        // Department Select2
-        // --------------------------
-        $("#department").select2({
-            placeholder: "-- Select Department --",
-            allowClear: false,
-            ajax: {
-                url: '/api/departments/search',
-                dataType: 'json',
-                delay: 250,
-                data: function (params) {
-                    return { search: params.term || '', page: params.page || 1, limit: 10 };
-                },
-                processResults: function (data, params) {
-                    params.page = params.page || 1;
-                    let results = data.data.map(dep => ({ id: dep._id, text: dep.name }));
-                    results.unshift({ id: 'all', text: '-- Select Department --' });
-                    return { results, pagination: { more: data.pagination.more } };
-                },
-                cache: true
-            }
-        });
-
-        // Pre-select department if editing
-        if (isEdit && document.department) {
-            const departmentOption = new Option(document.department.name, document.department._id, true, true);
-            $('#department').append(departmentOption).trigger('change');
-        }
-
-        // --------------------------
-        // Project Manager Select2
-        // --------------------------
-        $('#projectManager').select2({
-            placeholder: '-- Select Project Manager --',
-            allowClear: false,
-            ajax: {
-                url: '/api/user/search',
-                dataType: 'json',
-                delay: 250,
-                data: function (params) {
-                    return { search: params.term || '', page: params.page || 1, limit: 10, profile_type: 'user' };
-                },
-                processResults: function (data, params) {
-                    params.page = params.page || 1;
-                    let results = data.users.map(u => ({ id: u._id, text: u.name }));
-                    results.unshift({ id: 'all', text: '-- Select Project Manager --' });
-                    return { results, pagination: { more: params.page * 10 < data.pagination.total } };
-                },
-                cache: true
+    // --------------------------
+    // Project Name Select2
+    // --------------------------
+    $("#projectName").select2({
+        placeholder: "-- Select Project Name --",
+        allowClear: false,
+        ajax: {
+            delay: 300,
+            transport: function (params, success, failure) {
+                const search = params.data.term || "";
+                $.ajax({
+                    url: `/api/projects?search=${encodeURIComponent(search)}`,
+                    type: "GET",
+                    success: function (res) {
+                        let data = res.data || [];
+                        data.unshift({ _id: "all", projectName: "-- Select Project Name --" });
+                        success(data);
+                    },
+                    error: failure
+                });
             },
-            minimumInputLength: 0
-        });
-
-        // Pre-select projectManager if editing
-        if (isEdit && document.projectManager) {
-            const managerOption = new Option(document.projectManager.name, document.projectManager._id, true, true);
-            $('#projectManager').append(managerOption).trigger('change');
+            processResults: function (data) {
+                return {
+                    results: data.map(project => ({
+                        id: project._id,
+                        text: project.projectName
+                    }))
+                };
+            }
         }
     });
+
+    // Pre-select projectName if editing
+    if (isEdit && document.projectName) {
+        const projectOption = new Option(document.projectName.name || document.projectName.projectName, document.projectName._id, true, true);
+        $('#projectName').append(projectOption).trigger('change');
+    }
+
+    // --------------------------
+    // Department Select2
+    // --------------------------
+    $("#department").select2({
+        placeholder: "-- Select Department --",
+        allowClear: false,
+        ajax: {
+            url: '/api/departments/search',
+            dataType: 'json',
+            delay: 250,
+            data: function (params) {
+                return { search: params.term || '', page: params.page || 1, limit: 10 };
+            },
+            processResults: function (data, params) {
+                params.page = params.page || 1;
+                let results = data.data.map(dep => ({ id: dep._id, text: dep.name }));
+                results.unshift({ id: 'all', text: '-- Select Department --' });
+                return { results, pagination: { more: data.pagination.more } };
+            },
+            cache: true
+        }
+    });
+
+    // Pre-select department if editing
+    if (isEdit && document.department) {
+        const departmentOption = new Option(document.department.name, document.department._id, true, true);
+        $('#department').append(departmentOption).trigger('change');
+    }
+
+    // --------------------------
+    // Project Manager Select2
+    // --------------------------
+    $('#projectManager').select2({
+        placeholder: '-- Select Project Manager --',
+        allowClear: false,
+        ajax: {
+            url: '/api/user/search',
+            dataType: 'json',
+            delay: 250,
+            data: function (params) {
+                return { search: params.term || '', page: params.page || 1, limit: 10, profile_type: 'user' };
+            },
+            processResults: function (data, params) {
+                params.page = params.page || 1;
+                let results = data.users.map(u => ({ id: u._id, text: u.name }));
+                results.unshift({ id: 'all', text: '-- Select Project Manager --' });
+                return { results, pagination: { more: params.page * 10 < data.pagination.total } };
+            },
+            cache: true
+        },
+        minimumInputLength: 0
+    });
+
+    // Pre-select projectManager if editing
+    if (isEdit && document.projectManager) {
+        const managerOption = new Option(document.projectManager.name, document.projectManager._id, true, true);
+        $('#projectManager').append(managerOption).trigger('change');
+    }
+
 
 
     // Remove existing files in edit mode
@@ -510,58 +553,53 @@ $(document).ready(function () {
 
         const pathSegments = [];
 
-        // Always show project name (non-clickable)
+        // Project (non-clickable)
         if (projectText && projectText !== '-- Select Project Name --') {
             pathSegments.push({ text: projectText, type: 'project', id: projectId });
         }
 
-        // Always show department (clickable)
+        // Department (clickable)
         if (departmentText && departmentText !== '-- Select Department --') {
             pathSegments.push({ text: departmentText, type: 'department', id: departmentId });
         }
 
-        // Add selected folders, but remove any redundant project/department suffix
+        // Folders (clickable)
         folders.forEach(folder => {
-            let folderName = folder.name;
-
-            // Remove project/department from folder name if present at end
-            if (projectText && folderName.endsWith(projectText)) {
-                folderName = folderName.replace(new RegExp(projectText + '$'), '').trim();
-            }
-            if (departmentText && folderName.endsWith(departmentText)) {
-                folderName = folderName.replace(new RegExp(departmentText + '$'), '').trim();
-            }
-
-            pathSegments.push({ text: folderName, type: 'folder', id: folder.id });
+            pathSegments.push({ text: folder.name, type: 'folder', id: folder.id });
         });
 
         const breadcrumbHtml = pathSegments.map((seg, i) => {
             if (seg.type === 'project') {
                 return `<span class="dir-text">${seg.text}</span>`;
             } else {
-                return `<a href="javascript:void(0)" class="dir-link" data-type="${seg.type}" data-id="${seg.id}" data-index="${i}">${seg.text}</a>`;
+                return `<a href="javascript:void(0)" class="dir-link" data-type="${seg.type}" data-id="${seg.id}" data-level="${i}">${seg.text}</a>`;
             }
         }).join(' / ');
 
         $('#uploadDirectoryPath').html(breadcrumbHtml);
 
-        // Breadcrumb click handler
+        // Breadcrumb click
         $('#uploadDirectoryPath .dir-link').off('click').on('click', async function () {
             const type = $(this).data('type');
             const id = $(this).data('id');
-            const index = $(this).data('index');
+            const level = $(this).data('level'); // breadcrumb index
+
+            const numFixed = 0
+                + (projectText && projectText !== '-- Select Project Name --' ? 1 : 0)
+                + (departmentText && departmentText !== '-- Select Department --' ? 1 : 0);
 
             if (type === 'department') {
                 window.selectedFolders = [];
                 $('#selectedFolderId').val('');
                 await loadFolders(null, []);
             } else if (type === 'folder') {
-                const newPath = window.selectedFolders.slice(0, index + 1);
+                const newPath = window.selectedFolders.slice(0, level - numFixed + 1);
                 window.selectedFolders = newPath;
                 $('#selectedFolderId').val(id);
                 await loadFolders(id, newPath);
             }
         });
+
     }
 
 
