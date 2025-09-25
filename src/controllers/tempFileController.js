@@ -5,6 +5,7 @@ import crypto from "crypto";
 import path from "path";
 import Folder from "../models/Folder.js";
 import { generateUniqueFileName } from "../helper/generateUniquename.js";
+import mongoose from "mongoose";
 // Unique filename generator
 
 export const download = async (req, res) => {
@@ -22,7 +23,7 @@ export const uploadFile = async (req, res) => {
     try {
         const { folderId } = req.params;
         const ownerId = req.user._id;
-
+        console.log("Folder ID:", folderId);
         if (!mongoose.Types.ObjectId.isValid(folderId)) {
             return res.status(400).json({ success: false, message: "Invalid folder ID" });
         }
@@ -35,7 +36,7 @@ export const uploadFile = async (req, res) => {
         if (!req.files || req.files.length === 0) {
             return res.status(400).json({ success: false, message: "No files uploaded" });
         }
-
+        console.log("Files received:", folder);
         let totalSize = 0;
         const uploadedFiles = [];
 
@@ -44,7 +45,7 @@ export const uploadFile = async (req, res) => {
             const s3Filename = generateUniqueFileName(originalname);
 
             // Upload to S3
-            const { url, key } = await putObject(buffer, s3Filename, mimetype);
+            const { url, key } = await putObject(buffer, s3Filename, mimetype, folder.name);
 
             // Delete local file if exists
             if (localPath && fs.existsSync(localPath)) {
@@ -56,9 +57,13 @@ export const uploadFile = async (req, res) => {
                 fileName: originalname,
                 originalName: originalname,
                 s3Filename: key,
+                s3Url: url,        // ✅ required
                 fileType: mimetype,
-                status: "permanent",
+                status: "temp",
+                size: size || 0,   // ✅ required
             });
+
+            if (!folder.files) folder.files = [];
 
             // Add to folder's files array
             folder.files.push({
@@ -134,7 +139,7 @@ export const deleteFile = async (req, res) => {
     try {
         const { fileId } = req.params;
         const file = await TempFile.findById(fileId);
-
+        console.log("File to delete:", file);
         if (!file) return res.status(404).json({ error: "File not found" });
 
         if (file.status === "temp") {

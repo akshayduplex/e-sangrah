@@ -7,6 +7,7 @@ import {
     getFileStatus,
     download,
 } from "../controllers/tempFileController.js";
+import { authenticate } from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
 
@@ -16,8 +17,10 @@ const upload = multer({
     limits: {}, // 10MB
 });
 
+router.use(authenticate);
+
 // Routes
-router.post("/upload", upload.single("file"), uploadFile);
+router.post("/upload/:folderId", upload.array('file'), uploadFile);
 router.get("/download/:fileName", download);
 router.post("/submit-form", submitForm);
 router.delete("/:fileId", deleteFile);

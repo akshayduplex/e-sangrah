@@ -272,6 +272,7 @@ export const createDocument = async (req, res) => {
         //     isPrimary: idx === 0
         // }));
         // Handle uploaded files from temp file IDs
+        // Handle uploaded files from tempFile IDs (already on S3)
         let uploadedFiles = [];
         for (const fileId of parsedFileIds) {
             try {
@@ -281,7 +282,8 @@ export const createDocument = async (req, res) => {
                     await tempFile.save();
 
                     uploadedFiles.push({
-                        file: tempFile.s3Filename,
+                        file: tempFile.s3Filename,       // S3 key
+                        s3Url: tempFile.s3Url,           // S3 URL
                         originalName: tempFile.originalName,
                         version: 1,
                         uploadedAt: new Date(),
@@ -292,7 +294,6 @@ export const createDocument = async (req, res) => {
                 console.warn(`Skipping invalid file ID: ${fileId}`, err);
             }
         }
-
         let signature = {};
 
         // Case 1: Signature uploaded as file
@@ -391,6 +392,8 @@ export const updateDocument = async (req, res) => {
         const { id } = req.params;
         const document = await Document.findById(id);
         if (!document) return failResponse(res, "Document not found", 404);
+
+        // Update folder if provided
         if (req.body.folderId && mongoose.Types.ObjectId.isValid(req.body.folderId)) {
             document.folderId = req.body.folderId;
         }
@@ -420,7 +423,7 @@ export const updateDocument = async (req, res) => {
         // Parse tags
         const parsedTags = tags ? tags.split(",").map(tag => tag.trim()) : [];
 
-        // Update top-level fields
+        // Update basic fields
         document.project = projectName || document.project;
         document.department = department || document.department;
         document.projectManager = projectManager || document.projectManager;
@@ -430,8 +433,7 @@ export const updateDocument = async (req, res) => {
         document.tags = parsedTags;
         document.metadata = parsedMetadata;
 
-
-        // Update dates
+        // Update document date
         if (documentDate) {
             const [day, month, year] = documentDate.split("-");
             document.documentDate = new Date(`${year}-${month}-${day}`);
@@ -446,7 +448,7 @@ export const updateDocument = async (req, res) => {
             }
         }
 
-        // Handle files (like createDocument)
+        // Handle files already uploaded to S3 via TempFile IDs
         if (fileIds) {
             let parsedFileIds = typeof fileIds === "string" ? JSON.parse(fileIds) : fileIds;
             const uploadedFiles = [];
@@ -455,8 +457,10 @@ export const updateDocument = async (req, res) => {
                 if (tempFile && tempFile.status === "temp") {
                     tempFile.status = "permanent";
                     await tempFile.save();
+
                     uploadedFiles.push({
                         file: tempFile.s3Filename,
+                        s3Url: tempFile.s3Url,
                         originalName: tempFile.originalName,
                         version: 1,
                         uploadedAt: new Date(),
@@ -467,26 +471,23 @@ export const updateDocument = async (req, res) => {
             if (uploadedFiles.length) document.files = uploadedFiles;
         }
 
-        // Signature (file upload or base64 canvas)
+        // Signature handling
         if (req.files?.signature?.[0]) {
-            // Case 1: Signature uploaded as image file
             const file = req.files.signature[0];
             if (!file.mimetype.startsWith("image/")) {
                 return failResponse(res, "Signature must be an image", 400);
             }
             document.signature = {
                 fileName: file.originalname,
-                fileUrl: file.path || file.filename, // depending on Cloudinary/disk
+                fileUrl: file.path || file.filename,
             };
         } else if (req.body.signature) {
-            // Case 2: Signature drawn on canvas (base64 string)
             const base64Data = req.body.signature;
-
             if (!base64Data.startsWith("data:image/")) {
                 return failResponse(res, "Invalid signature format", 400);
             }
 
-            // Upload to Cloudinary
+            // Upload base64 to Cloudinary
             const uploaded = await cloudinary.uploader.upload(base64Data, {
                 folder: "signatures",
                 public_id: `signature-${Date.now()}`,
@@ -499,9 +500,7 @@ export const updateDocument = async (req, res) => {
             };
         }
 
-
         await document.save();
-
         return successResponse(res, { document }, "Document updated successfully");
 
     } catch (error) {

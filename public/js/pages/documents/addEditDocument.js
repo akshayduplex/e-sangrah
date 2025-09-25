@@ -1,10 +1,10 @@
 
-window.selectedFolders = [];
-// Store uploaded file IDs
+window.selectedFolders = []; // [{ id, name }]
 let uploadedFileIds = [];
 const folderForm = document.getElementById('folderForm');
 const folderContainer = document.getElementById('folderContainer');
 const selectedFolderInput = document.getElementById('selectedFolderId');
+
 function debounce(fn, delay) {
     let timer;
     return function (...args) {
@@ -65,68 +65,130 @@ $(document).ready(function () {
         $('#metadataDisplay').val(metadata.fileName + ' - ' + metadata.fileDescription);
         $('#metadata-modal').modal('hide');
     });
-    function toggleCreateFolderBtn() {
-        const projectSelected = !!$('#projectName').val();
-        const departmentSelected = !!$('#department').val();
-        $('#createFolderBtn').prop('disabled', !(projectSelected && departmentSelected));
-    }
-    async function loadFolders(rootId = null, parentPath = []) {
-        const departmentId = $('#department').val() || '';
-        const projectId = $('#projectName').val() || '';
-        const query = new URLSearchParams();
 
+    function toggleCreateFolderBtn() {
+        const projectSelected = !!$('#projectName').val() && $('#projectName').val() !== 'all';
+
+        // Enable/disable Create Folder button
+        $('#createFolderBtn').prop('disabled', !projectSelected);
+
+        // Enable/disable Upload Box
+        if (projectSelected) {
+            $('#uploadBox').css({ 'pointer-events': '', 'opacity': '' });
+        } else {
+            $('#uploadBox').css({ 'pointer-events': 'none', 'opacity': 0.6 });
+        }
+    }
+
+
+    async function loadFolders(rootId = null, parentPath = []) {
+        const departmentId = $('#department').val();
+        const projectId = $('#projectName').val();
+
+        // If nothing selected, reset
+        if ((!projectId || projectId === 'all') && (!departmentId || departmentId === 'all')) {
+            $('#folderContainer').empty();
+            window.selectedFolders = [];
+            $('#selectedFolderId').val('');
+            updateDirectoryPath();
+            return;
+        }
+
+        const query = new URLSearchParams();
         if (departmentId && departmentId !== 'all') query.append('departmentId', departmentId);
         if (projectId && projectId !== 'all') query.append('projectId', projectId);
         if (rootId) query.append('rootId', rootId);
 
-        const res = await fetch(`/api/folders/tree/structure?${query.toString()}`);
-        const data = await res.json();
-        if (!data.success) return;
+        try {
+            const res = await fetch(`/api/folders/tree/structure?${query.toString()}`);
+            const data = await res.json();
+            if (!data.success) return;
 
-        const container = $('#folderContainer').empty();
-        const folders = data.tree || [];
+            const folders = data.tree || [];
+            const container = $('#folderContainer').empty();
 
-        folders.forEach(folder => {
-            const subCount = folder.children ? folder.children.length : 0;
-            const folderCard = $(`
-            <div class="folder-card" style="width:80px;">
-                <div class="fldricon"><img src="/img/icons/folder.png"></div>
-                <div class="fldrname text-truncate">${folder.name}</div>
-                ${subCount ? `<span class="badge">${subCount}</span>` : ''}
-            </div>
-        `);
-            folderCard.data('id', folder._id);
-            folderCard.data('name', folder.name);
-            folderCard.data('children', folder.children || null);
+            folders.forEach((folder, index) => {
+                const subCount = folder.children?.length || 0;
+                const folderCard = $(`
+        <div class="folder-card" style="width:80px;">
+            <div class="fldricon"><img src="/img/icons/folder.png"></div>
+            <div class="fldrname text-truncate">${folder.name}</div>
+            ${subCount ? `<span class="badge">${subCount}</span>` : ''}
+        </div>
+    `);
 
-            folderCard.on('click', async function () {
-                $('.folder-card').removeClass('active border-primary').addClass('border');
-                folderCard.addClass('active border-primary');
+                folderCard.data('folder', folder); // store full folder object
 
-                const currentPath = [...parentPath, folderCard.data('name')];
-                window.selectedFolders = currentPath;
-                $('#selectedFolderId').val(folderCard.data('id'));
-                updateDirectoryPath();
+                // ----------- SINGLE CLICK HANDLER -----------
+                folderCard.on('click', function () {
+                    $('.folder-card').removeClass('active border-primary').addClass('border');
+                    folderCard.addClass('active border-primary');
 
-                // Lazy load children
-                if (folderCard.data('children') && folderCard.data('children').length > 0) {
-                    await loadFolders(folderCard.data('id'), currentPath);
-                }
+                    // <--- REPLACE HERE WITH FIXED CODE --->
+                    window.selectedFolders = [...parentPath, { id: folder._id, name: folder.name }];
+                    $('#selectedFolderId').val(folder._id);
+                    updateDirectoryPath();
+                });
+
+                // ----------- DOUBLE CLICK HANDLER -----------
+                folderCard.on('dblclick', async function () {
+                    const newPath = [...parentPath, { id: folder._id, name: folder.name }];
+                    await loadFolders(folder._id, newPath);
+                });
+
+                container.append(folderCard);
+
+                // Auto-select first folder at root
+                if (index === 0 && !rootId) folderCard.trigger('click');
             });
 
-            container.append(folderCard);
-        });
+
+            updateDirectoryPath();
+        } catch (err) {
+            console.error("Error loading folders:", err);
+        }
     }
 
 
-
-
     $('#folder-modal').on('show.bs.modal', function () {
-        const selectedFolderName = window.selectedFolders.join(' / ') || 'Root';
-        $('#parentFolder').val(selectedFolderName);
+        const projectText = $('#projectName option:selected').text();
+        const departmentText = $('#department option:selected').text();
+        const folders = window.selectedFolders || [];
+
+        const pathSegments = [];
+
+        if (projectText && projectText !== '-- Select Project Name --') {
+            pathSegments.push(projectText);
+        }
+        if (departmentText && departmentText !== '-- Select Department --') {
+            pathSegments.push(departmentText);
+        }
+
+        const parentFolderSelect = $('#parentFolder');
+        parentFolderSelect.empty();
+
+        // Root option
+        parentFolderSelect.append(
+            new Option(`-- Root (${pathSegments.join(' / ') || 'No Selection'}) --`, '', true, false)
+        );
+
+        // Add current folder chain
+        folders.forEach((f, i) => {
+            const fullPath = [...pathSegments, ...folders.slice(0, i + 1).map(ff => ff.name)].join(' / ');
+            parentFolderSelect.append(new Option(fullPath, f.id, false, false));
+        });
+
+        // Refresh Select2
+        parentFolderSelect.val(folders.length ? folders[folders.length - 1].id : '').trigger('change');
     });
+
+
+
+
     // Run on page load
-    // toggleCreateFolderBtn();
+    toggleCreateFolderBtn();
+    loadFolders();           // <-- load folders initially
+    updateDirectoryPath();   // <-- update breadcrumb
     // --------------------------
     // Handle folder creation
     $('#createFolderForm').on('submit', async function (e) {
@@ -135,10 +197,13 @@ $(document).ready(function () {
         const folderName = $('#folderName').val().trim();
         const projectId = $('#projectName').val();
         const departmentId = $('#department').val();
-        const parentId = $('#selectedFolderId').val() || null;
-
+        // const parentId = $('#selectedFolderId').val() || null;
+        let parentId = $('#parentFolder').val();
+        if (!parentId) {
+            parentId = $('#selectedFolderId').val() || null;
+        }
         if (!folderName || !projectId || !departmentId) {
-            alert('Please select Project, Department, and provide folder name.');
+            showToast('Please select Project, Department, and provide folder name.', 'error');
             return;
         }
 
@@ -176,11 +241,9 @@ $(document).ready(function () {
     uploadBox.addEventListener("click", () => fileInput.click());
 
     fileInput.addEventListener("change", async (e) => {
-        const files = e.target.files;
-        for (let i = 0; i < files.length; i++) {
-            await handleFileUpload(files[i]);
-        }
+        await handleFileUpload(e.target.files); // send all selected files
     });
+
 
     uploadBox.addEventListener("dragover", e => {
         e.preventDefault();
@@ -191,87 +254,142 @@ $(document).ready(function () {
         uploadBox.classList.remove("dragover");
     });
 
-    uploadBox.addEventListener("drop", async e => {
+    uploadBox.addEventListener("drop", async (e) => {
         e.preventDefault();
-        uploadBox.classList.remove("dragover");
-        const files = e.dataTransfer.files;
-        for (let i = 0; i < files.length; i++) {
-            await handleFileUpload(files[i]);
-        }
+        await handleFileUpload(e.dataTransfer.files); // send all dropped files
     });
 
-    async function handleFileUpload(file) {
-        const fileId = Date.now() + Math.random();
-        const fileItem = document.createElement("div");
-        fileItem.className = "file-item col-sm-5 mb-3 p-3 border rounded";
-        fileItem.setAttribute("data-id", fileId);
+    async function handleFileUpload(files) {
+        const folderId = $('#selectedFolderId').val();
+        if (!folderId) return showToast("Please select a folder.", 'info');
 
-        // Choose icon based on file type
-        let iconClass = "fa-file";
-        if (file.type.includes("word")) iconClass = "fa-file-word text-primary";
-        else if (file.type.includes("pdf")) iconClass = "fa-file-pdf text-danger";
-        else if (file.type.includes("presentation") || file.name.endsWith(".ppt") || file.name.endsWith(".pptx")) iconClass = "fa-file-powerpoint text-warning";
-        else if (file.type.includes("sheet") || file.name.endsWith(".xls") || file.name.endsWith(".xlsx")) iconClass = "fa-file-excel text-success";
+        for (const file of files) {
+            const fileId = 'temp_' + Date.now() + Math.random().toString(36).substring(2, 8); // temporary ID
 
-        fileItem.innerHTML = `
-        <div class="file-info d-flex align-items-center">
-          <i class="fa-solid ${iconClass} fa-2x me-3"></i>
-          <div class="flex-grow-1">
-            <h6 class="mb-0 text-truncate">${file.name}</h6>
-            <small class="text-muted">${(file.size / 1024 / 1024).toFixed(2)} MB</small>
-          </div>
-        </div>
-        <div class="file-progress mt-2">
-          <div class="progress">
-            <div class="progress-bar bg-success" role="progressbar" style="width: 0%">0%</div>
-          </div>
-        </div>
-        <button class="remove-btn btn btn-sm btn-danger mt-2" data-fileid="${fileId}">
-          <i class="fa-solid fa-xmark"></i> Remove
-        </button>
-      `;
-        fileList.appendChild(fileItem);
+            // Create UI element
+            const fileItem = document.createElement("div");
+            fileItem.className = "file-item col-sm-5 mb-3 p-3 border rounded";
+            fileItem.setAttribute("data-file-id", fileId);
 
-        const progressBar = fileItem.querySelector(".progress-bar");
+            // Choose icon based on file type
+            let iconClass = "fa-file";
+            if (file.type.includes("word")) iconClass = "fa-file-word text-primary";
+            else if (file.type.includes("pdf")) iconClass = "fa-file-pdf text-danger";
+            else if (file.type.includes("presentation") || file.name.endsWith(".ppt") || file.name.endsWith(".pptx")) iconClass = "fa-file-powerpoint text-warning";
+            else if (file.type.includes("sheet") || file.name.endsWith(".xls") || file.name.endsWith(".xlsx")) iconClass = "fa-file-excel text-success";
 
-        try {
-            const formData = new FormData();
-            formData.append('file', file);
+            fileItem.innerHTML = `
+            <div class="file-info d-flex align-items-center">
+                <i class="fa-solid ${iconClass} fa-2x me-3"></i>
+                <div class="flex-grow-1">
+                    <h6 class="mb-0 text-truncate">${file.name}</h6>
+                    <small class="text-muted">${(file.size / 1024 / 1024).toFixed(2)} MB</small>
+                </div>
+            </div>
+            <div class="file-progress mt-2">
+                <div class="progress">
+                    <div class="progress-bar bg-success" role="progressbar" style="width: 0%">0%</div>
+                </div>
+            </div>
+            <button class="remove-btn btn btn-sm btn-danger mt-2" data-file-id="${fileId}">
+                <i class="fa-solid fa-xmark"></i> Remove
+            </button>
+        `;
+            fileList.appendChild(fileItem);
 
-            const response = await fetch('/api/files/upload', { method: 'POST', body: formData });
-            const data = await response.json();
+            const progressBar = fileItem.querySelector(".progress-bar");
 
-            if (data.success) {
-                progressBar.style.width = "100%";
-                progressBar.textContent = "100%";
-                uploadedFileIds.push(data.fileId);
-                fileItem.setAttribute("data-file-id", data.fileId);
-                fileItem.querySelector(".remove-btn").setAttribute("data-file-id", data.fileId);
-            } else throw new Error(data.message || "Upload failed");
+            // Handle Remove button
+            fileItem.querySelector(".remove-btn").addEventListener("click", async function () {
+                const fileIdToRemove = this.getAttribute("data-file-id");
+                if (!fileIdToRemove) return;
 
-        } catch (error) {
-            console.error("Upload error:", error);
-            progressBar.classList.remove("bg-success");
-            progressBar.classList.add("bg-danger");
-            progressBar.textContent = "Error";
+                try {
+                    // Only call DELETE if the file was uploaded to server
+                    if (uploadedFileIds.includes(fileIdToRemove)) {
+                        const res = await fetch(`/api/files/${fileIdToRemove}`, { method: 'DELETE' });
+                        const data = await res.json();
+                        if (!data.success) throw new Error(data.message || "Delete failed");
+                    }
+                    // Remove from array & DOM
+                    uploadedFileIds = uploadedFileIds.filter(id => id !== fileIdToRemove);
+                    fileItem.remove();
+                } catch (err) {
+                    console.error(err);
+                    showToast('Error deleting file: ' + err.message, 'error');
+                }
+            });
 
-            const errorMsg = document.createElement("div");
-            errorMsg.className = "text-danger small mt-1";
-            errorMsg.textContent = "Upload failed. Please try again.";
-            fileItem.appendChild(errorMsg);
-        }
+            // Upload file to server
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
 
-        fileItem.querySelector(".remove-btn").addEventListener("click", function () {
-            const fileIdToRemove = this.getAttribute("data-file-id");
-            if (fileIdToRemove) {
-                uploadedFileIds = uploadedFileIds.filter(id => id !== fileIdToRemove);
-                fetch(`/api/files/${fileIdToRemove}`, { method: 'DELETE' }).catch(err => console.error(err));
+                const response = await fetch(`/api/files/upload/${folderId}`, { method: 'POST', body: formData });
+                const data = await response.json();
+
+                if (data.success) {
+                    progressBar.style.width = "100%";
+                    progressBar.textContent = "100%";
+
+                    // Use real file ID from server
+                    const uploadedId = data.fileId || fileId;
+                    uploadedFileIds.push(uploadedId);
+
+                    fileItem.setAttribute("data-file-id", uploadedId);
+                    fileItem.querySelector(".remove-btn").setAttribute("data-file-id", uploadedId);
+                } else {
+                    throw new Error(data.message || "Upload failed");
+                }
+            } catch (error) {
+                console.error("Upload error:", error);
+                progressBar.classList.remove("bg-success");
+                progressBar.classList.add("bg-danger");
+                progressBar.textContent = "Error";
+
+                const errorMsg = document.createElement("div");
+                errorMsg.className = "text-danger small mt-1";
+                errorMsg.textContent = "Upload failed. Please try again.";
+                fileItem.appendChild(errorMsg);
             }
-            fileItem.remove();
-        });
+        }
     }
 
+    // Existing files in edit mode — reuse the same remove logic
+    document.querySelectorAll('.remove-btn[data-file-id]').forEach(btn => {
+        btn.addEventListener('click', async function () {
+            const fileId = this.getAttribute('data-file-id');
+            const fileItem = this.closest('.file-item');
+            if (!fileId) return;
+
+            try {
+                const res = await fetch(`/api/files/${fileId}`, { method: 'DELETE' });
+                const data = await res.json();
+                if (data.success) {
+                    uploadedFileIds = uploadedFileIds.filter(id => id !== fileId);
+                    fileItem.remove();
+                } else {
+                    showToast('Error deleting file: ' + data.message, 'error');
+                }
+            } catch (err) {
+                console.error(err);
+                showToast('Error deleting file', 'error');
+            }
+        });
+    });
+
+
+
+
+
     $(document).ready(function () {
+        $('#parentFolder').select2({
+            dropdownParent: $('#folder-modal'), // ensures it stays inside modal
+            width: '100%',
+            placeholder: "-- Root (No Parent) --",
+            allowClear: true
+        });
+
         // --------------------------
         // Project Name Select2
         // --------------------------
@@ -382,30 +500,77 @@ $(document).ready(function () {
                 .catch(err => { console.error(err); alert('Error deleting file'); });
         });
     });
+
     function updateDirectoryPath() {
         const projectText = $('#projectName option:selected').text();
+        const projectId = $('#projectName').val();
         const departmentText = $('#department option:selected').text();
+        const departmentId = $('#department').val();
         const folders = window.selectedFolders || [];
 
-        const sanitize = text => text.replace(/\s+/g, '');
-        let segments = [BASE_URL];
-        if (projectText && projectText !== '-- Select Project Name --') segments.push(sanitize(projectText));
-        if (departmentText && departmentText !== '-- Select Department --') segments.push(sanitize(departmentText));
-        segments.push(...folders.map(sanitize));
+        const pathSegments = [];
 
-        let path = '';
-        const breadcrumb = segments.map((seg, i) => {
-            path += (i === 0 ? seg : '/' + seg);
-            return `<a href="${path}" class="dir-link">${i === 0 ? seg : '/' + seg}</a>`;
-        }).join(' ');
+        // Always show project name (non-clickable)
+        if (projectText && projectText !== '-- Select Project Name --') {
+            pathSegments.push({ text: projectText, type: 'project', id: projectId });
+        }
 
-        $('#uploadDirectoryPath').html(breadcrumb);
+        // Always show department (clickable)
+        if (departmentText && departmentText !== '-- Select Department --') {
+            pathSegments.push({ text: departmentText, type: 'department', id: departmentId });
+        }
+
+        // Add selected folders, but remove any redundant project/department suffix
+        folders.forEach(folder => {
+            let folderName = folder.name;
+
+            // Remove project/department from folder name if present at end
+            if (projectText && folderName.endsWith(projectText)) {
+                folderName = folderName.replace(new RegExp(projectText + '$'), '').trim();
+            }
+            if (departmentText && folderName.endsWith(departmentText)) {
+                folderName = folderName.replace(new RegExp(departmentText + '$'), '').trim();
+            }
+
+            pathSegments.push({ text: folderName, type: 'folder', id: folder.id });
+        });
+
+        const breadcrumbHtml = pathSegments.map((seg, i) => {
+            if (seg.type === 'project') {
+                return `<span class="dir-text">${seg.text}</span>`;
+            } else {
+                return `<a href="javascript:void(0)" class="dir-link" data-type="${seg.type}" data-id="${seg.id}" data-index="${i}">${seg.text}</a>`;
+            }
+        }).join(' / ');
+
+        $('#uploadDirectoryPath').html(breadcrumbHtml);
+
+        // Breadcrumb click handler
+        $('#uploadDirectoryPath .dir-link').off('click').on('click', async function () {
+            const type = $(this).data('type');
+            const id = $(this).data('id');
+            const index = $(this).data('index');
+
+            if (type === 'department') {
+                window.selectedFolders = [];
+                $('#selectedFolderId').val('');
+                await loadFolders(null, []);
+            } else if (type === 'folder') {
+                const newPath = window.selectedFolders.slice(0, index + 1);
+                window.selectedFolders = newPath;
+                $('#selectedFolderId').val(id);
+                await loadFolders(id, newPath);
+            }
+        });
     }
 
+
+
+
     // Call on page load and on select change
-    toggleCreateFolderBtn();
-    loadFolders();
-    updateDirectoryPath();
+    // toggleCreateFolderBtn();
+    // loadFolders();
+    // updateDirectoryPath();
     $('#projectName, #department').on('change select2:select select2:clear', function () {
         window.selectedFolders = [];
         $('#selectedFolderId').val('');
@@ -413,6 +578,16 @@ $(document).ready(function () {
         loadFolders();
         updateDirectoryPath();
     });
+
+    $('#projectName').on('change', function () {
+        const projectId = $(this).val();
+        if (!projectId || projectId === 'all') {
+            // Reset department if no project selected
+            $('#department').val(null).trigger('change');
+        }
+    });
+
+
 
     // --------------------------
     // Signature handling (Upload + Draw)
@@ -514,8 +689,19 @@ $(document).ready(function () {
             const fileIdsInput = document.createElement('input');
             fileIdsInput.type = 'hidden';
             fileIdsInput.name = 'fileIds';
-            fileIdsInput.value = JSON.stringify(uploadedFileIds);
+            fileIdsInput.value = JSON.stringify(uploadedFileIds || []);
             this.appendChild(fileIdsInput);
+
+            // NEW: clear the raw file input so multer won't receive unexpected 'files' field
+            const rawFileInput = document.getElementById('fileInput');
+            if (rawFileInput) {
+                try {
+                    rawFileInput.value = ''; // clears selected files from the <input>
+                } catch (err) {
+                    // fallback: remove input from DOM temporarily
+                    rawFileInput.parentNode && rawFileInput.parentNode.removeChild(rawFileInput);
+                }
+            }
 
             const formData = new FormData(this);
             const url = isEdit ? '/api/documents/' + documentId : '/api/documents';

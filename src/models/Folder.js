@@ -32,6 +32,17 @@ const folderSchema = new Schema({
     path: { type: String, index: true }, // materialized path, e.g., /root/documents/project1
     ancestors: [{ type: Schema.Types.ObjectId, ref: 'Folder', index: true }], // ancestor references
     depth: { type: Number, default: 0, index: true },
+    files: [
+        {
+            file: { type: String, required: true },      // s3 key or path
+            originalName: { type: String, required: true },
+            fileType: { type: String, required: true },
+            size: { type: Number, default: 0 },
+            uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+            uploadedAt: { type: Date, default: Date.now }
+        }
+    ],
+
     permissions: { type: [PermissionSchema], default: [] },
     deletedAt: { type: Date, default: null },
     status: {

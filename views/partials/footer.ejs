@@ -826,7 +826,9 @@
                     </div>
                     <div class="mb-3">
                         <label for="parentFolder" class="form-label">Parent Folder</label>
-                        <input type="text" id="parentFolder" class="form-control" readonly>
+                        <select id="parentFolder" class="form-control select2" style="width: 100%;">
+                            <option value="">-- Root (No Parent) --</option>
+                        </select>
                     </div>
                     <div class="mb-3 text-center">
                         <button class="btn btn-primary rounded-pill" type="submit">Create Folder</button>
