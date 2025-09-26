@@ -28,7 +28,7 @@ export const cleanupOldTempFiles = async () => {
             }
         }
 
-        logger.info(`🧹 Cleanup complete. ${oldFiles.length} files permanently removed.`);
+        logger.info(`Cleanup complete. ${oldFiles.length} files permanently removed.`);
         return oldFiles.length;
     } catch (err) {
         logger.error("Cleanup error:", err);

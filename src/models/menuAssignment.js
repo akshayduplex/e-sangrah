@@ -33,6 +33,6 @@ const menuAssignmentSchema = new mongoose.Schema(
 menuAssignmentSchema.index({ designation_id: 1, menu_id: 1 }, { unique: true });
 
 
-const MenuAssignment = mongoose.model('MenuAssignment', menuAssignmentSchema);
+const MenuAssignment = mongoose.models.MenuAssignment || mongoose.model('MenuAssignment', menuAssignmentSchema);
 
 export default MenuAssignment;

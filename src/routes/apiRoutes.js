@@ -185,7 +185,7 @@ router.get("/documents/:id/access-logs", getDocumentAccessLogs);
 
 
 // ---------------------------
-// Documents routes
+// Departments routes
 // ---------------------------
 // Publicly exposed API routes
 router.get('/departments', departmentController.getAllDepartments);
@@ -193,9 +193,9 @@ router.get('/departments/search', departmentController.searchDepartments);
 router.get('/departments/:id', authenticate, departmentController.getDepartmentById);
 
 // Admin-only routes (CRUD)
-router.post('/departments', authenticate, authorize('admin'), departmentController.createDepartment);
-router.patch('/departments/:id', authenticate, authorize('admin'), departmentController.updateDepartment);
-router.delete('/departments/:id', authenticate, authorize('admin'), departmentController.deleteDepartment);
+router.post('/departments', authenticate, authorize('admin', 'user'), checkPermissions, departmentController.createDepartment);
+router.patch('/departments/:id', authenticate, authorize('admin', 'user'), checkPermissions, departmentController.updateDepartment);
+router.delete('/departments/:id', authenticate, authorize('admin', 'user'), checkPermissions, departmentController.deleteDepartment);
 
 
 

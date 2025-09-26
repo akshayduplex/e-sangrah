@@ -1,60 +1,86 @@
-// middleware/rbac.js
-import MenuAssignment from '../models/menuAssignment.js';
+// middleware/rbacMiddleware.js
+import MenuAssignment from '../models/MenuAssignment.js';
 import UserPermission from '../models/UserPermission.js';
 import Menu from '../models/Menu.js';
 
 /**
- * RBAC Middleware based on request URL and HTTP method
+ * RBAC Middleware without console logs
  */
 const checkPermissions = async (req, res, next) => {
     try {
         const user = req.user;
+        const isApi = req.originalUrl.startsWith('/api') || req.headers.accept?.includes('application/json');
+
+        // 1. Authentication check
         if (!user) {
+            if (isApi) return res.status(401).json({ error: 'Unauthorized' });
             return res.redirect('/login');
         }
 
-        // Superadmin/Admin bypass
-        if (user.profile_type === 'superadmin' || user.profile_type === 'admin') {
+        // 2. Superadmin/Admin bypass
+        if (['superadmin', 'admin'].includes(user.profile_type)) {
             return next();
         }
 
-        // Normalize URL
-        let url = (req.baseUrl + req.path).replace(/\/+$/, '');
-        if (url.startsWith('/')) url = url.slice(1);
+        // 3. Normalize URL
+        let url = req.originalUrl.split('?')[0];
+        if (url.startsWith('/api')) url = url.substring(4);
+        if (!url.startsWith('/')) url = '/' + url;
+        url = url.replace(/\/[0-9a-fA-F]{24}/g, '/:id').replace(/\/\d+/g, '/:id');
+        url = url.replace(/\/+$/, '') || '/';
 
-        // Find menu
-        const menu = await Menu.findOne({ url, is_show: true });
+        // 4. Find menu by normalized URL
+        const menu = await Menu.findOne({ url: url, is_show: true });
         if (!menu) {
+            if (isApi) {
+                const allMenus = await Menu.find({ is_show: true }).select('url title type').lean();
+                return res.status(404).json({
+                    error: 'Menu not found or inactive',
+                    debug: { requestedUrl: url, availableUrls: allMenus.map(m => m.url) }
+                });
+            }
             return res.status(404).render('error', {
                 title: 'Menu Not Found',
                 message: 'Menu not found or inactive'
             });
         }
 
-        // Determine required permission
+        // 5. Determine required permission
         const methodMap = { GET: 'read', POST: 'write', PUT: 'write', PATCH: 'write', DELETE: 'delete' };
         const requiredPermission = methodMap[req.method] || 'read';
 
-        // Fetch both designation & user-specific permissions
+        // 6. Fetch permissions
         let designationPermission = null;
         if (user.userDetails?.designation) {
             designationPermission = await MenuAssignment.findOne({
                 designation_id: user.userDetails.designation,
                 menu_id: menu._id
-            });
+            }).lean();
         }
 
         const userPermission = await UserPermission.findOne({
             user_id: user._id,
             menu_id: menu._id
-        });
+        }).lean();
 
-        // ✅ Enforce AND condition
-        if (
-            designationPermission?.permissions?.[requiredPermission] === true &&
-            userPermission?.permissions?.[requiredPermission] === true
-        ) {
+        // 7. Check AND condition
+        const hasDesignationPermission = designationPermission?.permissions?.[requiredPermission] === true;
+        const hasUserPermission = userPermission?.permissions?.[requiredPermission] === true;
+
+        if (hasDesignationPermission && hasUserPermission) {
             return next();
+        }
+
+        // 8. Permission denied
+        if (isApi) {
+            return res.status(403).json({
+                error: 'Forbidden: insufficient permissions',
+                details: {
+                    required: requiredPermission,
+                    designation: hasDesignationPermission,
+                    user: hasUserPermission
+                }
+            });
         }
 
         return res.status(403).render('no-permission', {
@@ -63,16 +89,17 @@ const checkPermissions = async (req, res, next) => {
         });
 
     } catch (error) {
-        res.status(500).render('no-permission', {
+        if (req.originalUrl.startsWith('/api') || req.headers.accept?.includes('application/json')) {
+            return res.status(500).json({
+                error: 'Internal Server Error',
+                details: error.message
+            });
+        }
+        return res.status(500).render('error', {
             title: 'Internal Server Error',
             message: error.message
         });
-    } finally {
-        console.log(`${req.method} ${req.originalUrl} - User: ${req.user ? req.user.email : 'Guest'}`);
     }
 };
-
-
-
 
 export default checkPermissions;

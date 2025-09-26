@@ -87,7 +87,7 @@ router.get("/users/list", authenticate, checkPermissions, (req, res) => {
 });
 
 // Register new user form
-router.get("/users/register", authenticate, checkPermissions, async (req, res) => {
+router.get("/users/register", authenticate, authorize('admin', 'superadmin'), checkPermissions, async (req, res) => {
     try {
         const departments = await Department.find({ status: "Active" }, "name").lean();
         const designations = await Designation.find({ status: "Active" }).sort({ name: 1 }).lean();
@@ -211,7 +211,7 @@ router.get("/departments/list", authenticate, checkPermissions, (req, res) => {
 });
 
 // Edit Department page
-router.get("/departments/edit/:id", authenticate, checkPermissions, async (req, res) => {
+router.get("/departments/:id", authenticate, checkPermissions, async (req, res) => {
     const department = await Department.findById(req.params.id).lean();
     if (!department) return res.redirect("/departments/list");
 
@@ -501,7 +501,7 @@ router.get("/permissions/roles", authenticate, checkPermissions, (req, res) => {
 });
 
 // Menu Management
-router.get("/permissions/menu/list", authenticate, getMenuListValidator, getMenuList);
+router.get("/permissions/menu/list", authenticate, checkPermissions, getMenuListValidator, getMenuList);
 router.get("/permissions/menu/add", authenticate, checkPermissions, getAddMenu);
 router.get("/permissions/menu/add/:id", authenticate, checkPermissions, menuIdParamValidator, getEditMenu);
 
@@ -522,7 +522,7 @@ router.get("/dashboard", authenticate, checkPermissions, (req, res) => {
    ========================================= */
 
 // Folder list by ID
-router.get("/:folderId/list", authenticate, async (req, res) => {
+router.get("/:folderId/list", authenticate, checkPermissions, async (req, res) => {
     try {
         const { folderId } = req.params;
         res.render("pages/document/documentFolderList", {
@@ -557,7 +557,7 @@ router.get("/folders", authenticate, checkPermissions, (req, res) => {
 /* =========================================
    NOTIFICATIONS ROUTE
    ========================================= */
-router.get("/notifications", authenticate, (req, res) => {
+router.get("/notifications", authenticate, checkPermissions, (req, res) => {
     res.render("pages/notifications", { title: "E-Sangrah - Notifications", user: req.user });
 });
 
