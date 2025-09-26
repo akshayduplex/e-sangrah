@@ -70,7 +70,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             renderPagination();
         } catch (error) {
-            console.error("Error fetching projects:", error);
+            showToast("Error fetching projects:" + error, 'error');
         }
     }
 

@@ -73,7 +73,6 @@ document.addEventListener("DOMContentLoaded", function () {
                 sendOtpBtn.disabled = false;
             }
         } catch (err) {
-            console.error("Send OTP error:", err);
             showToast("Something went wrong. Please try again.", "error");
             sendOtpBtn.disabled = false;
         }
@@ -138,8 +137,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 otpInputs[0].focus();
             }
         } catch (err) {
-            console.error("Verify OTP error:", err);
-            showToast("Something went wrong. Please try again.", "error");
+            showToast("Something went wrong. Please try again." + err, "error");
         }
     };
 
@@ -187,8 +185,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 showToast(data.message || "Failed to send verification link.", "error");
             }
         } catch (err) {
-            console.error("Send reset link error:", err);
-            showToast("Something went wrong. Please try again.", "error");
+            showToast("Something went wrong. Please try again." + err, "error");
         }
     });
 });

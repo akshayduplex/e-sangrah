@@ -131,7 +131,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 showToast('Error: ' + result.message, 'error');
             }
         } catch (error) {
-            console.error('Error:', error);
             showToast('Error saving permissions', 'error');
         }
     });

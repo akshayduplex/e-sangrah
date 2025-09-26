@@ -178,8 +178,7 @@
 
 					})
 					.catch(err => {
-						console.error(err);
-						alert('Failed to load profile');
+						showToast('Failed to load profile', 'error');
 					});
 			};
 
@@ -201,7 +200,6 @@
 						loadProfile();
 					})
 					.catch(err => {
-						console.error(err);
 						showToast('Failed to update profile', 'error');
 					});
 			});

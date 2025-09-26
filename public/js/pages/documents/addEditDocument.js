@@ -1,4 +1,3 @@
-
 window.selectedFolders = []; // [{ id, name }]
 let uploadedFileIds = [];
 const folderForm = document.getElementById('folderForm');
@@ -145,7 +144,7 @@ $(document).ready(function () {
 
             updateDirectoryPath();
         } catch (err) {
-            console.error("Error loading folders:", err);
+            logger.error("Error loading folders:", err);
         }
     }
 
@@ -273,7 +272,6 @@ $(document).ready(function () {
 
             showToast('Folder created successfully!', 'success');
         } catch (err) {
-            console.error(err);
             showToast(err.message || 'Something went wrong while creating the folder.', 'error');
         }
     });
@@ -363,7 +361,6 @@ $(document).ready(function () {
                     uploadedFileIds = uploadedFileIds.filter(id => id !== fileIdToRemove);
                     fileItem.remove();
                 } catch (err) {
-                    console.error(err);
                     showToast('Error deleting file: ' + err.message, 'error');
                 }
             });
@@ -390,7 +387,7 @@ $(document).ready(function () {
                     throw new Error(data.message || "Upload failed");
                 }
             } catch (error) {
-                console.error("Upload error:", error);
+                showToast("Upload error:" + error, "error");
                 progressBar.classList.remove("bg-success");
                 progressBar.classList.add("bg-danger");
                 progressBar.textContent = "Error";
@@ -420,8 +417,7 @@ $(document).ready(function () {
                     showToast('Error deleting file: ' + data.message, 'error');
                 }
             } catch (err) {
-                console.error(err);
-                showToast('Error deleting file', 'error');
+                showToast('Error deleting file' + err, 'error');
             }
         });
     });
@@ -539,8 +535,8 @@ $(document).ready(function () {
             const fileItem = this.closest('.file-item');
             fetch(`/api/files/${fileId}`, { method: 'DELETE' })
                 .then(res => res.json())
-                .then(data => data.success ? fileItem.remove() : alert('Error deleting file: ' + data.message))
-                .catch(err => { console.error(err); alert('Error deleting file'); });
+                .then(data => data.success ? fileItem.remove() : showToast('Error deleting file: ' + data.message))
+                .catch(err => { showToast('Error deleting file' + err, 'error'); });
         });
     });
 
@@ -760,11 +756,10 @@ $(document).ready(function () {
                     });
                 }
             } else {
-                alert('Error: ' + (data.message || 'Unknown error occurred'));
+                showToast('Error: ' + (data.message || 'Unknown error occurred', 'error'));
             }
         } catch (error) {
-            console.error('Error:', error);
-            alert('An error occurred while submitting the form.');
+            showToast('An error occurred while submitting the form.' + error, 'error');
         } finally {
             $('#submitBtn').prop('disabled', false).html(isEdit ? "Update Document" : "Add Document");
         }

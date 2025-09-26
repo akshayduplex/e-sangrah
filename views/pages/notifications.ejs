@@ -6,19 +6,20 @@
 			<!-- Breadcrumb -->
 			<div class="d-md-flex d-block align-items-center justify-content-between page-breadcrumb mb-3">
 				<div class="my-auto mb-2">
-					<h2 class="mb-1">Notifications (<span id="unread_count">0</span> Unread)</h2>
+					<h2 class="mb-1">Notification (6 Unread)</h2>
 					<nav>
 						<ol class="breadcrumb mb-0">
 							<li class="breadcrumb-item">
 								<a href="#"><i class="ti ti-smart-home"></i></a>
 							</li>
-							<li class="breadcrumb-item">Notification</li>
+							<li class="breadcrumb-item">
+								Notification
+							</li>
 						</ol>
 					</nav>
 				</div>
 			</div>
 			<!-- /Breadcrumb -->
-
 			<div class="card">
 				<div class="card-header d-flex align-items-center justify-content-between flex-wrap row-gap-3">
 					<div class="card-body p-0">
@@ -32,8 +33,103 @@
 										<th>File Action</th>
 									</tr>
 								</thead>
-								<tbody id="notification_table_body">
-									<!-- Notifications will be inserted here dynamically -->
+								<tbody>
+									<tr>
+										<td>
+											<div class="action-icon d-inline-flex">
+												<a href="#" class="me-2" data-bs-toggle="modal"
+													data-bs-target="#edit_activity"><i class="ti ti-edit"></i></a>
+												<a href="javascript:void(0);" data-bs-toggle="modal"
+													data-bs-target="#delete_modal"><i class="ti ti-trash"></i></a>
+											</div>
+										</td>
+										<td>
+											<p class="fs-14 text-dark fw-medium">We scheduled a meeting for next week
+											</p>
+										</td>
+										<td>11-02-2025 11:20</td>
+										<td> <a href="#" class="fs-16 text-primary fw-light">View</a> </td>
+									</tr>
+									<tr>
+										<td>
+											<div class="action-icon d-inline-flex">
+												<a href="#" class="me-2" data-bs-toggle="modal"
+													data-bs-target="#edit_activity"><i class="ti ti-edit"></i></a>
+												<a href="javascript:void(0);" data-bs-toggle="modal"
+													data-bs-target="#delete_modal"><i class="ti ti-trash"></i></a>
+											</div>
+										</td>
+										<td>
+											<p class="fs-14 text-dark fw-medium">Arjun has added a new document and ask
+												your approval </p>
+										</td>
+										<td>11-02-2025 11:20</td>
+										<td> <button class="approvbtn btn btn-lg">Approve</button></td>
+									</tr>
+									<tr>
+										<td>
+											<div class="action-icon d-inline-flex">
+												<a href="#" class="me-2" data-bs-toggle="modal"
+													data-bs-target="#edit_activity"><i class="ti ti-edit"></i></a>
+												<a href="javascript:void(0);" data-bs-toggle="modal"
+													data-bs-target="#delete_modal"><i class="ti ti-trash"></i></a>
+											</div>
+										</td>
+										<td>
+											<p class="fs-14 text-dark fw-medium">We scheduled a meeting for next week
+											</p>
+										</td>
+										<td>11-02-2025 11:20</td>
+										<td> <a href="#" class="fs-16 text-primary fw-light">View</a> </td>
+									</tr>
+									<tr>
+										<td>
+											<div class="action-icon d-inline-flex">
+												<a href="#" class="me-2" data-bs-toggle="modal"
+													data-bs-target="#edit_activity"><i class="ti ti-edit"></i></a>
+												<a href="javascript:void(0);" data-bs-toggle="modal"
+													data-bs-target="#delete_modal"><i class="ti ti-trash"></i></a>
+											</div>
+										</td>
+										<td>
+											<p class="fs-14 text-dark fw-medium">Arjun has added a new document and ask
+												your approval </p>
+										</td>
+										<td>11-02-2025 11:20</td>
+										<td> <button class="approvbtn btn btn-lg">Approve</button></td>
+									</tr>
+									<tr>
+										<td>
+											<div class="action-icon d-inline-flex">
+												<a href="#" class="me-2" data-bs-toggle="modal"
+													data-bs-target="#edit_activity"><i class="ti ti-edit"></i></a>
+												<a href="javascript:void(0);" data-bs-toggle="modal"
+													data-bs-target="#delete_modal"><i class="ti ti-trash"></i></a>
+											</div>
+										</td>
+										<td>
+											<p class="fs-14 text-dark fw-medium">We scheduled a meeting for next week
+											</p>
+										</td>
+										<td>11-02-2025 11:20</td>
+										<td> <a href="#" class="fs-16 text-primary fw-light">View</a> </td>
+									</tr>
+									<tr>
+										<td>
+											<div class="action-icon d-inline-flex">
+												<a href="#" class="me-2" data-bs-toggle="modal"
+													data-bs-target="#edit_activity"><i class="ti ti-edit"></i></a>
+												<a href="javascript:void(0);" data-bs-toggle="modal"
+													data-bs-target="#delete_modal"><i class="ti ti-trash"></i></a>
+											</div>
+										</td>
+										<td>
+											<p class="fs-14 text-dark fw-medium">We scheduled a meeting for next week
+											</p>
+										</td>
+										<td>11-02-2025 11:20</td>
+										<td> <a href="#" class="fs-16 text-primary fw-light">View</a> </td>
+									</tr>
 								</tbody>
 							</table>
 						</div>
@@ -41,7 +137,6 @@
 				</div>
 			</div>
 		</div>
-
 		<div class="footer mt-4 d-sm-flex align-items-center justify-content-between border-top bg-white p-3">
 			<p class="mb-0">2025 &copy; HLFPPT.</p>
 			<p>Designed & Developed by <a href="javascript:void(0);" class="text-primary">Duplex services &
@@ -51,58 +146,3 @@
 	<!-- /Page Wrapper -->
 
 	<%- include('../partials/footer') %>
-
-		<script>
-			$(document).ready(function () {
-				const $tableBody = $("#notification_table_body");
-				const $unreadCount = $("#unread_count");
-
-				// Fetch all notifications
-				function loadNotifications() {
-					$.ajax({
-						url: '/api/notifications?page=1&limit=50', // Adjust the limit as needed
-						method: 'GET',
-						success: function (res) {
-							if (!res.success) return;
-
-							const notifications = res.data.notifications || [];
-							$tableBody.empty();
-
-							// Count unread notifications
-							const unreadCount = notifications.filter(n => !n.isRead).length;
-							$unreadCount.text(unreadCount);
-
-							// Populate table
-							notifications.forEach(n => {
-								const actionBtn = n.actionUrl
-									? `<a href="${n.actionUrl}" class="fs-16 text-primary fw-light">View</a>`
-									: `<button class="approvbtn btn btn-lg">Approve</button>`;
-
-								const rowHtml = `
-                        <tr>
-                            <td>
-                                <div class="action-icon d-inline-flex">
-                                    <a href="#" class="me-2" data-bs-toggle="modal" data-bs-target="#edit_activity"><i class="ti ti-edit"></i></a>
-                                    <a href="javascript:void(0);" data-bs-toggle="modal" data-bs-target="#delete_modal"><i class="ti ti-trash"></i></a>
-                                </div>
-                            </td>
-                            <td><span class="fs-14 text-dark fw-medium">${n.message}</span></td>
-                            <td>${new Date(n.createdAt).toLocaleString()}</td>
-                            <td>${actionBtn}</td>
-                        </tr>`;
-								$tableBody.append(rowHtml);
-							});
-						},
-						error: function (err) {
-							console.error("Failed to load notifications:", err);
-						}
-					});
-				}
-
-				// Initial load
-				loadNotifications();
-
-				// Auto-refresh every 60 seconds
-				setInterval(loadNotifications, 60000);
-			});
-		</script>

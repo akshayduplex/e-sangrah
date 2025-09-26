@@ -1,3 +1,4 @@
+
 async function loadSidebar() {
     try {
         const data = await apiFetch("/api/sidebar");
@@ -75,7 +76,7 @@ async function loadSidebar() {
             });
         }
     } catch (err) {
-        console.error("Error loading sidebar:", err);
+        showToast("Error loading sidebar:" + err, 'error');
     }
 }
 

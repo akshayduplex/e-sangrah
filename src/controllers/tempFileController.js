@@ -6,6 +6,7 @@ import path from "path";
 import Folder from "../models/Folder.js";
 import { generateUniqueFileName } from "../helper/generateUniquename.js";
 import mongoose from "mongoose";
+import logger from "../utils/logger.js";
 // Unique filename generator
 
 export const download = async (req, res) => {
@@ -23,7 +24,6 @@ export const uploadFile = async (req, res) => {
     try {
         const { folderId } = req.params;
         const ownerId = req.user._id;
-        console.log("Folder ID:", folderId);
         if (!mongoose.Types.ObjectId.isValid(folderId)) {
             return res.status(400).json({ success: false, message: "Invalid folder ID" });
         }
@@ -36,7 +36,6 @@ export const uploadFile = async (req, res) => {
         if (!req.files || req.files.length === 0) {
             return res.status(400).json({ success: false, message: "No files uploaded" });
         }
-        console.log("Files received:", folder);
         let totalSize = 0;
         const uploadedFiles = [];
 
@@ -94,7 +93,7 @@ export const uploadFile = async (req, res) => {
             files: uploadedFiles,
         });
     } catch (err) {
-        console.error("Upload to folder error:", err);
+        logger.error("Upload to folder error:", err);
         res.status(500).json({ success: false, message: "File upload failed" });
     }
 };
@@ -129,7 +128,7 @@ export const submitForm = async (req, res) => {
             formData,
         });
     } catch (err) {
-        console.error("Form submission error:", err);
+        logger.error("Form submission error:", err);
         res.status(500).json({ error: "Form submission failed" });
     }
 };
@@ -139,7 +138,6 @@ export const deleteFile = async (req, res) => {
     try {
         const { fileId } = req.params;
         const file = await TempFile.findById(fileId);
-        console.log("File to delete:", file);
         if (!file) return res.status(404).json({ error: "File not found" });
 
         if (file.status === "temp") {
@@ -161,7 +159,7 @@ export const deleteFile = async (req, res) => {
             res.status(400).json({ error: "Cannot delete non-temporary file" });
         }
     } catch (err) {
-        console.error("Delete error:", err);
+        logger.error("Delete error:", err);
         res.status(500).json({ error: "File deletion failed" });
     }
 };
@@ -181,7 +179,7 @@ export const getFileStatus = async (req, res) => {
             addDate: file.addDate,
         });
     } catch (err) {
-        console.error("Status check error:", err);
+        logger.error("Status check error:", err);
         res.status(500).json({ error: "Status check failed" });
     }
 };

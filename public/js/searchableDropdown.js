@@ -5,7 +5,6 @@ window.SearchableDropdown = (function () {
     function init(selector, options = {}) {
         const el = typeof selector === 'string' ? document.querySelector(selector) : selector;
         if (!el) {
-            console.warn(`[SearchableDropdown] Element not found: ${selector}`);
             return null;
         }
 

@@ -132,7 +132,6 @@
                                 $('#confirmDeleteModal').modal('hide');
                                 let msg = err.responseJSON?.message || 'Something went wrong';
                                 showToast(msg, 'warning');
-                                console.error(err);
                             }
                         });
                     });

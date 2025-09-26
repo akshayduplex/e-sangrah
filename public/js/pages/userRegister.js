@@ -1,4 +1,6 @@
 $(document).ready(function () {
+    const preview = $('#preview');
+    const uploadIcon = $('#uploadprofileBox .upload-icon');
     /**
      * Email validation on input
      */
@@ -76,31 +78,23 @@ $(document).ready(function () {
         try {
             const response = await fetch('/api/user/register', {
                 method: 'POST',
-                body: formData
+                body: new FormData(this)
             });
 
             const result = await response.json();
-            if (result.errors && result.errors.length > 0) {
-                result.errors.forEach(err => {
-                    const message = typeof err === 'string' ? err : err.msg;
-                    showToast(message, 'error');
-                });
-                return;
-            }
 
             if (response.ok && result.success) {
                 const successModal = new bootstrap.Modal(document.getElementById('data-success-register'));
                 successModal.show();
 
-                form.reset();
-                preview.empty();
-                uploadIcon.show();
+                this.reset();
+                preview.empty();      // ✅ clear uploaded image preview
+                uploadIcon.show();    // ✅ show upload icon again
                 $('.is-valid, .is-invalid').removeClass('is-valid is-invalid');
             } else {
                 showToast(result.error || 'Something went wrong!', 'error');
             }
         } catch (err) {
-            console.error('Error:', err);
             showToast(err.message || 'Internal server error', 'error');
         }
     });

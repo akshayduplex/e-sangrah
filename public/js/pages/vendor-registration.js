@@ -1,3 +1,4 @@
+
 $(document).ready(function () {
     // Cache jQuery elements
     const $form = $('#vendorForm');
@@ -24,7 +25,7 @@ $(document).ready(function () {
     }
     function notifyError(message) {
         if (typeof showToast === 'function') { try { showToast(message, 'error'); return; } catch (e) { } }
-        console.error('ERROR:', message);
+        showToast('ERROR:' + message, 'error');
     }
 
     // Email validation (same pattern used in donor form)

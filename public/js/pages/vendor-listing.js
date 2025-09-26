@@ -1,3 +1,4 @@
+
 (function waitForjQuery() {
   if (window.jQuery) {
     $(document).ready(function () {
@@ -66,7 +67,7 @@
             return (json && Array.isArray(json.data)) ? json.data : [];
           },
           error: function (xhr, error) {
-            console.error('Error loading data:', error);
+            showToast('Error loading data:' + (xhr.responseJSON?.message || error), 'error');
             $table.show();
             if (table && table.clear) table.clear();
             notifyError('Failed to load vendor data. Showing empty list.');

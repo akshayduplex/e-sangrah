@@ -1,6 +1,7 @@
 import cron from "node-cron";
 import TempFile from "../models/tempFile.js";
 import { deleteObject } from "../utils/s3Helpers.js";
+import logger from "../utils/logger.js";
 
 // Function to cleanup old temp files
 export const cleanupOldTempFiles = async () => {
@@ -21,16 +22,16 @@ export const cleanupOldTempFiles = async () => {
                 //Remove from DB completely
                 await TempFile.deleteOne({ _id: file._id });
 
-                console.log(`Permanently deleted file: ${file.s3Filename}`);
+                logger.info(`Permanently deleted file: ${file.s3Filename}`);
             } catch (err) {
-                console.error(`Failed to delete file ${file.s3Filename}:`, err);
+                logger.error(`Failed to delete file ${file.s3Filename}:`, err);
             }
         }
 
-        console.log(`🧹 Cleanup complete. ${oldFiles.length} files permanently removed.`);
+        logger.info(`🧹 Cleanup complete. ${oldFiles.length} files permanently removed.`);
         return oldFiles.length;
     } catch (err) {
-        console.error("Cleanup error:", err);
+        logger.error("Cleanup error:", err);
         return 0;
     }
 };

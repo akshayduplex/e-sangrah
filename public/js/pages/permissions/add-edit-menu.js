@@ -1,8 +1,9 @@
+
 // add-edit-menu.js
 $(function () {
     // sanity check
     if (typeof $.fn.select2 !== 'function') {
-        console.error('Select2 not loaded. Make sure jQuery and Select2 are included before this script.');
+        showToast('Select2 not loaded. Make sure jQuery and Select2 are included before this script.', 'error');
         return;
     }
 
@@ -66,7 +67,6 @@ $(function () {
                 showToast(result.message || 'Something went wrong', 'error');
             }
         } catch (err) {
-            console.error(err);
             showToast(err.message || 'An error occurred', 'error');
         }
     });

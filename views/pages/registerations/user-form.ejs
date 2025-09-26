@@ -1,0 +1,103 @@
+<%- include('../../partials/header') %>
+
+    <div class="page-wrapper">
+        <div class="content">
+            <div class="d-flex align-items-center justify-content-between page-breadcrumb mb-3">
+                <div class="my-auto mb-2">
+                    <h2 class="mb-1">
+                        <%= user.name %>
+                    </h2>
+                    <nav>
+                        <ol class="breadcrumb mb-0">
+                            <li class="breadcrumb-item"><a href="#"><i class="ti ti-smart-home"></i></a></li>
+                            <li class="breadcrumb-item">User List</li>
+                            <li class="breadcrumb-item active">
+                                <%= user.name %>
+                            </li>
+                        </ol>
+                    </nav>
+                </div>
+
+                <% if (!viewOnly) { %>
+                    <div class="rtbtn">
+                        <button id="toggleModeBtn" class="btn btn-secondary btn-lg rounded-pill me-2 mb-2">
+                            <i class="ti ti-eye me-1"></i> View
+                        </button>
+                    </div>
+                    <% } %>
+            </div>
+
+            <div id="viewMode" class="user-details" style="<%= viewOnly ? '' : 'display:none;' %>">
+                <%- include('../../forms/user-form', { user, departments, designations, viewOnly: true }) %>
+            </div>
+
+            <div id="editMode" class="user-details" style="<%= viewOnly ? 'display:none;' : '' %>">
+                <form id="editUserForm" novalidate>
+                    <%- include('../../forms/user-form', { user, departments, designations, viewOnly: false }) %>
+                </form>
+            </div>
+
+            <div id="userData" data-user-id="<%= user._id %>"></div>
+        </div>
+
+        <footer class="footer mt-4 d-sm-flex align-items-center justify-content-between border-top bg-white p-3">
+            <p class="mb-0">2025 &copy; HLFPPT.</p>
+            <p>Designed & Developed by <a href="#" class="text-primary">Duplex Services & Technology</a></p>
+        </footer>
+    </div>
+
+    <script>
+        $(document).ready(function () {
+            $('#toggleModeBtn').click(function () {
+                $('#viewMode').toggle();
+                $('#editMode').toggle();
+                $(this).toggleClass('btn-secondary btn-primary');
+                $(this).html($(this).hasClass('btn-primary') ? '<i class="ti ti-pencil me-1"></i> Edit' : '<i class="ti ti-eye me-1"></i> View');
+            });
+
+            $('#editUserForm').on('submit', function (e) {
+                e.preventDefault();
+                const userId = $('#userData').data('user-id');
+
+                const payload = {
+                    name: $('#editUserForm #name').val(),
+                    phone_number: $('#editUserForm #phone_number').val(),
+                    employee_id: $('#editUserForm #employee_id').val(),
+                    department: $('#editUserForm #department').val(),
+                    designation_id: $('#editUserForm #designation_id').val(),
+                    status: $('#editUserForm #status').val()
+                };
+
+                $.ajax({
+                    url: `/api/user/${userId}`,
+                    method: 'PUT',
+                    contentType: 'application/json',
+                    data: JSON.stringify(payload),
+                    success: function (res) {
+                        if (res.success) {
+                            showToast('User updated successfully!', 'success');
+
+                            // Update view mode
+                            $('#viewMode #name').text(payload.name);
+                            $('#viewMode #phone_number').text(payload.phone_number || '-');
+                            $('#viewMode #employee_id').text(payload.employee_id || '-');
+                            $('#viewMode #department').text($('#editUserForm #department option:selected').text());
+                            $('#viewMode #designation_id').text($('#editUserForm #designation_id option:selected').text());
+                            $('#viewMode #status').text(payload.status);
+
+                            $('#editMode').hide();
+                            $('#viewMode').show();
+                            $('#toggleModeBtn').show();
+                        } else {
+                            showToast(res.message || 'Update failed', 'error');
+                        }
+                    },
+                    error: function (err) {
+                        showToast('Error updating user', 'error');
+                    }
+                });
+            });
+        });
+    </script>
+
+    <%- include('../../partials/footer') %>

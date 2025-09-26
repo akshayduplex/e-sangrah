@@ -105,9 +105,8 @@ $(document).ready(function () {
         if (!isValid) {
             if (typeof showToast === 'function') {
                 showToast('Please fill all required fields correctly.', 'error');
-                // console.error('Please fill all required fields correctly.');
             } else {
-                console.error('Toast function not available');
+                showToast('Toast function not available', 'error');
             }
             return;
         }
@@ -166,17 +165,16 @@ $(document).ready(function () {
                 });
             },
             error: function (xhr, status, error) {
-                console.error('Error:', error);
+                showToast('Error:' + error, 'error');
                 const errorMessage = xhr.responseJSON && xhr.responseJSON.message ? xhr.responseJSON.message : 'An error occurred during registration.';
                 if (typeof showToast === 'function') {
                     showToast(errorMessage, 'error');
                     // console.error(errorMessage);
                 } else {
-                    console.error('Toast function not available');
                     showToast(errorMessage, 'error');
                 }
             }
-        }).always(function(){
+        }).always(function () {
             // Re-enable submit and hide spinner
             let id = $('#donor_id').length && String($('#donor_id').val() || '').trim() !== '';
             $submitBtn.prop('disabled', false);

@@ -88,8 +88,7 @@ async function handleLogin({ emailInput, passwordInput, loginBtn }) {
             showError(data.message || "Login failed. Please try again.");
         }
     } catch (error) {
-        console.error("Login error:", error);
-        showError("Network error. Please try again later.");
+        showError("Network error. Please try again later." + error, "error");
     } finally {
         loginBtn.disabled = false;
         loginBtn.textContent = "Submit";
@@ -115,8 +114,7 @@ async function handleLogoutLink(logoutLink) {
             logoutLink.textContent = "Logout";
         }
     } catch (error) {
-        console.error("Logout error:", error);
-        showError("Network error. Please try again later.");
+        showError("Network error. Please try again later." + error, 'error');
         logoutLink.textContent = "Logout";
     }
 }
