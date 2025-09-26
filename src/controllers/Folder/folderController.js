@@ -436,7 +436,7 @@ export const getFolderTree = async (req, res) => {
 
         const buildTree = async (parentId = null) => {
             // Build query dynamically
-            const query = { parent: parentId };
+            const query = { parent: parentId, status: "active", isArchived: false };
 
             if (departmentId && departmentId !== 'all') query.departmentId = departmentId;
             if (projectId && projectId !== 'all') query.projectId = projectId;
