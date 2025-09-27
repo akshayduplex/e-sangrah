@@ -131,6 +131,8 @@ import Menu from "../models/Menu.js";
 import DesignationMenu from "../models/menuAssignment.js";
 import UserPermission from "../models/UserPermission.js";
 import logger from "../utils/logger.js";
+import { createS3Uploader } from "../middlewares/multer-s3.js";
+import Folder from "../models/Folder.js";
 
 
 const router = express.Router();
@@ -668,11 +670,25 @@ router.put("/user/:id", updateUser);
 router.delete("/user/:id", deleteUser);
 
 
-
 // ---------------------------
 // TempFile routes
 // ---------------------------
-router.post("/files/upload/:folderId", upload.array('file'), uploadFile);
+router.post("/files/upload/:folderId", async (req, res, next) => {
+    try {
+        const { folderId } = req.params;
+        const folder = await Folder.findById(folderId);
+        if (!folder) return res.status(404).json({ success: false, message: "Folder not found" });
+
+        // Dynamically create uploader for the selected folder
+        const uploader = createS3Uploader(folder.name);
+        uploader.array("file")(req, res, (err) => {
+            if (err) return next(err);
+            uploadFile(req, res); // call your controller
+        });
+    } catch (err) {
+        next(err);
+    }
+});
 router.get("/files/download/:fileName", download);
 router.post("/files/submit-form", submitForm);
 router.delete("/files/:fileId", deleteFile);

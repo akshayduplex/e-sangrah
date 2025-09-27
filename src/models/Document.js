@@ -1,4 +1,3 @@
-
 import mongoose from "mongoose";
 
 const documentSchema = new mongoose.Schema({
@@ -26,10 +25,6 @@ const documentSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
         required: true
-    },
-    documentDate: {
-        type: Date,
-        default: Date.now
     },
     status: {
         type: String,
@@ -64,7 +59,6 @@ const documentSchema = new mongoose.Schema({
             trim: true
         }
     },
-    // In your Document model (documentSchema)
     files: [{
         file: {
             type: String, // Changed from ObjectId to String
@@ -97,24 +91,30 @@ const documentSchema = new mongoose.Schema({
     },
     link: {
         type: String
+    },
+    // New fields
+    sharedWith: [{
+        user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        accessLevel: { type: String, enum: ["view", "edit"], default: "view" },
+        sharedAt: { type: Date, default: Date.now }
+    }],
+    remark: {
+        type: String,
+        trim: true,
+        maxlength: 1000
     }
+
 }, {
     timestamps: true
 });
 
 // Indexes
-documentSchema.index({ title: "text", description: "text", tags: "text" });
-documentSchema.index({
-    status: 1,
-    department: 1,
-    owner: 1,
-    "sharedWith.user": 1,
-    "sharedWithDepartments.department": 1,
-    tags: 1,
-    "compliance.expiryDate": 1,
-    createdAt: 1,
-    updatedAt: 1
-});
+documentSchema.index({ status: 1 });
+documentSchema.index({ department: 1 });
+documentSchema.index({ owner: 1 });
+documentSchema.index({ "sharedWith.user": 1 });
+documentSchema.index({ createdAt: 1 });
+documentSchema.index({ "compliance.expiryDate": 1 });
 
 // Virtuals
 documentSchema.virtual("isExpired").get(function () {

@@ -1,5 +1,5 @@
-import { v4 as uuidv4 } from "uuid";
-import { putObject, deleteObject } from "../utils/s3Helpers.js";
+import fs from "fs"
+import { putObject, deleteObject, getObjectUrl } from "../utils/s3Helpers.js";
 import TempFile from "../models/tempFile.js";
 import crypto from "crypto";
 import path from "path";
@@ -9,62 +9,37 @@ import mongoose from "mongoose";
 import logger from "../utils/logger.js";
 // Unique filename generator
 
-export const download = async (req, res) => {
-    try {
-        const key = `file-temp-uploads/${req.params.fileName}`;
-        const url = await getObjectUrl(key, 300); // 5 minutes expiry
-        res.json({ url });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-
-}
 // Upload temporary file
 export const uploadFile = async (req, res) => {
     try {
         const { folderId } = req.params;
         const ownerId = req.user._id;
+
         if (!mongoose.Types.ObjectId.isValid(folderId)) {
             return res.status(400).json({ success: false, message: "Invalid folder ID" });
         }
 
-        const folder = await Folder.findOne({ _id: folderId, owner: ownerId });
-        if (!folder) {
-            return res.status(404).json({ success: false, message: "Folder not found" });
-        }
+        const folder = await Folder.findById(folderId);
+        if (!folder) return res.status(404).json({ success: false, message: "Folder not found" });
+        if (!req.files || req.files.length === 0) return res.status(400).json({ success: false, message: "No files uploaded" });
 
-        if (!req.files || req.files.length === 0) {
-            return res.status(400).json({ success: false, message: "No files uploaded" });
-        }
         let totalSize = 0;
         const uploadedFiles = [];
 
         for (const file of req.files) {
-            const { originalname, mimetype, buffer, size, path: localPath } = file;
-            const s3Filename = generateUniqueFileName(originalname);
+            const { originalname, mimetype, size, key, location } = file;
 
-            // Upload to S3
-            const { url, key } = await putObject(buffer, s3Filename, mimetype, folder.name);
-
-            // Delete local file if exists
-            if (localPath && fs.existsSync(localPath)) {
-                fs.unlinkSync(localPath);
-            }
-
-            // Save in TempFile
             const tempFile = await TempFile.create({
-                fileName: originalname,
+                fileName: key,
                 originalName: originalname,
                 s3Filename: key,
-                s3Url: url,        // ✅ required
+                s3Url: location,
                 fileType: mimetype,
                 status: "temp",
-                size: size || 0,   // ✅ required
+                size: size || 0,
             });
 
             if (!folder.files) folder.files = [];
-
-            // Add to folder's files array
             folder.files.push({
                 file: key,
                 originalName: originalname,
@@ -79,14 +54,14 @@ export const uploadFile = async (req, res) => {
                 fileId: tempFile._id,
                 originalName: originalname,
                 s3Filename: key,
-                s3Url: url,
+                s3Url: location,
             });
         }
 
         folder.size += totalSize;
         await folder.save();
 
-        res.status(201).json({
+        return res.status(201).json({
             success: true,
             message: "Files uploaded successfully",
             folderId: folder._id,
@@ -94,7 +69,7 @@ export const uploadFile = async (req, res) => {
         });
     } catch (err) {
         logger.error("Upload to folder error:", err);
-        res.status(500).json({ success: false, message: "File upload failed" });
+        return res.status(500).json({ success: false, message: "File upload failed" });
     }
 };
 
@@ -138,32 +113,43 @@ export const deleteFile = async (req, res) => {
     try {
         const { fileId } = req.params;
         const file = await TempFile.findById(fileId);
+
         if (!file) return res.status(404).json({ error: "File not found" });
+        if (file.status !== "temp") return res.status(400).json({ error: "Cannot delete non-temporary file" });
 
-        if (file.status === "temp") {
-            // Delete from S3
-            const result = await deleteObject(file.s3Filename);
-            if (result.status !== 204) {
-                return res.status(500).json({ error: "Failed to delete file from S3" });
-            }
-
-            await TempFile.deleteOne({ _id: file._id });
-            // Delete from local disk (if any)
-            if (file.localPath && fs.existsSync(file.localPath)) {
-                fs.unlinkSync(file.localPath);
-            }
-
-
-            res.json({ success: true, message: "File deleted successfully" });
-        } else {
-            res.status(400).json({ error: "Cannot delete non-temporary file" });
+        // Delete from S3
+        try {
+            await deleteObject(file.s3Filename); // should throw on failure
+        } catch (s3Err) {
+            logger.error("Failed to delete file from S3:", s3Err);
+            return res.status(500).json({ error: "Failed to delete file from S3" });
         }
+
+        // Delete MongoDB record
+        await TempFile.deleteOne({ _id: file._id });
+
+        res.status(200).json({ success: true, message: "File deleted successfully" });
     } catch (err) {
-        logger.error("Delete error:", err);
+        logger.error("Delete file error:", err);
         res.status(500).json({ error: "File deletion failed" });
     }
 };
 
+export const download = async (req, res) => {
+    try {
+        const { fileName } = req.params;
+
+        if (!fileName) return res.status(400).json({ error: "Missing file name" });
+
+        // Generate pre-signed URL valid for 5 minutes
+        const url = await getObjectUrl(fileName, 300);
+
+        res.status(200).json({ success: true, url });
+    } catch (err) {
+        console.error("Download error:", err);
+        res.status(500).json({ error: "Failed to generate download URL" });
+    }
+}
 // Get file status
 export const getFileStatus = async (req, res) => {
     try {

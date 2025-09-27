@@ -1,7 +1,6 @@
 // controllers/documentController.js
 import mongoose from "mongoose";
 import Document from "../models/Document.js";
-import tempFile from "../models/tempFile.js";
 import { errorResponse, successResponse, failResponse } from "../utils/responseHandler.js";
 import TempFile from "../models/tempFile.js";
 import Notification from "../models/notification.js";
@@ -53,14 +52,18 @@ export const getDocuments = async (req, res) => {
         const skip = (parseInt(page) - 1) * parseInt(limit);
         const limitNum = parseInt(limit);
 
-        // Fetch documents
         const documents = await Document.find(filter)
             .populate("department", "name")
-            .populate("project", "name")
-            .populate("owner", "firstName lastName email")
-            .populate("projectManager", "firstName lastName email")
+            .populate("project", "projectName")
+            .populate("owner", "name")
+            .populate("projectManager", "name")
             .populate("folderId", "name")
+            .populate({
+                path: "sharedWith.user",
+                select: "name"
+            })
             .sort(sort)
+            .select("metadata signature description project department owner status tags files link createdAt updatedAt sharedWith remark")
             .skip(skip)
             .limit(limitNum);
 

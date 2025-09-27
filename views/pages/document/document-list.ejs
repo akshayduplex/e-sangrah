@@ -6,54 +6,115 @@
             <!-- Breadcrumb -->
             <div class="d-flex align-items-center justify-content-between page-breadcrumb mb-3">
                 <div class="my-auto mb-2">
-                    <h2 class="mb-1">Documents List</h2>
+                    <h2 class="mb-1">All Documents ( <span class="totalDoc">10</span> )</h2>
                     <nav>
                         <ol class="breadcrumb mb-0">
                             <li class="breadcrumb-item">
                                 <a href="#"><i class="ti ti-smart-home"></i></a>
                             </li>
-                            <li class="breadcrumb-item">Documents List</li>
+                            <li class="breadcrumb-item">Dashboard</li>
+                            <li class="breadcrumb-item">Report</li>
+                            <li class="breadcrumb-item">All Documents</li>
                         </ol>
                     </nav>
                 </div>
                 <div class="rtbtn">
-                    <a href="/documents/add" class="btn btn-primary btn-lg rounded-pill me-2 mb-2">
-                        <i class="ti ti-plus me-1"></i>Add New Document
-                    </a>
+                    <!-- Search -->
+                    <div class="me-auto d-flex align-items-center" id="header-search">
+                        <form action="/search" method="get" class="input-group d-inline-flex me-1">
+                            <input type="text" name="q" class="form-control"
+                                placeholder="Search by doc, tag, metadata.." style="width: 300px;">
+                            <!-- Adjust width here -->
+                            <span class="input-icon-addon">
+                                <i class="ti ti-search"></i>
+                            </span>
+                        </form>
+                    </div>
+                    <!-- /Search -->
                 </div>
             </div>
             <!-- /Breadcrumb -->
+            <div class="filter-container mb-3">
+                <!-- Row 1: Tabs aligned left -->
+                <div class="d-flex flex-wrap gap-2 mb-2">
+                    <button type="button" class="btn btn-primary rounded-pill status-tab">All</button>
+                    <button type="button" class="btn btn-outline-primary rounded-pill status-tab">Pending</button>
+                    <button type="button" class="btn btn-outline-primary rounded-pill status-tab">Rejected</button>
+                    <button type="button" class="btn btn-outline-primary rounded-pill status-tab">Approved</button>
+                    <button type="button" class="btn btn-outline-primary rounded-pill status-tab">Draft</button>
+                    <button type="button" class="btn btn-outline-primary rounded-pill status-tab">Compliance and
+                        Retention</button>
+                </div>
 
-            <!-- Filter Section -->
-            <div class="row mb-3">
-                <div class="col-xxl-12">
-                    <div class="card p-3">
-                        <div class="row g-2 align-items-end">
-                            <div class="col-md-3">
-                                <label>Status</label>
-                                <select id="filter_status" class="form-select">
-                                    <option value="">All</option>
-                                    <option value="Draft">Draft</option>
-                                    <option value="Pending">Pending</option>
-                                    <option value="UnderReview">UnderReview</option>
-                                    <option value="Approved">Approved</option>
-                                    <option value="Rejected">Rejected</option>
-                                    <option value="Archived">Archived</option>
-                                </select>
-                            </div>
-                            <div class="col-md-3">
-                                <label>Department</label>
-                                <input type="text" id="filter_department" class="form-control"
-                                    placeholder="Department ID">
-                            </div>
-                            <div class="col-md-2">
-                                <button id="apply_filters" class="btn btn-primary w-100">Apply Filters</button>
+                <!-- Row 2: Filters & buttons aligned right -->
+                <div class="d-flex gap-2 justify-content-end align-items-end">
+                    <div class="mb-0">
+                        <select id="department" class="form-select select2">
+                            <option value="">-- Select Department --</option>
+                        </select>
+                    </div>
+                    <div class="mb-0">
+                        <select id="projectName" class="form-select select2">
+                            <option value="">-- Select Project --</option>
+                        </select>
+                    </div>
+                    <div class="mb-0 position-relative">
+                        <!-- Filter Button -->
+                        <div class="mb-0 position-relative">
+                            <!-- Filter Button -->
+                            <button class="btn btn-outline-secondary" id="columnFilterBtn">
+                                <i class="ti ti-filter"></i>
+                            </button>
+
+                            <!-- Filter Dropdown -->
+                            <div class="filter-dropdown d-none p-3 border rounded bg-white shadow-sm position-absolute end-0 mt-2"
+                                style="z-index: 1050; min-width: 220px;">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" value="fileName" id="filterFileName"
+                                        checked>
+                                    <label class="form-check-label" for="filterFileName">File name</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" value="tags" id="filterTags">
+                                    <label class="form-check-label" for="filterTags">Tags</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" value="metadata" id="filterMetadata"
+                                        checked>
+                                    <label class="form-check-label" for="filterMetadata">Meta data</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" value="ownerName"
+                                        id="filterOwnerName">
+                                    <label class="form-check-label" for="filterOwnerName">Owner name</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" value="fileType"
+                                        id="filterFileType">
+                                    <label class="form-check-label" for="filterFileType">File type</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" value="folderName"
+                                        id="filterFolderName" checked>
+                                    <label class="form-check-label" for="filterFolderName">Folder name</label>
+                                </div>
+                                <div class="mt-2 d-flex justify-content-between">
+                                    <button class="btn btn-primary btn-sm" id="applyFilter">Apply</button>
+                                    <button class="btn btn-sm" id="clearFilter">Clear</button>
+                                </div>
                             </div>
                         </div>
+                        <!-- Filter dropdown here -->
+                    </div>
+                    <div class="position-relative mb-0">
+                        <input type="text" class="form-control datetimepicker" placeholder="<%= todayDate %>"
+                            value="<%= todayDate %>">
+                        <span class="input-icon-addon">
+                            <i class="ti ti-calendar text-gray-7"></i>
+                        </span>
                     </div>
                 </div>
             </div>
-            <!-- /Filter Section -->
 
             <!-- Documents Table -->
             <div class="row">
@@ -61,18 +122,21 @@
                     <div class="card flex-fill">
                         <div class="card-body p-0">
                             <div class="custom-datatable-filter table-responsive">
-                                <table class="table datatable" id="documents_table">
-                                    <thead>
+                                <table class="table table-hover datatable" id="documents_table">
+                                    <thead class="thead-light">
                                         <tr>
                                             <th></th>
                                             <th>File Name</th>
                                             <th>Last Modified on</th>
                                             <th>Owner</th>
                                             <th>Department</th>
-                                            <th>Project</th>
+                                            <th>Project Name</th>
+                                            <th>Shared With</th>
                                             <th>Tags</th>
-                                            <th>Meta data</th>
-                                            <th>Created on</th>
+                                            <th>Metadata</th>
+                                            <th>Description</th>
+                                            <th>Remark</th>
+                                            <th>Signature</th>
                                             <th>Status</th>
                                         </tr>
                                     </thead>
@@ -93,100 +157,317 @@
         </div>
     </div>
     <!-- /Page Wrapper -->
-
+    <link href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" rel="stylesheet">
     <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
 
-    <script>
-        $(document).ready(function () {
-            const $tableBody = $("#documents_table_body");
-            let table;
-
-            function fetchDocuments(filters = {}) {
-                const query = $.param(filters);
-                $.ajax({
-                    url: `/api/documents?${query}`,
-                    method: 'GET',
-                    success: function (res) {
-                        if (!res.success) return;
-                        const documents = res.data.documents || [];
-                        $tableBody.empty();
-
-                        documents.forEach(doc => {
-                            const files = doc.files || [];
-                            const fileNames = files.map(f => f.originalName).join(", ") || "-";
-                            const tags = (doc.tags || []).join(", ") || "-";
-                            const metaData = doc.metadata ? Object.values(doc.metadata).filter(v => v).join(", ") : "-";
-                            const owner = doc.owner?.email || "-";
-                            const department = doc.department?.name || "-";
-                            const project = doc.project?._id || "-";
-                            const statusClass = {
-                                'Draft': 'bg-soft-info',
-                                'Pending': 'bg-soft-warning',
-                                'Approved': 'bg-soft-success',
-                                'Rejected': 'bg-soft-danger',
-                                'UnderReview': 'bg-soft-warning'
-                            }[doc.status] || 'bg-soft-secondary';
-
-                            const rowHtml = `
-<tr>
-    <td>
-        <div class="btn-group" role="group">
-            <button type="button" class="btn border-0" data-bs-toggle="dropdown" aria-expanded="false">
-                <i class="ti ti-settings"></i>
-            </button>
-            <ul class="dropdown-menu">
-                <li><a class="dropdown-item" href="${doc.link || '#'}"><i class="ti ti-eye"></i> View</a></li>
-                <li><a class="dropdown-item" href="/documents/edit/${doc._id}"><i class="ti ti-pencil-minus"></i> Edit</a></li>
-                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#sharedoc-modal">
-                        <i class="ti ti-share"></i> Share</a></li>
-                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#versionhistory-modal">
-                        <i class="ti ti-history"></i> Version History</a></li>
-                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#downloaddoc-modal">
-                        <i class="ti ti-download"></i> Download</a></li>
-                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#trashdoc-modal">
-                        <i class="ti ti-trash"></i> Move to Trash</a></li>
-                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#archivedoc-modal">
-                        <i class="ti ti-archive"></i> Move to Archive</a></li>
-            </ul>
-        </div>
-    </td>
-    <td>${fileNames}</td>
-    <td>${new Date(doc.updatedAt).toLocaleString()}</td>
-    <td>${owner}</td>
-    <td>${department}</td>
-    <td>${project}</td>
-    <td>${tags}</td>
-    <td>${metaData}</td>
-    <td>${new Date(doc.createdAt).toLocaleString()}</td>
-    <td><span class="badge badge-md ${statusClass}">${doc.status}</span></td>
-</tr>`;
-                            $tableBody.append(rowHtml);
-                        });
-
-                        if (table) {
-                            table.destroy();
-                        }
-                        table = $('#documents_table').DataTable();
-                    },
-                    error: function (err) {
-                        console.error("Error fetching documents:", err);
-                    }
-                });
-            }
-
-            // Initial load
-            fetchDocuments();
-
-            // Apply filters
-            $("#apply_filters").click(function () {
-                const filters = {
-                    status: $("#filter_status").val(),
-                    department: $("#filter_department").val()
-                };
-                fetchDocuments(filters);
-            });
-        });
-    </script>
-
     <%- include('../../partials/footer') %>
+        <script>
+            (function ($, document) {
+                "use strict";
+                let documentIdToDelete = null;
+                let documentNameToDelete = '';
+                // --------------------------
+                // Debounce utility
+                // --------------------------
+                function debounce(fn, delay = 300) {
+                    let timer;
+                    return function (...args) {
+                        clearTimeout(timer);
+                        timer = setTimeout(() => fn.apply(this, args), delay);
+                    };
+                }
+
+                // --------------------------
+                // Cached Select2 AJAX
+                // --------------------------
+                const selectCache = {};
+
+                function initSelect2(selector, url, textKey) {
+                    const $select = $(selector);
+                    $select.select2({
+                        placeholder: `-- Select ${textKey} --`,
+                        allowClear: true,
+                        minimumInputLength: 0,
+                        ajax: {
+                            transport: function (params, success, failure) {
+                                const term = params.data.term || "";
+                                const cacheKey = `${url}_${term}`;
+                                if (selectCache[cacheKey]) return success(selectCache[cacheKey]);
+
+                                $.ajax({
+                                    url: url,
+                                    type: "GET",
+                                    data: { search: term },
+                                    success: function (res) {
+                                        const data = res.data || [];
+                                        const results = data.map(item => ({ id: item._id, text: item[textKey] }));
+                                        selectCache[cacheKey] = results;
+                                        success(results);
+                                    },
+                                    error: failure
+                                });
+                            },
+                            processResults: data => ({ results: data }),
+                            delay: 300,
+                            cache: true
+                        },
+                        dropdownParent: $('.filter-container')
+                    });
+                }
+
+                async function preloadSelect2(selector, url, textKey) {
+                    try {
+                        const res = await fetch(url);
+                        const data = await res.json();
+                        if (!data.success) return;
+                        const initialItems = (data.data || []).slice(0, 10);
+                        const $select = $(selector);
+                        initialItems.forEach(item => {
+                            const option = new Option(item[textKey], item._id, false, false);
+                            $select.append(option);
+                        });
+                        $select.trigger('change');
+                    } catch (err) {
+                        console.error("Select2 preload error:", err);
+                    }
+                }
+
+                // --------------------------
+                // Initialize Select2 dropdowns
+                // --------------------------
+                initSelect2("#department", "/api/departments/search", "name");
+                initSelect2("#projectName", "/api/projects", "projectName");
+                preloadSelect2("#department", "/api/departments/search", "name");
+                preloadSelect2("#projectName", "/api/projects", "projectName");
+
+                // --------------------------
+                // Status Tabs Filter
+                // --------------------------
+                const $tabs = $('.status-tab');
+                $tabs.on('click', function () {
+                    $tabs.removeClass('btn-primary').addClass('btn-outline-primary');
+                    $(this).removeClass('btn-outline-primary').addClass('btn-primary');
+                    fetchDocuments(); // Refresh table with current filters
+                });
+                // Debounced search
+                $('#header-search input[name="q"]').on('input', debounce(function () {
+                    fetchDocuments();
+                }, 300));
+
+                // --------------------------
+                // Column Filter Elements
+                // --------------------------
+                const $filterDropdown = $('.filter-dropdown');
+                $('#columnFilterBtn').on('click', e => { e.stopPropagation(); $filterDropdown.toggleClass('d-none'); });
+                $filterDropdown.on('click', e => e.stopPropagation());
+                $(document).on('click', () => { if (!$filterDropdown.hasClass('d-none')) $filterDropdown.addClass('d-none'); });
+
+                // --------------------------
+                // DataTable Initialization
+                // --------------------------
+                let table;
+                const fileIcons = {
+                    ppt: "/img/icons/fn1.png",
+                    pptx: "/img/icons/fn1.png",
+                    doc: "/img/icons/fn2.png",
+                    docx: "/img/icons/fn2.png",
+                    xls: "/img/icons/fn3.png",
+                    xlsx: "/img/icons/fn3.png",
+                    pdf: "/img/icons/fn4.png",
+                    default: "/img/icons/fn1.png"
+                };
+
+                function renderDocuments(documents) {
+                    if (!Array.isArray(documents)) return;
+                    // Update total count
+                    $('.totalDoc').text(documents.length);
+                    const tbody = documents.map(doc => {
+                        const lastModified = new Date(doc.updatedAt).toLocaleString();
+                        const owner = doc.owner?.name || '-';
+                        const department = doc.department?.name || '-';
+                        const projectName = doc.project?.projectName || '-';
+                        const description = doc.description || '-';
+                        const remark = doc.remark || '-';
+                        const tags = doc.tags?.length ? doc.tags.join(', ') : '-';
+                        const sharedWith = doc.sharedWith?.length ? doc.sharedWith.map(sw => sw.user.name).join(', ') : '-';
+                        const metadata = doc.metadata ? `${doc.metadata.fileName || '-'}, ${doc.metadata.fileDescription || '-'}` : '-';
+                        const statusClass = {
+                            'draft': 'bg-soft-info',
+                            'pending': 'bg-soft-warning',
+                            'approved': 'bg-soft-success',
+                            'rejected': 'bg-soft-danger',
+                            'underreview': 'bg-soft-warning'
+                        }[(doc.status || '').toLowerCase().replace(/\s+/g, '')] || 'bg-soft-secondary';
+
+                        const filesInfo = doc.files?.length
+                            ? `<div class="flxtblleft">
+                        <span class="avatar rounded bg-light mb-2">
+                            <img src="${fileIcons[doc.files[0].originalName.split('.').pop().toLowerCase()] || fileIcons.default}">
+                        </span>
+                        <div class="flxtbltxt">
+                            <p class="fs-14 mb-1 fw-normal text-neutral">${doc.files[0].originalName}${doc.files.length > 1 ? `<span class="text-success">+${doc.files.length - 1}</span>` : ''}</p>
+                            <span class="fs-11 fw-light text-black">${Number(doc.files[0].size || 0) ? (doc.files[0].size / 1024).toFixed(2) + ' KB' : '-'}</span>
+                        </div>
+                    </div>` : '-';
+
+                        return `
+                        <tr>
+                <td>
+                    <div class="btn-group" role="group">
+                        <button type="button" class="btn border-0" data-bs-toggle="dropdown"><i class="ti ti-settings"></i></button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="${doc.link || '#'}"><i class="ti ti-eye"></i> View</a></li>
+                            <li><a class="dropdown-item" href="/documents/edit/${doc._id}"><i class="ti ti-pencil-minus"></i> Edit</a></li>
+                            <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#sharedoc-modal"><i class="ti ti-share"></i> Share</a></li>
+                            <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#versionhistory-modal"><i class="ti ti-history"></i> Version History</a></li>
+                            <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#downloaddoc-modal"><i class="ti ti-download"></i> Download</a></li>
+                            <li><a class="dropdown-item btn-delete" href="#" data-id="${doc._id}"><i class="ti ti-trash"></i> Delete</a></li>
+                        </ul>
+                    </div>
+                </td>
+                <td>${filesInfo}</td>
+                <td>${lastModified}</td>
+                <td>${owner}</td>
+                <td>${department}</td>
+                <td>${projectName}</td>
+                <td>${sharedWith}</td>
+                <td>${tags}</td>
+                <td>${metadata}</td>
+                <td>${description}</td>
+                <td>${remark}</td>
+                <td>${doc.signature && doc.signature.fileUrl ? `<img src="${doc.signature.fileUrl}" style="height:40px;">` : '-'}</td>
+                <td><span class="badge badge-md ${statusClass}">${doc.status}</span></td>
+            </tr>`;
+                    }).join('');
+
+                    $('#documents_table_body').html(tbody);
+
+                    if ($.fn.DataTable) {
+                        if (table) table.destroy();
+                        table = $('#documents_table').DataTable({ columnDefs: [{ orderable: false, targets: 13 }], order: [] });
+                    }
+                }
+                // Open modal and change content for permanent delete
+                $(document).on('click', '.btn-delete', function (e) {
+                    e.preventDefault();
+
+                    documentIdToDelete = $(this).data('id');
+                    documentNameToDelete = $(this).closest('tr').find('td:nth-child(2) p').text(); // assumes file name is in 2nd column
+
+                    // Update modal header and body dynamically
+                    $('#trashdocLabel').html(`
+            <img src="/img/icons/bin.png" alt="Delete Icon"><br>
+            Permanently Delete Document
+        `);
+
+                    $('.modal-body.text-muted').html(`
+            Are you sure you want to <strong>permanently delete</strong> <span>${documentNameToDelete}</span>?<br>
+            This action cannot be undone.
+        `);
+
+                    $('#confirm-trash-folder').removeClass('btn-primary').addClass('btn-danger').text('Yes, Delete Permanently');
+
+                    $('#trashdoc-modal').modal('show');
+                });
+
+                // Confirm delete
+                $('#confirm-trash-folder').on('click', function () {
+                    if (!documentIdToDelete) return;
+
+                    $.ajax({
+                        url: `/api/documents/${documentIdToDelete}`,
+                        method: 'DELETE',
+                        success: function (res) {
+                            if (res.success) {
+                                $('#trashdoc-modal').modal('hide');
+                                documentIdToDelete = null;
+                                showToast('Document deleted successfully', 'success');
+                                fetchDocuments(); // refresh table
+                            } else {
+                                showToast('Failed to delete document', 'error');
+                            }
+                        },
+                        error: function (err) {
+                            showToast('Error deleting document', 'error');
+                        }
+                    });
+                });
+                // --------------------------
+                // Fetch Documents (optimized)
+                // --------------------------
+                const fetchDocuments = debounce(function () {
+                    const status = $('.status-tab.btn-primary').text().trim();
+                    const departmentId = $('#department').val();
+                    const projectId = $('#projectName').val();
+                    const searchQuery = $('#header-search input[name="q"]').val().trim();
+                    const selectedDate = $('.datetimepicker').val();
+
+                    const params = {};
+                    if (status && status !== "All") params.status = status;
+                    if (departmentId) params.department = departmentId;
+                    if (projectId) params.project = projectId;
+                    if (searchQuery) params.search = searchQuery;       // Add search param
+                    if (selectedDate) params.date = selectedDate;       // Add date param
+
+                    $.ajax({
+                        url: '/api/documents',
+                        method: 'GET',
+                        data: params,
+                        success: function (res) {
+                            if (!res.success) return console.error('Failed to fetch documents');
+                            renderDocuments(res.data.documents);
+                        },
+                        error: function (err) {
+                            console.error('Error fetching documents', err);
+                        }
+                    });
+                }, 300);
+
+                // --------------------------
+                // Filters: department & project
+                // --------------------------
+                $('#department, #projectName').on('change', fetchDocuments);
+
+                // --------------------------
+                // Column Filter
+                // --------------------------
+                $('#applyFilter').on('click', function () {
+                    const columns = {
+                        fileName: $('#filterFileName').is(':checked'),
+                        tags: $('#filterTags').is(':checked'),
+                        metadata: $('#filterMetadata').is(':checked'),
+                        ownerName: $('#filterOwnerName').is(':checked'),
+                        fileType: $('#filterFileType').is(':checked'),
+                        folderName: $('#filterFolderName').is(':checked')
+                    };
+
+                    $('#documents_table thead th').each(function (index) {
+                        const colName = $(this).text().replace(/\s/g, '').toLowerCase();
+                        let showCol = true;
+
+                        if (colName.includes('filename') && !columns.fileName) showCol = false;
+                        if (colName.includes('tags') && !columns.tags) showCol = false;
+                        if (colName.includes('metadata') && !columns.metadata) showCol = false;
+                        if (colName.includes('owner') && !columns.ownerName) showCol = false;
+                        if (colName.includes('filetype') && !columns.fileType) showCol = false;
+                        if (colName.includes('folder') && !columns.folderName) showCol = false;
+
+                        table.column(index).visible(showCol);
+                    });
+
+                    $filterDropdown.addClass('d-none');
+                });
+
+                $('#clearFilter').on('click', function () {
+                    $('.filter-dropdown input[type="checkbox"]').prop('checked', false);
+                    if (table) table.columns().visible(true);
+                });
+
+                // --------------------------
+                // Initial load
+                // --------------------------
+                fetchDocuments();
+
+            })(jQuery, document);
+        </script>

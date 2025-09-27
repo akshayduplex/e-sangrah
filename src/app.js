@@ -85,7 +85,7 @@ app.use((req, res, next) => {
     res.locals.profile_type = user.profile_type || null;
     res.locals.email = user.email || null;
     res.locals.name = user.name || null;
-    res.locals.formatDateDDMMYYYY = formatDateDDMMYYYY;
+    res.locals.todayDate = formatDateDDMMYYYY();
     next();
 });
 

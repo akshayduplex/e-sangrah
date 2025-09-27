@@ -311,7 +311,7 @@ router.get("/documents/edit/:id", authenticate, checkPermissions, async (req, re
             return res.status(404).send("Document not found");
         }
 
-        res.render("pages/add-document", {
+        res.render("pages/document/add-document", {
             title: "E-Sangrah - Edit Document",
             user: req.user,
             document,

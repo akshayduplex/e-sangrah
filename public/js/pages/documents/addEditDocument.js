@@ -1,5 +1,9 @@
-window.selectedFolders = []; // [{ id, name }]
-let uploadedFileIds = [];
+// Global state
+window.selectedFolders = [];   // [{ id, name }]
+window.selectedProject = { id: null, name: null };
+window.selectedDepartment = { id: null, name: null };
+window.selectedProjectManager = { id: null, name: null };
+
 const folderForm = document.getElementById('folderForm');
 const folderContainer = document.getElementById('folderContainer');
 const selectedFolderInput = document.getElementById('selectedFolderId');
@@ -276,57 +280,53 @@ $(document).ready(function () {
         }
     });
 
-
-    // --------------------------
-    // File upload handling
-    // --------------------------
     const uploadBox = document.getElementById("uploadBox");
     const fileInput = document.getElementById("fileInput");
     const fileList = document.getElementById("fileList");
+    let uploadedFileIds = []; // store server-side file IDs
 
+    // Modal elements
+    const trashModal = new bootstrap.Modal(document.getElementById("trashdoc-modal"));
+    const trashModalTitle = document.querySelector("#trashdocLabel");
+    const trashModalBody = document.querySelector("#trashdoc-modal .modal-body");
+    const confirmTrashBtn = document.getElementById("confirm-trash-folder");
+
+    let fileToDelete = null; // store fileItem being deleted
+
+    // Click to open file dialog
     uploadBox.addEventListener("click", () => fileInput.click());
 
+    // File input change
     fileInput.addEventListener("change", async (e) => {
-        await handleFileUpload(e.target.files); // send all selected files
+        await handleFileUpload(e.target.files);
     });
 
-
+    // Drag & drop
     uploadBox.addEventListener("dragover", e => {
         e.preventDefault();
         uploadBox.classList.add("dragover");
     });
-
-    uploadBox.addEventListener("dragleave", () => {
-        uploadBox.classList.remove("dragover");
-    });
-
-    uploadBox.addEventListener("drop", async (e) => {
+    uploadBox.addEventListener("dragleave", () => uploadBox.classList.remove("dragover"));
+    uploadBox.addEventListener("drop", async e => {
         e.preventDefault();
-        await handleFileUpload(e.dataTransfer.files); // send all dropped files
+        await handleFileUpload(e.dataTransfer.files);
     });
 
+    // Handle file uploads
     async function handleFileUpload(files) {
-        const folderId = $('#selectedFolderId').val();
-        if (!folderId) return showToast("Please select a folder.", 'info');
+        const folderId = document.getElementById('selectedFolderId').value;
+        if (!folderId) return alert("Please select a folder.");
 
         for (const file of files) {
-            const fileId = 'temp_' + Date.now() + Math.random().toString(36).substring(2, 8); // temporary ID
+            const tempId = 'temp_' + Date.now() + Math.random().toString(36).substring(2, 8);
 
-            // Create UI element
             const fileItem = document.createElement("div");
             fileItem.className = "file-item col-sm-5 mb-3 p-3 border rounded";
-            fileItem.setAttribute("data-file-id", fileId);
-
-            // Choose icon based on file type
-            let iconClass = "fa-file";
-            if (file.type.includes("word")) iconClass = "fa-file-word text-primary";
-            else if (file.type.includes("pdf")) iconClass = "fa-file-pdf text-danger";
-            else if (file.type.includes("presentation") || file.name.endsWith(".ppt") || file.name.endsWith(".pptx")) iconClass = "fa-file-powerpoint text-warning";
-            else if (file.type.includes("sheet") || file.name.endsWith(".xls") || file.name.endsWith(".xlsx")) iconClass = "fa-file-excel text-success";
+            fileItem.setAttribute("data-file-id", tempId);
 
             fileItem.innerHTML = `
             <div class="file-info d-flex align-items-center">
-                <i class="fa-solid ${iconClass} fa-2x me-3"></i>
+                <i class="fa-solid fa-file fa-2x me-3"></i>
                 <div class="flex-grow-1">
                     <h6 class="mb-0 text-truncate">${file.name}</h6>
                     <small class="text-muted">${(file.size / 1024 / 1024).toFixed(2)} MB</small>
@@ -334,93 +334,96 @@ $(document).ready(function () {
             </div>
             <div class="file-progress mt-2">
                 <div class="progress">
-                    <div class="progress-bar bg-success" role="progressbar" style="width: 0%">0%</div>
+                    <div class="progress-bar bg-success" role="progressbar" style="width:0%">0%</div>
                 </div>
             </div>
-            <button class="remove-btn btn btn-sm btn-danger mt-2" data-file-id="${fileId}">
+            <button class="remove-btn btn btn-sm btn-danger mt-2" data-file-id="${tempId}" disabled>
                 <i class="fa-solid fa-xmark"></i> Remove
             </button>
         `;
             fileList.appendChild(fileItem);
 
             const progressBar = fileItem.querySelector(".progress-bar");
+            const removeBtn = fileItem.querySelector(".remove-btn");
 
-            // Handle Remove button
-            fileItem.querySelector(".remove-btn").addEventListener("click", async function () {
-                const fileIdToRemove = this.getAttribute("data-file-id");
-                if (!fileIdToRemove) return;
-
-                try {
-                    // Only call DELETE if the file was uploaded to server
-                    if (uploadedFileIds.includes(fileIdToRemove)) {
-                        const res = await fetch(`/api/files/${fileIdToRemove}`, { method: 'DELETE' });
-                        const data = await res.json();
-                        if (!data.success) throw new Error(data.message || "Delete failed");
-                    }
-                    // Remove from array & DOM
-                    uploadedFileIds = uploadedFileIds.filter(id => id !== fileIdToRemove);
-                    fileItem.remove();
-                } catch (err) {
-                    showToast('Error deleting file: ' + err.message, 'error');
-                }
-            });
-
-            // Upload file to server
             try {
                 const formData = new FormData();
                 formData.append('file', file);
 
-                const response = await fetch(`/api/files/upload/${folderId}`, { method: 'POST', body: formData });
-                const data = await response.json();
+                const res = await fetch(`/api/files/upload/${folderId}`, { method: 'POST', body: formData });
+                const data = await res.json();
 
-                if (data.success) {
-                    progressBar.style.width = "100%";
-                    progressBar.textContent = "100%";
+                if (!data.success) throw new Error(data.message || "Upload failed");
 
-                    // Use real file ID from server
-                    const uploadedId = data.fileId || fileId;
-                    uploadedFileIds.push(uploadedId);
+                const uploadedFile = data.files[0];
+                const fileId = uploadedFile.fileId;
 
-                    fileItem.setAttribute("data-file-id", uploadedId);
-                    fileItem.querySelector(".remove-btn").setAttribute("data-file-id", uploadedId);
-                } else {
-                    throw new Error(data.message || "Upload failed");
-                }
-            } catch (error) {
-                showToast("Upload error:" + error, "error");
+                uploadedFileIds.push(fileId);
+                fileItem.setAttribute("data-file-id", fileId);
+                removeBtn.setAttribute("data-file-id", fileId);
+                removeBtn.disabled = false;
+
+                progressBar.style.width = "100%";
+                progressBar.textContent = "Uploaded";
+
+            } catch (err) {
                 progressBar.classList.remove("bg-success");
                 progressBar.classList.add("bg-danger");
                 progressBar.textContent = "Error";
-
-                const errorMsg = document.createElement("div");
-                errorMsg.className = "text-danger small mt-1";
-                errorMsg.textContent = "Upload failed. Please try again.";
-                fileItem.appendChild(errorMsg);
+                console.error("Upload failed:", err);
             }
         }
     }
 
-    // Existing files in edit mode — reuse the same remove logic
-    document.querySelectorAll('.remove-btn[data-file-id]').forEach(btn => {
-        btn.addEventListener('click', async function () {
-            const fileId = this.getAttribute('data-file-id');
-            const fileItem = this.closest('.file-item');
-            if (!fileId) return;
+    // Remove file handler using modal
+    fileList.addEventListener("click", function (e) {
+        const btn = e.target.closest(".remove-btn");
+        if (!btn) return;
 
-            try {
-                const res = await fetch(`/api/files/${fileId}`, { method: 'DELETE' });
-                const data = await res.json();
-                if (data.success) {
-                    uploadedFileIds = uploadedFileIds.filter(id => id !== fileId);
-                    fileItem.remove();
-                } else {
-                    showToast('Error deleting file: ' + data.message, 'error');
-                }
-            } catch (err) {
-                showToast('Error deleting file' + err, 'error');
-            }
-        });
+        fileToDelete = btn.closest(".file-item");
+        const fileId = btn.getAttribute("data-file-id");
+        if (!fileToDelete || !fileId) return;
+
+        // Update modal content
+        trashModalTitle.innerHTML = `
+        <img src="/img/icons/bin.png" class="me-2" style="width:24px; height:24px;">
+        Delete File
+    `;
+        trashModalBody.innerHTML = `
+        You are about to delete <strong>"${fileToDelete.querySelector("h6").textContent}"</strong>.<br>
+        This action cannot be undone. Are you sure you want to proceed?
+    `;
+
+        trashModal.show();
     });
+
+
+    // Confirm deletion
+    confirmTrashBtn.addEventListener("click", async () => {
+        if (!fileToDelete) return;
+
+        const fileId = fileToDelete.getAttribute("data-file-id");
+
+        try {
+            if (uploadedFileIds.includes(fileId)) {
+                const res = await fetch(`/api/files/${fileId}`, { method: "DELETE" });
+                const data = await res.json();
+                if (!data.success) throw new Error(data.message || "Delete failed");
+                uploadedFileIds = uploadedFileIds.filter(id => id !== fileId);
+            }
+
+            fileToDelete.remove();
+            fileToDelete = null;
+            trashModal.hide();
+            showToast("File removed successfully!", 'success');
+
+        } catch (err) {
+            showToast("Error deleting file: " + err.message, 'error');
+            trashModal.hide();
+        }
+    });
+
+
 
     $('#parentFolder').select2({
         dropdownParent: $('#folder-modal'), // ensures it stays inside modal
