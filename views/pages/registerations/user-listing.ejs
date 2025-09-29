@@ -72,7 +72,77 @@
             <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
 
             <script>
-                let deleteUserId = null;
+                $(document).ready(function () {
+                    const table = $('#userTable').DataTable({
+                        serverSide: true,
+                        processing: true,
+                        ajax: {
+                            url: '/api/user',
+                            type: 'GET'
+                        },
+                        columns: [
+                            { data: 'srNo' },
+                            { data: 'name' },
+                            { data: 'email' },
+                            { data: 'phone' },
+                            { data: 'profile_type' },
+                            { data: 'status' },
+                            { data: 'department' },
+                            { data: 'designation' },
+                            { data: 'lastLogin' },
+                            { data: 'createdAt' },
+                            { data: 'actions', orderable: false, searchable: false }
+                        ],
+                        order: [[9, 'desc']],
+                        lengthMenu: [10, 25, 50],
+                    });
+
+                    // 🔹 Debounced search for server-side
+                    $('#userTable_filter input').off('keyup').on('keyup', debounce(function () {
+                        table.search(this.value).draw();
+                    }, 500)); // 500ms delay
+
+                    // Delete user logic (same as before)
+                    $(document).on('click', '.btn-delete', function (e) {
+                        e.preventDefault();
+                        let deleteUserId = $(this).data('id');
+                        $('#confirmDeleteModal').modal('show');
+
+                        $('#confirmDeleteBtn').off('click').on('click', function () {
+                            $.ajax({
+                                url: `/api/user/${deleteUserId}`,
+                                method: 'DELETE',
+                                success: function (res) {
+                                    $('#confirmDeleteModal').modal('hide');
+                                    if (res.success) {
+                                        showToast('User deleted successfully!', 'success');
+                                        table.ajax.reload(null, false); // refresh current page
+                                    } else {
+                                        showToast(res.message || 'Failed to delete user', 'error');
+                                    }
+                                },
+                                error: function () {
+                                    $('#confirmDeleteModal').modal('hide');
+                                    showToast('Error deleting user', 'error');
+                                }
+                            });
+                        });
+                    });
+                });
+
+
+                function debounce(func, wait) {
+                    let timeout;
+                    return function (...args) {
+                        clearTimeout(timeout);
+                        timeout = setTimeout(() => func.apply(this, args), wait);
+                    };
+                }
+
+            </script>
+
+            <!-- <script>
+let deleteUserId = null;
 
                 $(document).ready(function () {
                     let table;
@@ -172,4 +242,4 @@
                         });
                     });
                 });
-            </script>
+            </script> -->

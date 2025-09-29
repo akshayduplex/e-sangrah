@@ -317,8 +317,8 @@ router.get("/documents/edit/:id", authenticate, checkPermissions, async (req, re
             user: req.user,
             document,
             isEdit: true,
-            projectManager: document.projectManager, // send explicitly
-            department: document.department // send explicitly
+            // projectManager: document.projectManager, // send explicitly
+            // department: document.department // send explicitly
         });
     } catch (err) {
         logger.error("Error loading edit-document page:", err);

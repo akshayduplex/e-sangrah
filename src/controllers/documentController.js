@@ -12,45 +12,106 @@ import logger from "../utils/logger.js";
  */
 export const getDocuments = async (req, res) => {
     try {
-        const {
-            page = 1,
-            limit = 10,
-            search,
-            status,
-            department,
-            project,
-            owner,
-            tags,
-            category,
-            sortBy = "createdAt",
-            sortOrder = "desc"
-        } = req.query;
+        const { page = 1, limit = 10, search, status, department, project, owner, tags, category, date, sortBy = "createdAt", sortOrder = "desc", isCompliance } = req.query;
 
-        // Build filter object
         const filter = {};
 
-        // Text search (only if index exists)
-        if (search) {
-            filter.$text = { $search: search };
+        // Text search - IMPROVED: More comprehensive search
+        if (search && search.trim() !== "") {
+            const safeSearch = search.trim();
+            filter.$or = [
+                { "metadata.fileName": { $regex: safeSearch, $options: "i" } },
+                { "metadata.fileDescription": { $regex: safeSearch, $options: "i" } },
+                { "metadata.mainHeading": { $regex: safeSearch, $options: "i" } },
+                { description: { $regex: safeSearch, $options: "i" } },
+                { tags: { $in: [new RegExp(safeSearch, "i")] } },
+                { "files.originalName": { $regex: safeSearch, $options: "i" } }, // Search in file names
+                { remark: { $regex: safeSearch, $options: "i" } } // Search in remarks
+            ];
         }
 
-        // Utility to handle single or array values
-        const toArray = val => (Array.isArray(val) ? val : [val]);
+        // ... rest of your existing backend code remains the same
+        // Helper function to handle array conversion
+        const toArray = val => {
+            if (!val) return [];
+            if (Array.isArray(val)) return val;
+            if (typeof val === 'string') return val.split(',');
+            return [val];
+        };
 
-        if (status) filter.status = { $in: toArray(status) };
-        if (department) filter.department = { $in: toArray(department).filter(id => mongoose.Types.ObjectId.isValid(id)) };
-        if (project) filter.project = { $in: toArray(project).filter(id => mongoose.Types.ObjectId.isValid(id)) };
-        if (owner) filter.owner = { $in: toArray(owner).filter(id => mongoose.Types.ObjectId.isValid(id)) };
-        if (tags) filter.tags = { $in: toArray(tags) };
+        // Status filter
+        if (status) {
+            const statusArray = toArray(status);
+            filter.status = statusArray.length === 1 ? statusArray[0] : { $in: statusArray };
+        }
+        if (isCompliance !== undefined) {
+            filter["compliance.isCompliance"] = isCompliance === 'true' || isCompliance === true;
+        }
+
+        // Department filter
+        if (department) {
+            const deptArray = toArray(department).filter(id => mongoose.Types.ObjectId.isValid(id));
+            if (deptArray.length > 0) {
+                filter.department = deptArray.length === 1 ? deptArray[0] : { $in: deptArray };
+            }
+        }
+
+        // Project filter
+        if (project) {
+            const projectArray = toArray(project).filter(id => mongoose.Types.ObjectId.isValid(id));
+            if (projectArray.length > 0) {
+                filter.project = projectArray.length === 1 ? projectArray[0] : { $in: projectArray };
+            }
+        }
+
+        // Owner filter
+        if (owner) {
+            const ownerArray = toArray(owner).filter(id => mongoose.Types.ObjectId.isValid(id));
+            if (ownerArray.length > 0) {
+                filter.owner = ownerArray.length === 1 ? ownerArray[0] : { $in: ownerArray };
+            }
+        }
+
+        // Tags filter
+        if (tags) {
+            const tagsArray = toArray(tags);
+            filter.tags = { $in: tagsArray.map(tag => new RegExp(tag, "i")) };
+        }
+
+        // Category filter
         if (category) filter.category = category;
+
+        // Compliance filter
+        if (isCompliance !== undefined) {
+            filter["compliance.isCompliance"] = isCompliance === 'true' || isCompliance === true;
+        }
+
+        // Date filter
+        if (date) {
+            const [day, month, year] = date.split('-').map(Number);
+            const selectedDate = new Date(year, month - 1, day);
+
+            if (!isNaN(selectedDate.getTime())) {
+                const nextDate = new Date(selectedDate);
+                nextDate.setDate(nextDate.getDate() + 1);
+
+                filter.createdAt = {
+                    $gte: selectedDate,
+                    $lt: nextDate
+                };
+            }
+        }
 
         // Sorting
         const sort = {};
-        sort[sortBy] = sortOrder === "desc" ? -1 : 1;
+        const allowedSortFields = ["createdAt", "updatedAt", "metadata.fileName", "status"];
+        const sortField = allowedSortFields.includes(sortBy) ? sortBy : "createdAt";
+        sort[sortField] = sortOrder === "desc" ? -1 : 1;
 
         // Pagination
-        const skip = (parseInt(page) - 1) * parseInt(limit);
-        const limitNum = parseInt(limit);
+        const pageNum = Math.max(1, parseInt(page));
+        const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
+        const skip = (pageNum - 1) * limitNum;
 
         const documents = await Document.find(filter)
             .populate("department", "name")
@@ -63,22 +124,20 @@ export const getDocuments = async (req, res) => {
                 select: "name"
             })
             .sort(sort)
-            .select("metadata signature description project department owner status tags files link createdAt updatedAt sharedWith remark")
+            .select("metadata signature description project department owner status tags files link createdAt updatedAt sharedWith remark compliance")
             .skip(skip)
             .limit(limitNum);
 
-        // Total count
         const totalDocuments = await Document.countDocuments(filter);
 
-        // Return response
         return successResponse(res, {
             documents,
             pagination: {
-                currentPage: parseInt(page),
+                currentPage: pageNum,
                 totalPages: Math.ceil(totalDocuments / limitNum),
                 totalDocuments,
-                hasNext: page * limitNum < totalDocuments,
-                hasPrev: page > 1
+                hasNext: pageNum * limitNum < totalDocuments,
+                hasPrev: pageNum > 1
             }
         }, "Documents retrieved successfully");
 
@@ -86,7 +145,6 @@ export const getDocuments = async (req, res) => {
         logger.error("Error fetching documents:", error);
         return errorResponse(res, error, "Failed to retrieve documents");
     }
-
 };
 
 /**
@@ -152,26 +210,17 @@ export const getDocument = async (req, res) => {
         const document = await Document.findById(id)
             .populate("department", "name")
             .populate("project", "name")
-            .populate("owner", "firstName lastName email")
-            .populate("projectManager", "firstName lastName email")
-            .populate("documentManager", "firstName lastName email")
-            .populate("sharedWith.user", "firstName lastName email")
-            .populate("sharedWithDepartments.department", "name")
+            .populate("owner", "name email")
+            .populate("projectManager", "name email")
+            // .populate("department", "name")
+            .populate("sharedWith.user", "name email")
+            // .populate("sharedWithDepartments.department", "name")
             .populate("files.file", "filename originalName size mimetype url")
             .populate("folderId", "name");
 
         if (!document) {
             return failResponse(res, "Document not found", 404);
         }
-
-        // Check access permissions
-        const hasAccess = document.hasAccess(req.user._id, req.user.department);
-        if (!hasAccess) {
-            return failResponse(res, "Access denied", 403);
-        }
-
-        // Add access log for view
-        await document.addAccessLog(req.user._id, "view", req.ip, req.get("User-Agent"));
 
         return successResponse(res, { document }, "Document retrieved successfully");
     } catch (error) {
@@ -185,7 +234,7 @@ export const getDocument = async (req, res) => {
 export const createDocument = async (req, res) => {
     try {
         const {
-            projectName,
+            project,
             department,
             projectManager,
             documentDate,
@@ -335,7 +384,7 @@ export const createDocument = async (req, res) => {
 
 
         const document = new Document({
-            project: projectName || null,
+            project: project || null,
             department,
             projectManager: projectManager || null,
             folderId: validFolderId,
@@ -452,27 +501,27 @@ export const updateDocument = async (req, res) => {
             }
         }
 
-        // Handle files already uploaded to S3 via TempFile IDs
-        if (fileIds) {
+        // ---------------- Add new files as versions ----------------
+        if (fileIds && fileIds.length > 0) {
             let parsedFileIds = typeof fileIds === "string" ? JSON.parse(fileIds) : fileIds;
-            const uploadedFiles = [];
-            for (const fileId of parsedFileIds) {
-                const tempFile = await TempFile.findById(fileId);
-                if (tempFile && tempFile.status === "temp") {
-                    tempFile.status = "permanent";
-                    await tempFile.save();
 
-                    uploadedFiles.push({
-                        file: tempFile.s3Filename,
-                        s3Url: tempFile.s3Url,
-                        originalName: tempFile.originalName,
-                        version: 1,
-                        uploadedAt: new Date(),
-                        isPrimary: uploadedFiles.length === 0
-                    });
-                }
+            for (const fileId of parsedFileIds) {
+                if (!mongoose.Types.ObjectId.isValid(fileId)) continue;
+
+                const tempFile = await TempFile.findById(fileId);
+                if (!tempFile || tempFile.status !== "temp") continue;
+
+                tempFile.status = "permanent";
+                await tempFile.save();
+
+                // Add as a new version
+                await document.addNewVersion({
+                    file: tempFile.s3Filename,
+                    s3Url: tempFile.s3Url,
+                    originalName: tempFile.originalName,
+                    hash: tempFile.hash || null
+                }, req.user._id);
             }
-            if (uploadedFiles.length) document.files = uploadedFiles;
         }
 
         // Signature handling
@@ -746,5 +795,69 @@ export const searchDocuments = async (req, res) => {
         return successResponse(res, { documents }, "Search results retrieved successfully");
     } catch (error) {
         return errorResponse(res, error, "Failed to search documents");
+    }
+};
+
+// Upload new version
+export const uploadDocumentVersion = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const document = await Document.findById(id);
+        if (!document) return failResponse(res, "Document not found", 404);
+
+        const fileData = {
+            file: req.body.fileUrl,
+            s3Url: req.body.s3Url,
+            originalName: req.body.originalName,
+            hash: req.body.hash
+        };
+
+        await document.addNewVersion(fileData, req.user._id);
+        return successResponse(res, { document }, "New version uploaded successfully");
+    } catch (err) {
+        return errorResponse(res, err, "Failed to upload new version");
+    }
+};
+
+
+/**
+ * Get document versions
+ */
+export const getDocumentVersions = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return failResponse(res, "Invalid document ID", 400);
+        }
+
+        const document = await Document.findById(id)
+            .populate("files.uploadedBy", "firstName lastName email")
+            .select("files currentVersion");
+
+        if (!document) {
+            return failResponse(res, "Document not found", 404);
+        }
+
+        // Group files by version and include status
+        const versions = document.files.map(file => ({
+            version: file.version,
+            file: file.file,
+            originalName: file.originalName,
+            uploadedBy: file.uploadedBy,
+            uploadedAt: file.uploadedAt,
+            isPrimary: file.isPrimary,
+            status: file.status,
+            hash: file.hash
+        })).sort((a, b) => b.version - a.version);
+
+        return successResponse(res, {
+            versions,
+            currentVersion: document.currentVersion
+        }, "Document versions retrieved successfully");
+
+    } catch (error) {
+        logger.error("Error fetching document versions:", error);
+        return errorResponse(res, error, "Failed to retrieve document versions");
     }
 };

@@ -257,17 +257,27 @@
 					try {
 						const res = await fetch(`/api/folders/${pendingFolderId}`, { method: "DELETE" });
 						const data = await res.json();
-						if (!data.success) throw new Error(data.message);
-						showToast("Folder moved to recycle bin");
+
+						if (!data.success) {
+							// Show the exact backend message
+							showToast(data.message || "Failed to delete folder", "warning");
+							return; // stop further execution
+						}
+
+						// Success
+						showToast(data.message || "Folder deleted successfully"); // backend message or default
 						loadFolders(folderState.currentFolderId, folderState.selectedFolders);
+
 					} catch (err) {
-						showToast("Failed to delete folder", "danger");
+						// Fallback in case fetch/network fails
+						showToast(err.message || "Failed to delete folder", "warning");
 
 					} finally {
 						pendingFolderId = null;
 						bootstrap.Modal.getInstance(document.getElementById("trashdoc-modal")).hide();
 					}
 				});
+
 
 				// Confirm Archive
 				document.querySelector("#archivedoc-modal .btn.btn-primary")?.addEventListener("click", async () => {

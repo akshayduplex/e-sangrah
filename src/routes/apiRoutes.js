@@ -133,6 +133,7 @@ import UserPermission from "../models/UserPermission.js";
 import logger from "../utils/logger.js";
 import { createS3Uploader } from "../middlewares/multer-s3.js";
 import Folder from "../models/Folder.js";
+import mongoose from "mongoose";
 
 
 const router = express.Router();

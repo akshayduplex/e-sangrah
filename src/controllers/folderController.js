@@ -337,7 +337,7 @@ export const moveFolder = async (req, res) => {
 export const deleteFolder = async (req, res) => {
     try {
         const { id } = req.params;
-        const ownerId = req.user._id; // assuming you have req.user
+        const ownerId = req.user._id; // assuming req.user is populated
 
         // Find the folder
         const folder = await Folder.findOne({ _id: id, owner: ownerId });
@@ -345,21 +345,24 @@ export const deleteFolder = async (req, res) => {
             return res.status(404).json({ success: false, message: "Folder not found" });
         }
 
-        // Check if the folder has any files
-        const fileCount = await TempFile.countDocuments({ folder: id, status: { $ne: "deleted" } });
+        // Check if folder is empty
+        const fileCount = folder.files?.length || 0;
+        const subfolderCount = await Folder.countDocuments({ parent: id, owner: ownerId, isDeleted: false });
 
-        if (fileCount > 0) {
-            // Folder has files → mark as inactive
-            folder.status = 'inactive';
-            await folder.save();
-            return res.json({ success: true, message: "Folder contains files, marked as inactive" });
+        if (fileCount > 0 || subfolderCount > 0) {
+            // Folder is not empty → cannot delete
+            return res.status(400).json({
+                success: false,
+                message: "Folder is not empty. Delete files/subfolders first."
+            });
         }
 
-        // No files → delete permanently
+        // Folder is empty → permanently delete
         await Folder.deleteOne({ _id: id, owner: ownerId });
         return res.json({ success: true, message: "Folder permanently deleted" });
+
     } catch (err) {
-        logger.error("Error deleting folder:", err);
+        console.error("Error deleting folder:", err);
         res.status(500).json({ success: false, message: err.message || "Server error while deleting folder" });
     }
 };
@@ -514,7 +517,7 @@ export const getArchivedFolders = async (req, res) => {
 
         // Find all folders that are archived and not deleted
         const folders = await Folder.find({ owner: ownerId, isArchived: true, deletedAt: null })
-            .sort({ updatedAt: -1 }).select('name owner departmentId parent status createdBy updatedBy slug').populate('departmentId', 'name').populate('parent', 'name').populate('createdBy', 'name').populate('updatedBy', 'name').populate('owner', 'name email').populate('projectId', 'name')
+            .sort({ updatedAt: -1 }).select('name owner departmentId parent status createdBy updatedBy slug').populate('departmentId', 'name').populate('parent', 'name').populate('createdBy', 'name').populate('updatedBy', 'name').populate('owner', 'name email').populate('projectId', 'projectName')
             .lean();
 
         res.json({

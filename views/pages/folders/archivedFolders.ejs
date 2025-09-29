@@ -24,7 +24,7 @@
                                 <table class="table datatable" id="archived_folders_table">
                                     <thead>
                                         <tr>
-                                            <th>Actions</th>
+                                            <th></th>
                                             <th>Folder Name</th>
                                             <th>Owner Name</th>
                                             <th>Owner Email</th>
@@ -51,124 +51,84 @@
         <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
         <script>$(document).ready(function () {
                 const $table = $('#archived_folders_table');
-                const $tableBody = $("#archived_folders_table_body");
-                let folderIdToTrash = null;
-                let folderIdToRestore = null;
 
-                // Initialize DataTable
                 const dataTable = $table.DataTable({
+                    processing: true,       // show processing indicator
+                    serverSide: true,       // enable server-side processing
+                    ajax: {
+                        url: "http://localhost:5000/api/folders/archived",
+                        type: "GET",
+                        dataSrc: function (res) {
+                            // Map your response to DataTables format
+                            // DataTables expects: { data: [...], recordsTotal: x, recordsFiltered: y }
+                            if (!res.success) return [];
+                            return res.folders.map(folder => ({
+                                id: folder._id,
+                                actions: `<div class="btn-group" role="group">
+                                <a href="#" class="dropdown-item restore-folder" data-folder-id="${folder._id}" data-bs-toggle="modal" data-bs-target="#restore-folder-modal"><i class="ti ti-arrow-back-up"></i></a>
+                                <a class="dropdown-item trash-folder" href="#" data-folder-id="${folder._id}" data-bs-toggle="modal" data-bs-target="#trashdoc-modal"><i class="ti ti-trash"></i></a>
+                              </div>`,
+                                name: folder.name || "-",
+                                ownerName: folder.owner?.name || "-",
+                                ownerEmail: folder.owner?.email || "-",
+                                department: folder.departmentId?.name || "-",
+                                project: folder.projectId?.projectName || "-",
+                                status: folder.status || "-",
+                                createdBy: folder.createdBy?.name || "-",
+                                updatedBy: folder.updatedBy?.name || "-"
+                            }));
+                        }
+                    },
+                    columns: [
+                        { data: 'actions', orderable: false, searchable: false },
+                        { data: 'name' },
+                        { data: 'ownerName' },
+                        { data: 'ownerEmail' },
+                        { data: 'department' },
+                        { data: 'project' },
+                        { data: 'status' },
+                        { data: 'createdBy' },
+                        { data: 'updatedBy' }
+                    ],
+                    order: [[1, 'asc']],
                     paging: true,
                     searching: true,
                     ordering: true,
                     info: true,
-                    autoWidth: false,
-                    order: [[1, 'asc']]
+                    autoWidth: false
                 });
 
-                function fetchArchivedFolders() {
-                    $.ajax({
-                        url: "http://localhost:5000/api/folders/archived",
-                        method: "GET",
-                        success: function (res) {
-                            if (!res.success) return;
-                            const folders = res.folders || [];
-
-                            dataTable.clear();
-
-                            folders.forEach(folder => {
-                                const rowNode = dataTable.row.add([
-                                    `<div class="btn-group" role="group">
-                            <button type="button" class="btn border-0" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="ti ti-settings"></i>
-                            </button>
-                            <ul class="dropdown-menu">
-                                <li><a class="dropdown-item" href="/folders/view/${folder._id}"><i class="ti ti-eye"></i> View</a></li>
-                                <li><a class="dropdown-item" href="/folders/edit/${folder._id}"><i class="ti ti-pencil-minus"></i> Edit</a></li>
-                                <li><a href="#" class="dropdown-item restore-folder" data-folder-id="${folder._id}" data-bs-toggle="modal" data-bs-target="#restore-folder-modal"><i class="ti ti-arrow-back-up"></i> Restore</a></li>
-                                <li><a class="dropdown-item trash-folder" href="#" data-folder-id="${folder._id}" data-bs-toggle="modal" data-bs-target="#trashdoc-modal"><i class="ti ti-trash"></i> Delete</a></li>
-                            </ul>
-                        </div>`,
-                                    folder.name || "-",
-                                    folder.owner?.name || "-",
-                                    folder.owner?.email || "-",
-                                    folder.departmentId || "-",
-                                    folder.projectId || "-",
-                                    folder.status || "-",
-                                    folder.createdBy?.name || "-",
-                                    folder.updatedBy?.name || "-"
-                                ]).draw(false).node();
-
-                                $(rowNode).attr('data-folder-id', folder._id);
-                            });
-                        },
-                        error: function () {
-                            showToast("Error fetching archived folders", "error", 3000);
-                        }
-                    });
-                }
-
-                // Open Trash modal
+                // Handle restore and trash actions
                 $(document).on('click', '.trash-folder', function (e) {
                     e.preventDefault();
-                    folderIdToTrash = $(this).data('folder-id');
-                });
-
-                // Confirm Trash
-                $('#confirm-trash-folder').click(function () {
-                    if (!folderIdToTrash) return;
-
-                    $.ajax({
-                        url: `/api/folders/${folderIdToTrash}`,
-                        method: 'DELETE',
-                        success: function (res) {
-                            if (res.success) {
-                                showToast("Folder moved to Recycle Bin", "success", 3000);
-                                const row = $tableBody.find(`tr[data-folder-id="${folderIdToTrash}"]`);
-                                dataTable.row(row).remove().draw(false);
-                            } else {
-                                showToast("Failed to move folder", "error", 3000);
+                    const folderId = $(this).data('folder-id');
+                    $('#confirm-trash-folder').off('click').on('click', function () {
+                        $.ajax({
+                            url: `/api/folders/${folderId}`,
+                            type: 'DELETE',
+                            success: function (res) {
+                                if (res.success) {
+                                    dataTable.ajax.reload();
+                                }
                             }
-                            $('#trashdoc-modal').modal('hide');
-                            folderIdToTrash = null;
-                        },
-                        error: function () {
-                            showToast("Error moving folder", "error", 3000);
-                            $('#trashdoc-modal').modal('hide');
-                        }
+                        });
                     });
                 });
 
-                // Open Restore modal
                 $(document).on('click', '.restore-folder', function (e) {
                     e.preventDefault();
-                    folderIdToRestore = $(this).data('folder-id');
-                });
-
-                // Confirm Restore
-                $('#confirm-restore-folder').click(function () {
-                    if (!folderIdToRestore) return;
-
-                    $.ajax({
-                        url: `/api/folders/${folderIdToRestore}/restore`,
-                        method: 'PATCH',
-                        success: function (res) {
-                            if (res.success) {
-                                showToast("Folder restored successfully", "success", 3000);
-                                const row = $tableBody.find(`tr[data-folder-id="${folderIdToRestore}"]`);
-                                dataTable.row(row).remove().draw(false);
-                            } else {
-                                showToast("Failed to restore folder", "error", 3000);
+                    const folderId = $(this).data('folder-id');
+                    $('#confirm-restore-folder').off('click').on('click', function () {
+                        $.ajax({
+                            url: `/api/folders/${folderId}/restore`,
+                            type: 'PATCH',
+                            success: function (res) {
+                                if (res.success) {
+                                    dataTable.ajax.reload();
+                                }
                             }
-                            $('#restore-folder-modal').modal('hide');
-                            folderIdToRestore = null;
-                        },
-                        error: function () {
-                            showToast("Error restoring folder", "error", 3000);
-                            $('#restore-folder-modal').modal('hide');
-                        }
+                        });
                     });
                 });
-
-                fetchArchivedFolders();
             });
         </script>

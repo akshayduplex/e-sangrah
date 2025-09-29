@@ -91,66 +91,80 @@ export const registerUser = async (req, res) => {
 // Get all users with profile type 'user'
 export const getAllUsers = async (req, res) => {
     try {
-        let { page = 1, limit = 10, search = "", department, designation, status, profile_type } = req.query;
+        let draw = parseInt(req.query.draw) || 1;
+        let start = parseInt(req.query.start) || 0;
+        let length = parseInt(req.query.length) || 10;
 
-        page = parseInt(page, 10);
-        limit = parseInt(limit, 10);
+        let searchValue = req.query['search[value]'] || '';
+        let orderColumnIndex = req.query['order[0][column]'] || 0;
+        let orderDir = req.query['order[0][dir]'] || 'desc';
 
-        // default filter
-        const filter = {};
+        // Map DataTables column index to DB fields
+        const columns = ['name', 'email', 'phone_number', 'profile_type', 'status', 'userDetails.department', 'userDetails.designation', 'lastLogin', 'createdAt'];
+        const sortField = columns[orderColumnIndex] || 'createdAt';
 
-        if (profile_type) {
-            filter.profile_type = profile_type;
-        } else {
-            filter.profile_type = "user"; // fallback
-        }
-        // 🔎 search filter
-        if (search) {
+        // Build filter
+        const filter = { profile_type: 'user' };
+        if (searchValue) {
             filter.$or = [
-                { name: { $regex: search, $options: "i" } },
-                { email: { $regex: search, $options: "i" } },
-                { "userDetails.employee_id": { $regex: search, $options: "i" } },
+                { name: { $regex: searchValue, $options: 'i' } },
+                { email: { $regex: searchValue, $options: 'i' } },
+                { 'userDetails.employee_id': { $regex: searchValue, $options: 'i' } }
             ];
         }
 
-        // 🏢 filter by department ID
-        if (department) {
-            filter["userDetails.department"] = department;
-        }
-
-        // 📌 filter by designation ID
-        if (designation) {
-            filter["userDetails.designation"] = designation;
-        }
-
-        // ✅ filter by status
-        if (status) {
-            filter.status = status;
-        }
+        const totalRecords = await User.countDocuments({ profile_type: 'user' });
+        const filteredRecords = await User.countDocuments(filter);
 
         const users = await User.find(filter)
-            .populate("userDetails.department", "name")
-            .populate("userDetails.designation", "name")
-            .select("-password -raw_password")
-            .limit(limit)
-            .skip((page - 1) * limit)
-            .sort({ createdAt: -1 });
+            .populate('userDetails.department', 'name')
+            .populate('userDetails.designation', 'name')
+            .select('-password -raw_password')
+            .sort({ [sortField]: orderDir })
+            .skip(start)
+            .limit(length);
 
-        const total = await User.countDocuments(filter);
+        // Prepare data for DataTable
+        const data = users.map((user, index) => {
+            let department = user.userDetails?.department?.name || '-';
+            let designation = user.userDetails?.designation?.name || '-';
+            let phone = user.phone_number || '-';
+            let lastLogin = user.lastLogin ? new Date(user.lastLogin).toLocaleString() : '-';
+            let createdAt = new Date(user.createdAt).toLocaleString();
 
-        res.status(200).json({
-            success: true,
-            message: "Users fetched successfully",
-            users,
-            totalPages: Math.ceil(total / limit),
-            currentPage: page,
-            total,
+            return {
+                srNo: start + index + 1,
+                name: user.name,
+                email: user.email,
+                phone,
+                profile_type: user.profile_type,
+                status: user.status,
+                department,
+                designation,
+                lastLogin,
+                createdAt,
+                actions: `
+                    <a href="/users/edit/${user._id}" class="text-primary me-2" title="Edit">
+                        <i class="ti ti-edit"></i>
+                    </a>
+                    <a href="#" class="text-danger btn-delete" data-id="${user._id}" title="Delete">
+                        <i class="ti ti-trash"></i>
+                    </a>
+                `
+            };
         });
+
+        res.json({
+            draw,
+            recordsTotal: totalRecords,
+            recordsFiltered: filteredRecords,
+            data
+        });
+
     } catch (error) {
-        logger.error("Get users error:", error);
+        console.error('DataTable error:', error);
         res.status(500).json({
-            success: false,
-            message: "Internal server error",
+            error: 'Internal server error'
         });
     }
 };

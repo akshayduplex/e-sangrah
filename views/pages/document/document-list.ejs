@@ -21,14 +21,11 @@
                 <div class="rtbtn">
                     <!-- Search -->
                     <div class="me-auto d-flex align-items-center" id="header-search">
-                        <form action="/search" method="get" class="input-group d-inline-flex me-1">
-                            <input type="text" name="q" class="form-control"
-                                placeholder="Search by doc, tag, metadata.." style="width: 300px;">
-                            <!-- Adjust width here -->
-                            <span class="input-icon-addon">
-                                <i class="ti ti-search"></i>
-                            </span>
-                        </form>
+                        <div class="input-group" style="width: 300px;">
+                            <input type="text" id="searchInput" class="form-control"
+                                placeholder="Search by doc, tag, metadata..">
+                            <span class="input-group-text"><i class="ti ti-search"></i></span>
+                        </div>
                     </div>
                     <!-- /Search -->
                 </div>
@@ -49,12 +46,12 @@
                 <!-- Row 2: Filters & buttons aligned right -->
                 <div class="d-flex gap-2 justify-content-end align-items-end">
                     <div class="mb-0">
-                        <select id="department" class="form-select select2">
+                        <select id="department" class="form-select select2" style="width: 200px;">
                             <option value="">-- Select Department --</option>
                         </select>
                     </div>
-                    <div class="mb-0">
-                        <select id="projectName" class="form-select select2">
+                    <div class=" mb-0">
+                        <select id="projectName" class="form-select select2" style="width: 200px;">
                             <option value="">-- Select Project --</option>
                         </select>
                     </div>
@@ -107,8 +104,7 @@
                         <!-- Filter dropdown here -->
                     </div>
                     <div class="position-relative mb-0">
-                        <input type="text" class="form-control datetimepicker" placeholder="<%= todayDate %>"
-                            value="<%= todayDate %>">
+                        <input type="text" class="form-control datetimepicker" placeholder="Select date">
                         <span class="input-icon-addon">
                             <i class="ti ti-calendar text-gray-7"></i>
                         </span>
@@ -117,156 +113,54 @@
             </div>
 
             <!-- Documents Table -->
-            <div class="row">
-                <div class="col-xxl-12 col-xl-12">
-                    <div class="card flex-fill">
-                        <div class="card-body p-0">
-                            <div class="custom-datatable-filter table-responsive">
-                                <table class="table table-hover datatable" id="documents_table">
-                                    <thead class="thead-light">
-                                        <tr>
-                                            <th></th>
-                                            <th>File Name</th>
-                                            <th>Last Modified on</th>
-                                            <th>Owner</th>
-                                            <th>Department</th>
-                                            <th>Project Name</th>
-                                            <th>Shared With</th>
-                                            <th>Tags</th>
-                                            <th>Metadata</th>
-                                            <th>Description</th>
-                                            <th>Remark</th>
-                                            <th>Signature</th>
-                                            <th>Status</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="documents_table_body"></tbody>
-                                </table>
-                            </div>
-                        </div>
+            <div class="card">
+                <div class="card-body">
+                    <div class="table-responsive" id="documentsTableWrapper">
+                        <table class="table table-hover datatable" id="documents_table">
+                            <thead class="thead-light">
+                                <tr>
+                                    <th></th>
+                                    <th>File Name</th>
+                                    <th>Last Modified on</th>
+                                    <th>Owner</th>
+                                    <th>Department</th>
+                                    <th>Project Name</th>
+                                    <th>Shared With</th>
+                                    <th>Tags</th>
+                                    <th>Metadata</th>
+                                    <th>Description</th>
+                                    <th>Remark</th>
+                                    <th>Signature</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="documents_table_body"></tbody>
+                        </table>
                     </div>
                 </div>
             </div>
-            <!-- /Documents Table -->
-        </div>
-
-        <div class="footer mt-4 d-sm-flex align-items-center justify-content-between border-top bg-white p-3">
-            <p class="mb-0">2025 &copy; HLFPPT.</p>
-            <p>Designed & Developed by <a href="javascript:void(0);" class="text-primary">Duplex services &
-                    Technology</a></p>
         </div>
     </div>
+    <!-- /Documents Table -->
+    </div>
+
+    <div class="footer mt-4 d-sm-flex align-items-center justify-content-between border-top bg-white p-3">
+        <p class="mb-0">2025 &copy; HLFPPT.</p>
+        <p>Designed & Developed by <a href="javascript:void(0);" class="text-primary">Duplex services &
+                Technology</a></p>
+    </div>
+    </div>
     <!-- /Page Wrapper -->
-    <link href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" rel="stylesheet">
-    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
-    <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
 
     <%- include('../../partials/footer') %>
+        <link href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+        <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+        <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+
         <script>
-            (function ($, document) {
+            (function ($) {
                 "use strict";
-                let documentIdToDelete = null;
-                let documentNameToDelete = '';
-                // --------------------------
-                // Debounce utility
-                // --------------------------
-                function debounce(fn, delay = 300) {
-                    let timer;
-                    return function (...args) {
-                        clearTimeout(timer);
-                        timer = setTimeout(() => fn.apply(this, args), delay);
-                    };
-                }
 
-                // --------------------------
-                // Cached Select2 AJAX
-                // --------------------------
-                const selectCache = {};
-
-                function initSelect2(selector, url, textKey) {
-                    const $select = $(selector);
-                    $select.select2({
-                        placeholder: `-- Select ${textKey} --`,
-                        allowClear: true,
-                        minimumInputLength: 0,
-                        ajax: {
-                            transport: function (params, success, failure) {
-                                const term = params.data.term || "";
-                                const cacheKey = `${url}_${term}`;
-                                if (selectCache[cacheKey]) return success(selectCache[cacheKey]);
-
-                                $.ajax({
-                                    url: url,
-                                    type: "GET",
-                                    data: { search: term },
-                                    success: function (res) {
-                                        const data = res.data || [];
-                                        const results = data.map(item => ({ id: item._id, text: item[textKey] }));
-                                        selectCache[cacheKey] = results;
-                                        success(results);
-                                    },
-                                    error: failure
-                                });
-                            },
-                            processResults: data => ({ results: data }),
-                            delay: 300,
-                            cache: true
-                        },
-                        dropdownParent: $('.filter-container')
-                    });
-                }
-
-                async function preloadSelect2(selector, url, textKey) {
-                    try {
-                        const res = await fetch(url);
-                        const data = await res.json();
-                        if (!data.success) return;
-                        const initialItems = (data.data || []).slice(0, 10);
-                        const $select = $(selector);
-                        initialItems.forEach(item => {
-                            const option = new Option(item[textKey], item._id, false, false);
-                            $select.append(option);
-                        });
-                        $select.trigger('change');
-                    } catch (err) {
-                        console.error("Select2 preload error:", err);
-                    }
-                }
-
-                // --------------------------
-                // Initialize Select2 dropdowns
-                // --------------------------
-                initSelect2("#department", "/api/departments/search", "name");
-                initSelect2("#projectName", "/api/projects", "projectName");
-                preloadSelect2("#department", "/api/departments/search", "name");
-                preloadSelect2("#projectName", "/api/projects", "projectName");
-
-                // --------------------------
-                // Status Tabs Filter
-                // --------------------------
-                const $tabs = $('.status-tab');
-                $tabs.on('click', function () {
-                    $tabs.removeClass('btn-primary').addClass('btn-outline-primary');
-                    $(this).removeClass('btn-outline-primary').addClass('btn-primary');
-                    fetchDocuments(); // Refresh table with current filters
-                });
-                // Debounced search
-                $('#header-search input[name="q"]').on('input', debounce(function () {
-                    fetchDocuments();
-                }, 300));
-
-                // --------------------------
-                // Column Filter Elements
-                // --------------------------
-                const $filterDropdown = $('.filter-dropdown');
-                $('#columnFilterBtn').on('click', e => { e.stopPropagation(); $filterDropdown.toggleClass('d-none'); });
-                $filterDropdown.on('click', e => e.stopPropagation());
-                $(document).on('click', () => { if (!$filterDropdown.hasClass('d-none')) $filterDropdown.addClass('d-none'); });
-
-                // --------------------------
-                // DataTable Initialization
-                // --------------------------
-                let table;
                 const fileIcons = {
                     ppt: "/img/icons/fn1.png",
                     pptx: "/img/icons/fn1.png",
@@ -278,196 +172,197 @@
                     default: "/img/icons/fn1.png"
                 };
 
-                function renderDocuments(documents) {
-                    if (!Array.isArray(documents)) return;
-                    // Update total count
-                    $('.totalDoc').text(documents.length);
-                    const tbody = documents.map(doc => {
-                        const lastModified = new Date(doc.updatedAt).toLocaleString();
-                        const owner = doc.owner?.name || '-';
-                        const department = doc.department?.name || '-';
-                        const projectName = doc.project?.projectName || '-';
-                        const description = doc.description || '-';
-                        const remark = doc.remark || '-';
-                        const tags = doc.tags?.length ? doc.tags.join(', ') : '-';
-                        const sharedWith = doc.sharedWith?.length ? doc.sharedWith.map(sw => sw.user.name).join(', ') : '-';
-                        const metadata = doc.metadata ? `${doc.metadata.fileName || '-'}, ${doc.metadata.fileDescription || '-'}` : '-';
-                        const statusClass = {
-                            'draft': 'bg-soft-info',
-                            'pending': 'bg-soft-warning',
-                            'approved': 'bg-soft-success',
-                            'rejected': 'bg-soft-danger',
-                            'underreview': 'bg-soft-warning'
-                        }[(doc.status || '').toLowerCase().replace(/\s+/g, '')] || 'bg-soft-secondary';
-
-                        const filesInfo = doc.files?.length
-                            ? `<div class="flxtblleft">
-                        <span class="avatar rounded bg-light mb-2">
-                            <img src="${fileIcons[doc.files[0].originalName.split('.').pop().toLowerCase()] || fileIcons.default}">
-                        </span>
-                        <div class="flxtbltxt">
-                            <p class="fs-14 mb-1 fw-normal text-neutral">${doc.files[0].originalName}${doc.files.length > 1 ? `<span class="text-success">+${doc.files.length - 1}</span>` : ''}</p>
-                            <span class="fs-11 fw-light text-black">${Number(doc.files[0].size || 0) ? (doc.files[0].size / 1024).toFixed(2) + ' KB' : '-'}</span>
-                        </div>
-                    </div>` : '-';
-
-                        return `
-                        <tr>
-                <td>
-                    <div class="btn-group" role="group">
-                        <button type="button" class="btn border-0" data-bs-toggle="dropdown"><i class="ti ti-settings"></i></button>
-                        <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="${doc.link || '#'}"><i class="ti ti-eye"></i> View</a></li>
-                            <li><a class="dropdown-item" href="/documents/edit/${doc._id}"><i class="ti ti-pencil-minus"></i> Edit</a></li>
-                            <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#sharedoc-modal"><i class="ti ti-share"></i> Share</a></li>
-                            <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#versionhistory-modal"><i class="ti ti-history"></i> Version History</a></li>
-                            <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#downloaddoc-modal"><i class="ti ti-download"></i> Download</a></li>
-                            <li><a class="dropdown-item btn-delete" href="#" data-id="${doc._id}"><i class="ti ti-trash"></i> Delete</a></li>
-                        </ul>
-                    </div>
-                </td>
-                <td>${filesInfo}</td>
-                <td>${lastModified}</td>
-                <td>${owner}</td>
-                <td>${department}</td>
-                <td>${projectName}</td>
-                <td>${sharedWith}</td>
-                <td>${tags}</td>
-                <td>${metadata}</td>
-                <td>${description}</td>
-                <td>${remark}</td>
-                <td>${doc.signature && doc.signature.fileUrl ? `<img src="${doc.signature.fileUrl}" style="height:40px;">` : '-'}</td>
-                <td><span class="badge badge-md ${statusClass}">${doc.status}</span></td>
-            </tr>`;
-                    }).join('');
-
-                    $('#documents_table_body').html(tbody);
-
-                    if ($.fn.DataTable) {
-                        if (table) table.destroy();
-                        table = $('#documents_table').DataTable({ columnDefs: [{ orderable: false, targets: 13 }], order: [] });
-                    }
-                }
-                // Open modal and change content for permanent delete
-                $(document).on('click', '.btn-delete', function (e) {
-                    e.preventDefault();
-
-                    documentIdToDelete = $(this).data('id');
-                    documentNameToDelete = $(this).closest('tr').find('td:nth-child(2) p').text(); // assumes file name is in 2nd column
-
-                    // Update modal header and body dynamically
-                    $('#trashdocLabel').html(`
-            <img src="/img/icons/bin.png" alt="Delete Icon"><br>
-            Permanently Delete Document
-        `);
-
-                    $('.modal-body.text-muted').html(`
-            Are you sure you want to <strong>permanently delete</strong> <span>${documentNameToDelete}</span>?<br>
-            This action cannot be undone.
-        `);
-
-                    $('#confirm-trash-folder').removeClass('btn-primary').addClass('btn-danger').text('Yes, Delete Permanently');
-
-                    $('#trashdoc-modal').modal('show');
-                });
-
-                // Confirm delete
-                $('#confirm-trash-folder').on('click', function () {
-                    if (!documentIdToDelete) return;
-
-                    $.ajax({
-                        url: `/api/documents/${documentIdToDelete}`,
-                        method: 'DELETE',
-                        success: function (res) {
-                            if (res.success) {
-                                $('#trashdoc-modal').modal('hide');
-                                documentIdToDelete = null;
-                                showToast('Document deleted successfully', 'success');
-                                fetchDocuments(); // refresh table
-                            } else {
-                                showToast('Failed to delete document', 'error');
+                // Initialize Select2 with Clear Option
+                function initSelect2(selector, url, textKey) {
+                    $(selector).select2({
+                        placeholder: `-- Select ${textKey} --`,
+                        allowClear: false,
+                        ajax: {
+                            url,
+                            dataType: 'json',
+                            delay: 250,
+                            data: params => ({ search: params.term }),
+                            processResults: data => {
+                                const results = [
+                                    { id: 'clear', text: `-- Select ${textKey} --` },
+                                    ...data.data.map(item => ({ id: item._id, text: item[textKey] }))
+                                ];
+                                return { results };
                             }
-                        },
-                        error: function (err) {
-                            showToast('Error deleting document', 'error');
                         }
                     });
-                });
-                // --------------------------
-                // Fetch Documents (optimized)
-                // --------------------------
-                const fetchDocuments = debounce(function () {
-                    const status = $('.status-tab.btn-primary').text().trim();
-                    const departmentId = $('#department').val();
-                    const projectId = $('#projectName').val();
-                    const searchQuery = $('#header-search input[name="q"]').val().trim();
-                    const selectedDate = $('.datetimepicker').val();
 
-                    const params = {};
-                    if (status && status !== "All") params.status = status;
-                    if (departmentId) params.department = departmentId;
-                    if (projectId) params.project = projectId;
-                    if (searchQuery) params.search = searchQuery;       // Add search param
-                    if (selectedDate) params.date = selectedDate;       // Add date param
+                    $(selector).on('select2:select', function (e) {
+                        if (e.params.data.id === 'clear') {
+                            $(this).val(null).trigger('change');
+                        }
+                    });
+                }
 
-                    $.ajax({
+                // Initialize your selects
+                initSelect2('#department', '/api/departments/search', 'name');
+                initSelect2('#projectName', '/api/projects', 'projectName');
+
+
+                // -------------------------
+                // Initialize DataTable
+                // -------------------------
+                const table = $('#documents_table').DataTable({
+                    serverSide: true,
+                    processing: true,
+                    ajax: {
                         url: '/api/documents',
-                        method: 'GET',
-                        data: params,
-                        success: function (res) {
-                            if (!res.success) return console.error('Failed to fetch documents');
-                            renderDocuments(res.data.documents);
+                        type: 'GET',
+                        data: function (d) {
+                            const activeTab = $('.status-tab.btn-primary').text().trim();
+                            const searchValue = $('#searchInput').val()?.trim() || '';
+                            const selectedDate = $('.datetimepicker').val();
+                            return {
+                                page: (d.start / d.length) + 1,
+                                limit: d.length,
+                                status: activeTab === 'All' ? '' : activeTab,
+                                department: $('#department').val(),
+                                project: $('#projectName').val(),
+                                date: selectedDate, // Send date to API
+                                search: searchValue,
+                            };
                         },
-                        error: function (err) {
-                            console.error('Error fetching documents', err);
+                        dataSrc: function (json) {
+                            // Update total doc count
+                            $('.totalDoc').text(json.data.pagination.totalDocuments || 0);
+
+                            // Set server-side required values
+                            json.recordsTotal = json.data.pagination.totalDocuments || 0;
+                            json.recordsFiltered = json.data.pagination.totalDocuments || 0;
+
+                            // Map documents to table rows
+                            return (json.data.documents || []).map(doc => renderRow(doc));
                         }
-                    });
-                }, 300);
+                    },
+                    columns: [
+                        { title: '', orderable: false },
+                        { title: 'File Name' },
+                        { title: 'Last Modified on' },
+                        { title: 'Owner' },
+                        { title: 'Department' },
+                        { title: 'Project Name' },
+                        { title: 'Shared With' },
+                        { title: 'Tags' },
+                        { title: 'Metadata' },
+                        { title: 'Description' },
+                        { title: 'Remark' },
+                        { title: 'Signature' },
+                        { title: 'Status' }
+                    ],
+                    searching: false,
+                    lengthChange: true,
+                    pageLength: 10,
+                    lengthMenu: [10, 25, 50, 100],
+                    order: [[2, 'desc']],
+                    deferRender: true,
+                    stateSave: true,
+                    dom: 'lfrtip'
+                });
 
-                // --------------------------
-                // Filters: department & project
-                // --------------------------
-                $('#department, #projectName').on('change', fetchDocuments);
+                // -------------------------
+                // Render each row
+                // -------------------------
+                function renderRow(doc) {
+                    const lastModified = new Date(doc.updatedAt).toLocaleString();
+                    const owner = doc.owner?.name || '-';
+                    const departmentName = doc.department?.name || '-';
+                    const projectName = doc.project?.projectName || '-';
+                    const tags = doc.tags?.length ? doc.tags.join(', ') : '-';
+                    const description = doc.description
+                        ? (() => {
+                            const text = doc.description.replace(/<\/?[^>]+(>|$)/g, '');
+                            return text.length > 100 ? text.substring(0, 30) + '....' : text;
+                        })()
+                        : '-';
 
-                // --------------------------
-                // Column Filter
-                // --------------------------
-                $('#applyFilter').on('click', function () {
-                    const columns = {
-                        fileName: $('#filterFileName').is(':checked'),
-                        tags: $('#filterTags').is(':checked'),
-                        metadata: $('#filterMetadata').is(':checked'),
-                        ownerName: $('#filterOwnerName').is(':checked'),
-                        fileType: $('#filterFileType').is(':checked'),
-                        folderName: $('#filterFolderName').is(':checked')
+                    const metadata = doc.metadata ? `${doc.metadata.fileName || '-'}, ${doc.metadata.fileDescription || '-'}` : '-';
+                    const sharedWith = doc.sharedWith?.length ? doc.sharedWith.map(sw => sw.user?.name).join(', ') : '-';
+                    const statusClass = {
+                        'draft': 'bg-soft-info',
+                        'pending': 'bg-soft-warning',
+                        'approved': 'bg-soft-success',
+                        'rejected': 'bg-soft-danger',
+                        'underreview': 'bg-soft-warning',
+                        'archived': 'bg-soft-secondary'
+                    }[(doc.status || '').toLowerCase().replace(/\s+/g, '')] || 'bg-soft-secondary';
+
+                    const filesInfo = doc.files?.[0]
+                        ? `<div><img src="${fileIcons[doc.files[0].originalName.split('.').pop().toLowerCase()] || fileIcons.default}" style="height:30px;"> ${doc.files[0].originalName}</div>`
+                        : '-';
+
+                    // Dropdown HTML
+                    const dropdown = `
+                <div class="btn-group" role="group">
+                    <button type="button" class="btn border-0" data-bs-toggle="dropdown"><i class="ti ti-settings"></i></button>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="${doc.link || '#'}"><i class="ti ti-eye"></i> View</a></li>
+                        <li><a class="dropdown-item" href="/documents/edit/${doc._id}"><i class="ti ti-pencil-minus"></i> Edit</a></li>
+                        <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#sharedoc-modal"><i class="ti ti-share"></i> Share</a></li>
+                        <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#versionhistory-modal"><i class="ti ti-history"></i> Version History</a></li>
+                        <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#downloaddoc-modal"><i class="ti ti-download"></i> Download</a></li>
+                        <li><a class="dropdown-item btn-delete" href="#" data-id="${doc._id}"><i class="ti ti-trash"></i> Delete</a></li>
+                    </ul>
+                </div>
+            `;
+
+                    return [
+                        dropdown,
+                        filesInfo,
+                        lastModified,
+                        owner,
+                        departmentName,
+                        projectName,
+                        sharedWith,
+                        tags,
+                        metadata,
+                        description,
+                        doc.remark || '-',
+                        doc.signature?.fileUrl ? `<img src="${doc.signature.fileUrl}" style="height:40px;">` : '-',
+                        `<span class="badge ${statusClass}">${doc.status}</span>`
+                    ];
+                }
+
+                // -------------------------
+                // Filters & Tabs
+                // -------------------------
+                $('.status-tab').on('click', function () {
+                    $('.status-tab').removeClass('btn-primary').addClass('btn-outline-primary');
+                    $(this).removeClass('btn-outline-primary').addClass('btn-primary');
+                    table.ajax.reload(); // Only refresh table
+                });
+
+                // Department and Project filters - only refresh table
+                $('#department, #projectName').on('change', function () {
+                    table.ajax.reload(); // Only refresh table
+                });
+
+                // Remove the datetimepicker change handler that was causing page refresh
+                // Only use the daterangepicker specific events
+
+                // Search input handler
+                $('#searchInput').on('input', debounce(() => {
+                    table.ajax.reload(); // Only refresh table
+                }, 500));
+
+                // Add Enter key support for search
+                $('#searchInput').on('keypress', function (e) {
+                    if (e.which === 13) {
+                        table.ajax.reload(); // Only refresh table
+                    }
+                });
+
+                function debounce(fn, delay = 500) {
+                    let timer;
+                    return function (...args) {
+                        clearTimeout(timer);
+                        timer = setTimeout(() => fn.apply(this, args), delay);
                     };
+                }
 
-                    $('#documents_table thead th').each(function (index) {
-                        const colName = $(this).text().replace(/\s/g, '').toLowerCase();
-                        let showCol = true;
-
-                        if (colName.includes('filename') && !columns.fileName) showCol = false;
-                        if (colName.includes('tags') && !columns.tags) showCol = false;
-                        if (colName.includes('metadata') && !columns.metadata) showCol = false;
-                        if (colName.includes('owner') && !columns.ownerName) showCol = false;
-                        if (colName.includes('filetype') && !columns.fileType) showCol = false;
-                        if (colName.includes('folder') && !columns.folderName) showCol = false;
-
-                        table.column(index).visible(showCol);
-                    });
-
-                    $filterDropdown.addClass('d-none');
-                });
-
-                $('#clearFilter').on('click', function () {
-                    $('.filter-dropdown input[type="checkbox"]').prop('checked', false);
-                    if (table) table.columns().visible(true);
-                });
-
-                // --------------------------
-                // Initial load
-                // --------------------------
-                fetchDocuments();
-
-            })(jQuery, document);
+            })(jQuery);
         </script>

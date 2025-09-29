@@ -1,10 +1,39 @@
-// Centralized API endpoint configuration
+import dotenv from 'dotenv';
+
+// Load environment variables from .env file
+dotenv.config();
+
 export const API_ENDPOINTS = {
-    DOCUMENTS: window.env?.API_BASE_URL || '/api/documents',
-    DASHBOARD: window.env?.DASHBOARD_API_URL || '/api/dashboard',
-    DEPARTMENT_STATS: window.env?.DEPARTMENT_STATS_API_URL || '/api/dashboard/department-document-uploads',
-    UPLOAD_TRENDS: window.env?.UPLOADS_TRENDS_API_URL || '/api/dashboard/department-documents',
-    PROJECTS: '/api/projects'
+    documents: '/documents',
+    users: '/users',
+    departments: '/departments',
+    projects: '/projects',
+    folders: '/folders',
+    auth: '/auth',
+    notifications: '/notifications',
+    reports: '/reports',
+    settings: '/settings'
 };
 
-export default API_ENDPOINTS;
+// Centralized API config
+export const API_CONFIG = {
+    baseUrl: process.env.BASE_URL || 'http://localhost:5000/api',
+    timeout: Number(process.env.API_TIMEOUT) || 5000,
+    headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+    },
+    retryAttempts: Number(process.env.API_RETRY_ATTEMPTS) || 3
+};
+
+
+// import { API_ENDPOINTS, API_CONFIG } from './config';
+
+// async function fetchDocuments() {
+//     const response = await fetch(`${API_CONFIG.baseUrl}${API_ENDPOINTS.documents}`, {
+//         method: 'GET',
+//         headers: API_CONFIG.headers,
+//         timeout: API_CONFIG.timeout
+//     });
+//     return response.json();
+// }
