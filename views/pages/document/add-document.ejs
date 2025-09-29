@@ -27,17 +27,20 @@
 					<% if (isEdit) { %>
 						<input type="hidden" name="_method" value="PATCH">
 						<% } %>
-
-
 							<div class="modal-body">
 								<div class="row">
 									<!-- Project Name -->
 									<div class="col-md-4">
 										<div class="mb-3">
 											<label class="form-label">Project Name</label>
-											<select id="projectName" name="projectName" class="form-select select2"
+											<select id="projectName" name="project" class="form-select select2"
 												required>
 												<option value="">-- Select Project Name --</option>
+												<% if (isEdit && document.project) { %>
+													<option value="<%= document.project._id %>" selected>
+														<%= document.project.projectName %>
+													</option>
+													<% } %>
 											</select>
 										</div>
 									</div>
@@ -49,7 +52,14 @@
 											<label class="form-label">Department <span
 													class="text-danger">*</span></label>
 											<select id="department" name="department" class="form-select select2"
-												required></select>
+												required>
+												<% if (isEdit && document.department) { %>
+													<option value="<%= document.department._id %>" selected>
+														<%= document.department.name %>
+													</option>
+													<% } %>
+											</select>
+
 										</div>
 									</div>
 
@@ -59,7 +69,13 @@
 										<div class="mb-3">
 											<label class="form-label">Project Manager</label>
 											<select id="projectManager" name="projectManager"
-												class="form-select select2" required></select>
+												class="form-select select2" required>
+												<% if (isEdit && document.projectManager) { %>
+													<option value="<%= document.projectManager._id %>" selected>
+														<%= document.projectManager.name %>
+													</option>
+													<% } %>
+											</select>
 										</div>
 									</div>
 
@@ -138,9 +154,9 @@
 										</div>
 									</div>
 
-									<!-- Expiry Date -->
+									<!-- Expiry Date (only show if compliance is enabled) -->
 									<div class="col-md-6" id="expiryDateContainer"
-										style="display: <%= isEdit && document.compliance === 'yes' ? 'block' : 'none' %>;">
+										style="display: <%= isEdit && document.compliance?.isCompliance ? 'block' : 'none' %>;">
 										<div class="mb-3">
 											<div class="d-flex align-items-center gap-5">
 												<label class="form-label mb-0">Enter Expiry Date</label>
@@ -150,13 +166,13 @@
 														value="<%= isEdit && document.compliance?.expiryDate ? new Date(document.compliance.expiryDate).toLocaleDateString('en-GB') : '' %>"
 														<%=isEdit && document.compliance?.isCompliance ? 'required' : ''
 														%>>
-
 													<span class="input-icon-addon"><i
 															class="ti ti-calendar text-gray-7"></i></span>
 												</div>
 											</div>
 										</div>
 									</div>
+
 
 									<!-- Comment -->
 									<div class="col-md-12">

@@ -15,6 +15,23 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     };
 
+    // Loader toggle function
+    const toggleLoader = (btn, loading = true) => {
+        if (!btn) return;
+        const text = btn.querySelector(".btn-text");
+        const spinner = btn.querySelector(".spinner-border");
+
+        if (loading) {
+            btn.disabled = true;
+            if (text) text.classList.add("d-none");
+            if (spinner) spinner.classList.remove("d-none");
+        } else {
+            btn.disabled = false;
+            if (text) text.classList.remove("d-none");
+            if (spinner) spinner.classList.add("d-none");
+        }
+    };
+
     // Toggle Edit/View
     if (toggleBtn) {
         toggleBtn.addEventListener("click", () => {
@@ -36,6 +53,9 @@ document.addEventListener("DOMContentLoaded", () => {
     if (addForm) {
         addForm.addEventListener("submit", async e => {
             e.preventDefault();
+            const submitBtn = addForm.querySelector(".submitBtn");
+            toggleLoader(submitBtn, true);
+
             const formData = new FormData(addForm);
             appendMultiSelects(formData, ["donor", "vendor", "projectCollaborationTeam"]);
 
@@ -46,47 +66,41 @@ document.addEventListener("DOMContentLoaded", () => {
                 });
                 const data = await res.json();
                 if (res.ok) {
-                    // Show the success modal instead of toast
                     const successModalEl = document.getElementById("data-success-register");
                     const successModal = new bootstrap.Modal(successModalEl);
                     successModal.show();
 
-                    // Optional: reset the form after success
                     addForm.reset();
 
-                    // Optional: redirect when user clicks "Ok" button in modal
                     successModalEl.querySelector("button[data-bs-dismiss='modal']").addEventListener("click", () => {
                         window.location.href = "/projects";
                     });
                 } else {
                     showToast(data.message || "Failed to create project", "error");
+                    toggleLoader(submitBtn, false);
                 }
             } catch (err) {
                 showToast("Something went wrong while creating the project." + err, "error");
+                toggleLoader(submitBtn, false);
             }
         });
     }
-
 
     // Submit handler for Edit Project
     if (editForm) {
         editForm.addEventListener("submit", async e => {
             e.preventDefault();
+            const submitBtn = editForm.querySelector(".submitBtn");
+            toggleLoader(submitBtn, true);
+
             const projectId = document.getElementById("projectDetails").dataset.projectId;
             const formData = new FormData(editForm);
-
-            // Multi-select fields
-            ["donor", "vendor", "projectCollaborationTeam"].forEach(field => {
-                const values = formData.getAll(field + "[]");
-                formData.delete(field + "[]");
-                values.forEach(v => formData.append(field, v));
-            });
+            appendMultiSelects(formData, ["donor", "vendor", "projectCollaborationTeam"]);
 
             try {
                 const res = await fetch(`/api/projects/${projectId}`, {
                     method: "PATCH",
-                    body: formData // send as FormData, do NOT stringify
-                    // headers: do NOT set Content-Type; browser will handle it
+                    body: formData
                 });
                 const result = await res.json();
                 if (res.ok) {
@@ -94,13 +108,12 @@ document.addEventListener("DOMContentLoaded", () => {
                     window.location.reload();
                 } else {
                     showToast(result.message || "Failed to update project", "error");
+                    toggleLoader(submitBtn, false);
                 }
             } catch (err) {
                 showToast("Something went wrong while updating the project.", "error");
+                toggleLoader(submitBtn, false);
             }
         });
-
     }
 });
-
-

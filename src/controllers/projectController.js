@@ -6,6 +6,7 @@ import User from "../models/User.js";
 import Project from "../models/Project.js";
 import { normalizeToArray, validateObjectIdArray } from "../helper/validateobjectId.js";
 import logger from "../utils/logger.js";
+import { parseDateDDMMYYYY } from "../utils/formatDate.js";
 
 
 export const createProject = async (req, res) => {
@@ -48,11 +49,11 @@ export const createProject = async (req, res) => {
         }
 
         // Convert dates
-        const startDate = new Date(body.projectStartDate);
-        const endDate = new Date(body.projectEndDate);
+        const startDate = parseDateDDMMYYYY(body.projectStartDate);
+        const endDate = parseDateDDMMYYYY(body.projectEndDate);
 
-        if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-            return failResponse(res, "Invalid date format", 400);
+        if (!startDate || !endDate) {
+            return failResponse(res, "Invalid date format, expected dd/mm/yyyy", 400);
         }
 
         if (endDate <= startDate) {
@@ -181,6 +182,29 @@ export const updateProject = async (req, res) => {
             return failResponse(res, "Unauthorized to update this project", 403);
         }
 
+        // Convert and validate dates (DD/MM/YYYY or DD-MM-YYYY)
+        if (body.projectStartDate) {
+            const start = parseDateDDMMYYYY(body.projectStartDate);
+            if (!start) return failResponse(res, "Invalid start date format", 400);
+            body.projectStartDate = start;
+        }
+
+        if (body.projectEndDate) {
+            const end = parseDateDDMMYYYY(body.projectEndDate);
+            if (!end) return failResponse(res, "Invalid end date format", 400);
+            body.projectEndDate = end;
+        }
+
+        // Recompute duration if dates present
+        if (body.projectStartDate && body.projectEndDate) {
+            if (body.projectEndDate <= body.projectStartDate) {
+                return failResponse(res, "End date must be after start date", 400);
+            }
+            body.projectDuration = Math.ceil(
+                (body.projectEndDate - body.projectStartDate) / (1000 * 60 * 60 * 24)
+            );
+        }
+
         // Validate single ObjectId fields
         const singleFields = ["projectManager", "projectType"];
         for (const field of singleFields) {
@@ -215,19 +239,19 @@ export const updateProject = async (req, res) => {
         Object.assign(project, body);
 
         // Recompute projectDuration if dates present
-        if (project.projectStartDate && project.projectEndDate) {
-            const start = new Date(project.projectStartDate);
-            const end = new Date(project.projectEndDate);
-            if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-                return failResponse(res, "Invalid date format", 400);
-            }
-            if (end <= start) {
-                return failResponse(res, "End date must be after start date", 400);
-            }
-            project.projectDuration = Math.ceil(
-                (end - start) / (1000 * 60 * 60 * 24)
-            );
-        }
+        // if (project.projectStartDate && project.projectEndDate) {
+        //     const start = new Date(project.projectStartDate);
+        //     const end = new Date(project.projectEndDate);
+        //     if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        //         return failResponse(res, "Invalid date format", 400);
+        //     }
+        //     if (end <= start) {
+        //         return failResponse(res, "End date must be after start date", 400);
+        //     }
+        //     project.projectDuration = Math.ceil(
+        //         (end - start) / (1000 * 60 * 60 * 24)
+        //     );
+        // }
 
         await project.save();
         return successResponse(res, project, "Project updated successfully");

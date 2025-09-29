@@ -50,10 +50,9 @@
                                 </select>
                                 <% } %>
                     </div>
-
                 </div>
 
-                <!-- Project Manager, Status, Logo -->
+                <!-- Project Manager, Logo, Status -->
                 <div class="row mb-3">
                     <div class="col-md-4">
                         <label><strong>Project Manager</strong></label>
@@ -90,6 +89,7 @@
                                 <input type="file" name="projectLogo" class="form-control">
                                 <% } %>
                     </div>
+
                     <div class="col-md-4">
                         <label><strong>Status</strong></label>
                         <% if (viewOnly) { %>
@@ -118,11 +118,16 @@
                                 <%= project?.projectStartDateFormatted || "N/A" %>
                             </div>
                             <% } else { %>
-                                <input type="date" name="projectStartDate" class="form-control"
-                                    value="<%= project?.projectStartDateISO || '' %>">
+                                <div class="position-relative mb-0">
+                                    <input type="text" name="projectStartDate" class="form-control datetimepicker"
+                                        placeholder="<%= todayDate %>"
+                                        value="<%= project?.projectStartDateISO || todayDate %>">
+                                    <span class="input-icon-addon">
+                                        <i class="ti ti-calendar text-gray-7"></i>
+                                    </span>
+                                </div>
                                 <% } %>
                     </div>
-
 
                     <div class="col-md-4">
                         <label><strong>End Date</strong></label>
@@ -131,8 +136,14 @@
                                 <%= project?.projectEndDateFormatted || "N/A" %>
                             </div>
                             <% } else { %>
-                                <input type="date" name="projectEndDate" class="form-control"
-                                    value="<%= project?.projectEndDateISO || '' %>">
+                                <div class="position-relative mb-0">
+                                    <input type="text" name="projectEndDate" class="form-control datetimepicker"
+                                        placeholder="<%= todayDate %>"
+                                        value="<%= project?.projectEndDateISO || todayDate %>">
+                                    <span class="input-icon-addon">
+                                        <i class="ti ti-calendar text-gray-7"></i>
+                                    </span>
+                                </div>
                                 <% } %>
                     </div>
 
@@ -225,20 +236,27 @@
                                 <% } %>
                     </div>
                 </div>
-
                 <% if (!viewOnly) { %>
                     <div class="d-flex justify-content-end">
                         <% if (!project) { %>
                             <a href="/projects" class="btn btn-secondary me-2">Cancel</a>
-                            <button type="submit" class="btn btn-primary">Create Project</button>
+                            <button type="submit" id="createBtn" class="btn btn-primary submitBtn">
+                                <span class="btn-text">Create Project</span>
+                                <span class="spinner-border spinner-border-sm d-none" role="status"
+                                    aria-hidden="true"></span>
+                            </button>
                             <% } else { %>
                                 <button type="button" id="cancelEditBtn" class="btn btn-secondary me-2">Cancel</button>
-                                <button type="submit" class="btn btn-primary">Save Changes</button>
+                                <button type="submit" id="saveBtn" class="btn btn-primary submitBtn">
+                                    <span class="btn-text">Save Changes</span>
+                                    <span class="spinner-border spinner-border-sm d-none" role="status"
+                                        aria-hidden="true"></span>
+                                </button>
                                 <% } %>
                     </div>
                     <% } %>
-            </div>
 
+            </div>
             <% if (!viewOnly) { %>
     </form>
     <% } %>

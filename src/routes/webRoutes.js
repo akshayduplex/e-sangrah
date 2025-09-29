@@ -304,7 +304,8 @@ router.get("/documents/edit/:id", authenticate, checkPermissions, async (req, re
         const document = await Document.findById(id)
             .populate("department", "name")
             .populate("project", "projectName")
-            .populate("owner", "name email")
+            .populate("projectManager", "name")
+            .populate("owner", "name")
             .lean();
 
         if (!document) {
