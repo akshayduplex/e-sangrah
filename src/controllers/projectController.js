@@ -8,6 +8,60 @@ import { normalizeToArray, validateObjectIdArray } from "../helper/validateobjec
 import logger from "../utils/logger.js";
 import { parseDateDDMMYYYY } from "../utils/formatDate.js";
 
+//Page controllers
+
+// Projects List page
+export const showProjectListPage = async (req, res) => {
+    try {
+        const designations = await Designation.find({ status: "Active" })
+            .sort({ name: 1 })
+            .lean();
+
+        res.render("pages/projects/projectList", {
+            title: "E-Sangrah - Projects List",
+            designations,
+            user: req.user
+        });
+    } catch (err) {
+        logger.error("Error loading project list:", err);
+        res.status(500).render("pages/error", {
+            title: "Error",
+            message: "Unable to load project list"
+        });
+    }
+};
+
+// Project details (new)
+export const showNewProjectDetails = async (req, res) => {
+    await renderProjectDetails(res, null, req.user);
+};
+
+// Project details (existing)
+export const showExistingProjectDetails = async (req, res) => {
+    await renderProjectDetails(res, req.params.id, req.user);
+};
+
+// Main Projects page
+export const showMainProjectsPage = async (req, res) => {
+    try {
+        res.render("pages/projects/projects", {
+            user: req.user,
+            title: "E-Sangrah - Project List",
+            messages: req.flash(),
+        });
+    } catch (err) {
+        logger.error("Error loading projects page:", err);
+        res.render("pages/projects/projects", {
+            user: req.user,
+            title: "E-Sangrah - Project List",
+            messages: { error: "Unable to load projects" },
+            projects: [],
+        });
+    }
+};
+
+
+//API controllers
 
 export const createProject = async (req, res) => {
     try {

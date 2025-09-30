@@ -1,12 +1,32 @@
-const mongoose = require("mongoose");
-const Document = require("../models/Document");
-const { successResponse, failResponse, errorResponse } = require("../utils/responseHandler");
-const { calculateStartDate } = require("../utils/calculateStartDate");
+import mongoose from "mongoose";
+import Document from "../models/Document.js";
+import { successResponse, failResponse, errorResponse } from "../utils/responseHandler.js";
+import { calculateStartDate } from "../utils/calculateStartDate.js";
 
 const validPeriods = ["daily", "weekly", "monthly", "yearly"];
 
+//Page controllers
+
+// Render Dashboard page
+export const showDashboard = (req, res) => {
+    try {
+        res.render("pages/dashboard/dashboard", {
+            user: req.user
+        });
+    } catch (err) {
+        logger.error("Dashboard render error:", err);
+        res.status(500).render("pages/error", {
+            user: req.user,
+            message: "Unable to load dashboard"
+        });
+    }
+};
+
+
+//API Controllers
+
 // ------------------- Dashboard Stats -------------------
-exports.getDashboardStats = async (req, res) => {
+export const getDashboardStats = async (req, res) => {
     try {
         const user = req.user || req.session.user;
         const userId = user._id;
@@ -39,7 +59,7 @@ exports.getDashboardStats = async (req, res) => {
 };
 
 // ------------------- Document Type Uploads -------------------
-exports.getDocumentTypeUploads = async (req, res) => {
+export const getDocumentTypeUploads = async (req, res) => {
     try {
         const user = req.user || req.session.user;
         const { period = "monthly" } = req.query;
@@ -82,7 +102,7 @@ exports.getDocumentTypeUploads = async (req, res) => {
 };
 
 // ------------------- Documents Summary -------------------
-exports.getDocumentsSummary = async (req, res) => {
+export const getDocumentsSummary = async (req, res) => {
     try {
         const user = req.user || req.session.user;
         const { period = "monthly", fileType } = req.query;

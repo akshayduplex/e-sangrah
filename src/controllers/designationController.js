@@ -2,6 +2,46 @@ import mongoose from 'mongoose';
 import { successResponse, failResponse, errorResponse } from '../utils/responseHandler.js';
 import Designation from '../models/Designation.js';
 
+//Page Controllers
+
+// Render Add Designation page
+export const showAddDesignationPage = (req, res) => {
+    res.render("pages/designation/designation", {
+        designation: null,
+        user: req.user
+    });
+};
+
+// Render Edit Designation page
+export const showEditDesignationPage = async (req, res) => {
+    try {
+        const designation = await Designation.findById(req.params.id);
+        if (!designation) {
+            req.flash("error", "Designation not found");
+            return res.redirect("/designations/list");
+        }
+
+        res.render("pages/designation/designation", {
+            designation,
+            user: req.user
+        });
+    } catch (err) {
+        logger.error("Error loading designation edit page:", err);
+        req.flash("error", "Something went wrong");
+        res.redirect("/designations/list");
+    }
+};
+
+// Render Designation List page
+export const showDesignationListPage = (req, res) => {
+    res.render("pages/designation/designations-list", {
+        title: "Designation List",
+        user: req.user
+    });
+};
+
+//API Controllers
+
 // Get all designations
 export const getAllDesignations = async (req, res) => {
     try {

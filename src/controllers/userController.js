@@ -4,6 +4,67 @@ import { generateEmployeeId } from "../helper/generateEmployeeId.js";
 import { generateRandomPassword } from "../helper/generateRandomPassword.js";
 import { sendEmail } from "../services/emailService.js";
 import logger from "../utils/logger.js";
+import Department from "../models/Departments.js";
+import Designation from "../models/Designation.js";
+
+
+//page routes controllers
+
+// GET /users/list
+export const listUsers = (req, res) => {
+    res.render("pages/registerations/user-listing", {
+        title: "E-Sangrah - Users-List",
+        user: req.user
+    });
+};
+
+// GET /users/register
+export const showRegisterForm = async (req, res) => {
+    try {
+        const departments = await Department.find({ status: "Active" }, "name").lean();
+        const designations = await Designation.find({ status: "Active" }).sort({ name: 1 }).lean();
+
+        res.render("pages/registerations/user-registration", {
+            title: "E-Sangrah - Register",
+            departments,
+            designations,
+            user: req.user
+        });
+    } catch (err) {
+        logger.error("Error loading user registration:", err);
+        res.status(500).send("Internal Server Error");
+    }
+};
+
+// GET /users/:mode/:id
+export const viewOrEditUser = async (req, res) => {
+    try {
+        const { mode, id } = req.params;
+
+        const user = await User.findById(id)
+            .populate("userDetails.department", "name")
+            .populate("userDetails.designation", "name")
+            .lean();
+
+        if (!user) return res.status(404).send("User not found");
+
+        const departments = await Department.find().lean();
+        const designations = await Designation.find().lean();
+
+        res.render("pages/registerations/user-form", {
+            title: `User - ${user.name}`,
+            user,
+            departments,
+            designations,
+            viewOnly: mode === "view"
+        });
+    } catch (err) {
+        logger.error(err);
+        res.status(500).send("Internal Server Error");
+    }
+};
+
+// API controllers
 
 // Register user with profile type 'user'
 export const registerUser = async (req, res) => {
@@ -91,81 +152,34 @@ export const registerUser = async (req, res) => {
 // Get all users with profile type 'user'
 export const getAllUsers = async (req, res) => {
     try {
-        let draw = parseInt(req.query.draw) || 1;
-        let start = parseInt(req.query.start) || 0;
-        let length = parseInt(req.query.length) || 10;
+        let profile_type = req.query.profile_type || "user"; // Role filter from front-end
 
-        let searchValue = req.query['search[value]'] || '';
-        let orderColumnIndex = req.query['order[0][column]'] || 0;
-        let orderDir = req.query['order[0][dir]'] || 'desc';
+        const users = await User.find({ profile_type })
+            .populate("userDetails.department", "name")
+            .populate("userDetails.designation", "name")
+            .select("-password -raw_password")
+            .lean();
 
-        // Map DataTables column index to DB fields
-        const columns = ['name', 'email', 'phone_number', 'profile_type', 'status', 'userDetails.department', 'userDetails.designation', 'lastLogin', 'createdAt'];
-        const sortField = columns[orderColumnIndex] || 'createdAt';
+        // Map users to match DataTable expected format
+        const mappedUsers = users.map(user => ({
+            _id: user._id,
+            name: user.name || "-",
+            email: user.email || "-",
+            phone_number: user.phone_number || "-",
+            profile_type: user.profile_type,
+            status: user.status || "-",
+            userDetails: {
+                department: user.userDetails?.department || null,
+                designation: user.userDetails?.designation || null
+            },
+            lastLogin: user.lastLogin || null,
+            createdAt: user.createdAt
+        }));
 
-        // Build filter
-        const filter = { profile_type: 'user' };
-        if (searchValue) {
-            filter.$or = [
-                { name: { $regex: searchValue, $options: 'i' } },
-                { email: { $regex: searchValue, $options: 'i' } },
-                { 'userDetails.employee_id': { $regex: searchValue, $options: 'i' } }
-            ];
-        }
-
-        const totalRecords = await User.countDocuments({ profile_type: 'user' });
-        const filteredRecords = await User.countDocuments(filter);
-
-        const users = await User.find(filter)
-            .populate('userDetails.department', 'name')
-            .populate('userDetails.designation', 'name')
-            .select('-password -raw_password')
-            .sort({ [sortField]: orderDir })
-            .skip(start)
-            .limit(length);
-
-        // Prepare data for DataTable
-        const data = users.map((user, index) => {
-            let department = user.userDetails?.department?.name || '-';
-            let designation = user.userDetails?.designation?.name || '-';
-            let phone = user.phone_number || '-';
-            let lastLogin = user.lastLogin ? new Date(user.lastLogin).toLocaleString() : '-';
-            let createdAt = new Date(user.createdAt).toLocaleString();
-
-            return {
-                srNo: start + index + 1,
-                name: user.name,
-                email: user.email,
-                phone,
-                profile_type: user.profile_type,
-                status: user.status,
-                department,
-                designation,
-                lastLogin,
-                createdAt,
-                actions: `
-                    <a href="/users/edit/${user._id}" class="text-primary me-2" title="Edit">
-                        <i class="ti ti-edit"></i>
-                    </a>
-                    <a href="#" class="text-danger btn-delete" data-id="${user._id}" title="Delete">
-                        <i class="ti ti-trash"></i>
-                    </a>
-                `
-            };
-        });
-
-        res.json({
-            draw,
-            recordsTotal: totalRecords,
-            recordsFiltered: filteredRecords,
-            data
-        });
-
+        res.json({ success: true, users: mappedUsers });
     } catch (error) {
-        console.error('DataTable error:', error);
-        res.status(500).json({
-            error: 'Internal server error'
-        });
+        console.error("DataTable error:", error);
+        res.status(500).json({ success: false, message: "Internal server error" });
     }
 };
 
@@ -185,7 +199,7 @@ export const searchUsers = async (req, res) => {
 
         // Fetch only name
         const users = await User.find(filter)
-            .select('name') // only name field
+            .select('name email') // only name field
             .limit(limit)
             .skip((page - 1) * limit)
             .sort({ name: 1 }) // alphabetical

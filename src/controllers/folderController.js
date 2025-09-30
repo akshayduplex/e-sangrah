@@ -7,20 +7,51 @@ import { putObject } from '../utils/s3Helpers.js';
 import logger from '../utils/logger.js';
 import TempFile from '../models/tempFile.js';
 
-// Helper function to generate folder path
-const generatePath = async (folderId) => {
-    const pathParts = [];
-    let currentId = folderId;
+//Page controlers
 
-    while (currentId) {
-        const folder = await Folder.findById(currentId);
-        if (!folder) break;
-        pathParts.unshift(folder.slug || folder.name.toLowerCase().replace(/\s+/g, '-'));
-        currentId = folder.parent;
+// Folder list by ID
+export const showFolderListById = async (req, res) => {
+    try {
+        const { folderId } = req.params;
+        res.render("pages/document/documentFolderList", {
+            title: "E-Sangrah - Documents-List",
+            user: req.user,
+            folderId
+        });
+    } catch (err) {
+        logger.error("Error loading document list:", err);
+        res.status(500).render("pages/error", {
+            title: "Error",
+            message: "Unable to load documents",
+        });
     }
-
-    return '/' + pathParts.join('/');
 };
+
+// Upload Folder page
+export const showUploadFolderPage = (req, res) => {
+    res.render("pages/folders/upload-folder", {
+        title: "E-Sangrah - Upload-Folder",
+        user: req.user
+    });
+};
+
+// Archived Folders page
+export const showArchivedFoldersPage = (req, res) => {
+    res.render("pages/folders/archivedFolders", {
+        title: "E-Sangrah - ArchivedFolders",
+        user: req.user
+    });
+};
+
+// Main Folders page
+export const showMainFoldersPage = (req, res) => {
+    res.render("pages/folders/folders", {
+        title: "E-Sangrah - Folders",
+        user: req.user
+    });
+};
+
+//API controllers
 
 // Create folder
 export const createFolder = async (req, res) => {

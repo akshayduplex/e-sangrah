@@ -5,7 +5,7 @@ const fileSchema = new mongoose.Schema({
     s3Url: { type: String },
     originalName: { type: String, required: true },
     version: { type: Number, required: true },
-    uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     uploadedAt: { type: Date, default: Date.now },
     isPrimary: { type: Boolean, default: false },
     status: { type: String, enum: ["active", "archived"], default: "active" },
@@ -34,7 +34,12 @@ const documentSchema = new mongoose.Schema({
     },
     files: [fileSchema],
     currentVersion: { type: Number, default: 1 },
-    signature: { fileName: String, fileUrl: String },
+    documentDate: { type: Date, default: Date.now },
+
+    signature: {
+        fileName: { type: String, trim: true },
+        fileUrl: { type: String, trim: true }
+    },
     link: { type: String },
 
     // Flattened sharedWith for safe indexing
@@ -45,10 +50,10 @@ const documentSchema = new mongoose.Schema({
         user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
         accessLevel: { type: String, enum: ["view", "edit"], default: "view" },
         sharedAt: { type: Date, default: Date.now },
-        expiresAt: { type: Date, default: null } // for "One Day", "One Week", etc.
+        expiresAt: { type: Date, default: null },
+        inviteStatus: { type: String, enum: ["pending", "accepted", "rejected"], default: "pending" }
     }],
-
-    remark: { type: String, trim: true, maxlength: 1000 }
+    comment: { type: String, trim: true, maxlength: 1000 }
 }, { timestamps: true });
 
 /** -------------------- INDEXES -------------------- **/
@@ -59,8 +64,10 @@ documentSchema.index({ createdAt: 1 });
 documentSchema.index({ "compliance.expiryDate": 1 });
 documentSchema.index({ "files.isPrimary": 1 });
 documentSchema.index({ "files.version": -1 });
-documentSchema.index({ tags: 1 });              // Safe array index
-documentSchema.index({ sharedWithUsers: 1 });  // Flattened array index
+documentSchema.index({ tags: 1 });
+documentSchema.index({ sharedWithUsers: 1 });
+// ✅ compound index for better queries
+documentSchema.index({ "files.isPrimary": 1, "files.status": 1 });
 
 /** -------------------- VIRTUAL -------------------- **/
 documentSchema.virtual("isExpired").get(function () {
@@ -82,7 +89,14 @@ documentSchema.pre("save", function (next) {
 documentSchema.methods.addNewVersion = async function (fileData, userId) {
     const newVersion = this.currentVersion + 1;
     this.files.forEach(f => { if (f.status === "active") f.isPrimary = false; });
-    this.files.push({ ...fileData, version: newVersion, uploadedBy: userId, uploadedAt: new Date(), isPrimary: true, status: "active" });
+    this.files.push({
+        ...fileData,
+        version: newVersion,
+        uploadedBy: userId,
+        uploadedAt: new Date(),
+        isPrimary: true,
+        status: "active"
+    });
     this.currentVersion = newVersion;
     await this.save();
     return this;

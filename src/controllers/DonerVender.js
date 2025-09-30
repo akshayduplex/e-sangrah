@@ -2,6 +2,83 @@ import { generateRandomPassword } from "../helper/generateRandomPassword.js";
 import User from "../models/User.js";
 import { sendEmail } from "../services/emailService.js";
 
+//Page controller for Donor and Vendor Registration
+
+// GET /donors/register
+export const showDonorForm = async (req, res) => {
+    try {
+        const donor = req.query.id ? await User.findById(req.query.id).lean() : null;
+        res.render("pages/registerations/donor-registration", {
+            title: donor ? "E-Sangrah - Edit Donor" : "E-Sangrah - Register",
+            donor,
+            isEdit: Boolean(donor),
+            user: req.user
+        });
+    } catch (err) {
+        logger.error("Error loading donor register page:", err);
+        res.render("pages/registerations/donor-registration", {
+            title: "E-Sangrah - Register",
+            donor: null,
+            isEdit: false,
+            user: req.user
+        });
+    }
+};
+
+// GET /donors/list
+export const listDonors = async (req, res) => {
+    try {
+        const donors = await User.find({ profile_type: "donor" }).lean();
+        res.render("pages/registerations/donor-listing", {
+            title: "E-Sangrah - Donor List",
+            donors,
+            user: req.user
+        });
+    } catch (err) {
+        logger.error("Error fetching donor list:", err);
+        res.status(500).render("pages/error", { title: "Error", message: "Unable to load donor list" });
+    }
+};
+
+
+// GET /vendors/register
+export const showVendorForm = async (req, res) => {
+    try {
+        const vendor = req.query.id ? await User.findById(req.query.id).lean() : null;
+        res.render("pages/registerations/vendor-registration", {
+            title: vendor ? "E-Sangrah - Edit Vendor" : "E-Sangrah - Register",
+            vendor,
+            isEdit: Boolean(vendor),
+            user: req.user
+        });
+    } catch (err) {
+        logger.error("Error loading vendor register page:", err);
+        res.render("pages/registerations/vendor-registration", {
+            title: "E-Sangrah - Register",
+            vendor: null,
+            isEdit: false,
+            user: req.user
+        });
+    }
+};
+
+// GET /vendors/list
+export const listVendors = async (req, res) => {
+    try {
+        const vendors = await User.find({ profile_type: "vendor" }).lean();
+        res.render("pages/registerations/vendor-registration-list", {
+            title: "E-Sangrah - Vendor List",
+            vendors,
+            user: req.user
+        });
+    } catch (err) {
+        logger.error("Error fetching vendor list:", err);
+        res.status(500).render("pages/error", { title: "Error", message: "Unable to load vendor list" });
+    }
+};
+
+
+//API Controller for Donor and Vendor Registration
 
 export const registerDonorVendor = async (req, res, next) => {
     try {

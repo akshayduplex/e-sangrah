@@ -18,6 +18,11 @@ const otpStore = {};
 // ---------------------------
 // Register
 // ---------------------------
+
+export const getRegisterPage = (req, res) => {
+    res.render("pages/register", { title: "E-Sangrah - Register" });
+};
+
 export const register = async (req, res) => {
     try {
         const {
@@ -73,11 +78,15 @@ export const register = async (req, res) => {
 };
 
 
-
-
 // ---------------------------
 // Login
 // ---------------------------
+
+export const getLoginPage = (req, res) => {
+    res.render("pages/login", { title: "E-Sangrah - Login" });
+};
+
+
 export const login = async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -123,6 +132,28 @@ export const login = async (req, res) => {
 // ---------------------------
 // Get Logged-in User
 // ---------------------------
+
+export const getForgotPasswordPage = (req, res) => {
+    res.render("pages/forgot-password", {
+        otpSent: false,
+        otpVerified: false,
+        email: "",
+        message: null,
+        error: null,
+    });
+};
+
+export const getResetPasswordPage = (req, res) => {
+    res.render("pages/reset-password", {
+        otpSent: false,
+        otpVerified: false,
+        email: req.user.email,
+        message: null,
+        user: req.user,
+        error: null,
+    });
+};
+
 
 // ---------------------------
 // Logout
@@ -348,6 +379,25 @@ export const verifyResetLink = async (req, res) => {
     } catch (err) {
         logger.error("Verify reset link error:", err);
         return errorResponse(res, err);
+    }
+};
+
+// Render My Profile page
+export const showMyProfile = async (req, res) => {
+    try {
+        const user = await User.findById(req.session.user._id)
+            .populate("userDetails.designation")
+            .populate("userDetails.department")
+            .lean();
+
+        if (!user) {
+            return res.status(404).send("User not found");
+        }
+
+        res.render("pages/myprofile", { user });
+    } catch (err) {
+        logger.error("Error loading profile:", err);
+        res.status(500).send("Server Error");
     }
 };
 

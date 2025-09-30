@@ -4,6 +4,21 @@ import mongoose from "mongoose";
 // ===== Middlewares =====
 import { authenticate, authorize } from "../middlewares/authMiddleware.js";
 import checkPermissions from "../middlewares/checkPermission.js";
+
+import * as authController from "../controllers/authController.js";
+import * as userController from "../controllers/userController.js";
+import * as donorVendorController from "../controllers/DonerVender.js";
+import * as departmentController from "../controllers/departmentController.js";
+import * as designationController from "../controllers/designationController.js";
+import * as documentController from "../controllers/documentController.js";
+import * as projectController from "../controllers/projectController.js";
+import * as permissionController from "../controllers/permisssions.js";
+import * as folderController from "../controllers/folderController.js";
+import * as notificationController from "../controllers/notificationController.js";
+import * as dashboardController from "../controllers/dashboardController.js";
+
+// ===== Validators =====
+
 import {
     assignMenusValidator,
     getAssignedMenusValidator,
@@ -48,337 +63,104 @@ router.get("/", authenticate, (req, res) => {
 /* --- Authentication Pages --- */
 
 // Login page
-router.get("/login", (req, res) => {
-    res.render("pages/login", { title: "E-Sangrah - Login" });
-});
+router.get("/login", authController.getLoginPage);
 
 // Registration page
-router.get("/register", (req, res) => {
-    res.render("pages/register", { title: "E-Sangrah - Register" });
-});
+router.get("/register", authController.getRegisterPage);
 
 // Forgot password page
-router.get("/forgot-password", (req, res) => {
-    res.render("pages/forgot-password", {
-        otpSent: false,
-        otpVerified: false,
-        email: "",
-        message: null,
-        error: null,
-    });
-});
+router.get("/forgot-password", authController.getForgotPasswordPage);
 
 // Reset password page
-router.get("/reset-password", authenticate, (req, res) => {
-    res.render("pages/reset-password", {
-        otpSent: false,
-        otpVerified: false,
-        email: req.user.email,
-        message: null,
-        error: null,
-    });
-});
+router.get("/reset-password", authenticate, authController.getResetPasswordPage);
 
+
+// router.use(checkPermissions); // Apply RBAC middleware to all routes below
 /* --- User Management --- */
 
 // User list page
-router.get("/users/list", authenticate, checkPermissions, (req, res) => {
-    res.render("pages/registerations/user-listing", { title: "E-Sangrah - Users-List", user: req.user });
-});
+router.get("/users/list", authenticate, checkPermissions, userController.listUsers);
 
 // Register new user form
-router.get("/users/register", authenticate, authorize('admin', 'superadmin'), checkPermissions, async (req, res) => {
-    try {
-        const departments = await Department.find({ status: "Active" }, "name").lean();
-        const designations = await Designation.find({ status: "Active" }).sort({ name: 1 }).lean();
-
-        res.render("pages/registerations/user-registration", {
-            title: "E-Sangrah - Register",
-            departments,
-            designations,
-            user: req.user
-        });
-    } catch (err) {
-        logger.error("Error loading user registration:", err);
-        res.status(500).send("Internal Server Error");
-    }
-});
+router.get(
+    "/users/register",
+    authenticate,
+    authorize('admin', 'superadmin'),
+    checkPermissions,
+    userController.showRegisterForm
+);
 
 // Combined view/edit user form
-router.get("/users/:mode/:id", authenticate, checkPermissions, async (req, res) => {
-    try {
-        const { mode, id } = req.params;
-
-        const user = await User.findById(id)
-            .populate("userDetails.department", "name")
-            .populate("userDetails.designation", "name")
-            .lean();
-
-        if (!user) return res.status(404).send("User not found");
-
-        // Always send departments and designations for edit mode
-        const departments = await Department.find().lean();
-        const designations = await Designation.find().lean();
-
-        res.render("pages/registerations/user-form", {
-            title: `User - ${user.name}`,
-            user,
-            departments,
-            designations,
-            viewOnly: mode === "view"
-        });
-    } catch (err) {
-        logger.error(err);
-        res.status(500).send("Internal Server Error");
-    }
-});
+router.get("/users/:mode/:id", authenticate, checkPermissions, userController.viewOrEditUser);
 
 /* --- Donors --- */
 // Donor registration page (create or edit)
-router.get("/donors/register", authenticate, checkPermissions, async (req, res) => {
-    try {
-        const donor = req.query.id ? await User.findById(req.query.id).lean() : null;
-        res.render("pages/registerations/donor-registration", {
-            title: donor ? "E-Sangrah - Edit Donor" : "E-Sangrah - Register",
-            donor,
-            isEdit: Boolean(donor),
-            user: req.user
-        });
-    } catch (err) {
-        logger.error("Error loading donor register page:", err);
-        res.render("pages/registerations/donor-registration", { title: "E-Sangrah - Register", donor: null, isEdit: false, user: req.user });
-    }
-});
+router.get("/donors/register", authenticate, checkPermissions, donorVendorController.showDonorForm);
 
 // Donor list page
-router.get("/donors/list", authenticate, checkPermissions, async (req, res) => {
-    try {
-        const donors = await User.find({ profile_type: "donor" }).lean();
-        res.render("pages/registerations/donor-listing", { title: "E-Sangrah - Donor List", donors, user: req.user });
-    } catch (err) {
-        logger.error("Error fetching donor list:", err);
-        res.status(500).render("pages/error", { title: "Error", message: "Unable to load donor list" });
-    }
-});
+router.get("/donors/list", authenticate, checkPermissions, donorVendorController.listDonors);
 
 /* --- Vendors --- */
 // Vendor registration page (create/edit)
-router.get("/vendors/register", authenticate, checkPermissions, async (req, res) => {
-    try {
-        const vendor = req.query.id ? await User.findById(req.query.id).lean() : null;
-        res.render("pages/registerations/vendor-registration", {
-            title: vendor ? "E-Sangrah - Edit Vendor" : "E-Sangrah - Register",
-            vendor,
-            isEdit: Boolean(vendor),
-            user: req.user
-        });
-    } catch (err) {
-        logger.error("Error loading vendor register page:", err);
-        res.render("pages/registerations/vendor-registration", { title: "E-Sangrah - Register", vendor: null, isEdit: false, user: req.user });
-    }
-});
+router.get("/vendors/register", authenticate, checkPermissions, donorVendorController.showVendorForm);
 
 // Vendor list page
-router.get("/vendors/list", authenticate, checkPermissions, async (req, res) => {
-    try {
-        const vendors = await User.find({ profile_type: "vendor" }).lean();
-        res.render("pages/registerations/vendor-registration-list", { title: "E-Sangrah - Vendor List", vendors, user: req.user });
-    } catch (err) {
-        logger.error("Error fetching vendor list:", err);
-        res.status(500).render("pages/error", { title: "Error", message: "Unable to load vendor list" });
-    }
-});
+router.get("/vendors/list", authenticate, checkPermissions, donorVendorController.listVendors);
+
 
 /* =========================================
    DEPARTMENTS ROUTES
    ========================================= */
-
-// Render Add Department page
-router.get("/departments", authenticate, checkPermissions, (req, res) => {
-    res.render("pages/department/department", {
-        title: "E-Sangrah - Department",
-        user: req.user,
-        department: null,
-    });
-});
+// Add Department page
+router.get("/departments", authenticate, checkPermissions, departmentController.showAddDepartmentPage);
 
 // Department List page
-router.get("/departments/list", authenticate, checkPermissions, (req, res) => {
-    res.render("pages/department/departments-list", {
-        title: "E-Sangrah - Departments-List",
-        user: req.user
-    });
-});
+router.get("/departments/list", authenticate, checkPermissions, departmentController.showDepartmentListPage);
 
 // Edit Department page
-router.get("/departments/:id", authenticate, checkPermissions, async (req, res) => {
-    const department = await Department.findById(req.params.id).lean();
-    if (!department) return res.redirect("/departments/list");
+router.get("/departments/:id", authenticate, checkPermissions, departmentController.showEditDepartmentPage);
 
-    res.render("pages/department/department", {
-        title: "E-Sangrah - Edit Department",
-        department,
-        user: req.user
-    });
-});
 
 /* =========================================
    DESIGNATIONS ROUTES
    ========================================= */
-
-// Render Add Designation page
-router.get("/designations", authenticate, authorize("admin"), checkPermissions, (req, res) => {
-    res.render("pages/designation/designation", { designation: null, user: req.user });
-});
+// Add Designation page
+router.get("/designations", authenticate, authorize("admin"), checkPermissions, designationController.showAddDesignationPage);
 
 // Edit Designation page
-router.get("/designations/edit/:id", authenticate, authorize("admin"), checkPermissions, async (req, res) => {
-    try {
-        const designation = await Designation.findById(req.params.id);
-        if (!designation) {
-            req.flash("error", "Designation not found");
-            return res.redirect("/designations/list");
-        }
-        res.render("pages/designation/designation", { designation, user: req.user });
-    } catch (err) {
-        logger.error(err);
-        req.flash("error", "Something went wrong");
-        res.redirect("/designations/list");
-    }
-});
+router.get("/designations/edit/:id", authenticate, authorize("admin"), checkPermissions, designationController.showEditDesignationPage);
 
 // Designation List page
-router.get("/designations/list", authenticate, authorize("admin"), checkPermissions, (req, res) => {
-    res.render("pages/designation/designations-list", { title: "Designation List", user: req.user });
-});
+router.get("/designations/list", authenticate, authorize("admin"), checkPermissions, designationController.showDesignationListPage);
+
 
 /* =========================================
    DOCUMENTS ROUTES
    ========================================= */
 
 // Document List page
-router.get("/documents/list", authenticate, checkPermissions, async (req, res) => {
-    try {
-        const designations = await Designation.find({ status: "Active" })
-            .sort({ name: 1 })
-            .lean();
-
-        res.render("pages/document/document-list", {
-            title: "E-Sangrah - Documents-List",
-            designations,
-            user: req.user
-        });
-    } catch (err) {
-        logger.error("Error loading document list:", err);
-        res.status(500).render("pages/error", {
-            title: "Error",
-            message: "Unable to load documents",
-        });
-    }
-});
-
+router.get("/documents/list", authenticate, checkPermissions, documentController.showDocumentListPage);
 
 // Add Document page
-router.get("/documents/add", authenticate, checkPermissions, async (req, res) => {
-    try {
-        res.render("pages/document/add-document", {
-            title: "E-Sangrah - Add-Document",
-            user: req.user,
-            isEdit: false
-        });
-    } catch (err) {
-        logger.error("Error loading add-document page:", err);
-        res.status(500).send("Server Error");
-    }
-});
+router.get("/documents/add", authenticate, checkPermissions, documentController.showAddDocumentPage);
 
 // Edit Document page
-router.get("/documents/edit/:id", authenticate, checkPermissions, async (req, res) => {
-    try {
-        const { id } = req.params;
-
-        if (!mongoose.Types.ObjectId.isValid(id)) {
-            return res.status(400).send("Invalid document ID");
-        }
-
-        const document = await Document.findById(id)
-            .populate("department", "name")
-            .populate("project", "projectName")
-            .populate("projectManager", "name")
-            .populate("owner", "name")
-            .lean();
-
-        if (!document) {
-            return res.status(404).send("Document not found");
-        }
-
-        res.render("pages/document/add-document", {
-            title: "E-Sangrah - Edit Document",
-            user: req.user,
-            document,
-            isEdit: true,
-            // projectManager: document.projectManager, // send explicitly
-            // department: document.department // send explicitly
-        });
-    } catch (err) {
-        logger.error("Error loading edit-document page:", err);
-        res.status(500).send("Server Error");
-    }
-});
+router.get("/documents/edit/:id", authenticate, checkPermissions, documentController.showEditDocumentPage);
 
 /* =========================================
    PROJECTS ROUTES
    ========================================= */
-
 // Projects List page
-router.get("/projects/list", authenticate, async (req, res) => {
-    try {
-        const designations = await Designation.find({ status: "Active" })
-            .sort({ name: 1 })
-            .lean();
-
-        res.render("pages/projects/projectList", {
-            title: "E-Sangrah - Projects List",
-            designations,
-            user: req.user
-        });
-    } catch (err) {
-        logger.error("Error loading project list:", err);
-        res.status(500).render("pages/error", {
-            title: "Error",
-            message: "Unable to load project list"
-        });
-    }
-});
+router.get("/projects/list", authenticate, projectController.showProjectListPage);
 
 // Project details (new)
-router.get("/projects/details", authenticate, checkPermissions, async (req, res) => {
-    await renderProjectDetails(res, null, req.user);
-});
+router.get("/projects/details", authenticate, checkPermissions, projectController.showNewProjectDetails);
 
 // Project details (existing)
-router.get("/projects/:id/details", authenticate, checkPermissions, async (req, res) => {
-    await renderProjectDetails(res, req.params.id, req.user);
-});
+router.get("/projects/:id/details", authenticate, checkPermissions, projectController.showExistingProjectDetails);
 
 // Main Projects page
-router.get("/projects", authenticate, checkPermissions, async (req, res) => {
-    try {
-        res.render("pages/projects/projects", {
-            user: req.user,
-            title: "E-Sangrah - Project List",
-            messages: req.flash(),
-        });
-    } catch (err) {
-        logger.error("Error loading projects page:", err);
-        res.render("pages/projects/projects", {
-            user: req.user,
-            title: "E-Sangrah - Project List",
-            messages: { error: "Unable to load projects" },
-            projects: [],
-        });
-    }
-});
+router.get("/projects", authenticate, checkPermissions, projectController.showMainProjectsPage);
 
 /* =========================================
    PERMISSIONS ROUTES
@@ -444,18 +226,15 @@ router.get("/permissions/user/:id", authenticate, checkPermissions, async (req, 
     }
 });
 
-// Get user permissions
-// router.get("/permissions/user/:id/permissions", authenticate, checkPermissions, async (req, res) => {
-//     try {
-//         const userPermissions = await UserPermission.find({ user_id: req.params.id })
-//             .populate("menu_id", "name type master_id")
-//             .lean();
-//         res.json({ success: true, data: userPermissions });
-//     } catch (err) {
-//         logger.error("Error fetching user permissions:", err);
-//         res.status(500).json({ success: false, message: "Error fetching user permissions" });
-//     }
-// });
+// Role Permissions Page
+router.get("/permissions/roles", authenticate, checkPermissions, (req, res) => {
+    res.render("pages/permissions/roles-permissions", { user: req.user });
+});
+
+// Menu Management
+router.get("/permissions/menu/list", authenticate, checkPermissions, getMenuListValidator, getMenuList);
+router.get("/permissions/menu/add", authenticate, checkPermissions, getAddMenu);
+router.get("/permissions/menu/add/:id", authenticate, checkPermissions, menuIdParamValidator, getEditMenu);
 
 // Save user permissions
 router.post("/permissions/user/save", authenticate, checkPermissions, async (req, res) => {
@@ -496,235 +275,53 @@ router.post("/permissions/user/save", authenticate, checkPermissions, async (req
     }
 });
 
-// Role Permissions Page
-router.get("/permissions/roles", authenticate, checkPermissions, (req, res) => {
-    res.render("pages/permissions/roles-permissions", { user: req.user });
-});
-
-// Menu Management
-router.get("/permissions/menu/list", authenticate, checkPermissions, getMenuListValidator, getMenuList);
-router.get("/permissions/menu/add", authenticate, checkPermissions, getAddMenu);
-router.get("/permissions/menu/add/:id", authenticate, checkPermissions, menuIdParamValidator, getEditMenu);
-
 /* =========================================
    DASHBOARD ROUTE
    ========================================= */
-router.get("/dashboard", authenticate, checkPermissions, (req, res) => {
-    try {
-        res.render("pages/dashboard/dashboard", { user: req.user });
-    } catch (err) {
-        logger.error("Dashboard render error:", err);
-        res.status(500).render("pages/error", { user: req.user, message: "Unable to load dashboard" });
-    }
-});
+router.get("/dashboard", authenticate, checkPermissions, dashboardController.showDashboard);
 
 /* =========================================
    FOLDERS AND DOCUMENTS ROUTES
    ========================================= */
-
 // Folder list by ID
-router.get("/:folderId/list", authenticate, checkPermissions, async (req, res) => {
-    try {
-        const { folderId } = req.params;
-        res.render("pages/document/documentFolderList", {
-            title: "E-Sangrah - Documents-List",
-            user: req.user,
-            folderId
-        });
-    } catch (err) {
-        logger.error("Error loading document list:", err);
-        res.status(500).render("pages/error", {
-            title: "Error",
-            message: "Unable to load documents",
-        });
-    }
-});
+router.get("/:folderId/list", authenticate, checkPermissions, folderController.showFolderListById);
 
 // Upload Folder page
-router.get("/upload-folder", authenticate, checkPermissions, (req, res) => {
-    res.render("pages/folders/upload-folder", { title: "E-Sangrah - Upload-Folder", user: req.user });
-});
+router.get("/upload-folder", authenticate, checkPermissions, folderController.showUploadFolderPage);
 
 // Archived Folders page
-router.get("/archived", authenticate, checkPermissions, (req, res) => {
-    res.render("pages/folders/archivedFolders", { title: "E-Sangrah - ArchivedFolders", user: req.user });
-});
+router.get("/archived", authenticate, checkPermissions, folderController.showArchivedFoldersPage);
 
 // Main Folders page
-router.get("/folders", authenticate, checkPermissions, (req, res) => {
-    res.render("pages/folders/folders", { title: "E-Sangrah - Folders", user: req.user });
-});
+router.get("/folders", authenticate, checkPermissions, folderController.showMainFoldersPage);
 
 /* =========================================
    NOTIFICATIONS ROUTE
    ========================================= */
-router.get("/notifications", authenticate, checkPermissions, (req, res) => {
-    res.render("pages/notifications", { title: "E-Sangrah - Notifications", user: req.user });
-});
+// Notifications page
+router.get("/notifications", authenticate, checkPermissions, notificationController.showNotificationsPage);
 
 /* =========================================
    MY PROFILE ROUTE
    ========================================= */
-router.get("/my-profile", authenticate, checkPermissions, async (req, res) => {
-    try {
-        const user = await User.findById(req.session.user._id)
-            .populate("userDetails.designation")
-            .populate("userDetails.department")
-            .lean();
-
-        if (!user) return res.status(404).send("User not found");
-        res.render("pages/myprofile", { user });
-    } catch (err) {
-        logger.error("Error loading profile:", err);
-        res.status(500).send("Server Error");
-    }
-});
+router.get("/my-profile", authenticate, checkPermissions, authController.showMyProfile);
 
 
 /* ===========================
    Role and Permmissions Assignment
 =========================== */
-// Render assign-permissions page
-router.get("/assign-permissions", authenticate, checkPermissions, async (req, res) => {
-    try {
-        const departments = await Department.find({ status: "Active" }, "name").lean();
-        const designations = await Designation.find({ status: "Active" })
-            .sort({ name: 1 })
-            .lean();
-        res.render("pages/permissions/assign-permissions", {
-            user: req.user,
-            Roles: profile_type,
-            designations,
-            departments,
-            profile_type
-        });
-    } catch (err) {
-        logger.error("Dashboard render error:", err);
-        res.status(500).render("pages/error", {
-            user: req.user,
-            message: "Something went wrong while loading the dashboard",
-        });
-    }
-});
+
+// Assign Permissions page
+router.get("/assign-permissions", authenticate, checkPermissions, permissionController.showAssignPermissionsPage);
 
 // Get user permissions page
-router.get("/user-permissions/:id", authenticate, checkPermissions, async (req, res) => {
-    try {
-        const userId = req.params.id;
-        const user = await User.findById(userId)
-            .populate("userDetails.designation")
-            .populate("userDetails.department")
-            .lean();
-
-        if (!user) {
-            return res.status(404).render("pages/error", {
-                user: req.user,
-                message: "User not found",
-            });
-        }
-
-        // Get all menus
-        const menus = await Menu.find({ is_show: true })
-            .sort({ priority: 1, add_date: -1 })
-            .lean();
-
-        // Build menu tree
-        const masterMenus = buildMenuTree(menus);
-
-        // Get user's existing permissions
-        const userPermissions = await UserPermission.find({ user_id: userId })
-            .populate("menu_id")
-            .lean();
-
-        // Create a map of menu permissions for easy access
-        const permissionMap = {};
-        userPermissions.forEach(perm => {
-            if (perm.menu_id) {
-                permissionMap[perm.menu_id._id.toString()] = perm.permissions;
-            } else {
-                logger.warn(`Missing menu for permission ID: ${perm._id}`);
-            }
-        });
-
-        res.render("pages/permissions/assign-user-permissions", {
-            user: req.user,
-            targetUser: user,
-            masterMenus,
-            permissionMap
-        });
-    } catch (err) {
-        logger.error("Error loading user permissions page:", err);
-        res.status(500).render("error", {
-            user: req.user,
-            message: "Something went wrong while loading user permissions",
-        });
-    }
-});
+router.get("/user-permissions/:id", authenticate, checkPermissions, permissionController.showUserPermissionsPage);
 
 // Get user permissions API
-router.get("/user/:id/permissions", authenticate, checkPermissions, async (req, res) => {
-    try {
-        const userId = req.params.id;
-        const userPermissions = await UserPermission.find({ user_id: userId })
-            .populate("menu_id", "name type master_id")
-            .lean();
-
-        res.json({ success: true, data: userPermissions });
-    } catch (error) {
-        logger.error("Error fetching user permissions:", error);
-        res.status(500).json({ success: false, message: "Error fetching user permissions" });
-    }
-});
+router.get("/user/:id/permissions", authenticate, checkPermissions, permissionController.getUserPermissions);
 
 // Save user permissions
-router.post("/user/permissions", authenticate, checkPermissions, async (req, res) => {
-    try {
-        const { user_id, permissions } = req.body; // permissions now only contains checked menus/submenus
-        const assigned_by = req.user;
+router.post("/user/permissions", authenticate, checkPermissions, permissionController.saveUserPermissions);
 
-        if (!user_id || !permissions || Object.keys(permissions).length === 0) {
-            return res.status(400).json({
-                success: false,
-                message: "User ID and permissions are required"
-            });
-        }
-
-        // Delete existing permissions for the user
-        await UserPermission.deleteMany({ user_id });
-
-        // Prepare new permission documents
-        const permissionDocs = [];
-
-        for (const [menuId, permData] of Object.entries(permissions)) {
-            permissionDocs.push({
-                user_id,
-                menu_id: menuId,
-                permissions: {
-                    read: !!permData.read,
-                    write: !!permData.write,
-                    delete: !!permData.delete
-                },
-                assigned_by: {
-                    user_id: assigned_by._id,
-                    name: assigned_by.name,
-                    email: assigned_by.email
-                }
-            });
-        }
-
-        // Insert all new permissions at once
-        if (permissionDocs.length > 0) {
-            await UserPermission.insertMany(permissionDocs);
-        }
-
-        res.json({
-            success: true,
-            message: "User permissions saved successfully"
-        });
-    } catch (error) {
-        logger.error("Error saving user permissions:", error);
-        res.status(500).json({ success: false, message: "Error saving user permissions" });
-    }
-});
 
 export default router;

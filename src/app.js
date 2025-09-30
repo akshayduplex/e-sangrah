@@ -16,88 +16,100 @@ import { formatDateDDMMYYYY } from "./utils/formatDate.js";
 import { startCleanupJob } from "./helper/node-cron.js";
 import logger from "./utils/logger.js";
 import { connectDB } from "./database/db.js";
+import checkPermissions, { loadMenuMap } from './middlewares/checkPermission.js';
 import fs from "fs";
 
-// Initialize app
 const app = express();
 
-// Connect to MongoDB
-connectDB();
+(async () => {
+    // Connect to MongoDB
+    await connectDB();
 
-// Security middlewares
-app.use(helmet({ contentSecurityPolicy: false }));
+    // Load menu map into memory (for fast RBAC lookup)
+    await loadMenuMap();
 
-// Create a write stream for HTTP access logs
-const logDir = path.resolve(process.cwd(), "logs");
-const accessLogStream = fs.createWriteStream(path.join(logDir, "access.log"), { flags: "a" });
+    //Security middlewares
+    app.use(helmet({ contentSecurityPolicy: false }));
 
-// Request logging
-if (process.env.NODE_ENV === "development") {
-    app.use(morgan("dev"));
-} else {
-    app.use(morgan("combined", { stream: accessLogStream }));
-}
+    //  Logging
+    const logDir = path.resolve(process.cwd(), "logs");
+    const accessLogStream = fs.createWriteStream(path.join(logDir, "access.log"), { flags: "a" });
+    if (process.env.NODE_ENV === "development") {
+        app.use(morgan("dev"));
+    } else {
+        app.use(morgan("combined", { stream: accessLogStream }));
+    }
 
-// Body parser & method override
-app.use(bodyParser.urlencoded({ extended: false }));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(methodOverride("_method"));
+    // Body parser & method override
+    app.use(bodyParser.urlencoded({ extended: false }));
+    app.use(express.json());
+    app.use(express.urlencoded({ extended: true }));
+    app.use(methodOverride("_method"));
 
-// Compression
-app.use(compression());
+    // Compression
+    app.use(compression());
+    console.log("Mongo URL", process.env.MONGO_URI, process.env.SESSION_SECRET);
+    // Sessions (must be before RBAC middleware)
+    app.use(
+        session({
+            secret: process.env.SESSION_SECRET,
+            resave: false,
+            saveUninitialized: false,
+            store: MongoStore.create({
+                mongoUrl: process.env.MONGO_URI,
+                collectionName: "sessions",
+                ttl: 60 * 60, // 1 hour
+            }),
+            cookie: {
+                maxAge: 1000 * 60 * 60,
+                httpOnly: true,
+                secure: process.env.NODE_ENV === "production",
+                sameSite: "lax",
+            },
+        })
+    );
 
-// Sessions
-app.use(
-    session({
-        secret: process.env.SESSION_SECRET,
-        resave: false,
-        saveUninitialized: false,
-        store: MongoStore.create({
-            mongoUrl: process.env.MONGO_URI,
-            collectionName: "sessions",
-            ttl: 60 * 60, // 1 hour
-        }),
-        cookie: {
-            maxAge: 1000 * 60 * 60,
-            httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
-            sameSite: "lax",
-        },
-    })
-);
+    // Flash messages
+    app.use(flash());
 
-// Flash messages
-app.use(flash());
+    //  Views and static files
+    app.set("view engine", "ejs");
+    app.set("views", path.resolve("views"));
+    app.use(express.static(path.resolve("public")));
 
-// Views and static files
-app.set("view engine", "ejs");
-app.set("views", path.resolve("views"));
-app.use(express.static(path.resolve("public")));
+    // 🔹 Global locals
+    app.use((req, res, next) => {
+        const user = req.user || req.session.user || {};
+        res.locals.BASE_URL = process.env.BASE_URL || "";
+        res.locals.designation_id = user.designation_id || null;
+        res.locals.department = user.department || null;
+        res.locals.profile_image = user.profile_image || null;
+        res.locals.profile_type = user.profile_type || null;
+        res.locals.email = user.email || null;
+        res.locals.name = user.name || null;
+        res.locals.todayDate = formatDateDDMMYYYY();
+        next();
+    });
 
-// Global locals
-app.use((req, res, next) => {
-    const user = req.user || req.session.user || {};
-    res.locals.BASE_URL = process.env.BASE_URL || "";
-    res.locals.designation_id = user.designation_id || null;
-    res.locals.department = user.department || null;
-    res.locals.profile_image = user.profile_image || null;
-    res.locals.profile_type = user.profile_type || null;
-    res.locals.email = user.email || null;
-    res.locals.name = user.name || null;
-    res.locals.todayDate = formatDateDDMMYYYY();
-    next();
-});
+    // Test route for sessions (optional)
+    app.get("/test-session", (req, res) => {
+        req.session.test = "hello";
+        res.json(req.session);
+    });
 
-// Routes
-app.use("/api", ApiRoutes);
-app.use("/", pageRoutes);
+    //  Routes with RBAC middleware
+    app.use("/api", ApiRoutes);
+    app.use("/", pageRoutes);
 
-// Start cleanup cron job
-startCleanupJob();
+    //  Start cleanup cron job
+    startCleanupJob();
 
-// Error handling
-app.use(errorHandler);
+    // Error handling
+    app.use(errorHandler);
 
-// Export app
+    // Start server
+    const PORT = process.env.PORT || 3000;
+    app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+})();
+
 export default app;

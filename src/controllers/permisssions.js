@@ -5,6 +5,154 @@ import MenuAssignment from "../models/menuAssignment.js";
 
 import { buildMenuTree } from "../utils/buildMenuTree.js";
 import logger from "../utils/logger.js";
+import { profile_type } from "../constant/constant.js";
+import Department from "../models/Departments.js";
+import User from "../models/User.js";
+import UserPermission from "../models/UserPermission.js";
+import { incrementGlobalPermissionsVersion } from "../middlewares/checkPermission.js";
+
+//Page Controllers
+// Assign Permissions page
+export const showAssignPermissionsPage = async (req, res) => {
+    try {
+        const departments = await Department.find({ status: "Active" }, "name").lean();
+        const designations = await Designation.find({ status: "Active" })
+            .sort({ name: 1 })
+            .lean();
+
+        res.render("pages/permissions/assign-permissions", {
+            user: req.user,
+            Roles: profile_type,   // ⚠️ double-check where profile_type is coming from
+            designations,
+            departments,
+            profile_type
+        });
+    } catch (err) {
+        logger.error("Error rendering assign permissions page:", err);
+        res.status(500).render("pages/error", {
+            user: req.user,
+            message: "Something went wrong while loading assign permissions page",
+        });
+    }
+};
+
+// Get user permissions page
+export const showUserPermissionsPage = async (req, res) => {
+    try {
+        const userId = req.params.id;
+        const user = await User.findById(userId)
+            .populate("userDetails.designation")
+            .populate("userDetails.department")
+            .lean();
+
+        if (!user) {
+            return res.status(404).render("pages/error", {
+                user: req.user,
+                message: "User not found",
+            });
+        }
+
+        const menus = await Menu.find({ is_show: true })
+            .sort({ priority: 1, add_date: -1 })
+            .lean();
+
+        const masterMenus = buildMenuTree(menus);
+
+        const userPermissions = await UserPermission.find({ user_id: userId })
+            .populate("menu_id")
+            .lean();
+
+        const permissionMap = {};
+        userPermissions.forEach(perm => {
+            if (perm.menu_id) {
+                permissionMap[perm.menu_id._id.toString()] = perm.permissions;
+            } else {
+                logger.warn(`Missing menu for permission ID: ${perm._id}`);
+            }
+        });
+
+        res.render("pages/permissions/assign-user-permissions", {
+            user: req.user,
+            targetUser: user,
+            masterMenus,
+            permissionMap
+        });
+    } catch (err) {
+        logger.error("Error loading user permissions page:", err);
+        res.status(500).render("pages/error", {
+            user: req.user,
+            message: "Something went wrong while loading user permissions",
+        });
+    }
+};
+
+// Get user permissions API
+export const getUserPermissions = async (req, res) => {
+    try {
+        const userId = req.params.id;
+        const userPermissions = await UserPermission.find({ user_id: userId })
+            .populate("menu_id", "name type master_id")
+            .lean();
+
+        res.json({ success: true, data: userPermissions });
+    } catch (error) {
+        logger.error("Error fetching user permissions:", error);
+        res.status(500).json({ success: false, message: "Error fetching user permissions" });
+    }
+};
+
+// Save user permissions
+export const saveUserPermissions = async (req, res) => {
+    try {
+        const { user_id, permissions } = req.body;
+        const assigned_by = req.user;
+
+        if (!user_id || !permissions || Object.keys(permissions).length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: "User ID and permissions are required"
+            });
+        }
+
+        await UserPermission.deleteMany({ user_id });
+
+        const permissionDocs = [];
+
+        for (const [menuId, permData] of Object.entries(permissions)) {
+            permissionDocs.push({
+                user_id,
+                menu_id: menuId,
+                permissions: {
+                    read: !!permData.read,
+                    write: !!permData.write,
+                    delete: !!permData.delete
+                },
+                assigned_by: {
+                    user_id: assigned_by._id,
+                    name: assigned_by.name,
+                    email: assigned_by.email
+                }
+            });
+        }
+
+        if (permissionDocs.length > 0) {
+            await UserPermission.insertMany(permissionDocs);
+        }
+
+        res.json({
+            success: true,
+            message: "User permissions saved successfully"
+        });
+    } catch (error) {
+        logger.error("Error saving user permissions:", error);
+        res.status(500).json({ success: false, message: "Error saving user permissions" });
+    }
+};
+
+
+
+//API Controllers
+
 // Render assign menu page
 export const getAssignMenuPage = async (req, res) => {
     try {
@@ -101,7 +249,9 @@ export const assignMenusToDesignation = async (req, res) => {
 
             await MenuAssignment.insertMany(assignments);
         }
-
+        // Increment global permissions version to auto-refresh sessions
+        // Increment version for affected designation only
+        incrementGlobalPermissionsVersion(designation_id);
         res.json({
             success: true,
             message: "Menus assigned successfully",

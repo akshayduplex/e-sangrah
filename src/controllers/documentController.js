@@ -6,6 +6,94 @@ import TempFile from "../models/tempFile.js";
 import Notification from "../models/notification.js";
 import { cloudinary } from "../middlewares/fileUploads.js";
 import logger from "../utils/logger.js";
+import { sendEmail } from "../services/emailService.js";
+import User from "../models/User.js";
+import Designation from "../models/Designation.js";
+
+//Page Controllers
+
+// Document List page
+export const showDocumentListPage = async (req, res) => {
+    try {
+        const designations = await Designation.find({ status: "Active" })
+            .sort({ name: 1 })
+            .lean();
+
+        res.render("pages/document/document-list", {
+            title: "E-Sangrah - Documents-List",
+            designations,
+            user: req.user
+        });
+    } catch (err) {
+        logger.error("Error loading document list:", err);
+        res.status(500).render("pages/error", {
+            title: "Error",
+            message: "Unable to load documents",
+        });
+    }
+};
+
+// Add Document page
+export const showAddDocumentPage = async (req, res) => {
+    try {
+        res.render("pages/document/add-document", {
+            title: "E-Sangrah - Add-Document",
+            user: req.user,
+            isEdit: false
+        });
+    } catch (err) {
+        logger.error("Error loading add-document page:", err);
+        res.status(500).send("Server Error");
+    }
+};
+
+// Edit Document page
+export const showEditDocumentPage = async (req, res) => {
+    try {
+        const { id } = req.params;
+        console.log("Editing document ID:", id);
+
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).render("pages/error", {
+                title: "Error",
+                message: "Invalid document ID",
+            });
+        }
+
+        const document = await Document.findById(id)
+            .populate("department", "name _id")
+            .populate("project", "projectName _id")
+            .populate("projectManager", "name _id")
+            .populate("owner", "name _id")
+            .populate("files")
+            .lean();
+
+        if (!document) {
+            return res.status(404).render("pages/error", {
+                title: "Error",
+                message: "Document not found",
+            });
+        }
+
+        console.log("Document found:", document._id);
+
+        res.render("pages/document/add-document", {
+            title: "E-Sangrah - Edit Document",
+            user: req.user,
+            document,
+            isEdit: true
+        });
+    } catch (err) {
+        logger.error("Error loading edit-document page:", err);
+        res.status(500).render("pages/error", {
+            title: "Error",
+            message: "Unable to load edit document page",
+        });
+    }
+};
+
+//API Controllers
+
 
 /**
  * Get all documents with filtering, pagination, and search
@@ -440,6 +528,131 @@ export const createDocument = async (req, res) => {
 /**
  * Update document
  */
+// export const updateDocument = async (req, res) => {
+//     try {
+//         const { id } = req.params;
+//         const document = await Document.findById(id);
+//         if (!document) return failResponse(res, "Document not found", 404);
+
+//         // Update folder if provided
+//         if (req.body.folderId && mongoose.Types.ObjectId.isValid(req.body.folderId)) {
+//             document.folderId = req.body.folderId;
+//         }
+
+//         const {
+//             projectName,
+//             department,
+//             projectManager,
+//             documentDate,
+//             tags,
+//             metadata,
+//             description,
+//             compliance,
+//             expiryDate,
+//             comment,
+//             link,
+//             fileIds
+//         } = req.body;
+
+//         // Parse metadata
+//         let parsedMetadata = {};
+//         if (metadata) {
+//             try { parsedMetadata = typeof metadata === "string" ? JSON.parse(metadata) : metadata; }
+//             catch (err) { logger.warn("Invalid metadata", err); }
+//         }
+
+//         // Parse tags
+//         const parsedTags = tags ? tags.split(",").map(tag => tag.trim()) : [];
+
+//         // Update basic fields
+//         document.project = projectName || document.project;
+//         document.department = department || document.department;
+//         document.projectManager = projectManager || document.projectManager;
+//         document.description = description ?? document.description;
+//         document.comment = comment ?? document.comment;
+//         document.link = link ?? document.link;
+//         document.tags = parsedTags;
+//         document.metadata = parsedMetadata;
+
+//         // Update document date
+//         if (documentDate) {
+//             const [day, month, year] = documentDate.split("-");
+//             document.documentDate = new Date(`${year}-${month}-${day}`);
+//         }
+
+//         // Compliance
+//         if (compliance) {
+//             document.compliance.isCompliance = compliance === "yes";
+//             if (expiryDate) {
+//                 const [day, month, year] = expiryDate.split("-");
+//                 document.compliance.expiryDate = new Date(`${year}-${month}-${day}`);
+//             }
+//         }
+
+//         // ---------------- Add new files as versions ----------------
+//         if (fileIds && fileIds.length > 0) {
+//             let parsedFileIds = typeof fileIds === "string" ? JSON.parse(fileIds) : fileIds;
+
+//             for (const fileId of parsedFileIds) {
+//                 if (!mongoose.Types.ObjectId.isValid(fileId)) continue;
+
+//                 const tempFile = await TempFile.findById(fileId);
+//                 if (!tempFile || tempFile.status !== "temp") continue;
+
+//                 tempFile.status = "permanent";
+//                 await tempFile.save();
+
+//                 // Add as a new version
+//                 await document.addNewVersion({
+//                     file: tempFile.s3Filename,
+//                     s3Url: tempFile.s3Url,
+//                     originalName: tempFile.originalName,
+//                     hash: tempFile.hash || null
+//                 }, req.user._id);
+//             }
+//         }
+
+//         // Signature handling
+//         if (req.files?.signature?.[0]) {
+//             const file = req.files.signature[0];
+//             if (!file.mimetype.startsWith("image/")) {
+//                 return failResponse(res, "Signature must be an image", 400);
+//             }
+//             document.signature = {
+//                 fileName: file.originalname,
+//                 fileUrl: file.path || file.filename,
+//             };
+//         } else if (req.body.signature) {
+//             const base64Data = req.body.signature;
+//             if (!base64Data.startsWith("data:image/")) {
+//                 return failResponse(res, "Invalid signature format", 400);
+//             }
+
+//             // Upload base64 to Cloudinary
+//             const uploaded = await cloudinary.uploader.upload(base64Data, {
+//                 folder: "signatures",
+//                 public_id: `signature-${Date.now()}`,
+//                 overwrite: true,
+//             });
+
+//             document.signature = {
+//                 fileName: uploaded.original_filename,
+//                 fileUrl: uploaded.secure_url,
+//             };
+//         }
+
+//         await document.save();
+//         return successResponse(res, { document }, "Document updated successfully");
+
+//     } catch (error) {
+//         logger.error("Update error:", error);
+//         return errorResponse(res, error, "Failed to update document");
+//     }
+// };
+
+/**
+ * Update document
+ */
 export const updateDocument = async (req, res) => {
     try {
         const { id } = req.params;
@@ -451,76 +664,68 @@ export const updateDocument = async (req, res) => {
             document.folderId = req.body.folderId;
         }
 
-        const {
-            projectName,
-            department,
-            projectManager,
-            documentDate,
-            tags,
-            metadata,
-            description,
-            compliance,
-            expiryDate,
-            comment,
-            link,
-            fileIds
-        } = req.body;
+        // Iterate over req.body keys and update dynamically
+        for (const [key, value] of Object.entries(req.body)) {
+            if (value === undefined) continue; // skip undefined
 
-        // Parse metadata
-        let parsedMetadata = {};
-        if (metadata) {
-            try { parsedMetadata = typeof metadata === "string" ? JSON.parse(metadata) : metadata; }
-            catch (err) { logger.warn("Invalid metadata", err); }
-        }
+            switch (key) {
+                case "metadata":
+                    try {
+                        document.metadata = typeof value === "string" ? JSON.parse(value) : value;
+                    } catch (err) {
+                        logger.warn("Invalid metadata, ignoring", err);
+                    }
+                    break;
 
-        // Parse tags
-        const parsedTags = tags ? tags.split(",").map(tag => tag.trim()) : [];
+                case "tags":
+                    if (Array.isArray(value)) {
+                        document.tags = value.map(tag => tag.trim());
+                    } else if (typeof value === "string") {
+                        document.tags = value.split(",").map(tag => tag.trim());
+                    }
+                    break;
 
-        // Update basic fields
-        document.project = projectName || document.project;
-        document.department = department || document.department;
-        document.projectManager = projectManager || document.projectManager;
-        document.description = description ?? document.description;
-        document.comment = comment ?? document.comment;
-        document.link = link ?? document.link;
-        document.tags = parsedTags;
-        document.metadata = parsedMetadata;
+                case "documentDate":
+                    const [day, month, year] = value.split("-");
+                    document.documentDate = new Date(`${year}-${month}-${day}`);
+                    break;
 
-        // Update document date
-        if (documentDate) {
-            const [day, month, year] = documentDate.split("-");
-            document.documentDate = new Date(`${year}-${month}-${day}`);
-        }
+                case "compliance":
+                    document.compliance.isCompliance = value === "yes";
+                    if (req.body.expiryDate) {
+                        const [d, m, y] = req.body.expiryDate.split("-");
+                        document.compliance.expiryDate = new Date(`${y}-${m}-${d}`);
+                    }
+                    break;
 
-        // Compliance
-        if (compliance) {
-            document.compliance.isCompliance = compliance === "yes";
-            if (expiryDate) {
-                const [day, month, year] = expiryDate.split("-");
-                document.compliance.expiryDate = new Date(`${year}-${month}-${day}`);
-            }
-        }
+                case "fileIds":
+                    if (value && value.length > 0) {
+                        let parsedFileIds = Array.isArray(value) ? value : JSON.parse(value);
+                        for (const fileId of parsedFileIds) {
+                            if (!mongoose.Types.ObjectId.isValid(fileId)) continue;
 
-        // ---------------- Add new files as versions ----------------
-        if (fileIds && fileIds.length > 0) {
-            let parsedFileIds = typeof fileIds === "string" ? JSON.parse(fileIds) : fileIds;
+                            const tempFile = await TempFile.findById(fileId);
+                            if (!tempFile || tempFile.status !== "temp") continue;
 
-            for (const fileId of parsedFileIds) {
-                if (!mongoose.Types.ObjectId.isValid(fileId)) continue;
+                            tempFile.status = "permanent";
+                            await tempFile.save();
 
-                const tempFile = await TempFile.findById(fileId);
-                if (!tempFile || tempFile.status !== "temp") continue;
+                            await document.addNewVersion({
+                                file: tempFile.s3Filename,
+                                s3Url: tempFile.s3Url,
+                                originalName: tempFile.originalName,
+                                hash: tempFile.hash || null
+                            }, req.user._id);
+                        }
+                    }
+                    break;
 
-                tempFile.status = "permanent";
-                await tempFile.save();
+                case "signature":
+                    // signature handled separately below
+                    break;
 
-                // Add as a new version
-                await document.addNewVersion({
-                    file: tempFile.s3Filename,
-                    s3Url: tempFile.s3Url,
-                    originalName: tempFile.originalName,
-                    hash: tempFile.hash || null
-                }, req.user._id);
+                default:
+                    document[key] = value; // direct assignment for simple fields
             }
         }
 
@@ -540,7 +745,6 @@ export const updateDocument = async (req, res) => {
                 return failResponse(res, "Invalid signature format", 400);
             }
 
-            // Upload base64 to Cloudinary
             const uploaded = await cloudinary.uploader.upload(base64Data, {
                 folder: "signatures",
                 public_id: `signature-${Date.now()}`,
@@ -645,7 +849,8 @@ export const updateDocumentStatus = async (req, res) => {
 export const shareDocument = async (req, res) => {
     try {
         const { id } = req.params;
-        const { userId, accessLevel, duration, customStart, customEnd } = req.body;
+        const userId = req.user._id; // fixed destructuring
+        const { accessLevel, duration, customStart, customEnd } = req.body;
 
         if (!mongoose.Types.ObjectId.isValid(id) || !mongoose.Types.ObjectId.isValid(userId)) {
             return res.status(400).json({ success: false, message: "Invalid ID" });
@@ -658,16 +863,35 @@ export const shareDocument = async (req, res) => {
         const now = new Date();
 
         // Set expiry based on duration
-        if (duration === "oneday") expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-        else if (duration === "oneweek") expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-        else if (duration === "onemonth") expiresAt = new Date(now.setMonth(now.getMonth() + 1));
-        else if (duration === "custom" && customStart && customEnd) {
-            expiresAt = new Date(customEnd);
+        switch (duration) {
+            case "oneday":
+                expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+                break;
+            case "oneweek":
+                expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+                break;
+            case "onemonth":
+                expiresAt = new Date(now.getTime());
+                expiresAt.setMonth(expiresAt.getMonth() + 1);
+                break;
+            case "custom":
+                if (customStart && customEnd) {
+                    const start = new Date(customStart);
+                    const end = new Date(customEnd);
+                    if (isNaN(start) || isNaN(end)) {
+                        return res.status(400).json({ success: false, message: "Invalid custom dates" });
+                    }
+                    expiresAt = end;
+                }
+                break;
+            case "lifetime":
+            case "onetime":
+            default:
+                expiresAt = null;
         }
-        // "lifetime" and "onetime" can leave expiresAt = null
 
         // Update sharedWith
-        const existingIndex = doc.sharedWith.findIndex(sw => sw.user.toString() === userId);
+        const existingIndex = doc.sharedWith.findIndex(sw => sw.user.toString() === userId.toString());
         if (existingIndex >= 0) {
             doc.sharedWith[existingIndex].accessLevel = accessLevel;
             doc.sharedWith[existingIndex].expiresAt = expiresAt;
@@ -686,6 +910,211 @@ export const shareDocument = async (req, res) => {
         return res.status(500).json({ success: false, message: "Server error" });
     }
 };
+
+
+export const inviteUser = async (req, res) => {
+    try {
+        const { documentId } = req.params;
+        const { userEmail, accessLevel, duration, customEnd } = req.body;
+        const inviterId = req.user._id;
+
+        // Validation
+        if (!userEmail) {
+            return res.status(400).json({ success: false, message: "User email is required" });
+        }
+
+        if (!mongoose.Types.ObjectId.isValid(documentId)) {
+            return res.status(400).json({ success: false, message: "Invalid document ID" });
+        }
+
+        const doc = await Document.findById(documentId);
+        if (!doc) return res.status(404).json({ success: false, message: "Document not found" });
+
+        // Check if user is owner or has edit access
+        const isOwner = doc.owner.toString() === inviterId.toString();
+        const hasEditAccess = doc.sharedWith.some(sw =>
+            sw.user.toString() === inviterId.toString() &&
+            sw.accessLevel === 'edit' &&
+            sw.inviteStatus === 'accepted'
+        );
+
+        if (!isOwner && !hasEditAccess) {
+            return res.status(403).json({ success: false, message: "You don't have permission to share this document" });
+        }
+
+        // Find or create user by email
+        let user = await User.findOne({ email: userEmail });
+        if (!user) {
+            // Generate a more secure temporary password
+            const tempPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8);
+            user = new User({
+                email: userEmail,
+                name: userEmail.split('@')[0], // Use email prefix as name
+                password: tempPassword,
+                isTemporary: true // Flag for temporary users
+            });
+            await user.save();
+        }
+
+        const userId = user._id;
+
+        // Calculate expiry
+        let expiresAt = null;
+        const now = new Date();
+
+        switch (duration) {
+            case "oneday":
+                expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+                break;
+            case "oneweek":
+                expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+                break;
+            case "onemonth":
+                expiresAt = new Date(now);
+                expiresAt.setMonth(expiresAt.getMonth() + 1);
+                break;
+            case "custom":
+                if (customEnd) {
+                    expiresAt = new Date(customEnd);
+                    if (expiresAt <= now) {
+                        return res.status(400).json({ success: false, message: "Custom end date must be in the future" });
+                    }
+                }
+                break;
+            case "lifetime":
+            case "onetime":
+                // No expiry for lifetime, onetime might need special handling
+                expiresAt = null;
+                break;
+            default:
+                expiresAt = null;
+        }
+
+        // Update or add to sharedWith
+        const existingIndex = doc.sharedWith.findIndex(sw => sw.user.toString() === userId.toString());
+
+        if (existingIndex >= 0) {
+            doc.sharedWith[existingIndex].accessLevel = accessLevel;
+            doc.sharedWith[existingIndex].expiresAt = expiresAt;
+            doc.sharedWith[existingIndex].inviteStatus = "pending";
+            doc.sharedWith[existingIndex].sharedAt = new Date();
+        } else {
+            doc.sharedWith.push({
+                user: userId,
+                accessLevel,
+                expiresAt,
+                inviteStatus: "pending",
+                sharedAt: new Date()
+            });
+        }
+
+        // Update sharedWithUsers array
+        doc.sharedWithUsers = doc.sharedWith.map(sw => sw.user);
+        await doc.save();
+
+        // Send invite email
+        const inviteLink = `${process.env.FRONTEND_URL || 'http://localhost:5000'}/api/documents/${documentId}/invite/${userId}/accept`;
+
+        await sendEmail({
+            to: userEmail,
+            subject: "Document Invitation - E-Sangrah",
+            html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #333;">Document Sharing Invitation</h2>
+            <p>You have been invited to access a document on E-Sangrah.</p>
+            <p><strong>Document:</strong> ${doc.metadata?.fileName || 'Unnamed Document'}</p>
+            <p><strong>Access Level:</strong> ${accessLevel}</p>
+            ${expiresAt ? `<p><strong>Expires:</strong> ${expiresAt.toLocaleDateString()}</p>` : ''}
+            <div style="margin: 20px 0;">
+                <a href="${inviteLink}" style="background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">
+                    Accept Invitation & View Document
+                </a>
+            </div>
+            <p style="color: #666; font-size: 14px;">
+                Clicking this link will automatically accept the invitation and redirect you to your documents list.
+            </p>
+            <hr>
+            <p style="color: #999; font-size: 12px;">
+                If the button doesn't work, copy and paste this link in your browser:<br>
+                ${inviteLink}
+            </p>
+        </div>
+    `,
+            fromName: "E-Sangrah Support"
+        });
+
+        return res.json({ success: true, message: "Invite sent successfully" });
+    } catch (err) {
+        console.error("Invite user error:", err);
+        return res.status(500).json({ success: false, message: "Server error" });
+    }
+};
+
+// Auto-accept invite when email link is clicked
+export const autoAcceptInvite = async (req, res) => {
+    try {
+        const { documentId, userId } = req.params;
+
+        // Validate IDs
+        if (!mongoose.Types.ObjectId.isValid(documentId) || !mongoose.Types.ObjectId.isValid(userId)) {
+            return res.status(400).json({ success: false, message: "Invalid document or user ID" });
+        }
+
+        // Find the document
+        const doc = await Document.findById(documentId);
+        if (!doc) {
+            return res.status(404).json({ success: false, message: "Document not found" });
+        }
+
+        // Find the shared entry
+        const sharedIndex = doc.sharedWith.findIndex(sw => sw.user.toString() === userId);
+        if (sharedIndex === -1) {
+            return res.status(404).json({ success: false, message: "Invite not found" });
+        }
+
+        const sharedEntry = doc.sharedWith[sharedIndex];
+
+        // Check if invite is already accepted
+        if (sharedEntry.inviteStatus === 'accepted') {
+            return res.redirect('/documents/list');
+        }
+
+        // Check if invite is expired
+        if (sharedEntry.expiresAt && new Date() > sharedEntry.expiresAt) {
+            return res.status(400).json({
+                success: false,
+                message: "This invitation has expired"
+            });
+        }
+
+        // Check if invite was rejected
+        if (sharedEntry.inviteStatus === 'rejected') {
+            return res.status(400).json({
+                success: false,
+                message: "This invitation was already rejected"
+            });
+        }
+
+        // Update invite status to accepted
+        sharedEntry.inviteStatus = 'accepted';
+        sharedEntry.acceptedAt = new Date();
+
+        // Ensure user is in sharedWithUsers array
+        if (!doc.sharedWithUsers.includes(userId)) {
+            doc.sharedWithUsers.push(userId);
+        }
+
+        await doc.save();
+
+        // Redirect to documents list page
+        res.redirect('/documents/list');
+
+    } catch (err) {
+        console.error("Auto accept invite error:", err);
+        res.status(500).json({ success: false, message: "Server error" });
+    }
+};
+
 
 /**
  * Get document audit logs

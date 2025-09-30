@@ -457,12 +457,12 @@
             <div class="modal-body">
                 <!-- Search User -->
                 <div class="d-flex mb-3">
-                    <input type="text" class="form-control me-2" placeholder="Search user">
-                    <select class="form-select me-2" style="width: 140px;">
-                        <option>View Only</option>
-                        <option>Edit</option>
+                    <select id="userInviteSelect" class="form-select me-2" style="width: 200px;"></select>
+                    <select class="form-select me-2" id="accessLevelSelect" style="width: 140px;">
+                        <option value="view">View Only</option>
+                        <option value="edit">Edit</option>
                     </select>
-                    <button class="site-btnmd">Invite</button>
+                    <button id="inviteUserBtn" class="site-btnmd">Invite</button>
                 </div>
                 <!-- Time Duration -->
                 <h6 class="fw-normal fs-20 mb-3">Time Duration</h6>
@@ -857,92 +857,190 @@
         </div>
     </div>
 </div> -->
+<script>
+    $(document).ready(function () {
+        const baseUrl = "http://localhost:5000";
+        let currentDocId = null;
+
+        // Initialize Select2
+        $('#userInviteSelect').select2({
+            placeholder: "Select user or enter email",
+            allowClear: true,
+            width: 'resolve', // respects the container width
+            dropdownParent: $('#sharedoc-modal'), // ensures dropdown stays inside modal
+            ajax: {
+                url: `${baseUrl}/api/user/search`,
+                dataType: 'json',
+                delay: 250,
+                data: params => ({ search: params.term }),
+                processResults: data => ({
+                    results: (data.users || []).map(u => ({
+                        id: u.email,
+                        text: `${u.name}`,
+                        isNew: false
+                    }))
+                })
+            },
+            tags: true,
+            createTag: function (params) {
+                const email = params.term.trim();
+                if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                    return { id: email, text: email, isNew: true };
+                }
+                return null;
+            },
+            minimumInputLength: 0
+        });
 
 
+        // Show Share Modal
+        $('#sharedoc-modal').on('show.bs.modal', function (event) {
+            currentDocId = $(event.relatedTarget).data('doc-id');
+            if (!currentDocId) return alert('Error: No document selected');
 
-<!-- /Modal -->
-<!-- <script>
-    document.getElementById("createFolderForm").addEventListener("submit", async function (e) {
-        e.preventDefault();
+            const modal = $(this);
+            modal.find('input[type="text"]').val('');
+            modal.find('select').val('view').trigger('change');
+            modal.find('#customDateWrapper').hide();
+            modal.find('input[type="radio"]').prop('checked', false);
+            modal.find('#lifetime').prop('checked', true);
+            modal.find('.user-accssrow.dynamic').remove();
 
-        const folderName = document.getElementById("folderName").value.trim();
-        if (!folderName) {
-            alert("Please enter a folder name");
-            return;
+            loadSharedUsers(currentDocId, modal);
+        });
+
+        // Toggle custom duration
+        $('#sharedoc-modal input[name="time"]').on('change', function () {
+            const isCustom = $(this).attr('id') === 'custom';
+            $('#customDateWrapper').toggle(isCustom);
+            if (isCustom) {
+                const today = new Date().toISOString().split('T')[0];
+                $('#startDate').val(today);
+                $('#endDate').attr('min', today);
+            }
+        });
+
+        // Invite User
+        $('#inviteUserBtn').on('click', async function () {
+            if (!currentDocId) return alert('No document selected');
+
+            const selectedData = $('#userInviteSelect').select2('data')[0];
+            if (!selectedData) return alert('Please select or enter an email address');
+
+            const userEmail = selectedData.id;
+            const accessLevel = $('#accessLevelSelect').val() || 'view';
+            const duration = $('#sharedoc-modal input[name="time"]:checked').attr('id') || 'lifetime';
+            const customEnd = $('#endDate').val() || null;
+
+            if (duration === 'custom' && !customEnd) return alert('Please select an end date for custom duration');
+
+            try {
+                const response = await fetch(`${baseUrl}/api/documents/${currentDocId}/invite`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userEmail, accessLevel, duration, customEnd })
+                });
+                const data = await response.json();
+                if (!data.success) return alert(data.message || 'Failed to send invite');
+
+                addUserToUI(userEmail, accessLevel, true);
+                $('#userInviteSelect').val(null).trigger('change');
+            } catch (err) {
+                console.error('Invite error:', err);
+                alert('Error sending invite. Please try again.');
+            }
+        });
+
+        // Share Document
+        $('#sharedoc-modal .modal-footer .site-btnmd').on('click', async function () {
+            if (!currentDocId) return alert('No document selected');
+
+            try {
+                const response = await fetch(`${baseUrl}/api/documents/${currentDocId}/share`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: "Document shared" })
+                });
+                const data = await response.json();
+                if (!data.success) return alert(data.message || 'Failed to share document');
+
+                alert('Document shared successfully!');
+            } catch (err) {
+                console.error('Share error:', err);
+                alert('Error sharing document. Please try again.');
+            }
+        });
+
+        // Remove User
+        $('#sharedoc-modal').on('click', '.remove-user', function () {
+            const row = $(this).closest('.user-accssrow');
+            if (!confirm(`Remove ${row.find('.fw-normal').text()} from this document?`)) return;
+            row.remove();
+        });
+
+        // Load shared users from API
+        function loadSharedUsers(docId, modal) {
+            $.ajax({
+                url: `${baseUrl}/api/documents/${docId}`,
+                method: 'GET',
+                success: function (res) {
+                    if (!res.success || !res.document) return console.error('Failed to load document');
+
+                    const sharedWith = res.document.sharedWith || [];
+                    const wrapper = modal.find('.modal-body');
+                    wrapper.find('.user-accssrow.dynamic').remove();
+
+                    sharedWith.forEach(sw => {
+                        if (sw.user && sw.user.email) {
+                            const row = `
+                        <div class="user-accssrow dynamic" data-user-id="${sw.user._id}">
+                            <div class="empname_eml">
+                                <div class="fw-normal fs-18">${sw.user.name || sw.user.email}</div>
+                                <small class="fs-16">${sw.user.email}</small>
+                                <small class="badge bg-${sw.inviteStatus === 'accepted' ? 'success' : 'warning'}">
+                                    ${sw.inviteStatus}
+                                </small>
+                            </div>
+                            <div class="d-flex align-items-center gap-4">
+                                <select class="form-select form-select-sm access-level" style="width:100px;">
+                                    <option value="view" ${sw.accessLevel === 'view' ? 'selected' : ''}>View</option>
+                                    <option value="edit" ${sw.accessLevel === 'edit' ? 'selected' : ''}>Edit</option>
+                                </select>
+                                <button class="btn btn-sm btn-outline-danger remove-user">Remove</button>
+                            </div>
+                        </div>`;
+                            wrapper.append(row);
+                        }
+                    });
+                },
+                error: function (xhr, status, error) {
+                    console.error('Error loading shared users:', error);
+                }
+            });
         }
 
-        try {
-            const res = await fetch("/api/folders", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({ name: folderName })
-            });
-
-            const data = await res.json();
-
-            if (data.success) {
-                // ✅ Close modal
-                const modalEl = document.getElementById("folder-modal");
-                const modal = bootstrap.Modal.getInstance(modalEl);
-                modal.hide();
-
-                // ✅ Reset form
-                e.target.reset();
-
-                // ✅ Add new folder dynamically to the folder list
-                const folderRow = document.querySelector(".folderrow");
-                const newFolder = document.createElement("div");
-                newFolder.classList.add("folderbox");
-                newFolder.innerHTML = `
-                <div class="fldricon">
-                    <img src="/img/icons/folder.png">
-                </div>
-                <div class="fldrname">
-                    <p>${data.folder.name}</p>
-                </div>
-                <div class="folder_links">
-<button type="button" class="btn border-0" data-bs-toggle="dropdown" aria-expanded="false">
-							<i class="ti ti-dots"></i> </button>
-						<ul class="dropdown-menu">
-							<li><a class="dropdown-item" href="#"><i class="ti ti-eye"></i> View</a></li>
-							<li><a class="dropdown-item" href="#"><i class="ti ti-pencil-minus"></i> Rename</a></li>
-							<li><a class="dropdown-item" href="#" data-bs-toggle="modal"
-									data-bs-target="#sharedoc-modal">
-									<i class="ti ti-share"></i> Share</a>
-							</li>
-							<li><a class="dropdown-item" href="#" data-bs-toggle="modal"
-									data-bs-target="#versionhistory-modal">
-									<i class="ti ti-history"></i> Version History</a>
-							</li>
-							<li><a class="dropdown-item" href="#" data-bs-toggle="modal"
-									data-bs-target="#downloaddoc-modal">
-									<i class="ti ti-download"></i> Download</a>
-							</li>
-							<li><a class="dropdown-item" href="#" data-bs-toggle="modal"
-									data-bs-target="#trashdoc-modal">
-									<i class="ti ti-trash"></i> Move to Trash</a>
-							</li>
-							<li><a class="dropdown-item" href="#" data-bs-toggle="modal"
-									data-bs-target="#archivedoc-modal">
-									<i class="ti ti-archive"></i> Move to Archive</a>
-							</li>
-						</ul>
-                </div>
-            `;
-
-                folderRow.appendChild(newFolder);
-
-            } else {
-                alert(data.message || "Error creating folder");
-            }
-        } catch (err) {
-            console.error("Create folder error:", err);
-            alert("Server error while creating folder");
+        // Add user to UI dynamically
+        function addUserToUI(email, accessLevel, isPending = true) {
+            const wrapper = $('#sharedoc-modal .modal-body');
+            const row = `
+        <div class="user-accssrow dynamic" data-user-email="${email}">
+            <div class="empname_eml">
+                <div class="fw-normal fs-18">${email.split('@')[0]}</div>
+                <small class="fs-16">${email}</small>
+                <small class="badge bg-warning">pending</small>
+            </div>
+            <div class="d-flex align-items-center gap-4">
+                <select class="form-select form-select-sm access-level" style="width:100px;">
+                    <option value="view" ${accessLevel === 'view' ? 'selected' : ''}>View</option>
+                    <option value="edit" ${accessLevel === 'edit' ? 'selected' : ''}>Edit</option>
+                </select>
+                <button class="btn btn-sm btn-outline-danger remove-user">Remove</button>
+            </div>
+        </div>`;
+            wrapper.append(row);
         }
     });
-</script> -->
+</script>
 
 <script>
     document.querySelectorAll('input[name="time"]').forEach(radio => {

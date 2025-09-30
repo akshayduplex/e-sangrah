@@ -7,107 +7,23 @@ import express from "express";
 // Controller imports
 // ---------------------------
 import * as authController from "../controllers/authController.js";
-import * as departmentController from '../controllers/departmentController.js';
+import * as userController from "../controllers/userController.js";
+import * as donorVendorController from "../controllers/DonerVender.js";
+import * as departmentController from "../controllers/departmentController.js";
+import * as designationController from "../controllers/designationController.js";
+import * as documentController from "../controllers/documentController.js";
+import * as projectController from "../controllers/projectController.js";
+import * as permissionController from "../controllers/permisssions.js";
+import * as folderController from "../controllers/folderController.js";
 import * as notificationController from "../controllers/notificationController.js";
-import * as vendorDonorController from "../controllers/DonerVender.js";
-
-// Designation controllers
-import {
-    getAllDesignations,
-    getDesignationById,
-    createDesignation,
-    updateDesignation,
-    deleteDesignation,
-    searchDesignations
-} from '../controllers/designationController.js';
-
-// Project controllers
-import {
-    getAllProjects,
-    getProject,
-    createProject,
-    updateProject,
-    deleteProject,
-    getProjectsByStatus,
-    getProjectsByDepartment,
-    getProjectsByManager,
-    getOverdueProjects,
-    getUpcomingDeadlines,
-    bulkUpdateProjects,
-    exportProjects,
-    cloneProject,
-    archiveProject,
-    restoreProject,
-    updateProjectStatus,
-    addDonorToProject,
-    updateDonorInProject,
-    removeDonorFromProject,
-    addVendorToProject,
-    updateVendorInProject,
-    removeVendorFromProject,
-    getProjectTimeline,
-    searchProjects,
-} from '../controllers/projectController.js';
-
-// Document controllers
-import {
-    getDocuments,
-    getDocument,
-    createDocument,
-    updateDocument,
-    deleteDocument,
-    updateDocumentStatus,
-    shareDocument,
-    getDocumentAuditLogs,
-    getDocumentAccessLogs,
-    searchDocuments,
-    getDocumentsByFolder
-} from "../controllers/documentController.js";
-
-// User controllers
-import {
-    registerUser,
-    getAllUsers,
-    getUserById,
-    updateUser,
-    deleteUser,
-    searchUsers,
-} from "../controllers/userController.js";
-
-// Permission controllers
-import { assignMenusToDesignation, getAssignedMenus, getSidebarForUser, unAssignMenu } from "../controllers/permisssions.js";
-
-// Temporary file controllers
-import {
-    uploadFile,
-    submitForm,
-    deleteFile,
-    getFileStatus,
-    download,
-} from "../controllers/tempFileController.js";
-
-// Folder controllers
-import {
-    createFolder,
-    deleteFolder,
-    listFolders,
-    moveFolder,
-    renameFolder,
-    getFolder,
-    uploadToFolder,
-    getFolderTree,
-    getAllFolders,
-    archiveFolder,
-    restoreFolder,
-    getArchivedFolders,
-    getFoldersProjectDepartment
-} from '../controllers/folderController.js';
+// import * as dashboardController from "../controllers/dashboardController.js";
+import * as tempController from "../controllers/tempFileController.js";
 
 // ---------------------------
 // Middleware imports
 // ---------------------------
 import { authenticate, authorize } from "../middlewares/authMiddleware.js";
-import checkPermissions from "../middlewares/checkPermission.js";
+import checkPermissions, { incrementGlobalPermissionsVersion } from '../middlewares/checkPermission.js';
 import upload from "../middlewares/fileUploads.js";
 import { validate } from "../middlewares/validate.js";
 
@@ -159,7 +75,6 @@ router.get('/auth/verify-reset/:token', authController.verifyResetLink);
 // Apply authentication to all routes
 router.use(authenticate);
 
-
 // ---------------------------
 // Session-protected routes
 // ---------------------------
@@ -172,19 +87,23 @@ router.post("/auth/logout", authenticate, authController.logout);
 // ---------------------------
 // Documents routes
 // ---------------------------
-router.get("/documents", getDocuments);
-router.get("/documents/search", searchDocuments);
-router.get("/documents/folder/:folderId", authenticate, getDocumentsByFolder);
+router.get("/documents", documentController.getDocuments);
+router.get("/documents/search", documentController.searchDocuments);
+router.get("/documents/folder/:folderId", authenticate, documentController.getDocumentsByFolder);
 // Only accept signature file
-router.post("/documents", upload.fields([{ name: "signatureFile", maxCount: 1 }]), createDocument);
-router.get("/documents/:id", getDocument);
-router.patch("/documents/:id", upload.fields([{ name: "signature", maxCount: 1 }]), updateDocument);
-router.delete("/documents/:id", deleteDocument);
-router.patch("/documents/:id/status", updateDocumentStatus);
-router.post("/documents/:id/share", shareDocument);
-router.get("/documents/:id/audit-logs", getDocumentAuditLogs);
-router.get("/documents/:id/access-logs", getDocumentAccessLogs);
+router.post("/documents", upload.fields([{ name: "signatureFile", maxCount: 1 }]), documentController.createDocument);
+router.get("/documents/:id", documentController.getDocument);
+router.patch("/documents/:id", upload.fields([{ name: "signature", maxCount: 1 }]), documentController.updateDocument);
+router.delete("/documents/:id", documentController.deleteDocument);
+router.patch("/documents/:id/status", documentController.updateDocumentStatus);
+router.post("/documents/:id/share", documentController.shareDocument);
+router.get("/documents/:id/audit-logs", documentController.getDocumentAuditLogs);
+router.get("/documents/:id/access-logs", documentController.getDocumentAccessLogs);
+// Invite a user to a document (sends email)
+router.post("/documents/:documentId/invite", documentController.inviteUser);
 
+//accept or reject an invite
+router.get("/documents/:documentId/invite/:userId/accept", documentController.autoAcceptInvite);
 
 
 // ---------------------------
@@ -206,13 +125,13 @@ router.delete('/departments/:id', authenticate, authorize('admin', 'user'), chec
 // Designation routes
 // ---------------------------
 // Public API
-router.get('/designations', getAllDesignations);
-router.get('/designations/search', authenticate, searchDesignations)
-router.get('/designations/:id', authenticate, getDesignationById);
+router.get('/designations', designationController.getAllDesignations);
+router.get('/designations/search', authenticate, designationController.searchDesignations)
+router.get('/designations/:id', authenticate, designationController.getDesignationById);
 // Admin-only CRUD
-router.post('/designations', authenticate, authorize('admin'), createDesignation);
-router.patch('/designations/:id', authenticate, authorize('admin'), updateDesignation);
-router.delete('/designations/:id', authenticate, authorize('admin'), deleteDesignation);
+router.post('/designations', authenticate, authorize('admin'), designationController.createDesignation);
+router.patch('/designations/:id', authenticate, authorize('admin'), designationController.updateDesignation);
+router.delete('/designations/:id', authenticate, authorize('admin'), designationController.deleteDesignation);
 
 
 
@@ -244,76 +163,76 @@ router.get("/session/project", (req, res) => {
 router.route('/projects')
     .get(
         authorize('superadmin', 'admin', 'manager', 'employee', 'viewer', "user"),
-        getAllProjects
+        projectController.getAllProjects
     )
     .post(
         createProjectValidator,
-        authorize('superadmin', 'admin', 'manager'), upload.single('projectLogo'), createProject);
+        authorize('superadmin', 'admin', 'manager'), upload.single('projectLogo'), projectController.createProject);
 
 router.route('/projects/:id/status')
-    .patch(authorize('superadmin', 'admin', 'manager'), updateProjectStatus);
+    .patch(authorize('superadmin', 'admin', 'manager'), projectController.updateProjectStatus);
 // Filtered project routes
 router.route('/projects/status/:projectStatus')
-    .get(authorize('superadmin', 'admin', 'manager', 'employee', 'viewer'), getProjectsByStatus);
+    .get(authorize('superadmin', 'admin', 'manager', 'employee', 'viewer'), projectController.getProjectsByStatus);
 
 router.route('/projects/department/:departmentId')
-    .get(authorize('superadmin', 'admin', 'manager', 'employee', 'viewer'), getProjectsByDepartment);
+    .get(authorize('superadmin', 'admin', 'manager', 'employee', 'viewer'), projectController.getProjectsByDepartment);
 
 router.route('/projects/manager/:managerId')
-    .get(authorize('superadmin', 'admin', 'manager', 'employee', 'viewer'), getProjectsByManager);
+    .get(authorize('superadmin', 'admin', 'manager', 'employee', 'viewer'), projectController.getProjectsByManager);
 
 router.route('/projects/overdue')
-    .get(authorize('superadmin', 'admin', 'manager'), getOverdueProjects);
+    .get(authorize('superadmin', 'admin', 'manager'), projectController.getOverdueProjects);
 
 router.route('/projects/upcoming-deadlines')
-    .get(authorize('superadmin', 'admin', 'manager', 'employee'), getUpcomingDeadlines);
+    .get(authorize('superadmin', 'admin', 'manager', 'employee'), projectController.getUpcomingDeadlines);
 
 // Search route
 router.route('/projects/search')
-    .get(authorize('superadmin', 'admin', 'manager', 'employee', 'viewer'), searchProjectsValidator, searchProjects);
+    .get(authorize('superadmin', 'admin', 'manager', 'employee', 'viewer'), searchProjectsValidator, projectController.searchProjects);
 
 // Bulk operations
 router.route('/projects/bulk/update')
-    .patch(authorize('superadmin', 'admin'), bulkUpdateProjects);
+    .patch(authorize('superadmin', 'admin'), projectController.bulkUpdateProjects);
 
 // Export route
 router.route('/projects/export')
-    .get(authorize('superadmin', 'admin', 'manager'), exportProjects);
+    .get(authorize('superadmin', 'admin', 'manager'), projectController.exportProjects);
 
 // Project timeline
 router.route('/projects/:id/timeline')
-    .get(authorize('superadmin', 'admin', 'manager', 'employee', 'viewer'), getProjectTimeline);
+    .get(authorize('superadmin', 'admin', 'manager', 'employee', 'viewer'), projectController.getProjectTimeline);
 
 // Donor management routes
 router.route('/projects/:id/donors')
-    .post(authorize('superadmin', 'admin', 'manager'), addDonorToProject);
+    .post(authorize('superadmin', 'admin', 'manager'), projectController.addDonorToProject);
 
 router.route('/projects/:id/donors/:donorId')
-    .put(authorize('superadmin', 'admin', 'manager'), updateDonorInProject)
-    .delete(authorize('superadmin', 'admin', 'manager'), removeDonorFromProject);
+    .put(authorize('superadmin', 'admin', 'manager'), projectController.updateDonorInProject)
+    .delete(authorize('superadmin', 'admin', 'manager'), projectController.removeDonorFromProject);
 
 // Vendor management routes
 router.route('/projects/:id/vendors')
-    .post(donorValidator, authorize('superadmin', 'admin', 'manager'), vendorValidator, addVendorToProject);
+    .post(donorValidator, authorize('superadmin', 'admin', 'manager'), vendorValidator, projectController.addVendorToProject);
 
 router.route('/projects/:id/vendors/:vendorId')
-    .put(authorize('superadmin', 'admin', 'manager'), updateVendorInProject)
-    .delete(authorize('superadmin', 'admin', 'manager'), removeVendorFromProject);
+    .put(authorize('superadmin', 'admin', 'manager'), projectController.updateVendorInProject)
+    .delete(authorize('superadmin', 'admin', 'manager'), projectController.removeVendorFromProject);
 
 
 router.route('/projects/:id/clone')
-    .post(authorize('superadmin', 'admin', 'manager'), cloneProject);
+    .post(authorize('superadmin', 'admin', 'manager'), projectController.cloneProject);
 
 router.route('/projects/:id/archive')
-    .patch(authorize('superadmin', 'admin'), archiveProject);
+    .patch(authorize('superadmin', 'admin'), projectController.archiveProject);
 
 // Single project operations
 router.route('/projects/:id')
-    .get(authorize('superadmin', 'admin', 'manager', 'employee', 'viewer'), getProject)
-    .patch(authorize('superadmin', 'admin', 'manager'), upload.single('projectLogo'), updateProject)
-    .delete(projectIdValidator, authorize('superadmin', 'admin'), deleteProject);
+    .get(authorize('superadmin', 'admin', 'manager', 'employee', 'viewer'), projectController.getProject)
+    .patch(authorize('superadmin', 'admin', 'manager'), upload.single('projectLogo'), projectController.updateProject)
+    .delete(projectIdValidator, authorize('superadmin', 'admin'), projectController.deleteProject);
 router.route('/projects/:id/restore')
-    .patch(authorize('superadmin', 'admin'), restoreProject);
+    .patch(authorize('superadmin', 'admin'), projectController.restoreProject);
 
 
 
@@ -328,19 +247,6 @@ router.get("/notifications/unread-count", notificationController.getUnreadCount)
 router.patch("/notifications/:id/read", notificationController.markAsRead);
 router.patch("/notifications/mark-all-read", notificationController.markAllAsRead);
 router.delete("/notifications/:id", notificationController.deleteNotification);
-router.post("/notifications/notify", (req, res) => {
-    const io = req.app.get("io"); // get Socket.IO instance
-    const { message } = req.body;
-
-    io.emit("notification", {
-        message,
-        timestamp: new Date(),
-    });
-
-    res.json({ success: true, message: "Notification sent" });
-});
-
-
 
 
 // ---------------------------
@@ -606,12 +512,12 @@ router.post("/menu/assign", authenticate, async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 });
-router.delete("/assign-menu/unselect", authenticate, unAssignMenusValidator, unAssignMenu)
+router.delete("/assign-menu/unselect", authenticate, unAssignMenusValidator, permissionController.unAssignMenu)
 // For logged-in user’s sidebar
-router.get("/sidebar", authenticate, getSidebarForUser);
+router.get("/sidebar", authenticate, permissionController.getSidebarForUser);
 // Get assigned menus for a designation
-router.get("/assign-menu/designation/:designation_id/menus", authenticate, getAssignedMenusValidator, getAssignedMenus);
-router.post("/assign-menu/assign", authenticate, assignMenusValidator, assignMenusToDesignation);
+router.get("/assign-menu/designation/:designation_id/menus", authenticate, getAssignedMenusValidator, permissionController.getAssignedMenus);
+router.post("/assign-menu/assign", authenticate, assignMenusValidator, permissionController.assignMenusToDesignation);
 
 // Save user permissions
 router.post("permisssions/user/permissions/:userId", authenticate, async (req, res) => {
@@ -640,7 +546,8 @@ router.post("permisssions/user/permissions/:userId", authenticate, async (req, r
                 { upsert: true, new: true }
             );
         }
-
+        // Increment global permissions version to auto-refresh sessions
+        incrementGlobalPermissionsVersion(designation_id);
         res.json({ success: true, message: "Permissions assigned successfully." });
     } catch (err) {
         logger.error(err);
@@ -648,7 +555,7 @@ router.post("permisssions/user/permissions/:userId", authenticate, async (req, r
     }
 });
 
-router.get("/permissions/user/:id/permissions", authenticate, checkPermissions, async (req, res) => {
+router.get("/permissions/user/:id/permissions", async (req, res) => {
     try {
         const userPermissions = await UserPermission.find({ user_id: req.params.id })
             .populate("menu_id", "name type master_id")
@@ -663,12 +570,12 @@ router.get("/permissions/user/:id/permissions", authenticate, checkPermissions, 
 
 // Get user permissions
 
-router.post("/user/register", upload.single("profile_image"), registerUser);
-router.get("/user", getAllUsers);
-router.get("/user/search", searchUsers);
-router.get("/user/:id", getUserById);
-router.put("/user/:id", updateUser);
-router.delete("/user/:id", deleteUser);
+router.post("/user/register", upload.single("profile_image"), userController.registerUser);
+router.get("/user", userController.getAllUsers);
+router.get("/user/search", userController.searchUsers);
+router.get("/user/:id", userController.getUserById);
+router.put("/user/:id", userController.updateUser);
+router.delete("/user/:id", userController.deleteUser);
 
 
 // ---------------------------
@@ -690,10 +597,10 @@ router.post("/files/upload/:folderId", async (req, res, next) => {
         next(err);
     }
 });
-router.get("/files/download/:fileName", download);
-router.post("/files/submit-form", submitForm);
-router.delete("/files/:fileId", deleteFile);
-router.get("/files/:fileId/status", getFileStatus);
+router.get("/files/download/:fileName", tempController.download);
+router.post("/files/submit-form", tempController.submitForm);
+router.delete("/files/:fileId", tempController.deleteFile);
+router.get("/files/:fileId/status", tempController.getFileStatus);
 
 
 
@@ -701,37 +608,37 @@ router.get("/files/:fileId/status", getFileStatus);
 // Folders routes
 // ---------------------------
 // Create folder
-router.post('/folders', createFolder);
+router.post('/folders', folderController.createFolder);
 
 // List folders (optionally by parent)
-router.get('/folders', listFolders);
-router.get('/folders/all', getAllFolders);
+router.get('/folders', folderController.listFolders);
+router.get('/folders/all', folderController.getAllFolders);
 
 // Get folder details with contents
-router.get('/folders/details/:id', getFolder);
+router.get('/folders/details/:id', folderController.getFolder);
 
 // router.get('', getFoldersProjectDepartment)
 
 // Rename folder
-router.patch('/folders/:id/rename', renameFolder);
+router.patch('/folders/:id/rename', folderController.renameFolder);
 
 // Move folder
-router.patch('/folders/:id/move', moveFolder);
+router.patch('/folders/:id/move', folderController.moveFolder);
 
 // Delete folder (soft delete)
-router.delete('/folders/:id', deleteFolder);
+router.delete('/folders/:id', folderController.deleteFolder);
 
 // Upload files to folder
-router.post('/folders/:folderId/upload', upload.array("files"), uploadToFolder);
+router.post('/folders/:folderId/upload', upload.array("files"), folderController.uploadToFolder);
 
 // Get folder tree structure
-router.get('/folders/tree/structure', getFolderTree);
+router.get('/folders/tree/structure', folderController.getFolderTree);
 
-router.patch('/folders/:id/archive', archiveFolder);
+router.patch('/folders/:id/archive', folderController.archiveFolder);
 // Get all archived folders for the current user
-router.get('/folders/archived', getArchivedFolders);
+router.get('/folders/archived', folderController.getArchivedFolders);
 
-router.patch('/folders/:id/restore', restoreFolder);
+router.patch('/folders/:id/restore', folderController.restoreFolder);
 
 
 
@@ -743,22 +650,22 @@ router.patch('/folders/:id/restore', restoreFolder);
 router.post("/add-vendor-donor",
     upload.single('profile_image'),
     registerVendorOrDonor,
-    vendorDonorController.registerDonorVendor
+    donorVendorController.registerDonorVendor
 );
 
 router.post("/add-vendor",
     upload.single('profile_image'),
     registerVendor,
-    vendorDonorController.registerVendor
+    donorVendorController.registerVendor
 );
 
 
 // get all donor base on the DataTable api (use POST for DataTables server-side)
-router.post("/donors-list", vendorDonorController.getAllDonors);
+router.post("/donors-list", donorVendorController.getAllDonors);
 // get all vendors based on the DataTable api
-router.post("/vendors-list", vendorDonorController.getAllVendor);
+router.post("/vendors-list", donorVendorController.getAllVendor);
 // delete donor by id
-router.delete("/donor-delete/:id", vendorDonorController.deleteDonorVendor);
+router.delete("/donor-delete/:id", donorVendorController.deleteDonorVendor);
 
 
 export default router;

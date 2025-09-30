@@ -2,6 +2,27 @@ import Notification from "../models/notification.js";
 import logger from "../utils/logger.js";
 import { successResponse, failResponse, errorResponse } from "../utils/responseHandler.js";
 
+//Page Controllers
+
+// Render Notifications page
+export const showNotificationsPage = (req, res) => {
+    try {
+        res.render("pages/notifications", {
+            title: "E-Sangrah - Notifications",
+            user: req.user
+        });
+    } catch (err) {
+        console.error("Error loading notifications page:", err);
+        res.status(500).render("pages/error", {
+            title: "Error",
+            message: "Unable to load notifications",
+            user: req.user
+        });
+    }
+};
+
+//API Controllers
+
 // ------------------- Create Notification -------------------
 export const createNotification = async (req, res) => {
     try {
