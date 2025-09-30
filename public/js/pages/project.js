@@ -17,7 +17,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         try {
             const response = await fetch(
-                `http://localhost:5000/api/projects/search?q=${encodeURIComponent(query)}&page=${page}&limit=10`,
+                `${baseUrl}/api/projects/search?q=${encodeURIComponent(query)}&page=${page}&limit=10`,
                 { credentials: 'include' }
             );
 

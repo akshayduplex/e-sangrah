@@ -645,66 +645,45 @@ export const updateDocumentStatus = async (req, res) => {
 export const shareDocument = async (req, res) => {
     try {
         const { id } = req.params;
-        const { users, departments } = req.body;
+        const { userId, accessLevel, duration, customStart, customEnd } = req.body;
 
-        if (!mongoose.Types.ObjectId.isValid(id)) {
-            return failResponse(res, "Invalid document ID", 400);
+        if (!mongoose.Types.ObjectId.isValid(id) || !mongoose.Types.ObjectId.isValid(userId)) {
+            return res.status(400).json({ success: false, message: "Invalid ID" });
         }
 
-        const document = await Document.findById(id);
-        if (!document) {
-            return failResponse(res, "Document not found", 404);
+        const doc = await Document.findById(id);
+        if (!doc) return res.status(404).json({ success: false, message: "Document not found" });
+
+        let expiresAt = null;
+        const now = new Date();
+
+        // Set expiry based on duration
+        if (duration === "oneday") expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+        else if (duration === "oneweek") expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+        else if (duration === "onemonth") expiresAt = new Date(now.setMonth(now.getMonth() + 1));
+        else if (duration === "custom" && customStart && customEnd) {
+            expiresAt = new Date(customEnd);
+        }
+        // "lifetime" and "onetime" can leave expiresAt = null
+
+        // Update sharedWith
+        const existingIndex = doc.sharedWith.findIndex(sw => sw.user.toString() === userId);
+        if (existingIndex >= 0) {
+            doc.sharedWith[existingIndex].accessLevel = accessLevel;
+            doc.sharedWith[existingIndex].expiresAt = expiresAt;
+        } else {
+            doc.sharedWith.push({ user: userId, accessLevel, expiresAt });
         }
 
-        // Only owner can share
-        if (document.owner.toString() !== req.user._id.toString()) {
-            return failResponse(res, "Only the owner can share this document", 403);
-        }
+        // Update flattened array
+        doc.sharedWithUsers = doc.sharedWith.map(sw => sw.user);
 
-        // Add users to sharedWith
-        if (users && Array.isArray(users)) {
-            users.forEach(user => {
-                const existingShare = document.sharedWith.find(
-                    share => share.user.toString() === user.user.toString()
-                );
-                if (!existingShare) {
-                    document.sharedWith.push({
-                        user: user.user,
-                        permission: user.permission || "view",
-                        sharedBy: req.user._id
-                    });
-                }
-            });
-        }
+        await doc.save();
 
-        // Add departments to sharedWithDepartments
-        if (departments && Array.isArray(departments)) {
-            departments.forEach(dept => {
-                const existingShare = document.sharedWithDepartments.find(
-                    share => share.department.toString() === dept.department.toString()
-                );
-                if (!existingShare) {
-                    document.sharedWithDepartments.push({
-                        department: dept.department,
-                        permission: dept.permission || "view",
-                        sharedBy: req.user._id
-                    });
-                }
-            });
-        }
-
-        // Add audit log
-        document.auditLog.push({
-            action: "share",
-            performedBy: req.user._id,
-            details: { users, departments }
-        });
-
-        await document.save();
-
-        return successResponse(res, { document }, "Document shared successfully");
-    } catch (error) {
-        return errorResponse(res, error, "Failed to share document");
+        return res.json({ success: true, message: "Document shared successfully", document: doc });
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ success: false, message: "Server error" });
     }
 };
 

@@ -75,7 +75,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         },
         ajax: {
-            url: '/api/donors-list',
+            url: `${baseUrl}/api/donors-list`,
             type: 'post',
             dataSrc: function (json) {
                 // Hide loading spinner when data is loaded
@@ -216,7 +216,7 @@ document.addEventListener('DOMContentLoaded', function () {
         $btn.prop('disabled', true).text('Deleting...');
 
         $.ajax({
-            url: `/api/donor-delete/${pendingDeleteId}`,
+            url: `${baseUrl}/api/donor-delete/${pendingDeleteId}`,
             type: 'DELETE',
             success: function () {
                 notifySuccess('Donor deleted successfully');

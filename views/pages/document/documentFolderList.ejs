@@ -67,7 +67,7 @@
 
                 function fetchDocuments() {
                     $.ajax({
-                        url: `/api/documents/folder/${folderId}`,
+                        url: `${baseUrl}/api/documents/folder/${folderId}`,
                         method: 'GET',
                         success: function (res) {
                             if (!res.success) return;

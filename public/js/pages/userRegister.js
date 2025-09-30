@@ -76,7 +76,7 @@ $(document).ready(function () {
         const formData = new FormData(form);
 
         try {
-            const response = await fetch('/api/user/register', {
+            const response = await fetch(`${baseUrl}/api/user/register`, {
                 method: 'POST',
                 body: new FormData(this)
             });

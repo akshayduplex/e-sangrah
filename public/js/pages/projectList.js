@@ -13,7 +13,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // Fetch Projects
     async function fetchProjects(page = 1) {
         try {
-            let url = `http://localhost:5000/api/projects/search?page=${page}&limit=10`;
+            let url = `${baseUrl}/api/projects/search?page=${page}&limit=10`;
             if (searchKeyword) url += `&q=${encodeURIComponent(searchKeyword)}`;
 
             const res = await fetch(url, { credentials: "include" });

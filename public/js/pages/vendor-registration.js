@@ -128,7 +128,7 @@ $(document).ready(function () {
         setSubmitting(true);
 
         $.ajax({
-            url: '/api/add-vendor',
+            url: `${baseUrl}/api/add-vendor`,
             type: 'POST',
             data: formData,
             processData: false,

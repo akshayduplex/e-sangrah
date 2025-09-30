@@ -1,7 +1,7 @@
 
 async function loadSidebar() {
     try {
-        const data = await apiFetch("/api/sidebar");
+        const data = await apiFetch(`${baseUrl}/api/sidebar`);
 
         if (data.success && data.data) {
             const buildMenu = (items) => {

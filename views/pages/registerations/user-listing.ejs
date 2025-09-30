@@ -77,7 +77,7 @@
                         serverSide: true,
                         processing: true,
                         ajax: {
-                            url: '/api/user',
+                            url: `${baseUrl}/api/user`,
                             type: 'GET'
                         },
                         columns: [
@@ -110,7 +110,7 @@
 
                         $('#confirmDeleteBtn').off('click').on('click', function () {
                             $.ajax({
-                                url: `/api/user/${deleteUserId}`,
+                                url: `${baseUrl}/api/user/${deleteUserId}`,
                                 method: 'DELETE',
                                 success: function (res) {
                                     $('#confirmDeleteModal').modal('hide');

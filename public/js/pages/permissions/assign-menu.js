@@ -82,7 +82,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!designationId) return;
 
         try {
-            const res = await fetch(`/api/assign-menu/designation/${designationId}/menus`);
+            const res = await fetch(`${baseUrl}/api/assign-menu/designation/${designationId}/menus`);
             const data = await res.json();
 
             if (data.success && Array.isArray(data.data)) {
@@ -175,7 +175,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         try {
             // Always send all selected menus with their permissions
-            const response = await fetch('/api/assign-menu/assign', {
+            const response = await fetch(`${baseUrl}/api/assign-menu/assign`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

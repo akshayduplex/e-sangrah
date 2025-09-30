@@ -136,7 +136,7 @@
                     };
 
                     $.ajax({
-                        url: `/api/user/${userId}`,
+                        url: `${baseUrl}/api/user/${userId}`,
                         method: 'PUT',
                         contentType: 'application/json',
                         data: JSON.stringify(payload),

@@ -1,6 +1,7 @@
 // login.js
 
 // -------- Utility Functions --------
+const baseUrl = window.baseUrl || "";
 
 // Show error message
 function showError(message) {
@@ -70,7 +71,7 @@ async function handleLogin({ emailInput, passwordInput, loginBtn }) {
     loginBtn.textContent = "Logging in...";
 
     try {
-        const response = await fetch("/api/auth/login", {
+        const response = await fetch(`${baseUrl}/api/auth/login`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ email, password }),
@@ -100,7 +101,7 @@ async function handleLogoutLink(logoutLink) {
     logoutLink.textContent = "Logging out...";
 
     try {
-        const response = await fetch("/api/auth/logout", {
+        const response = await fetch(`${baseUrl}/api/auth/logout`, {
             method: "POST",
             credentials: "include"
         });

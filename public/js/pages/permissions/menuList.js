@@ -5,7 +5,7 @@ let allMenuData = [];
 
 // Fetch all menu data and initialize DataTable
 function fetchAllMenuData() {
-    fetch('/api/menu?limit=0')
+    fetch(`${baseUrl}/api/menu?limit=0`, { credentials: 'include' })
         .then(res => res.json())
         .then(result => {
             if (!result.success || !Array.isArray(result.data)) {
@@ -79,7 +79,7 @@ function attachToggleHandlers() {
         const checked = $(this).is(":checked");
         const label = $(this).siblings("label");
 
-        fetch(`/api/menu/${menuId}/toggle-status`, {
+        fetch(`${baseUrl}/api/menu/${menuId}/toggle-status`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" }
         })
@@ -112,7 +112,7 @@ function confirmDelete(menuId) {
 document.getElementById('confirmDeleteBtn').addEventListener('click', function () {
     if (!menuIdToDelete) return;
 
-    fetch(`/api/menu/${menuIdToDelete}`, {
+    fetch(`${baseUrl}/api/menu/${menuIdToDelete}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' }
     })

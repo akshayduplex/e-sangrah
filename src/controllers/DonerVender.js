@@ -1,4 +1,6 @@
+import { generateRandomPassword } from "../helper/generateRandomPassword.js";
 import User from "../models/User.js";
+import { sendEmail } from "../services/emailService.js";
 
 
 export const registerDonorVendor = async (req, res, next) => {
@@ -72,11 +74,14 @@ export const registerDonorVendor = async (req, res, next) => {
         if (emailExists) {
             return res.status(400).json({ success: false, message: "Email already in use" });
         }
+        // Generate random password
+        const randomPassword = generateRandomPassword();
 
         const newUser = new User({
             name: user_name,
             email: email_id,
             phone_number: user_mobile,
+            raw_password: randomPassword, // will be hashed by pre-save middleware
             address,
             profile_type: role,
             profile_image,
@@ -89,6 +94,25 @@ export const registerDonorVendor = async (req, res, next) => {
         });
 
         await newUser.save();
+        // Prepare HTML email content
+        const htmlContent = `
+                    <p>Hello ${user_name},</p>
+                    <p>Your account has been created successfully.</p>
+                    <ul>
+                        <li><strong>Email:</strong> ${email_id}</li>
+                        <li><strong>Password:</strong> ${randomPassword}</li>
+                    </ul>
+                    <p>Please log in and change your password immediately.</p>
+                    <p>Thank you.</p>
+                `;
+
+        // Send email using global helper
+        await sendEmail({
+            to: email_id,
+            subject: "Your Account Has Been Created",
+            html: htmlContent,
+            fromName: "Support Team",
+        });
         return res.status(201).json({ success: true, message: "Registration successful", data: newUser });
 
     } catch (error) {
@@ -172,6 +196,7 @@ export const registerVendor = async (req, res, next) => {
             if (uploadedProfileImage) updateDoc.profile_image = uploadedProfileImage;
 
             const updated = await User.findByIdAndUpdate(id, { $set: updateDoc }, { new: true });
+
             return res.status(200).json({ success: true, message: "Vendor updated successfully", data: updated });
         }
 
@@ -194,12 +219,14 @@ export const registerVendor = async (req, res, next) => {
         } else if (!Array.isArray(services_offered)) {
             servicesArrayCreate = [];
         }
-
+        // Generate random password
+        const randomPassword = generateRandomPassword();
         // Create vendor user
         const user = new User({
             name: vendor_name,
             email: vendor_email,
             phone_number: vendor_mobile,
+            raw_password: randomPassword, // will be hashed by pre-save middleware
             address: vendor_address || '',
             profile_type: 'vendor',
             profile_image: uploadedProfileImage,
@@ -210,7 +237,25 @@ export const registerVendor = async (req, res, next) => {
                 services_offered: servicesArrayCreate,
             }
         });
+        // Prepare HTML email content
+        const htmlContent = `
+            <p>Hello ${vendor_name},</p>
+            <p>Your account has been created successfully.</p>
+            <ul>
+                <li><strong>Email:</strong> ${vendor_email}</li>
+                <li><strong>Password:</strong> ${randomPassword}</li>
+            </ul>
+            <p>Please log in and change your password immediately.</p>
+            <p>Thank you.</p>
+        `;
 
+        // Send email using global helper
+        await sendEmail({
+            to: vendor_email,
+            subject: "Your Account Has Been Created",
+            html: htmlContent,
+            fromName: "Support Team",
+        });
         await user.save();
         return res.status(201).json({ success: true, message: "Registration successful", data: user });
     } catch (error) {

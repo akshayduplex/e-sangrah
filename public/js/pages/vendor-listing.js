@@ -60,7 +60,7 @@
           paginate: { first: 'First', last: 'Last', next: 'Next', previous: 'Previous' }
         },
         ajax: {
-          url: '/api/vendors-list',
+          url: `${baseUrl}/api/vendors-list`,
           type: 'post',
           dataSrc: function (json) {
             $table.show();
@@ -181,7 +181,7 @@
 
         // Reuse existing delete endpoint (works for any user id)
         $.ajax({
-          url: `/api/donor-delete/${pendingDeleteId}`,
+          url: `${baseUrl}/api/donor-delete/${pendingDeleteId}`,
           type: 'DELETE',
           success: function () {
             notifySuccess('Vendor deleted successfully');

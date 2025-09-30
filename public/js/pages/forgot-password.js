@@ -7,7 +7,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const resendBtn = document.querySelector(".resend-btn");
     const otpVerifiedText = otpSection.querySelector(".text-success");
     const countdownDisplay = document.getElementById("otp-timer");
-
+    const baseUrl = window.baseUrl || "";
     let countdownInterval;
     let otpSent = false;
 
@@ -54,7 +54,7 @@ document.addEventListener("DOMContentLoaded", function () {
         sendOtpBtn.disabled = true;
 
         try {
-            const response = await fetch("/api/auth/send-otp", {
+            const response = await fetch(`${baseUrl}/api/auth/send-otp`, {
                 method: "POST",
                 headers: { "Content-Type": "application/x-www-form-urlencoded" },
                 body: new URLSearchParams({ email })
@@ -118,7 +118,7 @@ document.addEventListener("DOMContentLoaded", function () {
         const otp = [...otpInputs].map(inp => inp.value).join("");
 
         try {
-            const response = await fetch("/api/auth/verify-otp", {
+            const response = await fetch(`${baseUrl}/api/auth/verify-otp`, {
                 method: "POST",
                 headers: { "Content-Type": "application/x-www-form-urlencoded" },
                 body: new URLSearchParams({ email, otp })
@@ -161,7 +161,7 @@ document.addEventListener("DOMContentLoaded", function () {
         }
 
         try {
-            const response = await fetch("/api/auth/send-reset-link", {
+            const response = await fetch(`${baseUrl}/api/auth/send-reset-link`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ email, password, confirmPassword })

@@ -71,7 +71,7 @@
 
                     // Fetch departments via API
                     $.ajax({
-                        url: '/api/departments',
+                        url: `${baseUrl}/api/departments`,
                         method: 'GET',
                         success: function (res) {
                             if (!res.success) return alert('Failed to fetch departments');
@@ -126,7 +126,7 @@
                         if (!deleteDeptId) return;
 
                         $.ajax({
-                            url: `/api/departments/${deleteDeptId}`,
+                            url: `${baseUrl}/api/departments/${deleteDeptId}`,
                             method: 'DELETE',
                             success: function (res) {
                                 $('#confirmDeleteModal').modal('hide');

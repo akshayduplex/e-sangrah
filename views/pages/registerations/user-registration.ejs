@@ -148,7 +148,7 @@
 					placeholder: '-- Select Department --',
 					allowClear: true,
 					ajax: {
-						url: '/api/departments/search',
+						url: `${baseUrl}/api/departments/search`,
 						dataType: 'json',
 						delay: 250,
 						data: function (params) {
@@ -180,7 +180,7 @@
 					placeholder: '-- Select Designation --',
 					allowClear: true,
 					ajax: {
-						url: '/api/designations/search', // API endpoint
+						url: `${baseUrl}/api/designations/search`, // API endpoint
 						dataType: 'json',
 						delay: 250, // debounce
 						data: function (params) {

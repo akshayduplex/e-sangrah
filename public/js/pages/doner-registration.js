@@ -129,7 +129,7 @@ $(document).ready(function () {
 
         // Submit the form
         $.ajax({
-            url: '/api/add-vendor-donor',
+            url: `${baseUrl}/api/add-vendor-donor`,
             type: 'POST',
             data: formData,
             processData: false, // Don't process the files

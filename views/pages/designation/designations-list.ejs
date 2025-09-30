@@ -67,7 +67,7 @@
 
                     // Fetch designations via API
                     $.ajax({
-                        url: '/api/designations',
+                        url: `${baseUrl}/api/designations`,
                         method: 'GET',
                         success: function (res) {
                             if (!res.success) return alert('Failed to fetch designations');
@@ -117,7 +117,7 @@
                         if (!deleteDesigId) return;
 
                         $.ajax({
-                            url: `/api/designations/${deleteDesigId}`,
+                            url: `${baseUrl}/api/designations/${deleteDesigId}`,
                             method: 'DELETE',
                             success: function (res) {
                                 $('#confirmDeleteModal').modal('hide');

@@ -60,7 +60,7 @@ document.addEventListener("DOMContentLoaded", () => {
             appendMultiSelects(formData, ["donor", "vendor", "projectCollaborationTeam"]);
 
             try {
-                const res = await fetch("/api/projects", {
+                const res = await fetch(`${baseUrl}/api/projects`, {
                     method: "POST",
                     body: formData
                 });
@@ -98,7 +98,7 @@ document.addEventListener("DOMContentLoaded", () => {
             appendMultiSelects(formData, ["donor", "vendor", "projectCollaborationTeam"]);
 
             try {
-                const res = await fetch(`/api/projects/${projectId}`, {
+                const res = await fetch(`${baseUrl}/api/projects/${projectId}`, {
                     method: "PATCH",
                     body: formData
                 });

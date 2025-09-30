@@ -90,7 +90,7 @@
 					processing: true,
 					serverSide: false,
 					ajax: {
-						url: `/api/user?profile_type=${selectedRole}`,
+						url: `${baseUrl}/api/user?profile_type=${selectedRole}`,
 						xhrFields: { withCredentials: true },
 						dataSrc: function (json) {
 							return json.users || [];
@@ -145,7 +145,7 @@
 				// Role filter change event
 				$("#roleFilter").on("change", function () {
 					selectedRole = $(this).val() || "user";
-					table.ajax.url(`/api/user?profile_type=${selectedRole}`).load();
+					table.ajax.url(`${baseUrl}/api/user?profile_type=${selectedRole}`).load();
 				});
 			});
 		</script>
