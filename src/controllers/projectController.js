@@ -7,6 +7,7 @@ import Project from "../models/Project.js";
 import { normalizeToArray, validateObjectIdArray } from "../helper/validateobjectId.js";
 import logger from "../utils/logger.js";
 import { parseDateDDMMYYYY } from "../utils/formatDate.js";
+import { renderProjectDetails } from "../utils/renderProjectDetails.js";
 
 //Page controllers
 

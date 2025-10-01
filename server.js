@@ -5,15 +5,9 @@ import logger from "./src/utils/logger.js";
 
 const PORT = process.env.PORT || 5000;
 
-// Create HTTP server
 const server = http.createServer(app);
+server.listen(PORT, () => logger.info(`🚀 Server running on http://localhost:${PORT}`));
 
-// Start server
-server.listen(PORT, () => {
-    logger.info(`🚀 Server running on http://localhost:${PORT}`);
-});
-
-// Global error handling
 process.on("unhandledRejection", (err) => {
     logger.error("Unhandled Promise Rejection:", err);
     server.close(() => process.exit(1));

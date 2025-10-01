@@ -7,7 +7,7 @@
         const cache = new Map(); // cache projects by ID
 
         async function fetchProjects(search = '', limit = INITIAL_LIMIT) {
-            const res = await fetch(`${baseUrl}/api/projects?search=${encodeURIComponent(search)}&limit=${limit}`, { credentials: 'include' });
+            const res = await fetch(`/api/projects?search=${encodeURIComponent(search)}&limit=${limit}`, { credentials: 'include' });
             const json = await res.json();
             let items = [];
             if (Array.isArray(json.data)) items = json.data;
@@ -53,12 +53,12 @@
                 items.forEach(p => $select.append(new Option(p.projectName || p.name || 'Untitled', p._id, false, false)));
 
                 // Load saved project from session
-                const sessionRes = await fetch(`${baseUrl}/api/session/project`, { credentials: 'include' });
+                const sessionRes = await fetch(`/api/session/project`, { credentials: 'include' });
                 const { selectedProject } = await sessionRes.json();
 
                 if (selectedProject) {
                     if (!cache.has(selectedProject)) {
-                        const res2 = await fetch(`${baseUrl}/api/projects/${selectedProject}`, { credentials: 'include' });
+                        const res2 = await fetch(`/api/projects/${selectedProject}`, { credentials: 'include' });
                         if (res2.ok) {
                             const proj = await res2.json();
                             const p = proj.data || proj;
@@ -77,16 +77,31 @@
 
         $select.on('change', async function () {
             const val = $(this).val();
+            window.selectedProjectId = val || null;
+
+            const addBtn = document.getElementById("btnAddFolder");
+            if (val) {
+                addBtn.classList.remove("disabled");
+                loadFolders(null, [], val); // load folders for the new project
+            } else {
+                addBtn.classList.add("disabled");
+                elements.container.innerHTML = "";
+                setEmptyState(false);
+                showNoProject(true); // show "please select project"
+            }
+
+            // Save project in session
             try {
-                await fetch(`${baseUrl}/api/session/project`, {
+                await fetch(`/api/session/project`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'include',
                     body: JSON.stringify({ projectId: val || null })
                 });
             } catch (err) {
-                showToast("Failed to save project in session:" + err, "error");
+                showToast("Failed to save project in session: " + err, "error");
             }
         });
+
     });
 })(jQuery);

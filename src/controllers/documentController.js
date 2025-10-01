@@ -205,6 +205,8 @@ export const getDocuments = async (req, res) => {
             .populate("department", "name")
             .populate("project", "projectName")
             .populate("owner", "name")
+            .populate("documentDonor", "name")
+            .populate("documentVendor", "name")
             .populate("projectManager", "name")
             .populate("folderId", "name")
             .populate({
@@ -212,7 +214,7 @@ export const getDocuments = async (req, res) => {
                 select: "name"
             })
             .sort(sort)
-            .select("metadata signature description project department owner status tags files link createdAt updatedAt sharedWith remark compliance")
+            .select("metadata signature description documentVendor documentDonor project department owner status tags files link createdAt updatedAt sharedWith remark compliance")
             .skip(skip)
             .limit(limitNum);
 
@@ -326,6 +328,8 @@ export const createDocument = async (req, res) => {
             department,
             projectManager,
             documentDate,
+            documentDonor,
+            documentVendor,
             tags,
             metadata,
             description,
@@ -400,20 +404,10 @@ export const createDocument = async (req, res) => {
 
             // Convert to ObjectId and filter invalid ones
             parsedFileIds = parsedFileIds
-                .filter(id => mongoose.Types.ObjectId.isValid(id))   // ✅ just call it
-                .map(id => new mongoose.Types.ObjectId(id));         // ✅ only wrap here
+                .filter(id => mongoose.Types.ObjectId.isValid(id))
+                .map(id => new mongoose.Types.ObjectId(id));
 
         }
-        // // Handle uploaded files (using string filenames - Option A)
-        // const uploadedFiles = (req.files?.files || []).map((file, idx) => ({
-        //     file: file.filename, // Store filename as string
-        //     originalName: file.originalname,
-        //     version: 1,
-        //     uploadedAt: new Date(),
-        //     isPrimary: idx === 0
-        // }));
-        // Handle uploaded files from temp file IDs
-        // Handle uploaded files from tempFile IDs (already on S3)
         let uploadedFiles = [];
         for (const fileId of parsedFileIds) {
             try {
@@ -475,6 +469,8 @@ export const createDocument = async (req, res) => {
             project: project || null,
             department,
             projectManager: projectManager || null,
+            documentDonor: documentDonor || null,
+            documentVendor: documentVendor || null,
             folderId: validFolderId,
             owner: req.user._id,
             documentManager: null,
@@ -911,6 +907,105 @@ export const shareDocument = async (req, res) => {
     }
 };
 
+/**
+ * Update user access level or download permission
+ * PUT /api/documents/share/:documentId
+ */
+export const updateSharedUser = async (req, res) => {
+    try {
+        const { documentId } = req.params;
+        const { userId, accessLevel, canDownload } = req.body;
+
+        if (!mongoose.Types.ObjectId.isValid(documentId) || !mongoose.Types.ObjectId.isValid(userId)) {
+            return res.status(400).json({ success: false, message: "Invalid ID" });
+        }
+
+        const doc = await Document.findById(documentId);
+        if (!doc) return res.status(404).json({ success: false, message: "Document not found" });
+
+        const sharedUser = doc.sharedWith.find(u => u.user.toString() === userId);
+        if (!sharedUser) return res.status(404).json({ success: false, message: "User not found in shared list" });
+
+        if (accessLevel) sharedUser.accessLevel = accessLevel;
+        if (canDownload !== undefined) sharedUser.canDownload = canDownload;
+
+        await doc.save();
+        res.json({ success: true, message: "User access updated successfully", data: sharedUser });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: "Server error" });
+    }
+};
+
+/**
+ * Remove a user from shared list
+ * DELETE /api/documents/share/:documentId
+ */
+export const removeSharedUser = async (req, res) => {
+    try {
+        const { documentId } = req.params;
+        const { userId } = req.body;
+
+        if (!mongoose.Types.ObjectId.isValid(documentId) || !mongoose.Types.ObjectId.isValid(userId)) {
+            return res.status(400).json({ success: false, message: "Invalid ID" });
+        }
+
+        const doc = await Document.findById(documentId);
+        if (!doc) return res.status(404).json({ success: false, message: "Document not found" });
+
+        const initialLength = doc.sharedWith.length;
+        doc.sharedWith = doc.sharedWith.filter(u => u.user.toString() !== userId);
+        doc.sharedWithUsers = doc.sharedWithUsers.filter(u => u.toString() !== userId);
+
+        if (doc.sharedWith.length === initialLength) {
+            return res.status(404).json({ success: false, message: "User not found in shared list" });
+        }
+
+        await doc.save();
+        res.json({ success: true, message: "User removed from shared list" });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: "Server error" });
+    }
+};
+
+
+/**
+ * @desc    Get list of users a document is shared with
+ * @route   GET /api/documents/:id/shared-users
+ * @access  Private
+ */
+export const getSharedUsers = async (req, res) => {
+    try {
+        const { documentId } = req.params;
+
+        if (!mongoose.Types.ObjectId.isValid(documentId)) {
+            return res.status(400).json({ success: false, message: "Invalid document ID" });
+        }
+
+        const doc = await Document.findById(documentId)
+            .populate("sharedWith.user", "name email role") // adjust fields as needed
+            .lean();
+
+        if (!doc) return res.status(404).json({ success: false, message: "Document not found" });
+
+        const data = doc.sharedWith.map(sw => ({
+            userId: sw.user._id,
+            name: sw.user.name,
+            email: sw.user.email,
+            role: sw.user.role || null,
+            accessLevel: sw.accessLevel,
+            expiresAt: sw.expiresAt,
+            inviteStatus: sw.inviteStatus,
+            sharedAt: sw.sharedAt
+        }));
+
+        return res.json({ success: true, data });
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ success: false, message: "Server error" });
+    }
+};
 
 export const inviteUser = async (req, res) => {
     try {

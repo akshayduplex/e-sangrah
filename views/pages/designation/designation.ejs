@@ -29,14 +29,11 @@
 
             <!-- Form -->
             <div class="add-info-fieldset">
-                <form id="designationForm"
-                    action="<%= designation ? `/api/designations/' + designation._id + '?_method=PATCH' : '/api/designations' %>"
-                    method="POST" novalidate>
+                <form id="designationForm" novalidate>
                     <div class="row">
                         <!-- Name -->
                         <div class="col-md-6 mb-3">
-                            <label for="name" class="form-label">Designation Name <span
-                                    class="text-danger">*</span></label>
+                            <label for="name" class="form-label">Designation Name</label>
                             <input type="text" id="name" name="name" class="form-control"
                                 placeholder="Enter designation name" value="<%= designation ? designation.name : '' %>"
                                 required>
@@ -92,16 +89,21 @@
 
     <script>
         const form = document.getElementById('designationForm');
+
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
+
             const formData = new FormData(form);
             const data = Object.fromEntries(formData.entries());
-            const url = form.action;
-            const method = form.getAttribute('method').toUpperCase();
+
+            // Set the correct URL and method based on Add or Edit
+            const designationId = "<%= designation ? designation._id : '' %>";
+            const url = designationId ? `/api/designations/${designationId}` : '/api/designations';
+            const method = designationId ? 'PATCH' : 'POST';
 
             try {
                 const res = await fetch(url, {
-                    method: method,
+                    method,
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)
                 });

@@ -1,4 +1,3 @@
-// models/Designation.js
 import mongoose from "mongoose";
 
 const designationSchema = new mongoose.Schema({
@@ -18,6 +17,10 @@ const designationSchema = new mongoose.Schema({
         enum: ['Active', 'Inactive'],
         default: 'Active'
     },
+    description: {
+        type: String,
+        default: ''
+    },
     added_by: {
         user_id: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
         name: { type: String, required: true },
@@ -27,21 +30,9 @@ const designationSchema = new mongoose.Schema({
         user_id: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
         name: { type: String },
         email: { type: String }
-    },
-    add_date: {
-        type: Date,
-        default: Date.now
-    },
-    updated_date: {
-        type: Date,
-        default: Date.now
     }
-});
-
-// Middleware to auto-update updated_date
-designationSchema.pre("save", function (next) {
-    this.updated_date = Date.now();
-    next();
+}, {
+    timestamps: { createdAt: 'add_date', updatedAt: 'updated_date' }
 });
 
 const Designation = mongoose.model("Designation", designationSchema);

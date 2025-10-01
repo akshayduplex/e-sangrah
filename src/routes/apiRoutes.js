@@ -96,6 +96,13 @@ router.get("/documents/:id", documentController.getDocument);
 router.patch("/documents/:id", upload.fields([{ name: "signature", maxCount: 1 }]), documentController.updateDocument);
 router.delete("/documents/:id", documentController.deleteDocument);
 router.patch("/documents/:id/status", documentController.updateDocumentStatus);
+// List all users document is shared with
+router.get("/:documentId/shared-users", documentController.getSharedUsers);
+// Update user access level
+router.put("/documents/share/:documentId", documentController.updateSharedUser);
+
+// Remove user from shared list
+router.delete("/documents/share/:documentId", documentController.removeSharedUser);
 router.post("/documents/:id/share", documentController.shareDocument);
 router.get("/documents/:id/audit-logs", documentController.getDocumentAuditLogs);
 router.get("/documents/:id/access-logs", documentController.getDocumentAccessLogs);
@@ -591,7 +598,7 @@ router.post("/files/upload/:folderId", async (req, res, next) => {
         const uploader = createS3Uploader(folder.name);
         uploader.array("file")(req, res, (err) => {
             if (err) return next(err);
-            uploadFile(req, res); // call your controller
+            tempController.uploadFile(req, res); // call your controller
         });
     } catch (err) {
         next(err);

@@ -29,4 +29,11 @@ export const FILTER_PERIODS = {
     YEARLY: "yearly"
 };
 
+export const Document_STATUS = {
+    DRAFT: "Draft",
+    PENDING: "Pending",
+    APPROVED: "Approved",
+    REJECTED: "Rejected"
+};
+
 export const profile_type = ["user"]

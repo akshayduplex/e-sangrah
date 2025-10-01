@@ -529,6 +529,73 @@ $(document).ready(function () {
         $('#projectManager').append(managerOption).trigger('change');
     }
 
+    function initializeDonorSelect2() {
+        $('#documentDonor').select2({
+            placeholder: '-- Select Donor Name --',
+            allowClear: false,
+            ajax: {
+                url: '/api/user/search',
+                dataType: 'json',
+                delay: 250,
+                data: function (params) {
+                    return {
+                        search: params.term || '',
+                        page: params.page || 1,
+                        limit: 10,
+                        profile_type: 'donor' // filter for donor users
+                    };
+                },
+                processResults: function (data, params) {
+                    params.page = params.page || 1;
+                    const results = data.users.map(u => ({ id: u._id, text: u.name }));
+                    return {
+                        results,
+                        pagination: { more: params.page * 10 < data.pagination.total }
+                    };
+                },
+                cache: true
+            },
+            minimumInputLength: 0
+        });
+    }
+    if (isEdit && document.donor) {
+        const donorOption = new Option(document.donor.name, document.donor._id, true, true);
+        $('#documentDonor').append(donorOption).trigger('change');
+    }
+    function initializeVendorSelect2() {
+        $('#documentVendor').select2({
+            placeholder: '-- Select Vendor Name --',
+            allowClear: false,
+            ajax: {
+                url: '/api/user/search',
+                dataType: 'json',
+                delay: 250,
+                data: function (params) {
+                    return {
+                        search: params.term || '',
+                        page: params.page || 1,
+                        limit: 10,
+                        profile_type: 'vendor' // filter for vendor users
+                    };
+                },
+                processResults: function (data, params) {
+                    params.page = params.page || 1;
+                    const results = data.users.map(u => ({ id: u._id, text: u.name }));
+                    return {
+                        results,
+                        pagination: { more: params.page * 10 < data.pagination.total }
+                    };
+                },
+                cache: true
+            },
+            minimumInputLength: 0
+        });
+    }
+
+    if (isEdit && document.vendor) {
+        const vendorOption = new Option(document.vendor.name, document.vendor._id, true, true);
+        $('#documentVendor').append(vendorOption).trigger('change');
+    }
 
 
     // Remove existing files in edit mode
@@ -624,7 +691,11 @@ $(document).ready(function () {
         }
     });
 
-
+    // --------------------------
+    // Initialize Donor and Vendor Select2
+    // --------------------------
+    initializeDonorSelect2();
+    initializeVendorSelect2();
 
     // --------------------------
     // Signature handling (Upload + Draw)
@@ -767,4 +838,6 @@ $(document).ready(function () {
             $('#submitBtn').prop('disabled', false).html(isEdit ? "Update Document" : "Add Document");
         }
     });
-});
+}
+
+);

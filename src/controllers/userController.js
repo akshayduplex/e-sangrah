@@ -185,12 +185,12 @@ export const getAllUsers = async (req, res) => {
 
 export const searchUsers = async (req, res) => {
     try {
-        let { page = 1, limit = 10, search = "" } = req.query;
+        let { page = 1, limit = 10, search = "", profile_type = "user" } = req.query;
 
         page = parseInt(page, 10);
         limit = parseInt(limit, 10);
 
-        const filter = { profile_type: "user" }; // only users
+        const filter = { profile_type }; // only users
 
         // Search by name
         if (search) {

@@ -104,7 +104,7 @@ export const login = async (req, res) => {
             );
         }
 
-        const isPasswordValid = await bcrypt.compare(password, user.password);
+        const isPasswordValid = bcrypt.compare(password, user.password);
         if (!isPasswordValid) {
             return failResponse(res, "Password incorrect", 401);
         }

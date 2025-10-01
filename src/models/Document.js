@@ -18,8 +18,10 @@ const documentSchema = new mongoose.Schema({
     department: { type: mongoose.Schema.Types.ObjectId, ref: "Department" },
     folderId: { type: mongoose.Schema.Types.ObjectId, ref: "Folder", default: null },
     projectManager: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    documentDonor: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    documentVendor: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
     owner: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-    status: { type: String, enum: ["Draft", "Pending", "UnderReview", "Approved", "Rejected", "Archived"], default: "Draft" },
+    status: { type: String, enum: ["Draft", "Pending", "Approved", "Rejected"], default: "Draft" },
     tags: [{ type: String, lowercase: true, trim: true }],
     metadata: {
         fileName: { type: String, trim: true },
@@ -49,6 +51,7 @@ const documentSchema = new mongoose.Schema({
     sharedWith: [{
         user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
         accessLevel: { type: String, enum: ["view", "edit"], default: "view" },
+        canDownload: { type: Boolean, default: false },
         sharedAt: { type: Date, default: Date.now },
         expiresAt: { type: Date, default: null },
         inviteStatus: { type: String, enum: ["pending", "accepted", "rejected"], default: "pending" }
@@ -66,7 +69,7 @@ documentSchema.index({ "files.isPrimary": 1 });
 documentSchema.index({ "files.version": -1 });
 documentSchema.index({ tags: 1 });
 documentSchema.index({ sharedWithUsers: 1 });
-// ✅ compound index for better queries
+
 documentSchema.index({ "files.isPrimary": 1, "files.status": 1 });
 
 /** -------------------- VIRTUAL -------------------- **/

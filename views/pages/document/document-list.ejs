@@ -126,6 +126,8 @@
                                     <th>Department</th>
                                     <th>Project Name</th>
                                     <th>Shared With</th>
+                                    <th>Donor</th>
+                                    <th>Vendor</th>
                                     <th>Tags</th>
                                     <th>Metadata</th>
                                     <th>Description</th>
@@ -161,6 +163,7 @@
             (function ($) {
                 "use strict";
 
+                let currentDocId = null; // Track currently selected document
                 const fileIcons = {
                     ppt: "/img/icons/fn1.png",
                     pptx: "/img/icons/fn1.png",
@@ -172,7 +175,9 @@
                     default: "/img/icons/fn1.png"
                 };
 
+                // -------------------------
                 // Initialize Select2 with Clear Option
+                // -------------------------
                 function initSelect2(selector, url, textKey) {
                     $(selector).select2({
                         placeholder: `-- Select ${textKey} --`,
@@ -199,10 +204,8 @@
                     });
                 }
 
-                // Initialize your selects
                 initSelect2('#department', `${baseUrl}/api/departments/search`, 'name');
                 initSelect2('#projectName', `${baseUrl}/api/projects`, 'projectName');
-
 
                 // -------------------------
                 // Initialize DataTable
@@ -223,19 +226,14 @@
                                 status: activeTab === 'All' ? '' : activeTab,
                                 department: $('#department').val(),
                                 project: $('#projectName').val(),
-                                date: selectedDate, // Send date to API
+                                date: selectedDate,
                                 search: searchValue,
                             };
                         },
                         dataSrc: function (json) {
-                            // Update total doc count
                             $('.totalDoc').text(json.data.pagination.totalDocuments || 0);
-
-                            // Set server-side required values
                             json.recordsTotal = json.data.pagination.totalDocuments || 0;
                             json.recordsFiltered = json.data.pagination.totalDocuments || 0;
-
-                            // Map documents to table rows
                             return (json.data.documents || []).map(doc => renderRow(doc));
                         }
                     },
@@ -247,6 +245,8 @@
                         { title: 'Department' },
                         { title: 'Project Name' },
                         { title: 'Shared With' },
+                        { title: 'Donor' },
+                        { title: 'Vendor' },
                         { title: 'Tags' },
                         { title: 'Metadata' },
                         { title: 'Description' },
@@ -279,9 +279,10 @@
                             return text.length > 100 ? text.substring(0, 30) + '....' : text;
                         })()
                         : '-';
-
                     const metadata = doc.metadata ? `${doc.metadata.fileName || '-'}, ${doc.metadata.fileDescription || '-'}` : '-';
                     const sharedWith = doc.sharedWith?.length ? doc.sharedWith.map(sw => sw.user?.name).join(', ') : '-';
+                    const donor = doc.documentDonor?.name || '-';
+                    const vendor = doc.documentVendor?.name || '-';
                     const statusClass = {
                         'draft': 'bg-soft-info',
                         'pending': 'bg-soft-warning',
@@ -295,24 +296,23 @@
                         ? `<div><img src="${fileIcons[doc.files[0].originalName.split('.').pop().toLowerCase()] || fileIcons.default}" style="height:30px;"> ${doc.files[0].originalName}</div>`
                         : '-';
 
-                    // Dropdown HTML
                     const dropdown = `
-                <div class="btn-group" role="group">
-                    <button type="button" class="btn border-0" data-bs-toggle="dropdown"><i class="ti ti-settings"></i></button>
-                    <ul class="dropdown-menu">
-                        <li><a class="dropdown-item" href="${doc.link || '#'}"><i class="ti ti-eye"></i> View</a></li>
-                        <li><a class="dropdown-item" href="/documents/edit/${doc._id}"><i class="ti ti-pencil-minus"></i> Edit</a></li>
-        <li>
-  <a class="dropdown-item share-btn" href="#" data-doc-id="${doc._id}" data-bs-toggle="modal" data-bs-target="#sharedoc-modal">
-    <i class="ti ti-share"></i> Share
-  </a>
-</li>
-                        <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#versionhistory-modal"><i class="ti ti-history"></i> Version History</a></li>
-                        <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#downloaddoc-modal"><i class="ti ti-download"></i> Download</a></li>
-                        <li><a class="dropdown-item btn-delete" href="#" data-id="${doc._id}"><i class="ti ti-trash"></i> Delete</a></li>
-                    </ul>
-                </div>
-            `;
+            <div class="btn-group" role="group">
+                <button type="button" class="btn border-0" data-bs-toggle="dropdown"><i class="ti ti-settings"></i></button>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="${doc.link || '#'}"><i class="ti ti-eye"></i> View</a></li>
+                    <li><a class="dropdown-item" href="/documents/edit/${doc._id}"><i class="ti ti-pencil-minus"></i> Edit</a></li>
+                    <li>
+                        <a class="dropdown-item share-btn" href="#" data-doc-id="${doc._id}" data-bs-toggle="modal" data-bs-target="#sharedoc-modal">
+                            <i class="ti ti-share"></i> Share
+                        </a>
+                    </li>
+                    <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#versionhistory-modal"><i class="ti ti-history"></i> Version History</a></li>
+                    <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#downloaddoc-modal"><i class="ti ti-download"></i> Download</a></li>
+                    <li><a class="dropdown-item btn-delete" href="#" data-id="${doc._id}" data-bs-toggle="modal" data-bs-target="#trashdoc-modal"><i class="ti ti-trash"></i> Move to Trash</a></li>
+                </ul>
+            </div>
+        `;
 
                     return [
                         dropdown,
@@ -322,6 +322,8 @@
                         departmentName,
                         projectName,
                         sharedWith,
+                        donor,
+                        vendor,
                         tags,
                         metadata,
                         description,
@@ -337,26 +339,20 @@
                 $('.status-tab').on('click', function () {
                     $('.status-tab').removeClass('btn-primary').addClass('btn-outline-primary');
                     $(this).removeClass('btn-outline-primary').addClass('btn-primary');
-                    table.ajax.reload(); // Only refresh table
+                    table.ajax.reload();
                 });
 
-                // Department and Project filters - only refresh table
                 $('#department, #projectName').on('change', function () {
-                    table.ajax.reload(); // Only refresh table
+                    table.ajax.reload();
                 });
 
-                // Remove the datetimepicker change handler that was causing page refresh
-                // Only use the daterangepicker specific events
-
-                // Search input handler
                 $('#searchInput').on('input', debounce(() => {
-                    table.ajax.reload(); // Only refresh table
+                    table.ajax.reload();
                 }, 500));
 
-                // Add Enter key support for search
                 $('#searchInput').on('keypress', function (e) {
                     if (e.which === 13) {
-                        table.ajax.reload(); // Only refresh table
+                        table.ajax.reload();
                     }
                 });
 
@@ -368,65 +364,98 @@
                     };
                 }
 
-            })(jQuery);
-        </script>
-
-        <!-- <script>
-            (function ($) {
-                "use strict";
-
-                let currentDocId = null; // Track currently selected document
-
-                // When share modal is about to open
-                $('#sharedoc-modal').on('show.bs.modal', function (event) {
-                    const button = $(event.relatedTarget); // Button that triggered modal
-                    currentDocId = button.data('doc-id'); // Get document ID
-
-                    const modal = $(this);
-
-                    // Clear previous modal inputs
-                    modal.find('input[type="text"]').val('');
-                    modal.find('select').val('View Only').trigger('change');
-                    modal.find('#customDateWrapper').hide();
-                    modal.find('input[type="checkbox"]').prop('checked', false);
-                    modal.find('.user-accssrow').remove();
-
-                    if (!currentDocId) return;
-
-                    // Fetch current shared users for this document
-                    $.ajax({
-                        url: `${baseUrl}/api/documents/${currentDocId}`,
-                        method: 'GET',
-                        success: function (res) {
-                            const sharedWith = res.document.sharedWith || [];
-                            const wrapper = modal.find('.modal-body');
-
-                            sharedWith.forEach(sw => {
-                                const row = `
-                        <div class="user-accssrow">
-                            <div class="empname_eml">
-                                <div class="fw-normal fs-18">${sw.user.name}</div>
-                                <small class="fs-16">${sw.user.email}</small>
-                            </div>
-                            <div class="d-flex align-items-center gap-4">
-                                <div class="form-check form-switch">
-                                    <label>Download Access</label>
-                                    <input class="form-check-input" type="checkbox" ${sw.canDownload ? 'checked' : ''}>
-                                </div>
-                                <select class="form-select form-select-sm" style="width:100px;">
-                                    <option ${sw.accessLevel === 'Edit' ? 'selected' : ''}>Edit</option>
-                                    <option ${sw.accessLevel === 'View' ? 'selected' : ''}>View</option>
-                                </select>
-                                <button class="btn btn-sm btn-outline-danger remove-user">Remove</button>
-                            </div>
-                        </div>`;
-                                wrapper.append(row);
-                            });
-                        }
+                // -------------------------
+                // Delete document
+                // -------------------------
+                $(document).on('click', '.btn-delete', function (e) {
+                    e.preventDefault();
+                    const docId = $(this).data('id');
+                    $('#trashdoc-modal').modal('show');
+                    $('#confirm-trash-folder').off('click').on('click', function () {
+                        $.ajax({
+                            url: `${baseUrl}/api/documents/${docId}`,
+                            type: 'DELETE',
+                            success: function () {
+                                $('#trashdoc-modal').modal('hide');
+                                table.ajax.reload();
+                                showToast('Document moved to trash!', 'success');
+                            },
+                            error: function () {
+                                showToast('Error moving document to trash.', 'error');
+                            }
+                        });
                     });
                 });
 
-                // Toggle custom date range
+                // -------------------------
+                // Share document modal
+                // -------------------------
+                // -------------------------
+                // Share document modal
+                // -------------------------
+                $('#sharedoc-modal').on('show.bs.modal', function (event) {
+                    const button = $(event.relatedTarget);
+                    currentDocId = button.data('doc-id');
+                    const modal = $(this);
+
+                    // Reset form
+                    modal.find('#userInviteSelect').val('');
+                    modal.find('#accessLevelSelect').val('view');
+                    modal.find('input[name="time"]').prop('checked', false);
+                    modal.find('#customDateWrapper').hide();
+                    modal.find('#startDate').val('');
+                    modal.find('#endDate').val('');
+                    modal.find('#accessType').val('anyone');
+                    modal.find('#roleType').val('viewer');
+                    modal.find('#infoText').text('Anyone on the internet with the link can view');
+
+                    // Clear previous dynamic rows
+                    const container = modal.find('#usersWithAccessContainer');
+                    container.empty();
+
+                    if (!currentDocId) return;
+
+                    // Load shared users
+                    $.ajax({
+                        url: `${baseUrl}/api/${currentDocId}/shared-users`,
+                        method: 'GET',
+                        success: function (res) {
+                            if (!res.success || !res.data) return;
+
+                            res.data.forEach(user => {
+                                const row = `
+                    <div class="user-accssrow dynamic">
+                        <div class="empname_eml">
+                            <div class="fw-normal fs-18">${user.name}</div>
+                            <small class="fs-16">${user.email}</small>
+                        </div>
+                        <div class="d-flex align-items-center gap-4">
+                            <div class="form-check form-switch">
+                                <label>Download Access</label>
+                                <input class="form-check-input download-access" type="checkbox" data-user-id="${user.userId}">
+                            </div>
+                            <select class="form-select form-select-sm access-level" style="width:100px;" data-user-id="${user.userId}">
+                                <option value="edit" ${user.accessLevel === 'edit' ? 'selected' : ''}>Edit</option>
+                                <option value="view" ${user.accessLevel === 'view' ? 'selected' : ''}>View</option>
+                            </select>
+                            <button class="btn btn-sm btn-outline-danger remove-user" data-user-id="${user.userId}">Remove</button>
+                        </div>
+                    </div>
+                `;
+                                container.append(row);
+                            });
+                        },
+                        error: function (err) {
+                            console.error('Failed to load shared users:', err);
+                        }
+                    });
+
+                    // Load users for invite dropdown
+                    loadUsersForInvite();
+                });
+
+
+                // Time duration radio buttons
                 $('#sharedoc-modal input[name="time"]').on('change', function () {
                     if ($(this).attr('id') === 'custom') {
                         $('#customDateWrapper').show();
@@ -435,28 +464,85 @@
                     }
                 });
 
-                // Invite button click
-                $('#sharedoc-modal').on('click', '.site-btnmd', function () {
-                    const userId = $('#sharedoc-modal input[placeholder="Search user"]').val();
-                    const accessLevel = $('#sharedoc-modal select').val();
-                    const duration = $('#sharedoc-modal input[name="time"]:checked').attr('id');
+                // Access type change handler
+                $('#sharedoc-modal #accessType').on('change', function () {
+                    const accessType = $(this).val();
+                    const infoText = $('#infoText');
+
+                    if (accessType === 'anyone') {
+                        infoText.text('Anyone on the internet with the link can view');
+                        $('#roleType').prop('disabled', false);
+                    } else {
+                        infoText.text('Only people with access can view');
+                        $('#roleType').prop('disabled', false);
+                    }
+                });
+
+                // Role type change handler
+                $('#sharedoc-modal #roleType').on('change', function () {
+                    const roleType = $(this).val();
+                    const infoText = $('#infoText');
+                    const accessType = $('#accessType').val();
+
+                    if (accessType === 'anyone') {
+                        if (roleType === 'viewer') {
+                            infoText.text('Anyone on the internet with the link can view');
+                        } else {
+                            infoText.text('Anyone on the internet with the link can edit');
+                        }
+                    }
+                });
+
+                // Invite user button
+                $('#sharedoc-modal').on('click', '#inviteUserBtn', function () {
+                    const userId = $('#userInviteSelect').val();
+                    const accessLevel = $('#accessLevelSelect').val();
+                    const duration = $('input[name="time"]:checked').attr('id');
                     const customStart = $('#startDate').val();
                     const customEnd = $('#endDate').val();
 
-                    if (!currentDocId || !userId) {
-                        alert('Select a user to share with');
+                    if (!currentDocId) {
+                        alert('No document selected');
                         return;
+                    }
+
+                    if (!userId) {
+                        alert('Please select a user to invite');
+                        return;
+                    }
+
+                    if (!$('input[name="time"]:checked').length) {
+                        alert('Please select a time duration');
+                        return;
+                    }
+
+                    if (duration === 'custom' && (!customStart || !customEnd)) {
+                        alert('Please select both start and end dates for custom duration');
+                        return;
+                    }
+
+                    const shareData = {
+                        userId: userId,
+                        accessLevel: accessLevel,
+                        duration: duration
+                    };
+
+                    if (duration === 'custom') {
+                        shareData.customStart = customStart;
+                        shareData.customEnd = customEnd;
                     }
 
                     $.ajax({
                         url: `${baseUrl}/api/documents/share/${currentDocId}`,
                         method: 'POST',
                         contentType: 'application/json',
-                        data: JSON.stringify({ userId, accessLevel, duration, customStart, customEnd }),
-                        success: function () {
+                        data: JSON.stringify(shareData),
+                        success: function (response) {
                             alert('Document shared successfully!');
                             $('#sharedoc-modal').modal('hide');
-                            $('#documents_table').DataTable().ajax.reload(); // Refresh table
+                            if (typeof table !== 'undefined' && table.ajax.reload) {
+                                table.ajax.reload();
+                            }
                         },
                         error: function (err) {
                             alert(err.responseJSON?.message || 'Failed to share document');
@@ -464,10 +550,130 @@
                     });
                 });
 
-                // Remove user dynamically
+                // Remove user access using custom confirmation modal
                 $('#sharedoc-modal').on('click', '.remove-user', function () {
-                    $(this).closest('.user-accssrow').remove();
+                    const userId = $(this).data('user-id');
+                    const userRow = $(this).closest('.user-accssrow');
+
+                    if (!currentDocId || !userId) {
+                        userRow.remove();
+                        return;
+                    }
+
+                    // Show custom modal
+                    $('#trashdoc-modal').modal('show');
+
+                    // Ensure previous click handler is removed
+                    $('#confirm-trash-folder').off('click').on('click', function () {
+                        $.ajax({
+                            url: `${baseUrl}/api/documents/share/${currentDocId}`,
+                            method: 'DELETE',
+                            contentType: 'application/json',
+                            data: JSON.stringify({ userId: userId }),
+                            success: function () {
+                                userRow.remove();
+                                $('#trashdoc-modal').modal('hide'); // Hide modal after success
+                                showToast('User access removed successfully!', 'success');
+                            },
+                            error: function (err) {
+                                $('#trashdoc-modal').modal('hide');
+                                showToast(err.responseJSON?.message || 'Failed to remove user access', 'error');
+                            }
+                        });
+                    });
                 });
 
+                // Update user access level
+                $('#sharedoc-modal').on('change', '.access-level', function () {
+                    const userId = $(this).data('user-id');
+                    const accessLevel = $(this).val();
+
+                    if (!currentDocId || !userId) return;
+
+                    $.ajax({
+                        url: `${baseUrl}/api/documents/share/${currentDocId}`,
+                        method: 'PUT',
+                        contentType: 'application/json',
+                        data: JSON.stringify({
+                            userId: userId,
+                            accessLevel: accessLevel
+                        }),
+                        success: function () {
+                            console.log('Access level updated successfully');
+                        },
+                        error: function (err) {
+                            alert(err.responseJSON?.message || 'Failed to update access level');
+                        }
+                    });
+                });
+
+                // Update download access
+                $('#sharedoc-modal').on('change', '.download-access', function () {
+                    const userId = $(this).data('user-id');
+                    const canDownload = $(this).is(':checked');
+
+                    if (!currentDocId || !userId) return;
+
+                    $.ajax({
+                        url: `${baseUrl}/api/documents/share/${currentDocId}`,
+                        method: 'PUT',
+                        contentType: 'application/json',
+                        data: JSON.stringify({
+                            userId: userId,
+                            canDownload: canDownload
+                        }),
+                        success: function () {
+                            console.log('Download access updated successfully');
+                        },
+                        error: function (err) {
+                            alert(err.responseJSON?.message || 'Failed to update download access');
+                        }
+                    });
+                });
+
+                // Copy link functionality
+                $('#sharedoc-modal').on('click', '.btn-outline-secondary', function () {
+                    const linkInput = $(this).closest('.input-group').find('input[type="text"]');
+                    linkInput.select();
+                    document.execCommand('copy');
+                    alert('Link copied to clipboard!');
+                });
+
+                // Share button in footer
+                $('#sharedoc-modal .modal-footer .site-btnmd').on('click', function () {
+                    // This could be used for general access sharing
+                    const accessType = $('#accessType').val();
+                    const roleType = $('#roleType').val();
+
+                    if (!currentDocId) {
+                        alert('No document selected');
+                        return;
+                    }
+
+                    // Implement general access sharing logic here
+                    console.log('General access sharing:', { accessType, roleType });
+                    alert('General access settings updated!');
+                    $('#sharedoc-modal').modal('hide');
+                });
+
+                // Function to load users for invite dropdown
+                function loadUsersForInvite() {
+                    $.ajax({
+                        url: `${baseUrl}/api/users`,
+                        method: 'GET',
+                        success: function (users) {
+                            const select = $('#userInviteSelect');
+                            select.empty();
+                            select.append('<option value="">Select a user...</option>');
+
+                            users.forEach(user => {
+                                select.append(`<option value="${user.id}">${user.name} (${user.email})</option>`);
+                            });
+                        },
+                        error: function (err) {
+                            console.error('Failed to load users:', err);
+                        }
+                    });
+                }
             })(jQuery);
-        </script> -->
+        </script>

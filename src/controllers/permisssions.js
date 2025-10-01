@@ -313,56 +313,109 @@ export const getSidebarForUser = async (req, res) => {
         let assignedMenus = [];
 
         if (profileType === "admin" || profileType === "superadmin") {
-            // Admin: get all visible menus
-            assignedMenus = await Menu.find({ is_show: true }).sort({ priority: 1 });
+            // Admin: fetch all menus directly (one lean query)
+            assignedMenus = await Menu.find(
+                { is_show: true },
+                { name: 1, url: 1, icon_code: 1, type: 1, master_id: 1, priority: 1 }
+            )
+                .sort({ priority: 1 })
+                .lean();
         } else {
-            // Regular user: menus assigned to their designation
-            const designationId = req.session.user?.designation_id;
+            const designationId = req.user.userDetails.designation;;
             if (!designationId) {
                 return res.status(400).json({
                     success: false,
                     message: "No designation assigned to user",
                 });
             }
+            // Single aggregation pipeline to fetch assigned + parent menus
+            const assignments = await MenuAssignment.aggregate([
+                { $match: { designation_id: new mongoose.Types.ObjectId(designationId) } },
+                {
+                    $lookup: {
+                        from: "menus",
+                        localField: "menu_id",
+                        foreignField: "_id",
+                        as: "menu"
+                    }
+                },
+                { $unwind: "$menu" },
+                {
+                    $project: {
+                        _id: "$menu._id",
+                        name: "$menu.name",
+                        url: "$menu.url",
+                        icon_code: "$menu.icon_code",
+                        type: "$menu.type",
+                        master_id: "$menu.master_id",
+                        priority: "$menu.priority",
+                        permissions: "$permissions.read"
+                    }
+                },
+                // ✅ bring in parent menus in the same pipeline
+                {
+                    $graphLookup: {
+                        from: "menus",
+                        startWith: "$master_id",
+                        connectFromField: "master_id",
+                        connectToField: "_id",
+                        as: "parents",
+                        restrictSearchWithMatch: { is_show: true }
+                    }
+                },
+                {
+                    $project: {
+                        _id: 1,
+                        name: 1,
+                        url: 1,
+                        icon_code: 1,
+                        type: 1,
+                        master_id: 1,
+                        priority: 1,
+                        permissions: 1,
+                        parents: {
+                            _id: 1,
+                            name: 1,
+                            url: 1,
+                            icon_code: 1,
+                            type: 1,
+                            master_id: 1,
+                            priority: 1
+                        }
+                    }
+                }
+            ]);
 
-            // Fetch assigned menus with permissions
-            const assignments = await MenuAssignment.find({
-                designation_id: new mongoose.Types.ObjectId(designationId),
-            }).populate("menu_id");
-
-            // Extract menu documents and attach permissions
-            assignedMenus = assignments
-                .map(a => {
-                    if (!a.menu_id) return null;
-                    const menu = a.menu_id.toObject();
-                    menu.permissions = a.permissions || {};
-                    return menu;
-                })
-                .filter(Boolean);
-
-            // Include parent masters of assigned submenus
-            const masterIds = assignedMenus
-                .filter(m => m.master_id)
-                .map(m => m.master_id.toString());
-
-            if (masterIds.length > 0) {
-                const masters = await Menu.find({
-                    _id: { $in: masterIds },
-                    is_show: true
+            // Flatten child + parent menus
+            const allMenus = [];
+            for (const a of assignments) {
+                allMenus.push({
+                    _id: a._id,
+                    name: a.name,
+                    url: a.url,
+                    icon_code: a.icon_code,
+                    type: a.type,
+                    master_id: a.master_id,
+                    priority: a.priority,
+                    permissions: a.permissions || {}
                 });
-                assignedMenus = [...assignedMenus, ...masters];
+                if (a.parents?.length) {
+                    allMenus.push(...a.parents);
+                }
             }
+
+            // Deduplicate menus
+            const menuMap = new Map();
+            for (const m of allMenus) {
+                menuMap.set(m._id.toString(), m);
+            }
+            assignedMenus = Array.from(menuMap.values());
         }
 
-        // Remove duplicates
-        const menuMap = new Map();
-        assignedMenus.forEach(m => menuMap.set(m._id.toString(), m));
-        assignedMenus = Array.from(menuMap.values());
-
-        // Build hierarchy recursively
-        const buildHierarchy = (menus, parentId = null) => {
-            return menus
-                .filter(m => (m.master_id ? m.master_id.toString() : null) === parentId)
+        // Build hierarchy in-memory (fast recursion)
+        const buildHierarchy = (menus, parentId = null) =>
+            menus
+                .filter(m => String(m.master_id || null) === String(parentId))
                 .sort((a, b) => a.priority - b.priority)
                 .map(m => ({
                     _id: m._id,
@@ -371,23 +424,23 @@ export const getSidebarForUser = async (req, res) => {
                     icon_code: m.icon_code,
                     type: m.type,
                     permissions: m.permissions || {},
-                    children: buildHierarchy(menus, m._id.toString())
+                    children: buildHierarchy(menus, m._id)
                 }));
-        };
 
-        const sidebar = buildHierarchy(assignedMenus, null);
+        const sidebar = buildHierarchy(assignedMenus);
 
         // Disable caching
-        res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-        res.set("Pragma", "no-cache");
-        res.set("Expires", "0");
-        res.set("Surrogate-Control", "no-store");
+        res.set({
+            "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
+            "Surrogate-Control": "no-store"
+        });
 
-        res.json({ success: true, data: sidebar });
-
+        return res.json({ success: true, data: sidebar });
     } catch (error) {
         logger.error("Error in getSidebarForUser:", error);
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             message: "Error fetching sidebar",
             error: process.env.NODE_ENV === "development" ? error.message : {},

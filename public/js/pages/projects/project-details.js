@@ -71,7 +71,6 @@ document.addEventListener("DOMContentLoaded", () => {
                     successModal.show();
 
                     addForm.reset();
-
                     successModalEl.querySelector("button[data-bs-dismiss='modal']").addEventListener("click", () => {
                         window.location.href = "/projects";
                     });
@@ -105,7 +104,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 const result = await res.json();
                 if (res.ok) {
                     showToast("Project updated successfully!", "success");
-                    window.location.reload();
+                    window.location.href = `/projects/${projectId}/details`;
                 } else {
                     showToast(result.message || "Failed to update project", "error");
                     toggleLoader(submitBtn, false);

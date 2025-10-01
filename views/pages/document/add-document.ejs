@@ -48,8 +48,7 @@
 									<!-- Department -->
 									<div class="col-md-4">
 										<div class="mb-3">
-											<label class="form-label">Department <span
-													class="text-danger">*</span></label>
+											<label class="form-label">Department </label>
 											<select id="department" name="department" class="form-select select2"
 												required>
 												<% if (isEdit && document.department) { %>
@@ -92,11 +91,31 @@
 											</div>
 										</div>
 									</div>
-
-									<!-- Tags -->
+									<!-- Donor Name -->
 									<div class="col-md-4">
 										<div class="mb-3">
-											<label class="form-label">Add Tags (comma separated)</label>
+											<label class="form-label">Donor Name</label>
+											<select id="documentDonor" name="documentDonor" class="form-select select2"
+												required>
+												<option value="">-- Select Donor Name --</option>
+											</select>
+										</div>
+									</div>
+
+									<!-- Vendor Name -->
+									<div class="col-md-4">
+										<div class="mb-3">
+											<label class="form-label">Vendor Name </label>
+											<select id="documentVendor" name="documentVendor"
+												class="form-select select2" required>
+												<option value="">-- Select Vendor Name --</option>
+											</select>
+										</div>
+									</div>
+									<!-- Tags -->
+									<div class="col-md-6">
+										<div class="mb-3">
+											<label class="form-label">Add Tags</label>
 											<input type="text" name="tags" class="form-control"
 												placeholder="tag1, tag2, tag3"
 												value="<%= isEdit && document.tags ? document.tags.join(', ') : '' %>">
@@ -104,7 +123,7 @@
 									</div>
 
 									<!-- Metadata -->
-									<div class="col-md-4">
+									<div class="col-md-6">
 										<div class="mb-3">
 											<label class="form-label">Meta Data</label>
 											<div class="position-relative">
@@ -372,12 +391,12 @@
 		</div>
 	</div>
 	<!-- /Page Wrapper -->
-	<script>
+	<!-- <script>
 		// EJS variables exposed to JS
 		const isEdit = <%= isEdit ? 'true' : 'false' %>;
 		const documentId = "<%= isEdit && document ? document._id : '' %>";
 		const documentData = <%= isEdit && document ? JSON.stringify(document) : 'null' %>;
-	</script>
+	</script> -->
 	<!-- Metadata Modal -->
 	<div id="metadata-modal" class="modal fade" tabindex="-1" role="dialog" aria-hidden="true">
 		<div class="modal-dialog modal-dialog-centered">
@@ -483,11 +502,13 @@
 		});
 	</script>
 	<%- include('../../partials/footer') %>
-		<!-- CHANGE THIS: Use separated script files instead of addEditDocument.js -->
-		<% if (isEdit) { %>
+		<script src="/js/pages/documents/addEditDocument.js"></script>
+		<!-- CHANGE THIS: Use separated script files instead of addEditDocument.js
+	
+		<!-- <% if (isEdit) { %>
 			<script src="/js/pages/documents/document-utils.js"></script>
 			<script src="/js/pages/documents/edit-document.js"></script>
 			<% } else { %>
 				<script src="/js/pages/documents/document-utils.js"></script>
 				<script src="/js/pages/documents/add-document.js"></script>
-				<% } %>
+				<% } %> --> -->

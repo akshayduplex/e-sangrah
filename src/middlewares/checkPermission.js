@@ -104,7 +104,6 @@
 
 // export default checkPermissions;
 
-// middleware/rbacMiddleware.js
 import UserPermission from '../models/UserPermission.js';
 import Menu from '../models/Menu.js';
 import MenuAssignment from '../models/menuAssignment.js';
@@ -112,10 +111,12 @@ import MenuAssignment from '../models/menuAssignment.js';
 // In-memory caches
 let urlMenuMap = {};
 let userPermissionsCache = {};
+let designationUserMap = {}; // ✅ Added to track users under each designation
 
 // Global permissions version
 let globalPermissionsVersion = 1;
 
+// Increment version and invalidate affected users
 export const incrementGlobalPermissionsVersion = (designationId) => {
     if (designationId && designationUserMap[designationId]) {
         designationUserMap[designationId].forEach(userId => {
@@ -131,7 +132,7 @@ export const incrementGlobalPermissionsVersion = (designationId) => {
     }
 };
 
-
+// Load all menus into memory
 export const loadMenuMap = async () => {
     const menus = await Menu.find({ is_show: true }).lean();
     urlMenuMap = {};
@@ -180,13 +181,21 @@ const checkPermissions = async (req, res, next) => {
             if (isApi) return res.status(401).json({ error: 'Unauthorized' });
             return res.redirect('/login');
         }
+
         // Superadmin/Admin bypass
         if (['superadmin', 'admin'].includes(user.profile_type)) {
             return next();
         }
 
         const userId = user._id.toString();
-        const designationId = user.userDetails.designation;
+        const designationId = user.userDetails.designation?.toString();
+
+        // ✅ Maintain designation-user map
+        if (designationId) {
+            designationUserMap[designationId] = designationUserMap[designationId] || new Set();
+            designationUserMap[designationId].add(userId);
+        }
+
         // Normalize URL and get menu
         const url = normalizeUrl(req.originalUrl);
         const menu = urlMenuMap[url];
@@ -197,6 +206,7 @@ const checkPermissions = async (req, res, next) => {
 
         const menuId = menu._id.toString();
         const requiredPermission = methodMap[req.method] || 'read';
+
         // Initialize cache for user if needed
         userPermissionsCache[userId] = userPermissionsCache[userId] || {};
         userPermissionsCache[userId]._version = userPermissionsCache[userId]._version || 0;
@@ -205,14 +215,12 @@ const checkPermissions = async (req, res, next) => {
         if (!userPermissionsCache[userId][menuId] || userPermissionsCache[userId]._version !== globalPermissionsVersion) {
             userPermissionsCache[userId][menuId] = await fetchUserPermissions(userId, designationId, menuId);
             userPermissionsCache[userId]._version = globalPermissionsVersion;
-
-        } else {
-            console.log("Using cached permissions:", userPermissionsCache[userId][menuId]);
         }
 
         const perms = userPermissionsCache[userId][menuId];
-        // AND condition: both designation AND user permissions must be true
-        const hasPermission = !!(perms.designation[requiredPermission] && perms.user[requiredPermission]);
+
+        // ✅ Allow if either designation OR user override has permission
+        const hasPermission = !!(perms.designation[requiredPermission] || perms.user[requiredPermission]);
 
         if (hasPermission) {
             return next();
@@ -229,4 +237,5 @@ const checkPermissions = async (req, res, next) => {
         return res.status(500).render('error', { title: 'Internal Server Error', message: error.message });
     }
 };
+
 export default checkPermissions;

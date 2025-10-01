@@ -101,8 +101,12 @@ export const createDesignation = async (req, res) => {
     try {
         if (!req.user) return failResponse(res, 'Unauthorized', 401);
 
+        // Explicitly take values from req.body
         const designationData = {
-            ...req.body,
+            name: req.body.name,
+            priority: req.body.priority || 0,
+            status: req.body.status || 'Active',
+            description: req.body.description || '',
             added_by: {
                 user_id: req.user._id,
                 name: req.user.name,
@@ -120,6 +124,10 @@ export const createDesignation = async (req, res) => {
 
         return successResponse(res, designation, 'Designation created successfully');
     } catch (err) {
+        // Handle duplicate name error
+        if (err.code === 11000 && err.keyValue?.name) {
+            return failResponse(res, 'Designation name already exists', 400);
+        }
         return errorResponse(res, err);
     }
 };
@@ -132,26 +140,35 @@ export const updateDesignation = async (req, res) => {
         if (!req.user) return failResponse(res, 'Unauthorized', 401);
 
         const updateData = {
-            ...req.body,
+            name: req.body.name,
+            priority: req.body.priority,
+            status: req.body.status,
+            description: req.body.description,
             updated_by: {
                 user_id: req.user._id,
                 name: req.user.name,
                 email: req.user.email
-            },
-            updated_date: Date.now()
+            }
         };
 
         const designation = await Designation.findByIdAndUpdate(id, updateData, {
             new: true,
-            runValidators: true
+            runValidators: true,
+            context: 'query'
         });
 
         if (!designation) return failResponse(res, 'Designation not found', 404);
         return successResponse(res, designation, 'Designation updated successfully');
     } catch (err) {
+        // Handle duplicate name error
+        if (err.code === 11000 && err.keyValue?.name) {
+            return failResponse(res, 'Designation name already exists', 400);
+        }
         return errorResponse(res, err);
     }
 };
+
+
 
 // Delete designation
 export const deleteDesignation = async (req, res) => {

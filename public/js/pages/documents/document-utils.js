@@ -146,6 +146,66 @@ function initializeProjectManagerSelect2() {
     });
 }
 
+function initializeDonorSelect2() {
+    $('#documentDonor').select2({
+        placeholder: '-- Select Donor Name --',
+        allowClear: false,
+        ajax: {
+            url: '/api/user/search',
+            dataType: 'json',
+            delay: 250,
+            data: function (params) {
+                return {
+                    search: params.term || '',
+                    page: params.page || 1,
+                    limit: 10,
+                    profile_type: 'donor' // filter for donor users
+                };
+            },
+            processResults: function (data, params) {
+                params.page = params.page || 1;
+                const results = data.users.map(u => ({ id: u._id, text: u.name }));
+                return {
+                    results,
+                    pagination: { more: params.page * 10 < data.pagination.total }
+                };
+            },
+            cache: true
+        },
+        minimumInputLength: 0
+    });
+}
+
+function initializeVendorSelect2() {
+    $('#documentVendor').select2({
+        placeholder: '-- Select Vendor Name --',
+        allowClear: false,
+        ajax: {
+            url: '/api/user/search',
+            dataType: 'json',
+            delay: 250,
+            data: function (params) {
+                return {
+                    search: params.term || '',
+                    page: params.page || 1,
+                    limit: 10,
+                    profile_type: 'vendor' // filter for vendor users
+                };
+            },
+            processResults: function (data, params) {
+                params.page = params.page || 1;
+                const results = data.users.map(u => ({ id: u._id, text: u.name }));
+                return {
+                    results,
+                    pagination: { more: params.page * 10 < data.pagination.total }
+                };
+            },
+            cache: true
+        },
+        minimumInputLength: 0
+    });
+}
+
 function toggleCreateFolderBtn() {
     const projectSelected = !!$('#projectName').val() && $('#projectName').val() !== 'all';
 

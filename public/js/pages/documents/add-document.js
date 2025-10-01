@@ -8,6 +8,8 @@ $(document).ready(function () {
     initializeProjectSelect2();
     initializeDepartmentSelect2();
     initializeProjectManagerSelect2();
+    initializeDonorSelect2();
+    initializeVendorSelect2();
     initializeFolderManagement();
     initializeFileUpload();
     initializeSignature();

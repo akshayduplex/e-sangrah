@@ -71,14 +71,34 @@
             <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
             <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
 
-            <script>
-                $(document).ready(function () {
+            <script>$(document).ready(function () {
                     const table = $('#userTable').DataTable({
-                        serverSide: true,
-                        processing: true,
+                        serverSide: true, // server-side processing
+                        processing: true, // show loader
                         ajax: {
                             url: `${baseUrl}/api/user`,
-                            type: 'GET'
+                            type: 'GET',
+                            dataSrc: function (json) {
+                                // Check if API success
+                                if (!json.success) return [];
+                                // Map users to DataTables format
+                                return json.users.map((user, index) => ({
+                                    srNo: index + 1,
+                                    name: user.name,
+                                    email: user.email,
+                                    phone: user.phone_number || '-',
+                                    profile_type: user.profile_type,
+                                    status: user.status,
+                                    department: user.userDetails?.department?.name || '-',
+                                    designation: user.userDetails?.designation?.name || '-',
+                                    lastLogin: user.lastLogin ? new Date(user.lastLogin).toLocaleString() : '-',
+                                    createdAt: new Date(user.createdAt).toLocaleString(),
+                                    actions: `
+                        <a href="/users/edit/${user._id}" class="text-primary me-2"><i class="ti ti-edit"></i></a>
+                        <a href="#" class="text-danger btn-delete" data-id="${user._id}"><i class="ti ti-trash"></i></a>
+                    `
+                                }));
+                            }
                         },
                         columns: [
                             { data: 'srNo' },
@@ -97,15 +117,15 @@
                         lengthMenu: [10, 25, 50],
                     });
 
-                    // 🔹 Debounced search for server-side
+                    // Debounced search
                     $('#userTable_filter input').off('keyup').on('keyup', debounce(function () {
                         table.search(this.value).draw();
-                    }, 500)); // 500ms delay
+                    }, 500));
 
-                    // Delete user logic (same as before)
+                    // Delete user logic
                     $(document).on('click', '.btn-delete', function (e) {
                         e.preventDefault();
-                        let deleteUserId = $(this).data('id');
+                        const deleteUserId = $(this).data('id');
                         $('#confirmDeleteModal').modal('show');
 
                         $('#confirmDeleteBtn').off('click').on('click', function () {
@@ -116,7 +136,7 @@
                                     $('#confirmDeleteModal').modal('hide');
                                     if (res.success) {
                                         showToast('User deleted successfully!', 'success');
-                                        table.ajax.reload(null, false); // refresh current page
+                                        table.ajax.reload(null, false);
                                     } else {
                                         showToast(res.message || 'Failed to delete user', 'error');
                                     }
@@ -128,17 +148,15 @@
                             });
                         });
                     });
+
+                    function debounce(func, wait) {
+                        let timeout;
+                        return function (...args) {
+                            clearTimeout(timeout);
+                            timeout = setTimeout(() => func.apply(this, args), wait);
+                        };
+                    }
                 });
-
-
-                function debounce(func, wait) {
-                    let timeout;
-                    return function (...args) {
-                        clearTimeout(timeout);
-                        timeout = setTimeout(() => func.apply(this, args), wait);
-                    };
-                }
-
             </script>
 
             <!-- <script>

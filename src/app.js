@@ -21,25 +21,26 @@ import fs from "fs";
 
 const app = express();
 
+// ------------------- Async Startup -------------------
 (async () => {
     // Connect to MongoDB
+    console.time("MongoDB Connect");
     await connectDB();
+    console.timeEnd("MongoDB Connect");
 
-    // Load menu map into memory (for fast RBAC lookup)
-    await loadMenuMap();
-
-    //Security middlewares
+    // Security middleware
     app.use(helmet({ contentSecurityPolicy: false }));
 
-    //  Logging
+    // Logging
     const logDir = path.resolve(process.cwd(), "logs");
+    if (!fs.existsSync(logDir)) fs.mkdirSync(logDir);
     const accessLogStream = fs.createWriteStream(path.join(logDir, "access.log"), { flags: "a" });
+
     if (process.env.NODE_ENV === "development") {
         app.use(morgan("dev"));
     } else {
         app.use(morgan("combined", { stream: accessLogStream }));
     }
-
     // Body parser & method override
     app.use(bodyParser.urlencoded({ extended: false }));
     app.use(express.json());
@@ -48,8 +49,8 @@ const app = express();
 
     // Compression
     app.use(compression());
-    console.log("Mongo URL", process.env.MONGO_URI, process.env.SESSION_SECRET);
-    // Sessions (must be before RBAC middleware)
+
+    // Session setup (MongoStore with touchAfter optimization)
     app.use(
         session({
             secret: process.env.SESSION_SECRET,
@@ -58,7 +59,8 @@ const app = express();
             store: MongoStore.create({
                 mongoUrl: process.env.MONGO_URI,
                 collectionName: "sessions",
-                ttl: 60 * 60, // 1 hour
+                ttl: 60 * 60,          // 1 hour
+                touchAfter: 24 * 3600, // avoid rewriting unchanged sessions
             }),
             cookie: {
                 maxAge: 1000 * 60 * 60,
@@ -72,12 +74,12 @@ const app = express();
     // Flash messages
     app.use(flash());
 
-    //  Views and static files
+    // Views and static files
     app.set("view engine", "ejs");
     app.set("views", path.resolve("views"));
     app.use(express.static(path.resolve("public")));
 
-    // 🔹 Global locals
+    // ------------------- Global Locals -------------------
     app.use((req, res, next) => {
         const user = req.user || req.session.user || {};
         res.locals.BASE_URL = process.env.BASE_URL || "";
@@ -91,25 +93,28 @@ const app = express();
         next();
     });
 
-    // Test route for sessions (optional)
+    // ------------------- Test Route -------------------
     app.get("/test-session", (req, res) => {
         req.session.test = "hello";
         res.json(req.session);
     });
 
-    //  Routes with RBAC middleware
+    // ------------------- Routes -------------------
     app.use("/api", ApiRoutes);
     app.use("/", pageRoutes);
 
-    //  Start cleanup cron job
+    // ------------------- Background Tasks -------------------
     startCleanupJob();
 
-    // Error handling
+    // ------------------- Error Handling -------------------
     app.use(errorHandler);
 
-    // Start server
+    // ------------------- Start Server -------------------
     const PORT = process.env.PORT || 3000;
-    app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+    const server = app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
+    // ------------------- Load Menu Map in Background -------------------
+    loadMenuMap().then(() => console.log("Menu map loaded in memory"));
 })();
 
 export default app;
