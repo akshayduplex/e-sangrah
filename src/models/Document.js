@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-
+const { Decimal128 } = mongoose.Schema.Types;
 const documentSchema = new mongoose.Schema({
     description: { type: String, trim: true, maxlength: 1000 },
     project: { type: mongoose.Schema.Types.ObjectId, ref: "Project", default: null },
@@ -37,20 +37,19 @@ const documentSchema = new mongoose.Schema({
     comment: { type: String, trim: true, maxlength: 1000 },
 
     versioning: {
-        currentVersion: { type: Number, default: 1.0 },
-        previousVersion: { type: Number, default: null },
-        nextVersion: { type: Number, default: null },
-        versionHistory: [{
-            version: { type: Number, required: true },
-            timestamp: { type: Date, default: Date.now },
-            changedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-            changes: { type: String }, // Description of changes
-            file: { type: mongoose.Schema.Types.ObjectId, ref: "File" },
-            snapshot: { type: mongoose.Schema.Types.Mixed } // Full document snapshot
-        }],
-        majorVersion: { type: Number, default: 1 },
-        minorVersion: { type: Number, default: 0 }
-    }
+        currentVersion: { type: Decimal128, default: mongoose.Types.Decimal128.fromString("1.0") },
+        previousVersion: { type: Decimal128, default: null },
+        nextVersion: { type: Decimal128, default: null },
+        firstVersion: { type: Decimal128, default: mongoose.Types.Decimal128.fromString("1.0") },
+    },
+    versionHistory: [{
+        version: { type: Decimal128, required: true, default: mongoose.Types.Decimal128.fromString("1.0") },
+        timestamp: { type: Date, default: Date.now },
+        changedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        changes: { type: String },
+        file: { type: mongoose.Schema.Types.ObjectId, ref: "File" },
+        snapshot: { type: mongoose.Schema.Types.Mixed }
+    }],
 }, { timestamps: true });
 
 /** -------------------- INDEXES -------------------- **/
@@ -59,59 +58,13 @@ documentSchema.index({ department: 1 });
 documentSchema.index({ owner: 1 });
 documentSchema.index({ createdAt: 1 });
 documentSchema.index({ "compliance.expiryDate": 1 });
-documentSchema.index({ "files.isPrimary": 1 });
-documentSchema.index({ "files.version": -1 });
 documentSchema.index({ tags: 1 });
-
-documentSchema.index({ "files.isPrimary": 1, "files.status": 1 });
 
 /** -------------------- VIRTUAL -------------------- **/
 documentSchema.virtual("isExpired").get(function () {
     return this.compliance.expiryDate ? this.compliance.expiryDate < new Date() : false;
 });
 
-/** -------------------- PRE-SAVE -------------------- **/
-documentSchema.pre("save", function (next) {
-    if (this.isModified("files")) {
-        const activePrimary = this.files.filter(f => f.isPrimary && f.status === "active");
-        if (activePrimary.length > 1) {
-            for (let i = 1; i < activePrimary.length; i++) activePrimary[i].isPrimary = false;
-        }
-    }
-    next();
-});
-
-/** -------------------- METHODS -------------------- **/
-documentSchema.methods.addNewVersion = async function (fileData, userId) {
-    const newVersion = this.currentVersion + 1;
-    this.files.forEach(f => { if (f.status === "active") f.isPrimary = false; });
-    this.files.push({
-        ...fileData,
-        version: newVersion,
-        uploadedBy: userId,
-        uploadedAt: new Date(),
-        isPrimary: true,
-        status: "active"
-    });
-    this.currentVersion = newVersion;
-    await this.save();
-    return this;
-};
-
-documentSchema.methods.archiveVersion = async function (versionNumber) {
-    const file = this.files.find(f => f.version === versionNumber);
-    if (file) {
-        file.status = "archived";
-        if (file.isPrimary) {
-            file.isPrimary = false;
-            const prevActive = this.files.filter(f => f.version < versionNumber && f.status === "active")
-                .sort((a, b) => b.version - a.version)[0];
-            if (prevActive) prevActive.isPrimary = true;
-        }
-        await this.save();
-    }
-    return this;
-};
 
 const Document = mongoose.model("Document", documentSchema);
 export default Document;

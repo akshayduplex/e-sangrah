@@ -373,25 +373,27 @@
                     e.preventDefault();
                     const docId = $(this).data('id');
                     $('#trashdoc-modal').modal('show');
+
                     $('#confirm-trash-folder').off('click').on('click', function () {
                         $.ajax({
                             url: `${baseUrl}/api/documents/${docId}`,
                             type: 'DELETE',
-                            success: function () {
+                            success: function (response) {
                                 $('#trashdoc-modal').modal('hide');
                                 table.ajax.reload();
-                                showToast('Document moved to trash!', 'success');
+                                // show server message if available
+                                showToast(response.message || 'Document moved to trash!', 'success');
                             },
-                            error: function () {
-                                showToast('Error moving document to trash.', 'error');
+                            error: function (xhr) {
+                                let msg = 'Error moving document to trash.';
+                                if (xhr.responseJSON && xhr.responseJSON.message) {
+                                    msg = xhr.responseJSON.message; // display actual server message
+                                }
+                                showToast(msg, 'error');
                             }
                         });
                     });
                 });
-
-                // -------------------------
-                // Share document modal
-                // -------------------------
                 // -------------------------
                 // Share document modal
                 // -------------------------
@@ -425,25 +427,29 @@
                             if (!res.success || !res.data) return;
 
                             res.data.forEach(user => {
+                                // unique ID for proper label association
+                                const checkboxId = `download-${user.userId}`;
+
                                 const row = `
-                    <div class="user-accssrow dynamic">
-                        <div class="empname_eml">
-                            <div class="fw-normal fs-18">${user.name}</div>
-                            <small class="fs-16">${user.email}</small>
-                        </div>
-                        <div class="d-flex align-items-center gap-4">
-                            <div class="form-check form-switch">
-                                <label>Download Access</label>
-                                <input class="form-check-input download-access" type="checkbox" data-user-id="${user.userId}">
-                            </div>
-                            <select class="form-select form-select-sm access-level" style="width:100px;" data-user-id="${user.userId}">
-                                <option value="edit" ${user.accessLevel === 'edit' ? 'selected' : ''}>Edit</option>
-                                <option value="view" ${user.accessLevel === 'view' ? 'selected' : ''}>View</option>
-                            </select>
-                            <button class="btn btn-sm btn-outline-danger remove-user" data-user-id="${user.userId}">Remove</button>
-                        </div>
+                <div class="user-accssrow dynamic">
+                    <div class="empname_eml">
+                        <div class="fw-normal fs-18">${user.name}</div>
+                        <small class="fs-16">${user.email}</small>
                     </div>
-                `;
+                    <div class="d-flex align-items-center gap-4">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input download-access" type="checkbox" id="${checkboxId}" data-user-id="${user.userId}" ${user.canDownload ? 'checked' : ''}>
+                            <label class="form-check-label" for="${checkboxId}">Download Access</label>
+                        </div>
+                        <select class="form-select form-select-sm access-level" style="width:100px;" data-user-id="${user.userId}">
+                            <option value="edit" ${user.accessLevel === 'edit' ? 'selected' : ''}>Edit</option>
+                            <option value="view" ${user.accessLevel === 'view' ? 'selected' : ''}>View</option>
+                        </select>
+                        <button class="btn btn-sm btn-outline-danger remove-user" data-user-id="${user.userId}">Remove</button>
+                    </div>
+                </div>
+            `;
+
                                 container.append(row);
                             });
                         },
@@ -451,7 +457,6 @@
                             console.error('Failed to load shared users:', err);
                         }
                     });
-
                     // Load users for invite dropdown
                     loadUsersForInvite();
                 });
@@ -496,58 +501,54 @@
                 });
 
                 // Invite user button
+                // Invite user button
                 $('#sharedoc-modal').on('click', '#inviteUserBtn', function () {
-                    const userId = $('#userInviteSelect').val();
+                    const userEmail = $('#userInviteSelect').val(); // now email instead of userId
                     const accessLevel = $('#accessLevelSelect').val();
                     const duration = $('input[name="time"]:checked').attr('id');
-                    const customStart = $('#startDate').val();
                     const customEnd = $('#endDate').val();
 
                     if (!currentDocId) {
-                        alert('No document selected');
+                        showToast('No document selected', 'info');
                         return;
                     }
 
-                    if (!userId) {
-                        alert('Please select a user to invite');
+                    if (!userEmail) {
+                        showToast('Please select a user to invite', 'info');
                         return;
                     }
 
                     if (!$('input[name="time"]:checked').length) {
-                        alert('Please select a time duration');
+                        showToast('Please select a time duration', 'info');
                         return;
                     }
 
-                    if (duration === 'custom' && (!customStart || !customEnd)) {
-                        alert('Please select both start and end dates for custom duration');
+                    if (duration === 'custom' && !customEnd) {
+                        showToast('Please select an end date for custom duration', 'info');
                         return;
                     }
 
-                    const shareData = {
-                        userId: userId,
-                        accessLevel: accessLevel,
-                        duration: duration
+                    const inviteData = {
+                        userEmail,
+                        accessLevel,
+                        duration
                     };
 
                     if (duration === 'custom') {
-                        shareData.customStart = customStart;
-                        shareData.customEnd = customEnd;
+                        inviteData.customEnd = customEnd;
                     }
 
                     $.ajax({
-                        url: `${baseUrl}/api/documents/share/${currentDocId}`,
+                        url: `${baseUrl}/api/documents/${currentDocId}/invite`,
                         method: 'POST',
                         contentType: 'application/json',
-                        data: JSON.stringify(shareData),
+                        data: JSON.stringify(inviteData),
                         success: function (response) {
-                            alert('Document shared successfully!');
+                            showToast('Invitation email sent successfully!', 'success');
                             $('#sharedoc-modal').modal('hide');
-                            if (typeof table !== 'undefined' && table.ajax.reload) {
-                                table.ajax.reload();
-                            }
                         },
                         error: function (err) {
-                            alert(err.responseJSON?.message || 'Failed to share document');
+                            showToast(err.responseJSON?.message || 'Failed to send invitation', 'error');
                         }
                     });
                 });
@@ -601,10 +602,10 @@
                             accessLevel: accessLevel
                         }),
                         success: function () {
-                            console.log('Access level updated successfully');
+                            showToast('Access level updated successfully', 'success');
                         },
                         error: function (err) {
-                            alert(err.responseJSON?.message || 'Failed to update access level');
+                            showToast(err.responseJSON?.message || 'Failed to update access level', 'error');
                         }
                     });
                 });
@@ -625,10 +626,10 @@
                             canDownload: canDownload
                         }),
                         success: function () {
-                            console.log('Download access updated successfully');
+                            showToast('Download access updated successfully', 'success');
                         },
                         error: function (err) {
-                            alert(err.responseJSON?.message || 'Failed to update download access');
+                            showToast(err.responseJSON?.message || 'Failed to update download access', 'error');
                         }
                     });
                 });
@@ -638,24 +639,159 @@
                     const linkInput = $(this).closest('.input-group').find('input[type="text"]');
                     linkInput.select();
                     document.execCommand('copy');
-                    alert('Link copied to clipboard!');
+                    showToast('Link copied to clipboard!', 'success');
                 });
 
                 // Share button in footer
+                // Share button in footer - FIXED VERSION
                 $('#sharedoc-modal .modal-footer .site-btnmd').on('click', function () {
-                    // This could be used for general access sharing
+                    const accessLevel = $('#accessLevelSelect').val();
+                    const duration = $('input[name="time"]:checked').attr('id');
+                    const customStart = $('#startDate').val();
+                    const customEnd = $('#endDate').val();
                     const accessType = $('#accessType').val();
                     const roleType = $('#roleType').val();
 
+                    // Validation
                     if (!currentDocId) {
-                        alert('No document selected');
+                        showToast('No document selected', 'info');
+                        return;
+                    }
+                    if (!duration) {
+                        showToast('Please select a time duration', 'info');
+                        return;
+                    }
+                    if (duration === 'custom' && !customEnd) {
+                        showToast('Please select an end date for custom duration', 'info');
                         return;
                     }
 
-                    // Implement general access sharing logic here
-                    console.log('General access sharing:', { accessType, roleType });
-                    alert('General access settings updated!');
-                    $('#sharedoc-modal').modal('hide');
+                    // Prepare data to send
+                    const shareData = {
+                        accessLevel: accessLevel,
+                        duration: duration,
+                        generalAccess: accessType === 'anyone', // true for general access
+                        generalRole: roleType // 'viewer' or 'editor'
+                    };
+
+                    if (duration === 'custom') {
+                        shareData.customEnd = customEnd;
+                        if (customStart) shareData.customStart = customStart;
+                    }
+
+                    $.ajax({
+                        url: `${baseUrl}/api/documents/${currentDocId}/share`,
+                        method: 'PUT',
+                        contentType: 'application/json',
+                        data: JSON.stringify(shareData),
+                        success: function (response) {
+                            showToast(response.message || 'Document shared successfully!', 'success');
+                            $('#sharedoc-modal').modal('hide');
+
+                            // Reload table if exists
+                            if (typeof table !== 'undefined' && table.ajax?.reload) {
+                                table.ajax.reload(null, false);
+                            }
+                        },
+                        error: function (err) {
+                            showToast(err.responseJSON?.message || 'Failed to share document', 'error');
+                        }
+                    });
+                });
+                // -------------------------
+                // Load version history into modal
+                // -------------------------
+                $('#versionhistory-modal').on('show.bs.modal', function (event) {
+                    const button = $(event.relatedTarget);
+                    const docId = button.closest('tr').find('.btn-delete').data('id'); // get from table row
+                    if (!docId) return;
+
+                    currentDocId = docId;
+                    const versionList = $(this).find('.version-list');
+                    versionList.html('<p class="text-center">Loading...</p>');
+
+                    $.ajax({
+                        url: `${baseUrl}/api/documents/${docId}/versions/history`,
+                        method: 'GET',
+                        success: function (res) {
+                            if (!res.success || !res.data) {
+                                versionList.html('<p class="text-danger">No version history found.</p>');
+                                return;
+                            }
+
+                            versionList.empty();
+                            res.data.versionHistory.forEach(item => {
+                                const modifiedDate = new Date(item.timestamp).toLocaleString();
+
+                                const html = `
+                    <div class="version-item border-bottom pb-3 mb-3">
+                        <div class="dflexbtwn align-items-start">
+                            <div class="flxtblleft">
+                                <span class="avatar rounded bg-light mb-2">
+                                    <img src="${item.changedBy?.avatar || '/img/icons/fn2.png'}" alt="User">
+                                </span>
+                                <div class="flxtbltxt">
+                                    <p class="fs-18 mb-1 fw-normal">
+                                        ${res.data.documentName} v${item.version}
+                                        ${item.isCurrent ? '<span class="badge bg-success ms-2">Current</span>' : ''}
+                                    </p>
+                                    <span class="fs-16 fw-normal d-block mb-2">
+                                        Modified by ${item.changedBy?.name || 'Unknown'}
+                                    </span>
+                                    <h5 class="fs-18 fw-light text-black mb-3">
+                                        ${item.changes || 'Updated document'}
+                                    </h5>
+                                    <div class="version-actions">
+                                        <button class="site-btnmd fw-light btn-view-version" data-version="${item.version}">
+                                            View
+                                        </button>
+                                        <button class="btn btn-outline-light rounded-pill btn-restore-version" 
+                                            data-version="${item.version}">
+                                            Restore to v${item.version}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <p class="text-muted">Modified on ${modifiedDate}</p>
+                        </div>
+                    </div>
+                `;
+                                versionList.append(html);
+                            });
+                        },
+                        error: function () {
+                            versionList.html('<p class="text-danger">Failed to load version history.</p>');
+                        }
+                    });
+                });
+
+                // -------------------------
+                // Handle View & Restore buttons
+                // -------------------------
+                $(document).on('click', '.btn-view-version', function () {
+                    const version = $(this).data('version');
+                    alert(`Viewing version ${version} of document ${currentDocId}`);
+                    // 👉 you can open another modal or panel here with version snapshot details
+                });
+
+                $(document).on('click', '.btn-restore-version', function () {
+                    const version = $(this).data('version');
+                    if (!confirm(`Restore document to version ${version}?`)) return;
+
+                    $.ajax({
+                        url: `${baseUrl}/api/documents/${currentDocId}/versions/restore`,
+                        method: 'POST',
+                        contentType: 'application/json',
+                        data: JSON.stringify({ version }),
+                        success: function (res) {
+                            showToast(res.message || `Restored to version ${version}`, 'success');
+                            $('#versionhistory-modal').modal('hide');
+                            table.ajax.reload(); // reload table so status/files update
+                        },
+                        error: function (err) {
+                            showToast(err.responseJSON?.message || 'Failed to restore version', 'error');
+                        }
+                    });
                 });
 
                 // Function to load users for invite dropdown
@@ -673,7 +809,7 @@
                             });
                         },
                         error: function (err) {
-                            console.error('Failed to load users:', err);
+                            showToast('Failed to load users:' + err, 'error');
                         }
                     });
                 }

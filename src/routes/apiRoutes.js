@@ -103,7 +103,7 @@ router.put("/documents/share/:documentId", documentController.updateSharedUser);
 
 // Remove user from shared list
 router.delete("/documents/share/:documentId", documentController.removeSharedUser);
-router.post("/documents/:id/share", documentController.shareDocument);
+router.put("/documents/:id/share", documentController.shareDocument);
 router.get("/documents/:id/audit-logs", documentController.getDocumentAuditLogs);
 router.get("/documents/:id/access-logs", documentController.getDocumentAccessLogs);
 // Invite a user to a document (sends email)
@@ -113,9 +113,9 @@ router.post("/documents/:documentId/invite", documentController.inviteUser);
 router.get("/documents/:documentId/invite/:userId/accept", documentController.autoAcceptInvite);
 
 // routes/documents.js
-router.get('/:id/versions/history', documentController.getVersionHistory);
-router.get('/:id/versions/:version/view', documentController.viewVersion);
-router.post('/:id/versions/:version/restore', documentController.restoreVersion);
+router.get('/documents/:id/versions/history', documentController.getVersionHistory);
+router.get('/documents/:id/versions/:version/view', documentController.viewVersion);
+router.post('/documents/:id/versions/:version/restore', documentController.restoreVersion);
 
 // ---------------------------
 // Departments routes

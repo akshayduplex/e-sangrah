@@ -1,13 +1,16 @@
 import mongoose from "mongoose";
 
 const sharedWithSchema = new mongoose.Schema({
-    document: { type: mongoose.Schema.Types.ObjectId, ref: "Document", required: true },
-    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-    accessLevel: { type: String, enum: ["view", "edit"], default: "view" },
+    document: { type: mongoose.Schema.Types.ObjectId, ref: 'Document', required: true },
+    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    accessLevel: { type: String, enum: ['view', 'edit'], default: 'view' },
     canDownload: { type: Boolean, default: false },
-    sharedAt: { type: Date, default: Date.now },
-    expiresAt: { type: Date, default: null },
-    inviteStatus: { type: String, enum: ["pending", "accepted", "rejected"], default: "pending" }
+    inviteStatus: { type: String, enum: ["pending", "accepted", "rejected"], default: "pending" },
+    expiresAt: { type: Date, default: null }, // for timed shares
+    duration: { type: String, enum: ['oneday', 'oneweek', 'onemonth', 'custom', 'onetime', 'lifetime'], default: 'lifetime' },
+    used: { type: Boolean, default: false }, // for onetime shares
+    generalAccess: { type: Boolean, default: false }, // add this for general role shares
+    generalRole: { type: String, enum: ['viewer', 'editor'], default: 'viewer' }
 }, { timestamps: true });
 
 // Useful indexes

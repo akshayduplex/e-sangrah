@@ -6,6 +6,7 @@ import { sendEmail } from "../services/emailService.js";
 import logger from "../utils/logger.js";
 import Department from "../models/Departments.js";
 import Designation from "../models/Designation.js";
+import Project from "../models/Project.js";
 
 
 //page routes controllers
@@ -185,27 +186,47 @@ export const getAllUsers = async (req, res) => {
 
 export const searchUsers = async (req, res) => {
     try {
-        let { page = 1, limit = 10, search = "", profile_type = "user" } = req.query;
+        let { page = 1, limit = 10, search = "", profile_type = "user", projectId } = req.query;
 
         page = parseInt(page, 10);
         limit = parseInt(limit, 10);
 
-        const filter = { profile_type }; // only users
+        let users = [];
+        let total = 0;
 
-        // Search by name
-        if (search) {
-            filter.name = { $regex: search, $options: "i" }; // case-insensitive
+        // If donor or vendor, fetch from Project
+        if ((profile_type === "donor" || profile_type === "vendor") && projectId) {
+            const project = await Project.findById(projectId)
+                .populate({
+                    path: profile_type, // "donor" or "vendor"
+                    select: "name email",
+                    match: search ? { name: { $regex: search, $options: "i" } } : {}
+                })
+                .lean();
+
+            if (project) {
+                users = project[profile_type] || [];
+                total = users.length;
+                // Apply pagination manually
+                const start = (page - 1) * limit;
+                const end = start + limit;
+                users = users.slice(start, end);
+            }
+        } else {
+            // Default: search regular users
+            const filter = { profile_type };
+
+            if (search) filter.name = { $regex: search, $options: "i" };
+
+            users = await User.find(filter)
+                .select("name email")
+                .limit(limit)
+                .skip((page - 1) * limit)
+                .sort({ name: 1 })
+                .lean();
+
+            total = await User.countDocuments(filter);
         }
-
-        // Fetch only name
-        const users = await User.find(filter)
-            .select('name email') // only name field
-            .limit(limit)
-            .skip((page - 1) * limit)
-            .sort({ name: 1 }) // alphabetical
-            .lean();
-
-        const total = await User.countDocuments(filter);
 
         res.status(200).json({
             success: true,

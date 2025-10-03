@@ -11,6 +11,7 @@ import User from "../models/User.js";
 import Designation from "../models/Designation.js";
 import SharedWith from "../models/SharedWith.js";
 import File from "../models/File.js";
+import { bumpVersion } from "../utils/bumpVersion.js";
 
 //Page Controllers
 
@@ -406,7 +407,22 @@ export const createDocument = async (req, res) => {
             files: [], // empty for now
             signature: {},
             link: link || null,
-            comment: comment || null
+            comment: comment || null,
+            versioning: {
+                currentVersion: mongoose.Types.Decimal128.fromString("1.0"),
+                previousVersion: null,
+                nextVersion: null,
+                firstVersion: mongoose.Types.Decimal128.fromString("1.0"),
+            },
+            versionHistory: [
+                {
+                    version: mongoose.Types.Decimal128.fromString("1.0"),
+                    timestamp: new Date(),
+                    changedBy: req.user._id,
+                    changes: "Initial document creation",
+                    snapshot: {},
+                },
+            ],
         });
         await document.save();
 
@@ -433,6 +449,7 @@ export const createDocument = async (req, res) => {
         for (const fileId of parsedFileIds) {
             try {
                 const tempFile = await TempFile.findById(fileId);
+                console.log("TempFile", tempFile);
                 if (!tempFile || tempFile.status !== "temp") continue;
 
                 tempFile.status = "permanent";
@@ -451,6 +468,7 @@ export const createDocument = async (req, res) => {
                 });
                 fileDocs.push(newFile._id);
             } catch (err) {
+                console.error(`Failed to create file for ${fileId}`, err);
                 logger.warn(`Skipping invalid file ID: ${fileId}`, err);
             }
         }
@@ -534,76 +552,99 @@ export const createDocument = async (req, res) => {
 //             document.folderId = req.body.folderId;
 //         }
 
-//         const {
-//             projectName,
-//             department,
-//             projectManager,
-//             documentDate,
-//             tags,
-//             metadata,
-//             description,
-//             compliance,
-//             expiryDate,
-//             comment,
-//             link,
-//             fileIds
-//         } = req.body;
+//         // Iterate over req.body keys and update dynamically
+//         for (const [key, value] of Object.entries(req.body)) {
+//             if (value === undefined) continue; // skip undefined
 
-//         // Parse metadata
-//         let parsedMetadata = {};
-//         if (metadata) {
-//             try { parsedMetadata = typeof metadata === "string" ? JSON.parse(metadata) : metadata; }
-//             catch (err) { logger.warn("Invalid metadata", err); }
-//         }
+//             switch (key) {
+//                 case "metadata":
+//                     try {
+//                         document.metadata = typeof value === "string" ? JSON.parse(value) : value;
+//                     } catch (err) {
+//                         logger.warn("Invalid metadata, ignoring", err);
+//                     }
+//                     break;
 
-//         // Parse tags
-//         const parsedTags = tags ? tags.split(",").map(tag => tag.trim()) : [];
+//                 case "tags":
+//                     if (Array.isArray(value)) {
+//                         document.tags = value.map(tag => tag.trim());
+//                     } else if (typeof value === "string") {
+//                         document.tags = value.split(",").map(tag => tag.trim());
+//                     }
+//                     break;
 
-//         // Update basic fields
-//         document.project = projectName || document.project;
-//         document.department = department || document.department;
-//         document.projectManager = projectManager || document.projectManager;
-//         document.description = description ?? document.description;
-//         document.comment = comment ?? document.comment;
-//         document.link = link ?? document.link;
-//         document.tags = parsedTags;
-//         document.metadata = parsedMetadata;
+//                 case "documentDate":
+//                     const [day, month, year] = value.split("-");
+//                     document.documentDate = new Date(`${year}-${month}-${day}`);
+//                     break;
 
-//         // Update document date
-//         if (documentDate) {
-//             const [day, month, year] = documentDate.split("-");
-//             document.documentDate = new Date(`${year}-${month}-${day}`);
-//         }
+//                 case "compliance":
+//                     document.compliance.isCompliance = value === "yes";
+//                     if (req.body.expiryDate) {
+//                         const [d, m, y] = req.body.expiryDate.split("-");
+//                         document.compliance.expiryDate = new Date(`${y}-${m}-${d}`);
+//                     }
+//                     break;
 
-//         // Compliance
-//         if (compliance) {
-//             document.compliance.isCompliance = compliance === "yes";
-//             if (expiryDate) {
-//                 const [day, month, year] = expiryDate.split("-");
-//                 document.compliance.expiryDate = new Date(`${year}-${month}-${day}`);
-//             }
-//         }
+//                 case "fileIds":
+//                     if (value && value.length > 0) {
+//                         let parsedFileIds = Array.isArray(value) ? value : JSON.parse(value);
+//                         const newFileIds = [];
 
-//         // ---------------- Add new files as versions ----------------
-//         if (fileIds && fileIds.length > 0) {
-//             let parsedFileIds = typeof fileIds === "string" ? JSON.parse(fileIds) : fileIds;
+//                         for (const tempId of parsedFileIds) {
+//                             if (!mongoose.Types.ObjectId.isValid(tempId)) continue;
+//                             const tempFile = await TempFile.findById(tempId);
+//                             if (!tempFile || tempFile.status !== "temp") continue;
 
-//             for (const fileId of parsedFileIds) {
-//                 if (!mongoose.Types.ObjectId.isValid(fileId)) continue;
+//                             tempFile.status = "permanent";
+//                             await tempFile.save();
 
-//                 const tempFile = await TempFile.findById(fileId);
-//                 if (!tempFile || tempFile.status !== "temp") continue;
+//                             // Increment version
+//                             const currentVersion = parseFloat(document.versioning.currentVersion.toString());
+//                             const newVersion = (currentVersion + 0.1).toFixed(1);
 
-//                 tempFile.status = "permanent";
-//                 await tempFile.save();
+//                             // Mark old primary inactive
+//                             await File.updateMany(
+//                                 { document: document._id, isPrimary: true, status: "active" },
+//                                 { $set: { isPrimary: false } }
+//                             );
 
-//                 // Add as a new version
-//                 await document.addNewVersion({
-//                     file: tempFile.s3Filename,
-//                     s3Url: tempFile.s3Url,
-//                     originalName: tempFile.originalName,
-//                     hash: tempFile.hash || null
-//                 }, req.user._id);
+//                             const newFile = await File.create({
+//                                 document: document._id,
+//                                 file: tempFile.s3Filename,
+//                                 s3Url: tempFile.s3Url,
+//                                 originalName: tempFile.originalName,
+//                                 version: parseFloat(newVersion),
+//                                 uploadedBy: req.user._id,
+//                                 uploadedAt: new Date(),
+//                                 isPrimary: true,
+//                                 status: "active"
+//                             });
+
+//                             document.versioning.previousVersion = document.versioning.currentVersion;
+//                             document.versioning.currentVersion = mongoose.Types.Decimal128.fromString(newVersion);
+//                             document.versionHistory.push({
+//                                 version: mongoose.Types.Decimal128.fromString(newVersion),
+//                                 timestamp: new Date(),
+//                                 changedBy: req.user._id,
+//                                 changes: "File added",
+//                                 file: newFile._id,
+//                                 snapshot: {},
+//                             });
+
+//                             newFileIds.push(newFile._id);
+//                         }
+
+//                         document.files.push(...newFileIds);
+//                     }
+//                     break;
+
+//                 case "signature":
+//                     // signature handled separately below
+//                     break;
+
+//                 default:
+//                     document[key] = value; // direct assignment for simple fields
 //             }
 //         }
 
@@ -623,7 +664,6 @@ export const createDocument = async (req, res) => {
 //                 return failResponse(res, "Invalid signature format", 400);
 //             }
 
-//             // Upload base64 to Cloudinary
 //             const uploaded = await cloudinary.uploader.upload(base64Data, {
 //                 folder: "signatures",
 //                 public_id: `signature-${Date.now()}`,
@@ -646,339 +686,325 @@ export const createDocument = async (req, res) => {
 // };
 
 /**
- * Update document
+ * PATCH /api/documents/:id - Update document with versioning
+ * Fully working implementation
  */
 export const updateDocument = async (req, res) => {
     try {
         const { id } = req.params;
+
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return failResponse(res, "Invalid document ID", 400);
+        }
+
         const document = await Document.findById(id);
-        if (!document) return failResponse(res, "Document not found", 404);
+        if (!document) {
+            return failResponse(res, "Document not found", 404);
+        }
+
+        let hasChanges = false;
+        let changeReason = "Document updated";
+        let changedFields = [];
+        let fileUpdates = false;
 
         // Update folder if provided
         if (req.body.folderId && mongoose.Types.ObjectId.isValid(req.body.folderId)) {
-            document.folderId = req.body.folderId;
+            if (document.folderId?.toString() !== req.body.folderId) {
+                document.folderId = req.body.folderId;
+                hasChanges = true;
+                changeReason = "Folder updated";
+                changedFields.push("folderId");
+            }
         }
 
-        // Iterate over req.body keys and update dynamically
+        // Process all fields from request
         for (const [key, value] of Object.entries(req.body)) {
-            if (value === undefined) continue; // skip undefined
+            if (value === undefined || value === null || key === 'folderId') continue;
 
             switch (key) {
                 case "metadata":
                     try {
-                        document.metadata = typeof value === "string" ? JSON.parse(value) : value;
-                    } catch (err) {
-                        logger.warn("Invalid metadata, ignoring", err);
+                        const newMetadata = typeof value === "string" ? JSON.parse(value) : value;
+                        const mergedMetadata = { ...document.metadata, ...newMetadata };
+                        if (JSON.stringify(document.metadata) !== JSON.stringify(mergedMetadata)) {
+                            document.metadata = mergedMetadata;
+                            hasChanges = true;
+                            changeReason = "Metadata updated";
+                            changedFields.push("metadata");
+                        }
+                    } catch (error) {
+                        console.warn("Invalid metadata format:", error.message);
                     }
                     break;
 
                 case "tags":
-                    if (Array.isArray(value)) {
-                        document.tags = value.map(tag => tag.trim());
-                    } else if (typeof value === "string") {
-                        document.tags = value.split(",").map(tag => tag.trim());
+                    let newTags = Array.isArray(value)
+                        ? value.map(tag => tag.trim().toLowerCase()).filter(tag => tag)
+                        : value.split(",").map(tag => tag.trim().toLowerCase()).filter(tag => tag);
+
+                    if (JSON.stringify([...document.tags].sort()) !== JSON.stringify([...newTags].sort())) {
+                        document.tags = newTags;
+                        hasChanges = true;
+                        changeReason = "Tags updated";
+                        changedFields.push("tags");
                     }
                     break;
 
                 case "documentDate":
-                    const [day, month, year] = value.split("-");
-                    document.documentDate = new Date(`${year}-${month}-${day}`);
+                    try {
+                        const [day, month, year] = value.split("-");
+                        const newDate = new Date(`${year}-${month}-${day}`);
+                        if (!document.documentDate || document.documentDate.getTime() !== newDate.getTime()) {
+                            document.documentDate = newDate;
+                            hasChanges = true;
+                            changeReason = "Document date updated";
+                            changedFields.push("documentDate");
+                        }
+                    } catch (error) {
+                        console.warn("Invalid document date format:", error.message);
+                    }
                     break;
 
                 case "compliance":
-                    document.compliance.isCompliance = value === "yes";
-                    if (req.body.expiryDate) {
-                        const [d, m, y] = req.body.expiryDate.split("-");
-                        document.compliance.expiryDate = new Date(`${y}-${m}-${d}`);
+                    const newCompliance = value === "yes" || value === "true" || value === true;
+                    if (document.compliance.isCompliance !== newCompliance) {
+                        document.compliance.isCompliance = newCompliance;
+                        hasChanges = true;
+                        changeReason = "Compliance status updated";
+                        changedFields.push("compliance");
+                    }
+                    break;
+
+                case "expiryDate":
+                    if (value) {
+                        try {
+                            const [d, m, y] = value.split("-");
+                            const newExpiry = new Date(`${y}-${m}-${d}`);
+                            if (!document.compliance.expiryDate || document.compliance.expiryDate.getTime() !== newExpiry.getTime()) {
+                                document.compliance.expiryDate = newExpiry;
+                                hasChanges = true;
+                                changeReason = "Expiry date updated";
+                                changedFields.push("compliance");
+                            }
+                        } catch (error) {
+                            console.warn("Invalid expiry date format:", error.message);
+                        }
                     }
                     break;
 
                 case "fileIds":
                     if (value && value.length > 0) {
-                        let parsedFileIds = Array.isArray(value) ? value : JSON.parse(value);
-                        const newFileIds = [];
-
-                        for (const tempId of parsedFileIds) {
-                            if (!mongoose.Types.ObjectId.isValid(tempId)) continue;
-
-                            const tempFile = await TempFile.findById(tempId);
-                            if (!tempFile || tempFile.status !== "temp") continue;
-
-                            tempFile.status = "permanent";
-                            await tempFile.save();
-
-                            const newFile = await File.create({
-                                document: document._id,
-                                file: tempFile.s3Filename,
-                                s3Url: tempFile.s3Url,
-                                originalName: tempFile.originalName,
-                                hash: tempFile.hash || null,
-                                version: document.currentVersion + 1,
-                                uploadedBy: req.user._id,
-                                uploadedAt: new Date(),
-                                isPrimary: true,
-                                status: "active"
-                            });
-
-                            // mark previous primary files inactive
-                            await File.updateMany(
-                                { document: document._id, isPrimary: true, status: "active" },
-                                { $set: { isPrimary: false } }
-                            );
-
-                            newFileIds.push(newFile._id);
-                            document.currentVersion += 1;
+                        try {
+                            const parsedIds = Array.isArray(value) ? value : JSON.parse(value);
+                            const validIds = parsedIds.filter(id => mongoose.Types.ObjectId.isValid(id));
+                            if (validIds.length > 0) {
+                                await processFileUpdates(document, validIds, req.user);
+                                hasChanges = true;
+                                fileUpdates = true;
+                                changeReason = "Files updated";
+                                changedFields.push("files");
+                            }
+                        } catch (error) {
+                            console.warn("Invalid fileIds format:", error.message);
                         }
+                    }
+                    break;
 
-                        document.files.push(...newFileIds);
+                case "description":
+                case "comment":
+                case "link":
+                case "status":
+                    if (document[key] !== value) {
+                        document[key] = value;
+                        hasChanges = true;
+                        changeReason = `${key.charAt(0).toUpperCase() + key.slice(1)} updated`;
+                        changedFields.push(key);
                     }
                     break;
 
                 case "signature":
-                    // signature handled separately below
+                    // handled separately
                     break;
 
                 default:
-                    document[key] = value; // direct assignment for simple fields
+                    if (document.schema.path(key) && document[key] !== value) {
+                        document[key] = value;
+                        hasChanges = true;
+                        changedFields.push(key);
+                    }
             }
         }
 
-        // Signature handling
-        if (req.files?.signature?.[0]) {
-            const file = req.files.signature[0];
-            if (!file.mimetype.startsWith("image/")) {
-                return failResponse(res, "Signature must be an image", 400);
-            }
-            document.signature = {
-                fileName: file.originalname,
-                fileUrl: file.path || file.filename,
-            };
-        } else if (req.body.signature) {
-            const base64Data = req.body.signature;
-            if (!base64Data.startsWith("data:image/")) {
-                return failResponse(res, "Invalid signature format", 400);
-            }
-
-            const uploaded = await cloudinary.uploader.upload(base64Data, {
-                folder: "signatures",
-                public_id: `signature-${Date.now()}`,
-                overwrite: true,
-            });
-
-            document.signature = {
-                fileName: uploaded.original_filename,
-                fileUrl: uploaded.secure_url,
-            };
+        // Handle signature
+        const signatureUpdated = await handleSignatureUpdate(document, req);
+        if (signatureUpdated) {
+            hasChanges = true;
+            changeReason = "Signature updated";
+            changedFields.push("signature");
         }
 
-        await document.save();
-        return successResponse(res, { document }, "Document updated successfully");
+        // Save and create version history
+        if (hasChanges) {
+            if (fileUpdates) changeReason = "Files and content updated";
+            bumpVersion(document);
+            await createVersionHistory(document, req.user, changeReason, changedFields);
+            await document.save();
+
+            const populatedDoc = await Document.findById(document._id)
+                .populate('files')
+                .populate('owner', 'name email')
+                .populate('folderId', 'name')
+                .populate('versionHistory.changedBy', 'name email');
+
+            return successResponse(res, {
+                document: populatedDoc,
+                changes: changeReason,
+                version: document.versioning.currentVersion.toString()
+            }, "Document updated successfully");
+        } else {
+            const populatedDoc = await Document.findById(document._id)
+                .populate('files')
+                .populate('owner', 'name email');
+
+            return successResponse(res, {
+                document: populatedDoc
+            }, "No changes detected");
+        }
 
     } catch (error) {
-        logger.error("Update error:", error);
+        console.error("Update document error:", error);
         return errorResponse(res, error, "Failed to update document");
     }
 };
 
+
 /**
- * Update document with complete change tracking
+ * Process file updates and versioning
  */
-// export const updateDocument = async (req, res) => {
-//     const session = await mongoose.startSession();
-//     session.startTransaction();
+const processFileUpdates = async (document, fileIds, user, changedFields) => {
+    for (const tempId of fileIds) {
+        const tempFile = await TempFile.findById(tempId);
+        if (!tempFile || tempFile.status !== "temp") continue;
 
-//     try {
-//         const { id } = req.params;
-//         const { changeDescription, changeType = 'minor' } = req.body;
+        tempFile.status = "permanent";
+        await tempFile.save();
 
-//         // Get current document state BEFORE updates
-//         const oldDocument = await Document.findById(id).session(session);
-//         if (!oldDocument) {
-//             await session.abortTransaction();
-//             return failResponse(res, "Document not found", 404);
-//         }
+        await File.updateMany(
+            { document: document._id, isPrimary: true, status: "active" },
+            { $set: { isPrimary: false, status: "inactive" } }
+        );
 
-//         // Clone old document for comparison
-//         const oldState = oldDocument.toObject();
+        const newFile = await File.create({
+            document: document._id,
+            file: tempFile.s3Filename,
+            s3Url: tempFile.s3Url,
+            originalName: tempFile.originalName,
+            version: document.versioning.currentVersion, // version will be bumped outside
+            uploadedBy: user._id,
+            uploadedAt: new Date(),
+            isPrimary: true,
+            status: "active",
+            mimeType: tempFile.mimeType,
+            size: tempFile.size
+        });
 
-//         // Create version snapshot BEFORE any changes
-//         const versionSnapshot = await VersionManager.createVersionSnapshot(oldDocument);
-//         const previousVersion = oldDocument.versioning.currentVersion;
+        if (!document.files.includes(newFile._id)) {
+            document.files.push(newFile._id);
+        }
 
-//         // Calculate next version
-//         const nextVersion = VersionManager.getNextVersion(previousVersion, changeType);
+        if (!changedFields.includes("files")) changedFields.push("files");
+    }
+};
 
-//         // Apply updates to the document
-//         const document = await Document.findById(id).session(session);
-
-//         // Track which fields are being updated
-//         const updatedFields = {};
-
-//         // Handle folder update
-//         if (req.body.folderId && mongoose.Types.ObjectId.isValid(req.body.folderId)) {
-//             updatedFields.folderId = req.body.folderId;
-//             document.folderId = req.body.folderId;
-//         }
-
-//         // Iterate over other fields
-//         for (const [key, value] of Object.entries(req.body)) {
-//             if (['fileIds', 'changeDescription', 'changeType', 'folderId'].includes(key)) continue;
-
-//             if (value !== undefined) {
-//                 switch (key) {
-//                     case "metadata":
-//                         try {
-//                             updatedFields.metadata = typeof value === "string" ? JSON.parse(value) : value;
-//                             document.metadata = updatedFields.metadata;
-//                         } catch (err) {
-//                             logger.warn("Invalid metadata, ignoring", err);
-//                         }
-//                         break;
-
-//                     case "tags":
-//                         if (Array.isArray(value)) {
-//                             updatedFields.tags = value.map(tag => tag.trim());
-//                             document.tags = updatedFields.tags;
-//                         } else if (typeof value === "string") {
-//                             updatedFields.tags = value.split(",").map(tag => tag.trim());
-//                             document.tags = updatedFields.tags;
-//                         }
-//                         break;
-
-//                     case "documentDate":
-//                         const [day, month, year] = value.split("-");
-//                         updatedFields.documentDate = new Date(`${year}-${month}-${day}`);
-//                         document.documentDate = updatedFields.documentDate;
-//                         break;
-
-//                     case "compliance":
-//                         document.compliance.isCompliance = value === "yes";
-//                         updatedFields.compliance = document.compliance;
-//                         if (req.body.expiryDate) {
-//                             const [d, m, y] = req.body.expiryDate.split("-");
-//                             document.compliance.expiryDate = new Date(`${y}-${m}-${d}`);
-//                         }
-//                         break;
-
-//                     default:
-//                         updatedFields[key] = value;
-//                         document[key] = value;
-//                 }
-//             }
-//         }
-
-//         // Handle file updates
-//         let fileChanges = false;
-//         if (req.body.fileIds && req.body.fileIds.length > 0) {
-//             fileChanges = true;
-//             let parsedFileIds = Array.isArray(req.body.fileIds) ? 
-//                 req.body.fileIds : JSON.parse(req.body.fileIds);
-
-//             const newFileIds = [];
-//             for (const tempId of parsedFileIds) {
-//                 if (!mongoose.Types.ObjectId.isValid(tempId)) continue;
-
-//                 const tempFile = await TempFile.findById(tempId).session(session);
-//                 if (!tempFile || tempFile.status !== "temp") continue;
-
-//                 tempFile.status = "permanent";
-//                 await tempFile.save({ session });
-
-//                 const newFile = await File.create([{
-//                     document: document._id,
-//                     file: tempFile.s3Filename,
-//                     s3Url: tempFile.s3Url,
-//                     originalName: tempFile.originalName,
-//                     version: parseFloat(nextVersion),
-//                     uploadedBy: req.user._id,
-//                     uploadedAt: new Date(),
-//                     isPrimary: true,
-//                     status: "active"
-//                 }], { session });
-
-//                 newFileIds.push(newFile[0]._id);
-//             }
-
-//             // Mark previous primary files as inactive
-//             await File.updateMany(
-//                 { document: document._id, isPrimary: true },
-//                 { $set: { isPrimary: false } },
-//                 { session }
-//             );
-
-//             document.files.push(...newFileIds);
-//             updatedFields.files = document.files;
-//         }
-
-//         // Handle signature updates
-//         if (req.files?.signature?.[0] || req.body.signature) {
-//             // Your existing signature handling code...
-//             updatedFields.signature = document.signature;
-//         }
-
-//         // Detect changes and generate description
-//         const changes = VersionManager.detectChanges(oldState, document.toObject());
-//         const autoChangeDescription = VersionManager.generateChangeDescription(changes);
-
-//         // Use provided description or auto-generated one
-//         const finalChangeDescription = changeDescription || 
-//                                     (fileChanges ? 'File updated' : autoChangeDescription) || 
-//                                     'Document updated';
-
-//         // Update versioning information
-//         document.versioning.previousVersion = previousVersion;
-//         document.versioning.currentVersion = parseFloat(nextVersion);
-
-//         // Add to version history
-//         document.versioning.versionHistory.unshift({
-//             version: parseFloat(nextVersion),
-//             timestamp: new Date(),
-//             changedBy: req.user._id,
-//             changes: finalChangeDescription,
-//             changesDetail: changes, // Store detailed changes
-//             snapshot: versionSnapshot,
-//             files: document.files // Reference to files at this version
-//         });
-
-//         // Limit history size
-//         if (document.versioning.versionHistory.length > 50) {
-//             document.versioning.versionHistory = document.versioning.versionHistory.slice(0, 50);
-//         }
-
-//         await document.save({ session });
-//         await session.commitTransaction();
-
-//         // Populate for response
-//         await document.populate([
-//             { path: "versioning.versionHistory.changedBy", select: "name email" },
-//             { path: "department", select: "name" },
-//             { path: "project", select: "projectName" },
-//             { path: "files", select: "originalName version uploadedAt" }
-//         ]);
-
-//         return successResponse(res, { 
-//             document,
-//             versionInfo: {
-//                 previous: previousVersion,
-//                 current: document.versioning.currentVersion,
-//                 changes: finalChangeDescription,
-//                 detailedChanges: changes
-//             }
-//         }, "Document updated successfully");
-
-//     } catch (error) {
-//         await session.abortTransaction();
-//         logger.error("Update error:", error);
-//         return errorResponse(res, error, "Failed to update document");
-//     } finally {
-//         session.endSession();
-//     }
-// };
 
 
 /**
- * Restore to previous version
+ * Handle signature updates
  */
+const handleSignatureUpdate = async (document, req) => {
+    let signatureUpdated = false;
+
+    try {
+        if (req.files?.signature?.[0]) {
+            const file = req.files.signature[0];
+            if (!file.mimetype.startsWith("image/")) {
+                throw new Error("Signature must be an image");
+            }
+
+            document.signature = {
+                fileName: file.originalname,
+                fileUrl: file.path || file.filename,
+                uploadedAt: new Date()
+            };
+            signatureUpdated = true;
+
+        } else if (req.body.signature && req.body.signature.trim() !== '') {
+            const base64Data = req.body.signature;
+            if (!base64Data.startsWith("data:image/")) {
+                throw new Error("Invalid signature format");
+            }
+
+            // If using Cloudinary
+            if (typeof cloudinary !== 'undefined') {
+                const uploaded = await cloudinary.uploader.upload(base64Data, {
+                    folder: "signatures",
+                    public_id: `signature-${document._id}-${Date.now()}`,
+                    overwrite: false
+                });
+
+                document.signature = {
+                    fileName: uploaded.original_filename,
+                    fileUrl: uploaded.secure_url,
+                    uploadedAt: new Date(),
+                    cloudinaryId: uploaded.public_id
+                };
+            } else {
+                // Local storage fallback
+                document.signature = {
+                    fileName: `signature-${Date.now()}.png`,
+                    fileUrl: base64Data, // store as base64 or process accordingly
+                    uploadedAt: new Date()
+                };
+            }
+            signatureUpdated = true;
+        }
+    } catch (error) {
+        console.error("Signature update error:", error);
+        throw error;
+    }
+
+    return signatureUpdated;
+};
+
+/**
+ * Create version history entry
+ */
+const createVersionHistory = async (document, user, changes, changedFields) => {
+    const snapshot = {};
+    changedFields.forEach(field => {
+        if (field === "metadata") snapshot[field] = { ...document.metadata };
+        else if (field === "tags") snapshot[field] = [...document.tags];
+        else if (field === "files") snapshot[field] = document.files.map(f => f.toString());
+        else if (field === "compliance") snapshot[field] = { ...document.compliance };
+        else if (field === "signature") snapshot[field] = document.signature ? { ...document.signature } : null;
+        else snapshot[field] = document[field];
+    });
+
+    document.versionHistory.push({
+        version: document.versioning.currentVersion,
+        timestamp: new Date(),
+        changedBy: user._id,
+        changes,
+        snapshot
+    });
+
+    if (document.versionHistory.length > 50) {
+        document.versionHistory = document.versionHistory.slice(-50);
+    }
+};
+
+
+
 /**
  * Restore to specific version
  */
@@ -1200,8 +1226,8 @@ export const getVersionHistory = async (req, res) => {
         const { id } = req.params;
 
         const document = await Document.findById(id)
-            .populate('versioning.versionHistory.changedBy', 'name email avatar')
-            .select('versioning metadata.mainHeading description currentVersion');
+            .populate('versionHistory.changedBy', 'name email')
+            .select('versioning metadata.mainHeading description versionHistory');
 
         if (!document) {
             return failResponse(res, "Document not found", 404);
@@ -1209,24 +1235,25 @@ export const getVersionHistory = async (req, res) => {
 
         // Enhance version history with additional data
         const enhancedHistory = await Promise.all(
-            document.versioning.versionHistory.map(async (version) => {
+            document.versionHistory.map(async (version) => {
                 // Get files for this version
                 const versionFiles = await File.find({
-                    _id: { $in: version.snapshot.files || [] }
-                }).select('originalName fileSize uploadedAt version');
+                    _id: { $in: version.snapshot?.files || [] }
+                }).select('originalName size uploadedAt version');
 
                 return {
-                    version: version.version,
+                    previousVersion: version.previousVersion?.toString(),
+                    version: version.version?.toString(),
+                    nextVersion: version.nextVersion?.toString(),
                     timestamp: version.timestamp,
                     changedBy: version.changedBy,
                     changes: version.changes,
-                    changesDetail: version.changesDetail,
                     files: versionFiles,
-                    isCurrent: version.version === document.versioning.currentVersion,
+                    isCurrent: version.version?.toString() === document.versioning.currentVersion?.toString(),
                     snapshotPreview: {
-                        description: version.snapshot.description,
-                        mainHeading: version.snapshot.metadata?.mainHeading,
-                        tags: version.snapshot.tags
+                        description: version.snapshot?.description,
+                        mainHeading: version.snapshot?.metadata?.mainHeading,
+                        tags: version.snapshot?.tags
                     }
                 };
             })
@@ -1235,16 +1262,17 @@ export const getVersionHistory = async (req, res) => {
         return successResponse(res, {
             documentId: document._id,
             documentName: document.metadata?.mainHeading || document.description || 'Untitled',
-            currentVersion: document.versioning.currentVersion,
+            currentVersion: document.versioning.currentVersion?.toString(),
             versionHistory: enhancedHistory,
             totalVersions: enhancedHistory.length
         }, "Version history retrieved successfully");
 
     } catch (error) {
-        logger.error("Get version history error:", error);
+        console.error("Get version history error:", error);
         return errorResponse(res, error, "Failed to retrieve version history");
     }
 };
+
 
 /**
  * Delete document
@@ -1326,12 +1354,100 @@ export const updateDocumentStatus = async (req, res) => {
 /**
  * Share document with users or departments
  */
+// export const shareDocument = async (req, res) => {
+//     try {
+//         const { id } = req.params;
+//         const userId = req.user._id;
+//         const { accessLevel, duration, customStart, customEnd } = req.body;
+//         console.log("Frontend payload:", req.body);
+
+//         if (!mongoose.Types.ObjectId.isValid(id) || !mongoose.Types.ObjectId.isValid(userId)) {
+//             return res.status(400).json({ success: false, message: "Invalid ID" });
+//         }
+
+//         const doc = await Document.findById(id);
+//         if (!doc) return res.status(404).json({ success: false, message: "Document not found" });
+
+//         let expiresAt = null;
+//         const now = new Date();
+
+//         switch (duration) {
+//             case "oneday":
+//                 expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+//                 break;
+
+//             case "oneweek":
+//                 expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+//                 break;
+
+//             case "onemonth":
+//                 expiresAt = new Date(now);
+//                 expiresAt.setMonth(expiresAt.getMonth() + 1);
+//                 break;
+
+//             case "custom":
+//                 if (!customStart || !customEnd) {
+//                     console.log("Custom dates missing:", { customStart, customEnd });
+//                     return res.status(400).json({ success: false, message: "Custom start and end dates are required" });
+//                 }
+
+//                 // Parse dates in local timezone
+//                 const start = new Date(customStart);
+//                 const end = new Date(customEnd);
+
+//                 if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+//                     console.log("Invalid custom dates:", { start, end });
+//                     return res.status(400).json({ success: false, message: "Invalid custom dates" });
+//                 }
+
+//                 // Optional: set expiry to the end of the end day (23:59:59)
+//                 end.setHours(23, 59, 59, 999);
+//                 expiresAt = end;
+//                 console.log("Computed expiresAt:", expiresAt);
+//                 break;
+
+//             case "lifetime":
+//             case "onetime":
+//             default:
+//                 expiresAt = null;
+//                 break;
+//         }
+
+//         console.log("Computed expiresAt:", expiresAt);
+
+//         const share = await SharedWith.findOneAndUpdate(
+//             { document: id, user: userId },
+//             { accessLevel, expiresAt, sharedAt: new Date(), inviteStatus: "pending" },
+//             { upsert: true, new: true }
+//         );
+
+//         // update quick lookup array in Document
+//         await Document.findByIdAndUpdate(id, { $addToSet: { sharedWithUsers: userId } });
+
+//         return res.json({ success: true, message: "Document shared successfully", data: share });
+
+//     } catch (err) {
+//         console.error(err);
+//         return res.status(500).json({ success: false, message: "Server error" });
+//     }
+// };
+/**
+ * Share document with users or departments
+ */
 export const shareDocument = async (req, res) => {
     try {
         const { id } = req.params;
         const userId = req.user._id;
-        const { accessLevel, duration, customStart, customEnd } = req.body;
+        const {
+            accessLevel = "view",
+            duration = "lifetime",
+            customEnd,
+            generalAccess = false,
+            generalRole = "viewer",
+            targetUserId
+        } = req.body;
 
+        // Validate IDs
         if (!mongoose.Types.ObjectId.isValid(id) || !mongoose.Types.ObjectId.isValid(userId)) {
             return res.status(400).json({ success: false, message: "Invalid ID" });
         }
@@ -1339,10 +1455,21 @@ export const shareDocument = async (req, res) => {
         const doc = await Document.findById(id);
         if (!doc) return res.status(404).json({ success: false, message: "Document not found" });
 
-        let expiresAt = null;
-        const now = new Date();
+        // Check permission
+        const isOwner = doc.owner.toString() === userId.toString();
+        const existingEditAccess = await SharedWith.findOne({
+            document: id,
+            user: userId,
+        });
+        if (!isOwner && !existingEditAccess) {
+            return res.status(403).json({ success: false, message: "You don't have permission to share this document" });
+        }
 
-        // Set expiry based on duration
+        // Determine expiration
+        const now = new Date();
+        let expiresAt = null;
+        let used;
+
         switch (duration) {
             case "oneday":
                 expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
@@ -1351,38 +1478,65 @@ export const shareDocument = async (req, res) => {
                 expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
                 break;
             case "onemonth":
-                expiresAt = new Date(now.getTime());
+                expiresAt = new Date(now);
                 expiresAt.setMonth(expiresAt.getMonth() + 1);
                 break;
             case "custom":
-                if (customStart && customEnd) {
-                    const start = new Date(customStart);
-                    const end = new Date(customEnd);
-                    if (isNaN(start) || isNaN(end)) {
-                        return res.status(400).json({ success: false, message: "Invalid custom dates" });
-                    }
-                    expiresAt = end;
+                if (customEnd) {
+                    expiresAt = new Date(customEnd);
+                    if (expiresAt <= now)
+                        return res.status(400).json({ success: false, message: "Custom end date must be in the future" });
                 }
                 break;
-            case "lifetime":
             case "onetime":
+                used = false;
+                break;
+            case "lifetime":
             default:
                 expiresAt = null;
         }
 
-        const share = await SharedWith.findOneAndUpdate(
-            { document: id, user: userId },
-            { accessLevel, expiresAt, sharedAt: new Date(), inviteStatus: "pending" },
-            { upsert: true, new: true }
+        // Determine which user to share with
+        let shareUserId;
+        if (!generalAccess) {
+            if (!targetUserId || !mongoose.Types.ObjectId.isValid(targetUserId)) {
+                return res.status(400).json({ success: false, message: "Invalid target user ID" });
+            }
+            shareUserId = targetUserId;
+        }
+
+        // Prepare update data
+        const updateData = {
+            accessLevel: generalAccess ? (generalRole === "editor" ? "edit" : "view") : accessLevel,
+            expiresAt,
+            duration,
+            generalAccess
+        };
+        if (used !== undefined) updateData.used = used;
+
+        // Update or create sharing record
+        const updatedShare = await SharedWith.findOneAndUpdate(
+            {
+                document: id,
+                ...(generalAccess ? { generalAccess: true } : { user: shareUserId })
+            },
+            updateData,
+            { upsert: true, new: true } // Create if not exist
         );
 
-        // update quick lookup array in Document
-        await Document.findByIdAndUpdate(id, { $addToSet: { sharedWithUsers: userId } });
+        // Add to document's sharedWithUsers list if not general access
+        if (!generalAccess) {
+            await Document.findByIdAndUpdate(id, { $addToSet: { sharedWithUsers: shareUserId } });
+        }
 
-        return res.json({ success: true, message: "Document shared successfully", data: share });
+        return res.json({
+            success: true,
+            message: "Document share settings updated successfully",
+            data: updatedShare
+        });
 
     } catch (err) {
-        console.error(err);
+        console.error("Update document share error:", err);
         return res.status(500).json({ success: false, message: "Server error" });
     }
 };
@@ -1455,17 +1609,17 @@ export const getSharedUsers = async (req, res) => {
             return res.status(400).json({ success: false, message: "Invalid document ID" });
         }
 
-        const shares = await SharedWith.find({ document: documentId })
-            .populate("user", "name email role");
+        const shares = await SharedWith.find({ document: documentId, inviteStatus: 'accepted' })
+            .populate("user", "name email");
         if (!shares) return res.status(404).json({ success: false, message: "Shares not found" });
 
         const data = shares.map(sw => ({
             userId: sw.user._id,
             name: sw.user.name,
             email: sw.user.email,
-            role: sw.user.role,
             accessLevel: sw.accessLevel,
             expiresAt: sw.expiresAt,
+            canDownload: sw.canDownload,
             inviteStatus: sw.inviteStatus,
             sharedAt: sw.sharedAt
         }));
@@ -1480,86 +1634,66 @@ export const getSharedUsers = async (req, res) => {
 export const inviteUser = async (req, res) => {
     try {
         const { documentId } = req.params;
-        const { userEmail, accessLevel, duration, customEnd } = req.body;
+        const { userEmail, accessLevel = "view", duration = "lifetime", customEnd } = req.body;
         const inviterId = req.user._id;
 
         // Validation
-        if (!userEmail) {
-            return res.status(400).json({ success: false, message: "User email is required" });
-        }
-
-        if (!mongoose.Types.ObjectId.isValid(documentId)) {
-            return res.status(400).json({ success: false, message: "Invalid document ID" });
-        }
+        if (!userEmail) return res.status(400).json({ success: false, message: "User email is required" });
+        if (!mongoose.Types.ObjectId.isValid(documentId)) return res.status(400).json({ success: false, message: "Invalid document ID" });
 
         const doc = await Document.findById(documentId);
         if (!doc) return res.status(404).json({ success: false, message: "Document not found" });
 
-        // Check if inviter is allowed
+        // Check permissions: owner or edit access
         const isOwner = doc.owner.toString() === inviterId.toString();
-        const existingShare = await SharedWith.findOne({ document: documentId, user: inviterId, accessLevel: "edit", inviteStatus: "accepted" });
-        const hasEditAccess = !!existingShare;
-
-        if (!isOwner && !hasEditAccess) {
-            return res.status(403).json({ success: false, message: "You don't have permission to share this document" });
-        }
+        const existingShare = await SharedWith.findOne({ document: documentId, user: inviterId, accessLevel: "edit" });
+        if (!isOwner && !existingShare) return res.status(403).json({ success: false, message: "You don't have permission to share this document" });
 
         // Find or create user by email
         let user = await User.findOne({ email: userEmail });
         if (!user) {
-            // Generate a more secure temporary password
             const tempPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8);
             user = new User({
                 email: userEmail,
-                name: userEmail.split('@')[0], // Use email prefix as name
+                name: userEmail.split('@')[0],
                 password: tempPassword,
-                isTemporary: true // Flag for temporary users
+                isTemporary: true
             });
             await user.save();
         }
 
         const userId = user._id;
 
-        // Calculate expiry
+        // Compute expiresAt
         let expiresAt = null;
         const now = new Date();
-
         switch (duration) {
-            case "oneday":
-                expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-                break;
-            case "oneweek":
-                expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-                break;
-            case "onemonth":
-                expiresAt = new Date(now);
-                expiresAt.setMonth(expiresAt.getMonth() + 1);
-                break;
+            case "oneday": expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); break;
+            case "oneweek": expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); break;
+            case "onemonth": expiresAt = new Date(now.setMonth(now.getMonth() + 1)); break;
             case "custom":
                 if (customEnd) {
                     expiresAt = new Date(customEnd);
-                    if (expiresAt <= now) {
-                        return res.status(400).json({ success: false, message: "Custom end date must be in the future" });
-                    }
+                    if (expiresAt <= now) return res.status(400).json({ success: false, message: "Custom end date must be in the future" });
                 }
                 break;
             case "lifetime":
             case "onetime":
-                // No expiry for lifetime, onetime might need special handling
-                expiresAt = null;
-                break;
             default:
                 expiresAt = null;
         }
 
-        // Upsert into SharedWith
+        // 1️⃣ Create or update SharedWith entry with minimal data
         await SharedWith.findOneAndUpdate(
             { document: documentId, user: userId },
             {
+                document: documentId,
+                user: userId,
                 accessLevel,
                 expiresAt,
-                inviteStatus: "pending",
-                sharedAt: new Date()
+                duration,
+                inviteStatus: "pending", // added field for invite workflow
+                used: false
             },
             { upsert: true, new: true }
         );

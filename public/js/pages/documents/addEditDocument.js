@@ -538,10 +538,12 @@ $(document).ready(function () {
                 dataType: 'json',
                 delay: 250,
                 data: function (params) {
+                    const projectId = $('#projectName').val();
                     return {
                         search: params.term || '',
                         page: params.page || 1,
                         limit: 10,
+                        projectId: projectId, // filter by selected project
                         profile_type: 'donor' // filter for donor users
                     };
                 },
@@ -571,10 +573,12 @@ $(document).ready(function () {
                 dataType: 'json',
                 delay: 250,
                 data: function (params) {
+                    const projectId = $('#projectName').val();
                     return {
                         search: params.term || '',
                         page: params.page || 1,
                         limit: 10,
+                        projectId: projectId, // filter by selected project
                         profile_type: 'vendor' // filter for vendor users
                     };
                 },
@@ -688,6 +692,12 @@ $(document).ready(function () {
         if (!projectId || projectId === 'all') {
             // Reset department if no project selected
             $('#department').val(null).trigger('change');
+            $('#documentDonor').val(null).trigger('change');
+            $('#documentVendor').val(null).trigger('change');
+
+            // Reload Select2 options based on new project
+            $('#documentDonor').select2('destroy');
+            $('#documentVendor').select2('destroy');
         }
     });
 
@@ -820,14 +830,16 @@ $(document).ready(function () {
 
             if (data.success) {
                 if (data.document?.metadata?.fileName) {
-                    $('#successFileName').text(data.document.metadata.fileName);
+                    document.getElementById('successFileName').textContent = data.document.metadata.fileName;
                 }
-                $('#data-success-modal').modal('show');
+                // Show modal
+                const successModal = new bootstrap.Modal(document.getElementById('data-success-modal'));
+                successModal.show();
 
                 if (!isEdit) {
-                    $('#data-success-modal').on('hidden.bs.modal', function () {
+                    document.getElementById('data-success-modal').addEventListener('hidden.bs.modal', function () {
                         window.location.href = '/documents/add';
-                    });
+                    }, { once: true }); // `once: true` ensures it runs only once
                 }
             } else {
                 showToast('Error: ' + (data.message || 'Unknown error occurred', 'error'));

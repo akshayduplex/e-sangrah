@@ -876,64 +876,6 @@
             }
         });
 
-        // Invite User
-        $('#inviteUserBtn').on('click', async function () {
-            if (!currentDocId) return alert('No document selected');
-
-            const selectedData = $('#userInviteSelect').select2('data')[0];
-            if (!selectedData) return alert('Please select or enter an email address');
-
-            const userEmail = selectedData.id;
-            const accessLevel = $('#accessLevelSelect').val() || 'view';
-            const duration = $('#sharedoc-modal input[name="time"]:checked').attr('id') || 'lifetime';
-            const customEnd = $('#endDate').val() || null;
-
-            if (duration === 'custom' && !customEnd) return alert('Please select an end date for custom duration');
-
-            try {
-                const response = await fetch(`${baseUrl}/api/documents/${currentDocId}/invite`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userEmail, accessLevel, duration, customEnd })
-                });
-                const data = await response.json();
-                if (!data.success) return alert(data.message || 'Failed to send invite');
-
-                addUserToUI(userEmail, accessLevel, true);
-                $('#userInviteSelect').val(null).trigger('change');
-            } catch (err) {
-                console.error('Invite error:', err);
-                alert('Error sending invite. Please try again.');
-            }
-        });
-
-        // Share Document
-        $('#sharedoc-modal .modal-footer .site-btnmd').on('click', async function () {
-            if (!currentDocId) return alert('No document selected');
-
-            try {
-                const response = await fetch(`${baseUrl}/api/documents/${currentDocId}/share`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: "Document shared" })
-                });
-                const data = await response.json();
-                if (!data.success) return alert(data.message || 'Failed to share document');
-
-                alert('Document shared successfully!');
-            } catch (err) {
-                console.error('Share error:', err);
-                alert('Error sharing document. Please try again.');
-            }
-        });
-
-        // Remove User
-        $('#sharedoc-modal').on('click', '.remove-user', function () {
-            const row = $(this).closest('.user-accssrow');
-            if (!confirm(`Remove ${row.find('.fw-normal').text()} from this document?`)) return;
-            row.remove();
-        });
-
         // Load shared users from API
         function loadSharedUsers(docId, modal) {
             $.ajax({
