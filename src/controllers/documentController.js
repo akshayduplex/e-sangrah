@@ -9,6 +9,8 @@ import logger from "../utils/logger.js";
 import { sendEmail } from "../services/emailService.js";
 import User from "../models/User.js";
 import Designation from "../models/Designation.js";
+import SharedWith from "../models/SharedWith.js";
+import File from "../models/File.js";
 
 //Page Controllers
 
@@ -204,22 +206,20 @@ export const getDocuments = async (req, res) => {
         const documents = await Document.find(filter)
             .populate("department", "name")
             .populate("project", "projectName")
-            .populate("owner", "name")
+            .populate("owner", "name email")
             .populate("documentDonor", "name")
             .populate("documentVendor", "name")
             .populate("projectManager", "name")
             .populate("folderId", "name")
-            .populate({
-                path: "sharedWith.user",
-                select: "name"
-            })
+            .populate("sharedWithUsers", "name")
+            .populate("files")
             .sort(sort)
-            .select("metadata signature description documentVendor documentDonor project department owner status tags files link createdAt updatedAt sharedWith remark compliance")
+            .select("metadata signature description sharedWithUsers documentVendor documentDonor project department owner status tags files link createdAt updatedAt remark compliance")
             .skip(skip)
-            .limit(limitNum);
+            .limit(limitNum).
+            lean();
 
         const totalDocuments = await Document.countDocuments(filter);
-
         return successResponse(res, {
             documents,
             pagination: {
@@ -340,43 +340,25 @@ export const createDocument = async (req, res) => {
             link,
             fileIds
         } = req.body;
-        // Validate folderId if provided
-        let validFolderId = null;
-        if (folderId && mongoose.Types.ObjectId.isValid(folderId)) {
-            validFolderId = folderId;
-        }
-        // Parse metadata if it's a JSON string
+
+        // ------------------- Validate folder -------------------
+        const validFolderId = folderId && mongoose.Types.ObjectId.isValid(folderId) ? folderId : null;
+
+        // ------------------- Parse metadata -------------------
         let parsedMetadata = {};
         if (metadata) {
             try {
                 parsedMetadata = typeof metadata === "string" ? JSON.parse(metadata) : metadata;
-            } catch (error) {
-                logger.error("Error parsing metadata:", error);
+            } catch (err) {
+                logger.error("Error parsing metadata:", err);
             }
         }
 
-        // Parse tags if they're comma-separated
-        const parsedTags = tags ? tags.split(",").map(tag => tag.trim()) : [];
+        // ------------------- Parse tags -------------------
+        const parsedTags = tags ? tags.split(",").map(t => t.trim()) : [];
 
+        // ------------------- Compliance -------------------
         const isCompliance = compliance === "yes";
-
-        // Fix date parsing
-        let parsedDocumentDate;
-        if (documentDate) {
-            if (documentDate.includes("-")) {
-                const [day, month, year] = documentDate.split("-");
-                parsedDocumentDate = new Date(`${year}-${month}-${day}`);
-            } else {
-                parsedDocumentDate = new Date(documentDate);
-            }
-            if (isNaN(parsedDocumentDate.getTime())) {
-                return failResponse(res, "Invalid document date format", 400);
-            }
-        } else {
-            parsedDocumentDate = new Date();
-        }
-
-        // Parse expiry date if needed
         let parsedExpiryDate = null;
         if (isCompliance && expiryDate) {
             if (expiryDate.includes("-")) {
@@ -389,82 +371,22 @@ export const createDocument = async (req, res) => {
                 return failResponse(res, "Invalid expiry date format", 400);
             }
         }
-        let parsedFileIds = [];
-        if (fileIds) {
-            if (typeof fileIds === "string") {
-                try {
-                    parsedFileIds = JSON.parse(fileIds);
-                    if (!Array.isArray(parsedFileIds)) parsedFileIds = [parsedFileIds];
-                } catch (err) {
-                    parsedFileIds = [fileIds]; // fallback single id
-                }
-            } else if (Array.isArray(fileIds)) {
-                parsedFileIds = fileIds;
+
+        // ------------------- Document date -------------------
+        let parsedDocumentDate = new Date();
+        if (documentDate) {
+            if (documentDate.includes("-")) {
+                const [day, month, year] = documentDate.split("-");
+                parsedDocumentDate = new Date(`${year}-${month}-${day}`);
+            } else {
+                parsedDocumentDate = new Date(documentDate);
             }
-
-            // Convert to ObjectId and filter invalid ones
-            parsedFileIds = parsedFileIds
-                .filter(id => mongoose.Types.ObjectId.isValid(id))
-                .map(id => new mongoose.Types.ObjectId(id));
-
-        }
-        let uploadedFiles = [];
-        for (const fileId of parsedFileIds) {
-            try {
-                const tempFile = await TempFile.findById(fileId);
-                if (tempFile && tempFile.status === "temp") {
-                    tempFile.status = "permanent";
-                    await tempFile.save();
-
-                    uploadedFiles.push({
-                        file: tempFile.s3Filename,       // S3 key
-                        s3Url: tempFile.s3Url,           // S3 URL
-                        originalName: tempFile.originalName,
-                        version: 1,
-                        uploadedAt: new Date(),
-                        isPrimary: uploadedFiles.length === 0
-                    });
-                }
-            } catch (err) {
-                logger.warn(`Skipping invalid file ID: ${fileId}`, err);
+            if (isNaN(parsedDocumentDate.getTime())) {
+                return failResponse(res, "Invalid document date format", 400);
             }
         }
-        let signature = {};
 
-        // Case 1: Signature uploaded as file
-        if (req.files?.signatureFile?.[0]) {
-            const file = req.files.signatureFile[0];
-            if (!file.mimetype.startsWith("image/")) {
-                return failResponse(res, "Signature must be an image", 400);
-            }
-            signature = {
-                fileName: file.originalname,
-                fileUrl: file.path || file.filename, // Cloudinary gives .path (URL)
-            };
-        }
-
-        // Case 2: Signature drawn on canvas (base64 string)
-        else if (req.body.signature) {
-            const base64Data = req.body.signature;
-
-            if (!base64Data.startsWith("data:image/")) {
-                return failResponse(res, "Invalid signature format", 400);
-            }
-
-            // Upload base64 to Cloudinary
-            const uploaded = await cloudinary.uploader.upload(base64Data, {
-                folder: "signatures",
-                public_id: `signature-${Date.now()}`,
-                overwrite: true,
-            });
-
-            signature = {
-                fileName: uploaded.original_filename,
-                fileUrl: uploaded.secure_url,
-            };
-        }
-
-
+        // ------------------- Create Document first -------------------
         const document = new Document({
             project: project || null,
             department,
@@ -480,16 +402,94 @@ export const createDocument = async (req, res) => {
             category: null,
             metadata: parsedMetadata,
             description,
-            compliance: {
-                isCompliance,
-                expiryDate: parsedExpiryDate
-            },
-            files: uploadedFiles,
-            signature,
+            compliance: { isCompliance, expiryDate: parsedExpiryDate },
+            files: [], // empty for now
+            signature: {},
             link: link || null,
             comment: comment || null
         });
-        // ------------------- Create Notification -------------------
+        await document.save();
+
+        // ------------------- Process files -------------------
+        let parsedFileIds = [];
+        if (fileIds) {
+            if (typeof fileIds === "string") {
+                try {
+                    parsedFileIds = JSON.parse(fileIds);
+                    if (!Array.isArray(parsedFileIds)) parsedFileIds = [parsedFileIds];
+                } catch {
+                    parsedFileIds = [fileIds];
+                }
+            } else if (Array.isArray(fileIds)) {
+                parsedFileIds = fileIds;
+            }
+        }
+
+        parsedFileIds = parsedFileIds
+            .filter(id => mongoose.Types.ObjectId.isValid(id))
+            .map(id => new mongoose.Types.ObjectId(id));
+
+        const fileDocs = [];
+        for (const fileId of parsedFileIds) {
+            try {
+                const tempFile = await TempFile.findById(fileId);
+                if (!tempFile || tempFile.status !== "temp") continue;
+
+                tempFile.status = "permanent";
+                await tempFile.save();
+
+                const newFile = await File.create({
+                    document: document._id, // now valid
+                    file: tempFile.s3Filename,
+                    s3Url: tempFile.s3Url,
+                    originalName: tempFile.originalName,
+                    version: 1,
+                    uploadedBy: req.user._id,
+                    uploadedAt: new Date(),
+                    isPrimary: fileDocs.length === 0,
+                    status: "active"
+                });
+                fileDocs.push(newFile._id);
+            } catch (err) {
+                logger.warn(`Skipping invalid file ID: ${fileId}`, err);
+            }
+        }
+
+        // Update Document with file references
+        if (fileDocs.length > 0) {
+            document.files = fileDocs;
+            await document.save();
+        }
+
+        // ------------------- Signature -------------------
+        if (req.files?.signatureFile?.[0]) {
+            const file = req.files.signatureFile[0];
+            if (!file.mimetype.startsWith("image/")) {
+                return failResponse(res, "Signature must be an image", 400);
+            }
+            document.signature = {
+                fileName: file.originalname,
+                fileUrl: file.path || file.filename
+            };
+        } else if (req.body.signature) {
+            const base64Data = req.body.signature;
+            if (!base64Data.startsWith("data:image/")) {
+                return failResponse(res, "Invalid signature format", 400);
+            }
+            const uploaded = await cloudinary.uploader.upload(base64Data, {
+                folder: "signatures",
+                public_id: `signature-${Date.now()}`,
+                overwrite: true
+            });
+            document.signature = {
+                fileName: uploaded.original_filename,
+                fileUrl: uploaded.secure_url
+            };
+        }
+
+        await document.save();
+
+        // ------------------- Notification -------------------
         if (projectManager) {
             await Notification.create({
                 recipient: projectManager,
@@ -502,12 +502,11 @@ export const createDocument = async (req, res) => {
                 actionUrl: `/documents/${document._id}`
             });
         }
-        await document.save();
 
         await document.populate([
             { path: "department", select: "name" },
             { path: "project", select: "projectName" },
-            { path: "owner", select: "firstName lastName email" }
+            { path: "owner", select: "name email" }
         ]);
 
         return successResponse(res, { document }, "Document created successfully", 201);
@@ -697,22 +696,41 @@ export const updateDocument = async (req, res) => {
                 case "fileIds":
                     if (value && value.length > 0) {
                         let parsedFileIds = Array.isArray(value) ? value : JSON.parse(value);
-                        for (const fileId of parsedFileIds) {
-                            if (!mongoose.Types.ObjectId.isValid(fileId)) continue;
+                        const newFileIds = [];
 
-                            const tempFile = await TempFile.findById(fileId);
+                        for (const tempId of parsedFileIds) {
+                            if (!mongoose.Types.ObjectId.isValid(tempId)) continue;
+
+                            const tempFile = await TempFile.findById(tempId);
                             if (!tempFile || tempFile.status !== "temp") continue;
 
                             tempFile.status = "permanent";
                             await tempFile.save();
 
-                            await document.addNewVersion({
+                            const newFile = await File.create({
+                                document: document._id,
                                 file: tempFile.s3Filename,
                                 s3Url: tempFile.s3Url,
                                 originalName: tempFile.originalName,
-                                hash: tempFile.hash || null
-                            }, req.user._id);
+                                hash: tempFile.hash || null,
+                                version: document.currentVersion + 1,
+                                uploadedBy: req.user._id,
+                                uploadedAt: new Date(),
+                                isPrimary: true,
+                                status: "active"
+                            });
+
+                            // mark previous primary files inactive
+                            await File.updateMany(
+                                { document: document._id, isPrimary: true, status: "active" },
+                                { $set: { isPrimary: false } }
+                            );
+
+                            newFileIds.push(newFile._id);
+                            document.currentVersion += 1;
                         }
+
+                        document.files.push(...newFileIds);
                     }
                     break;
 
@@ -759,6 +777,472 @@ export const updateDocument = async (req, res) => {
     } catch (error) {
         logger.error("Update error:", error);
         return errorResponse(res, error, "Failed to update document");
+    }
+};
+
+/**
+ * Update document with complete change tracking
+ */
+// export const updateDocument = async (req, res) => {
+//     const session = await mongoose.startSession();
+//     session.startTransaction();
+
+//     try {
+//         const { id } = req.params;
+//         const { changeDescription, changeType = 'minor' } = req.body;
+
+//         // Get current document state BEFORE updates
+//         const oldDocument = await Document.findById(id).session(session);
+//         if (!oldDocument) {
+//             await session.abortTransaction();
+//             return failResponse(res, "Document not found", 404);
+//         }
+
+//         // Clone old document for comparison
+//         const oldState = oldDocument.toObject();
+
+//         // Create version snapshot BEFORE any changes
+//         const versionSnapshot = await VersionManager.createVersionSnapshot(oldDocument);
+//         const previousVersion = oldDocument.versioning.currentVersion;
+
+//         // Calculate next version
+//         const nextVersion = VersionManager.getNextVersion(previousVersion, changeType);
+
+//         // Apply updates to the document
+//         const document = await Document.findById(id).session(session);
+
+//         // Track which fields are being updated
+//         const updatedFields = {};
+
+//         // Handle folder update
+//         if (req.body.folderId && mongoose.Types.ObjectId.isValid(req.body.folderId)) {
+//             updatedFields.folderId = req.body.folderId;
+//             document.folderId = req.body.folderId;
+//         }
+
+//         // Iterate over other fields
+//         for (const [key, value] of Object.entries(req.body)) {
+//             if (['fileIds', 'changeDescription', 'changeType', 'folderId'].includes(key)) continue;
+
+//             if (value !== undefined) {
+//                 switch (key) {
+//                     case "metadata":
+//                         try {
+//                             updatedFields.metadata = typeof value === "string" ? JSON.parse(value) : value;
+//                             document.metadata = updatedFields.metadata;
+//                         } catch (err) {
+//                             logger.warn("Invalid metadata, ignoring", err);
+//                         }
+//                         break;
+
+//                     case "tags":
+//                         if (Array.isArray(value)) {
+//                             updatedFields.tags = value.map(tag => tag.trim());
+//                             document.tags = updatedFields.tags;
+//                         } else if (typeof value === "string") {
+//                             updatedFields.tags = value.split(",").map(tag => tag.trim());
+//                             document.tags = updatedFields.tags;
+//                         }
+//                         break;
+
+//                     case "documentDate":
+//                         const [day, month, year] = value.split("-");
+//                         updatedFields.documentDate = new Date(`${year}-${month}-${day}`);
+//                         document.documentDate = updatedFields.documentDate;
+//                         break;
+
+//                     case "compliance":
+//                         document.compliance.isCompliance = value === "yes";
+//                         updatedFields.compliance = document.compliance;
+//                         if (req.body.expiryDate) {
+//                             const [d, m, y] = req.body.expiryDate.split("-");
+//                             document.compliance.expiryDate = new Date(`${y}-${m}-${d}`);
+//                         }
+//                         break;
+
+//                     default:
+//                         updatedFields[key] = value;
+//                         document[key] = value;
+//                 }
+//             }
+//         }
+
+//         // Handle file updates
+//         let fileChanges = false;
+//         if (req.body.fileIds && req.body.fileIds.length > 0) {
+//             fileChanges = true;
+//             let parsedFileIds = Array.isArray(req.body.fileIds) ? 
+//                 req.body.fileIds : JSON.parse(req.body.fileIds);
+
+//             const newFileIds = [];
+//             for (const tempId of parsedFileIds) {
+//                 if (!mongoose.Types.ObjectId.isValid(tempId)) continue;
+
+//                 const tempFile = await TempFile.findById(tempId).session(session);
+//                 if (!tempFile || tempFile.status !== "temp") continue;
+
+//                 tempFile.status = "permanent";
+//                 await tempFile.save({ session });
+
+//                 const newFile = await File.create([{
+//                     document: document._id,
+//                     file: tempFile.s3Filename,
+//                     s3Url: tempFile.s3Url,
+//                     originalName: tempFile.originalName,
+//                     version: parseFloat(nextVersion),
+//                     uploadedBy: req.user._id,
+//                     uploadedAt: new Date(),
+//                     isPrimary: true,
+//                     status: "active"
+//                 }], { session });
+
+//                 newFileIds.push(newFile[0]._id);
+//             }
+
+//             // Mark previous primary files as inactive
+//             await File.updateMany(
+//                 { document: document._id, isPrimary: true },
+//                 { $set: { isPrimary: false } },
+//                 { session }
+//             );
+
+//             document.files.push(...newFileIds);
+//             updatedFields.files = document.files;
+//         }
+
+//         // Handle signature updates
+//         if (req.files?.signature?.[0] || req.body.signature) {
+//             // Your existing signature handling code...
+//             updatedFields.signature = document.signature;
+//         }
+
+//         // Detect changes and generate description
+//         const changes = VersionManager.detectChanges(oldState, document.toObject());
+//         const autoChangeDescription = VersionManager.generateChangeDescription(changes);
+
+//         // Use provided description or auto-generated one
+//         const finalChangeDescription = changeDescription || 
+//                                     (fileChanges ? 'File updated' : autoChangeDescription) || 
+//                                     'Document updated';
+
+//         // Update versioning information
+//         document.versioning.previousVersion = previousVersion;
+//         document.versioning.currentVersion = parseFloat(nextVersion);
+
+//         // Add to version history
+//         document.versioning.versionHistory.unshift({
+//             version: parseFloat(nextVersion),
+//             timestamp: new Date(),
+//             changedBy: req.user._id,
+//             changes: finalChangeDescription,
+//             changesDetail: changes, // Store detailed changes
+//             snapshot: versionSnapshot,
+//             files: document.files // Reference to files at this version
+//         });
+
+//         // Limit history size
+//         if (document.versioning.versionHistory.length > 50) {
+//             document.versioning.versionHistory = document.versioning.versionHistory.slice(0, 50);
+//         }
+
+//         await document.save({ session });
+//         await session.commitTransaction();
+
+//         // Populate for response
+//         await document.populate([
+//             { path: "versioning.versionHistory.changedBy", select: "name email" },
+//             { path: "department", select: "name" },
+//             { path: "project", select: "projectName" },
+//             { path: "files", select: "originalName version uploadedAt" }
+//         ]);
+
+//         return successResponse(res, { 
+//             document,
+//             versionInfo: {
+//                 previous: previousVersion,
+//                 current: document.versioning.currentVersion,
+//                 changes: finalChangeDescription,
+//                 detailedChanges: changes
+//             }
+//         }, "Document updated successfully");
+
+//     } catch (error) {
+//         await session.abortTransaction();
+//         logger.error("Update error:", error);
+//         return errorResponse(res, error, "Failed to update document");
+//     } finally {
+//         session.endSession();
+//     }
+// };
+
+
+/**
+ * Restore to previous version
+ */
+/**
+ * Restore to specific version
+ */
+export const restoreVersion = async (req, res) => {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+        const { id, version } = req.params;
+        const { restoreNotes = '' } = req.body;
+
+        const document = await Document.findById(id).session(session);
+        if (!document) {
+            await session.abortTransaction();
+            return failResponse(res, "Document not found", 404);
+        }
+
+        // Find the target version
+        const targetVersion = document.versioning.versionHistory.find(
+            v => v.version === parseFloat(version)
+        );
+
+        if (!targetVersion) {
+            await session.abortTransaction();
+            return failResponse(res, `Version ${version} not found`, 404);
+        }
+
+        // Create snapshot of CURRENT state before restore
+        const currentSnapshot = await VersionManager.createVersionSnapshot(document);
+        const previousVersion = document.versioning.currentVersion;
+
+        // Calculate new version number for the restore action
+        const newVersion = VersionManager.getNextVersion(previousVersion, 'minor');
+
+        // Restore document fields from the target version snapshot
+        const snapshot = targetVersion.snapshot;
+
+        document.description = snapshot.description;
+        document.metadata = snapshot.metadata;
+        document.tags = snapshot.tags;
+        document.compliance = snapshot.compliance;
+        document.project = snapshot.project;
+        document.department = snapshot.department;
+        document.projectManager = snapshot.projectManager;
+        document.documentDonor = snapshot.documentDonor;
+        document.documentVendor = snapshot.documentVendor;
+        document.status = snapshot.status;
+        document.link = snapshot.link;
+        document.comment = snapshot.comment;
+        document.documentDate = snapshot.documentDate;
+
+        // Handle file restoration
+        if (snapshot.files && snapshot.files.length > 0) {
+            // Get files from the target version
+            const versionFiles = await File.find({
+                _id: { $in: snapshot.files }
+            }).session(session);
+
+            // Create new file entries for the restored version (to maintain file history)
+            const restoredFileIds = [];
+            for (const oldFile of versionFiles) {
+                const newFile = await File.create([{
+                    document: document._id,
+                    file: oldFile.file,
+                    s3Url: oldFile.s3Url,
+                    originalName: oldFile.originalName,
+                    version: parseFloat(newVersion),
+                    uploadedBy: req.user._id,
+                    uploadedAt: new Date(),
+                    isPrimary: oldFile.isPrimary,
+                    status: "active",
+                    restoredFrom: oldFile._id, // Track original file
+                    restoredAt: new Date()
+                }], { session });
+
+                restoredFileIds.push(newFile[0]._id);
+            }
+
+            // Mark all current files as inactive
+            await File.updateMany(
+                { document: document._id, status: "active" },
+                { $set: { isPrimary: false, status: "inactive" } },
+                { session }
+            );
+
+            // Mark restored files as active and set primary
+            if (restoredFileIds.length > 0) {
+                await File.updateMany(
+                    { _id: { $in: restoredFileIds } },
+                    { $set: { status: "active", isPrimary: true } },
+                    { session }
+                );
+            }
+
+            document.files = restoredFileIds;
+        }
+
+        // Update versioning information
+        document.versioning.previousVersion = previousVersion;
+        document.versioning.currentVersion = parseFloat(newVersion);
+
+        // Add restore action to version history
+        document.versioning.versionHistory.unshift({
+            version: parseFloat(newVersion),
+            timestamp: new Date(),
+            changedBy: req.user._id,
+            changes: `Restored to version ${version}${restoreNotes ? ` - ${restoreNotes}` : ''}`,
+            changesDetail: [
+                {
+                    field: 'restore_action',
+                    oldValue: `Version ${previousVersion}`,
+                    newValue: `Version ${version}`
+                }
+            ],
+            snapshot: currentSnapshot, // Store current state before restore
+            restoredFrom: parseFloat(version),
+            isRestorePoint: true
+        });
+
+        await document.save({ session });
+        await session.commitTransaction();
+
+        // Populate for response
+        await document.populate([
+            { path: "versioning.versionHistory.changedBy", select: "name email" },
+            { path: "department", select: "name" },
+            { path: "project", select: "projectName" },
+            { path: "files", select: "originalName version uploadedAt" }
+        ]);
+
+        return successResponse(res, {
+            document,
+            restoreInfo: {
+                fromVersion: version,
+                toVersion: newVersion,
+                previousVersion: previousVersion,
+                restoredAt: new Date()
+            }
+        }, `Document successfully restored to version ${version}`);
+
+    } catch (error) {
+        await session.abortTransaction();
+        logger.error("Restore version error:", error);
+        return errorResponse(res, error, "Failed to restore version");
+    } finally {
+        session.endSession();
+    }
+};
+
+
+/**
+ * View specific version of document
+ */
+export const viewVersion = async (req, res) => {
+    try {
+        const { id, version } = req.params;
+
+        const document = await Document.findById(id);
+        if (!document) {
+            return failResponse(res, "Document not found", 404);
+        }
+
+        // Find the specific version in history
+        const versionData = document.versioning.versionHistory.find(
+            v => v.version === parseFloat(version)
+        );
+
+        if (!versionData) {
+            return failResponse(res, `Version ${version} not found`, 404);
+        }
+
+        // Get files associated with this version
+        const versionFiles = await File.find({
+            _id: { $in: versionData.snapshot.files || [] }
+        }).select('originalName s3Url version uploadedAt');
+
+        // Reconstruct the document as it was at that version
+        const versionDocument = {
+            _id: document._id,
+            ...versionData.snapshot,
+            version: versionData.version,
+            versionInfo: {
+                timestamp: versionData.timestamp,
+                changedBy: versionData.changedBy,
+                changes: versionData.changes,
+                changesDetail: versionData.changesDetail
+            },
+            files: versionFiles
+        };
+
+        // Populate referenced fields
+        await Document.populate(versionDocument, [
+            { path: 'department', select: 'name' },
+            { path: 'project', select: 'projectName' },
+            { path: 'projectManager', select: 'name email' },
+            { path: 'documentDonor', select: 'name email' },
+            { path: 'documentVendor', select: 'name email' },
+            { path: 'versionInfo.changedBy', select: 'name email' }
+        ]);
+
+        return successResponse(res, {
+            document: versionDocument,
+            isHistorical: true,
+            currentVersion: document.versioning.currentVersion
+        }, `Viewing version ${version}`);
+
+    } catch (error) {
+        logger.error("View version error:", error);
+        return errorResponse(res, error, "Failed to retrieve version");
+    }
+};
+
+
+/**
+ * Get complete version history for a document
+ */
+export const getVersionHistory = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const document = await Document.findById(id)
+            .populate('versioning.versionHistory.changedBy', 'name email avatar')
+            .select('versioning metadata.mainHeading description currentVersion');
+
+        if (!document) {
+            return failResponse(res, "Document not found", 404);
+        }
+
+        // Enhance version history with additional data
+        const enhancedHistory = await Promise.all(
+            document.versioning.versionHistory.map(async (version) => {
+                // Get files for this version
+                const versionFiles = await File.find({
+                    _id: { $in: version.snapshot.files || [] }
+                }).select('originalName fileSize uploadedAt version');
+
+                return {
+                    version: version.version,
+                    timestamp: version.timestamp,
+                    changedBy: version.changedBy,
+                    changes: version.changes,
+                    changesDetail: version.changesDetail,
+                    files: versionFiles,
+                    isCurrent: version.version === document.versioning.currentVersion,
+                    snapshotPreview: {
+                        description: version.snapshot.description,
+                        mainHeading: version.snapshot.metadata?.mainHeading,
+                        tags: version.snapshot.tags
+                    }
+                };
+            })
+        );
+
+        return successResponse(res, {
+            documentId: document._id,
+            documentName: document.metadata?.mainHeading || document.description || 'Untitled',
+            currentVersion: document.versioning.currentVersion,
+            versionHistory: enhancedHistory,
+            totalVersions: enhancedHistory.length
+        }, "Version history retrieved successfully");
+
+    } catch (error) {
+        logger.error("Get version history error:", error);
+        return errorResponse(res, error, "Failed to retrieve version history");
     }
 };
 
@@ -845,7 +1329,7 @@ export const updateDocumentStatus = async (req, res) => {
 export const shareDocument = async (req, res) => {
     try {
         const { id } = req.params;
-        const userId = req.user._id; // fixed destructuring
+        const userId = req.user._id;
         const { accessLevel, duration, customStart, customEnd } = req.body;
 
         if (!mongoose.Types.ObjectId.isValid(id) || !mongoose.Types.ObjectId.isValid(userId)) {
@@ -886,21 +1370,17 @@ export const shareDocument = async (req, res) => {
                 expiresAt = null;
         }
 
-        // Update sharedWith
-        const existingIndex = doc.sharedWith.findIndex(sw => sw.user.toString() === userId.toString());
-        if (existingIndex >= 0) {
-            doc.sharedWith[existingIndex].accessLevel = accessLevel;
-            doc.sharedWith[existingIndex].expiresAt = expiresAt;
-        } else {
-            doc.sharedWith.push({ user: userId, accessLevel, expiresAt });
-        }
+        const share = await SharedWith.findOneAndUpdate(
+            { document: id, user: userId },
+            { accessLevel, expiresAt, sharedAt: new Date(), inviteStatus: "pending" },
+            { upsert: true, new: true }
+        );
 
-        // Update flattened array
-        doc.sharedWithUsers = doc.sharedWith.map(sw => sw.user);
+        // update quick lookup array in Document
+        await Document.findByIdAndUpdate(id, { $addToSet: { sharedWithUsers: userId } });
 
-        await doc.save();
+        return res.json({ success: true, message: "Document shared successfully", data: share });
 
-        return res.json({ success: true, message: "Document shared successfully", document: doc });
     } catch (err) {
         console.error(err);
         return res.status(500).json({ success: false, message: "Server error" });
@@ -920,17 +1400,15 @@ export const updateSharedUser = async (req, res) => {
             return res.status(400).json({ success: false, message: "Invalid ID" });
         }
 
-        const doc = await Document.findById(documentId);
-        if (!doc) return res.status(404).json({ success: false, message: "Document not found" });
+        const share = await SharedWith.findOne({ document: documentId, user: userId });
+        if (!share) return res.status(404).json({ success: false, message: "User not found in shared list" });
 
-        const sharedUser = doc.sharedWith.find(u => u.user.toString() === userId);
-        if (!sharedUser) return res.status(404).json({ success: false, message: "User not found in shared list" });
+        if (accessLevel) share.accessLevel = accessLevel;
+        if (canDownload !== undefined) share.canDownload = canDownload;
 
-        if (accessLevel) sharedUser.accessLevel = accessLevel;
-        if (canDownload !== undefined) sharedUser.canDownload = canDownload;
+        await share.save();
 
-        await doc.save();
-        res.json({ success: true, message: "User access updated successfully", data: sharedUser });
+        res.json({ success: true, message: "User access updated successfully", data: share });
     } catch (err) {
         console.error(err);
         res.status(500).json({ success: false, message: "Server error" });
@@ -953,15 +1431,9 @@ export const removeSharedUser = async (req, res) => {
         const doc = await Document.findById(documentId);
         if (!doc) return res.status(404).json({ success: false, message: "Document not found" });
 
-        const initialLength = doc.sharedWith.length;
-        doc.sharedWith = doc.sharedWith.filter(u => u.user.toString() !== userId);
-        doc.sharedWithUsers = doc.sharedWithUsers.filter(u => u.toString() !== userId);
+        await SharedWith.deleteOne({ document: documentId, user: userId });
+        await Document.findByIdAndUpdate(documentId, { $pull: { sharedWithUsers: userId } });
 
-        if (doc.sharedWith.length === initialLength) {
-            return res.status(404).json({ success: false, message: "User not found in shared list" });
-        }
-
-        await doc.save();
         res.json({ success: true, message: "User removed from shared list" });
     } catch (err) {
         console.error(err);
@@ -983,17 +1455,15 @@ export const getSharedUsers = async (req, res) => {
             return res.status(400).json({ success: false, message: "Invalid document ID" });
         }
 
-        const doc = await Document.findById(documentId)
-            .populate("sharedWith.user", "name email role") // adjust fields as needed
-            .lean();
+        const shares = await SharedWith.find({ document: documentId })
+            .populate("user", "name email role");
+        if (!shares) return res.status(404).json({ success: false, message: "Shares not found" });
 
-        if (!doc) return res.status(404).json({ success: false, message: "Document not found" });
-
-        const data = doc.sharedWith.map(sw => ({
+        const data = shares.map(sw => ({
             userId: sw.user._id,
             name: sw.user.name,
             email: sw.user.email,
-            role: sw.user.role || null,
+            role: sw.user.role,
             accessLevel: sw.accessLevel,
             expiresAt: sw.expiresAt,
             inviteStatus: sw.inviteStatus,
@@ -1025,13 +1495,10 @@ export const inviteUser = async (req, res) => {
         const doc = await Document.findById(documentId);
         if (!doc) return res.status(404).json({ success: false, message: "Document not found" });
 
-        // Check if user is owner or has edit access
+        // Check if inviter is allowed
         const isOwner = doc.owner.toString() === inviterId.toString();
-        const hasEditAccess = doc.sharedWith.some(sw =>
-            sw.user.toString() === inviterId.toString() &&
-            sw.accessLevel === 'edit' &&
-            sw.inviteStatus === 'accepted'
-        );
+        const existingShare = await SharedWith.findOne({ document: documentId, user: inviterId, accessLevel: "edit", inviteStatus: "accepted" });
+        const hasEditAccess = !!existingShare;
 
         if (!isOwner && !hasEditAccess) {
             return res.status(403).json({ success: false, message: "You don't have permission to share this document" });
@@ -1085,27 +1552,20 @@ export const inviteUser = async (req, res) => {
                 expiresAt = null;
         }
 
-        // Update or add to sharedWith
-        const existingIndex = doc.sharedWith.findIndex(sw => sw.user.toString() === userId.toString());
-
-        if (existingIndex >= 0) {
-            doc.sharedWith[existingIndex].accessLevel = accessLevel;
-            doc.sharedWith[existingIndex].expiresAt = expiresAt;
-            doc.sharedWith[existingIndex].inviteStatus = "pending";
-            doc.sharedWith[existingIndex].sharedAt = new Date();
-        } else {
-            doc.sharedWith.push({
-                user: userId,
+        // Upsert into SharedWith
+        await SharedWith.findOneAndUpdate(
+            { document: documentId, user: userId },
+            {
                 accessLevel,
                 expiresAt,
                 inviteStatus: "pending",
                 sharedAt: new Date()
-            });
-        }
+            },
+            { upsert: true, new: true }
+        );
 
-        // Update sharedWithUsers array
-        doc.sharedWithUsers = doc.sharedWith.map(sw => sw.user);
-        await doc.save();
+        // Keep document.sharedWithUsers synced
+        await Document.findByIdAndUpdate(documentId, { $addToSet: { sharedWithUsers: userId } });
 
         // Send invite email
         const inviteLink = `${process.env.FRONTEND_URL || 'http://localhost:5000'}/api/documents/${documentId}/invite/${userId}/accept`;
@@ -1162,44 +1622,31 @@ export const autoAcceptInvite = async (req, res) => {
         }
 
         // Find the shared entry
-        const sharedIndex = doc.sharedWith.findIndex(sw => sw.user.toString() === userId);
-        if (sharedIndex === -1) {
-            return res.status(404).json({ success: false, message: "Invite not found" });
+        const share = await SharedWith.findOne({ document: documentId, user: userId });
+        if (!share) return res.status(404).json({ success: false, message: "Invite not found" });
+
+        // Already accepted
+        if (share.inviteStatus === "accepted") {
+            return res.redirect("/documents/list");
         }
 
-        const sharedEntry = doc.sharedWith[sharedIndex];
-
-        // Check if invite is already accepted
-        if (sharedEntry.inviteStatus === 'accepted') {
-            return res.redirect('/documents/list');
+        // Expired
+        if (share.expiresAt && new Date() > share.expiresAt) {
+            return res.status(400).json({ success: false, message: "This invitation has expired" });
         }
 
-        // Check if invite is expired
-        if (sharedEntry.expiresAt && new Date() > sharedEntry.expiresAt) {
-            return res.status(400).json({
-                success: false,
-                message: "This invitation has expired"
-            });
+        // Rejected
+        if (share.inviteStatus === "rejected") {
+            return res.status(400).json({ success: false, message: "This invitation was rejected" });
         }
 
-        // Check if invite was rejected
-        if (sharedEntry.inviteStatus === 'rejected') {
-            return res.status(400).json({
-                success: false,
-                message: "This invitation was already rejected"
-            });
-        }
+        // Accept
+        share.inviteStatus = "accepted";
+        share.acceptedAt = new Date();
+        await share.save();
 
-        // Update invite status to accepted
-        sharedEntry.inviteStatus = 'accepted';
-        sharedEntry.acceptedAt = new Date();
-
-        // Ensure user is in sharedWithUsers array
-        if (!doc.sharedWithUsers.includes(userId)) {
-            doc.sharedWithUsers.push(userId);
-        }
-
-        await doc.save();
+        // Make sure user exists in quick lookup
+        await Document.findByIdAndUpdate(documentId, { $addToSet: { sharedWithUsers: userId } });
 
         // Redirect to documents list page
         res.redirect('/documents/list');

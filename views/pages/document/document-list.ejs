@@ -280,7 +280,9 @@
                         })()
                         : '-';
                     const metadata = doc.metadata ? `${doc.metadata.fileName || '-'}, ${doc.metadata.fileDescription || '-'}` : '-';
-                    const sharedWith = doc.sharedWith?.length ? doc.sharedWith.map(sw => sw.user?.name).join(', ') : '-';
+                    const sharedWith = doc.sharedWithUsers?.length
+                        ? doc.sharedWithUsers.map(sw => sw.name).join(', ')
+                        : '-';
                     const donor = doc.documentDonor?.name || '-';
                     const vendor = doc.documentVendor?.name || '-';
                     const statusClass = {

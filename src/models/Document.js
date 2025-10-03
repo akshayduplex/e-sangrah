@@ -1,17 +1,5 @@
 import mongoose from "mongoose";
 
-const fileSchema = new mongoose.Schema({
-    file: { type: String, required: true },
-    s3Url: { type: String },
-    originalName: { type: String, required: true },
-    version: { type: Number, required: true },
-    uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-    uploadedAt: { type: Date, default: Date.now },
-    isPrimary: { type: Boolean, default: false },
-    status: { type: String, enum: ["active", "archived"], default: "active" },
-    hash: { type: String }
-}, { _id: true });
-
 const documentSchema = new mongoose.Schema({
     description: { type: String, trim: true, maxlength: 1000 },
     project: { type: mongoose.Schema.Types.ObjectId, ref: "Project", default: null },
@@ -34,8 +22,8 @@ const documentSchema = new mongoose.Schema({
         retentionPeriod: { type: Number, default: null },
         complianceType: { type: String, trim: true }
     },
-    files: [fileSchema],
-    currentVersion: { type: Number, default: 1 },
+    files: [{ type: mongoose.Schema.Types.ObjectId, ref: "File", default: null }],
+    // currentVersion: { type: Number, default: 1 },
     documentDate: { type: Date, default: Date.now },
 
     signature: {
@@ -46,17 +34,23 @@ const documentSchema = new mongoose.Schema({
 
     // Flattened sharedWith for safe indexing
     sharedWithUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+    comment: { type: String, trim: true, maxlength: 1000 },
 
-    // Keep original sharedWith if needed for accessLevel tracking
-    sharedWith: [{
-        user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-        accessLevel: { type: String, enum: ["view", "edit"], default: "view" },
-        canDownload: { type: Boolean, default: false },
-        sharedAt: { type: Date, default: Date.now },
-        expiresAt: { type: Date, default: null },
-        inviteStatus: { type: String, enum: ["pending", "accepted", "rejected"], default: "pending" }
-    }],
-    comment: { type: String, trim: true, maxlength: 1000 }
+    versioning: {
+        currentVersion: { type: Number, default: 1.0 },
+        previousVersion: { type: Number, default: null },
+        nextVersion: { type: Number, default: null },
+        versionHistory: [{
+            version: { type: Number, required: true },
+            timestamp: { type: Date, default: Date.now },
+            changedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+            changes: { type: String }, // Description of changes
+            file: { type: mongoose.Schema.Types.ObjectId, ref: "File" },
+            snapshot: { type: mongoose.Schema.Types.Mixed } // Full document snapshot
+        }],
+        majorVersion: { type: Number, default: 1 },
+        minorVersion: { type: Number, default: 0 }
+    }
 }, { timestamps: true });
 
 /** -------------------- INDEXES -------------------- **/
@@ -68,7 +62,6 @@ documentSchema.index({ "compliance.expiryDate": 1 });
 documentSchema.index({ "files.isPrimary": 1 });
 documentSchema.index({ "files.version": -1 });
 documentSchema.index({ tags: 1 });
-documentSchema.index({ sharedWithUsers: 1 });
 
 documentSchema.index({ "files.isPrimary": 1, "files.status": 1 });
 

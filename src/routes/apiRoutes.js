@@ -112,6 +112,10 @@ router.post("/documents/:documentId/invite", documentController.inviteUser);
 //accept or reject an invite
 router.get("/documents/:documentId/invite/:userId/accept", documentController.autoAcceptInvite);
 
+// routes/documents.js
+router.get('/:id/versions/history', documentController.getVersionHistory);
+router.get('/:id/versions/:version/view', documentController.viewVersion);
+router.post('/:id/versions/:version/restore', documentController.restoreVersion);
 
 // ---------------------------
 // Departments routes

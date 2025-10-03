@@ -637,3 +637,12 @@
         flex-direction: column;
         justify-content: space-between;
     }
+
+    /* AddedbyAkshay */
+
+    #sharedoc-modal .select2-container {
+        min-width: 0 !important;
+        /* or auto */
+        width: 100% !important;
+        /* if you want it responsive */
+    }
