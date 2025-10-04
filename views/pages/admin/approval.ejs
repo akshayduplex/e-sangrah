@@ -1,0 +1,189 @@
+<%- include('../../partials/header') %>
+
+    <!-- Page Wrapper -->
+    <div class="page-wrapper">
+        <div class="content">
+            <!-- Breadcrumb -->
+            <div class="d-flex align-items-center justify-content-between page-breadcrumb mb-3">
+                <div class="my-auto mb-2">
+                    <h2 class="mb-1">Approvals Requests</h2>
+                    <nav>
+                        <ol class="breadcrumb mb-0">
+                            <li class="breadcrumb-item">
+                                <a href="#"><i class="ti ti-smart-home"></i></a>
+                            </li>
+                            <li class="breadcrumb-item">
+                                Dashboard
+                            </li>
+                            <li class="breadcrumb-item">
+                                Approvals
+                            </li>
+                        </ol>
+                    </nav>
+                </div>
+            </div>
+            <!-- /Breadcrumb -->
+
+            <div class="row">
+                <div class="seprate_crdhdr mb-4">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+
+                        <!-- Left Side: Status Buttons -->
+                        <div class="d-flex flex-wrap gap-2">
+                            <button type="button" class="btn btn-primary rounded-pill status-tab">All</button>
+                            <button type="button"
+                                class="btn btn-outline-primary rounded-pill status-tab">Pending</button>
+                            <button type="button"
+                                class="btn btn-outline-primary rounded-pill status-tab">Rejected</button>
+                            <button type="button"
+                                class="btn btn-outline-primary rounded-pill status-tab">Approved</button>
+                            <button type="button" class="btn btn-outline-primary rounded-pill status-tab">Draft</button>
+                        </div>
+
+                        <!-- Right Side: Datepicker + Dropdown -->
+                        <div class="d-flex align-items-center gap-2 flex-wrap ms-auto">
+                            <div class="position-relative">
+                                <input type="text" class="form-control datetimepicker" placeholder="Select date">
+                                <span class="input-icon-addon">
+                                    <i class="ti ti-calendar text-gray-7"></i>
+                                </span>
+                            </div>
+                            <div class="dropdown">
+                                <a href="javascript:void(0);"
+                                    class="dropdown-toggle border text-black btn btn-outline-secondary fs-13"
+                                    data-bs-toggle="dropdown">
+                                    Select Department
+                                </a>
+                                <ul class="dropdown-menu dropdown-menu-end p-3">
+                                    <li><a href="javascript:void(0);" class="dropdown-item rounded-1">UI/UX Designer</a>
+                                    </li>
+                                    <li><a href="javascript:void(0);" class="dropdown-item rounded-1">HR Manager</a>
+                                    </li>
+                                    <li><a href="javascript:void(0);" class="dropdown-item rounded-1">Junior Tester</a>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+                <div class="col-xxl-12 col-xl-12">
+                    <div class="card flex-fill">
+                        <div class="card-body p-0">
+                            <div class="custom-datatable-filter table-responsive">
+                                <table class="table datatable align-middle">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th></th>
+                                            <th>File Name</th>
+                                            <th>Submitted By</th>
+                                            <th>Department</th>
+                                            <th>Approval Status</th>
+                                            <th>Approval Action</th>
+                                            <th>Track Approvals</th>
+                                            <th>Remark</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="approvals-tbody">
+                                        <!-- Rows will be dynamically added here -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- /Projects -->
+            </div>
+
+        </div>
+
+        <div class="footer mt-4 d-sm-flex align-items-center justify-content-between border-top bg-white p-3">
+            <p class="mb-0">2025 &copy; HLFPPT.</p>
+            <p>Designed & Developed by <a href="javascript:void(0);" class="text-primary">Duplex services &
+                    Technology</a></p>
+        </div>
+
+    </div>
+    <!-- /Page Wrapper -->
+
+    <%- include('../../partials/footer') %>
+        <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+        <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+        <script>$(document).ready(function () {
+                // Initialize DataTable
+                var table = $('.datatable').DataTable({
+                    "order": [[1, "asc"]], // sort by File Name
+                    "columnDefs": [
+                        { "orderable": false, "targets": [0, 5, 6] } // disable ordering for action columns
+                    ]
+                });
+
+                // Fetch data from API
+                $.ajax({
+                    url: '/api/my-approvals',
+                    type: 'GET',
+                    success: function (response) {
+                        if (response.success && response.data.length > 0) {
+                            response.data.forEach(function (doc) {
+                                // Prepare file size display
+                                var fileSizeKB = doc.files[0]?.fileSize ? (doc.files[0].fileSize / 1024).toFixed(2) + ' KB' : '-';
+
+                                // Approval Status Badge
+                                var statusClass = 'bg-secondary';
+                                if (doc.status === 'Approved') statusClass = 'bg-soft-success text-success';
+                                else if (doc.status === 'Pending') statusClass = 'bg-soft-warning text-warning';
+                                else if (doc.status === 'Rejected') statusClass = 'bg-soft-danger text-danger';
+                                else if (doc.status === 'Draft') statusClass = 'bg-soft-info text-info';
+
+                                // Action buttons (can expand as needed)
+                                var actionBtn = `<button class="btn btn-sm btn-outline-primary rounded-pill px-4 py-2">Review</button>`;
+                                if (doc.status === 'Approved') actionBtn = `<button class="btn btn-sm btn-success rounded-pill px-4 py-2">Approve</button>`;
+                                else if (doc.status === 'Rejected') actionBtn = `<button class="btn btn-sm btn-outline-danger rounded-pill px-4 py-2">Revise</button>`;
+                                else if (doc.status === 'Draft') actionBtn = `<button class="btn btn-sm btn-outline-secondary rounded-pill px-4 py-2">Edit</button>`;
+
+                                // Append row to table
+                                table.row.add([
+                                    `<div class="btn-group" role="group">
+                            <button type="button" class="btn border-0" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="ti ti-settings"></i>
+                            </button>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="#"><i class="ti ti-eye"></i> View</a></li>
+                                <li><a class="dropdown-item" href="#"><i class="ti ti-pencil-minus"></i> Edit</a></li>
+                                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#sharedoc-modal">
+                                    <i class="ti ti-share"></i> Share</a></li>
+                                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#versionhistory-modal">
+                                    <i class="ti ti-history"></i> Version History</a></li>
+                                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#downloaddoc-modal">
+                                    <i class="ti ti-download"></i> Download</a></li>
+                                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#trashdoc-modal">
+                                    <i class="ti ti-trash"></i> Move to Trash</a></li>
+                                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#archivedoc-modal">
+                                    <i class="ti ti-archive"></i> Move to Archive</a></li>
+                            </ul>
+                        </div>`,
+                                    `<div class="d-flex align-items-center">
+                            <span class="avatar rounded bg-light me-2">
+                                <img src="/img/icons/fn1.png" alt="file icon">
+                            </span>
+                            <div>
+                                <p class="mb-0 text-dark">${doc.metadata.fileName} v${doc.versioning.currentVersion.$numberDecimal}</p>
+                                <small class="text-muted">${fileSizeKB}</small>
+                            </div>
+                        </div>`,
+                                    doc.documentDonor.name,
+                                    doc.department.name,
+                                    `<span class="badge ${statusClass} p-2">${doc.status}</span>`,
+                                    actionBtn,
+                                    `<button class="btn btn-status btn-outline-primary px-4 rounded-pill">Track</button>`,
+                                    doc.comment || '-'
+                                ]).draw(false);
+                            });
+                        }
+                    },
+                    error: function (err) {
+                        console.error('Error fetching approvals:', err);
+                    }
+                });
+            });
+        </script>

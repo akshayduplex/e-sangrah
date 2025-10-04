@@ -162,7 +162,6 @@
         <script>
             (function ($) {
                 "use strict";
-
                 let currentDocId = null; // Track currently selected document
                 const fileIcons = {
                     ppt: "/img/icons/fn1.png",
@@ -268,6 +267,7 @@
                 // Render each row
                 // -------------------------
                 function renderRow(doc) {
+                    var fileSizeKB = doc.files[0]?.fileSize ? (doc.files[0].fileSize / 1024).toFixed(2) + ' KB' : '-';
                     const lastModified = new Date(doc.updatedAt).toLocaleString();
                     const owner = doc.owner?.name || '-';
                     const departmentName = doc.department?.name || '-';
@@ -295,7 +295,15 @@
                     }[(doc.status || '').toLowerCase().replace(/\s+/g, '')] || 'bg-soft-secondary';
 
                     const filesInfo = doc.files?.[0]
-                        ? `<div><img src="${fileIcons[doc.files[0].originalName.split('.').pop().toLowerCase()] || fileIcons.default}" style="height:30px;"> ${doc.files[0].originalName}</div>`
+                        ? `<div class="d-flex align-items-center">
+                            <span class="avatar rounded bg-light me-2">
+                                <img src="${fileIcons[doc.files[0].originalName.split('.').pop().toLowerCase()] || fileIcons.default}" style="height:30px;">
+                            </span>
+                            <div>
+                                <p class="mb-0 text-dark">${doc.files[0].originalName}</p>
+                                <small class="text-muted">${fileSizeKB}</small>
+                            </div>
+                        </div>`
                         : '-';
 
                     const dropdown = `
@@ -563,10 +571,20 @@
                         return;
                     }
 
-                    // Show custom modal
+                    // Update modal content dynamically for removing user access
+                    $('#trashdocLabel').html(`
+        <img src="/img/icons/bin.png" alt="Remove User" width="40" class="mb-2"><br>
+        Remove User Access
+    `);
+                    $('#trashdoc-modal .modal-body').text(
+                        'Are you sure you want to remove this user’s access to the document? This action cannot be undone.'
+                    );
+                    $('#confirm-trash-folder').text('Yes, Remove');
+
+                    // Show confirmation modal
                     $('#trashdoc-modal').modal('show');
 
-                    // Ensure previous click handler is removed
+                    // Ensure previous click handler is removed before reattaching
                     $('#confirm-trash-folder').off('click').on('click', function () {
                         $.ajax({
                             url: `${baseUrl}/api/documents/share/${currentDocId}`,
@@ -580,12 +598,14 @@
                             },
                             error: function (err) {
                                 $('#trashdoc-modal').modal('hide');
-                                showToast(err.responseJSON?.message || 'Failed to remove user access', 'error');
+                                showToast(
+                                    err.responseJSON?.message || 'Failed to remove user access',
+                                    'error'
+                                );
                             }
                         });
                     });
                 });
-
                 // Update user access level
                 $('#sharedoc-modal').on('change', '.access-level', function () {
                     const userId = $(this).data('user-id');
@@ -643,7 +663,6 @@
                 });
 
                 // Share button in footer
-                // Share button in footer - FIXED VERSION
                 $('#sharedoc-modal .modal-footer .site-btnmd').on('click', function () {
                     const accessLevel = $('#accessLevelSelect').val();
                     const duration = $('input[name="time"]:checked').attr('id');
@@ -652,27 +671,44 @@
                     const accessType = $('#accessType').val();
                     const roleType = $('#roleType').val();
 
-                    // Validation
                     if (!currentDocId) {
                         showToast('No document selected', 'info');
                         return;
                     }
+
                     if (!duration) {
                         showToast('Please select a time duration', 'info');
                         return;
                     }
+
                     if (duration === 'custom' && !customEnd) {
                         showToast('Please select an end date for custom duration', 'info');
                         return;
                     }
 
-                    // Prepare data to send
-                    const shareData = {
-                        accessLevel: accessLevel,
+                    const generalAccess = accessType === 'anyone';
+                    let shareData = {
+                        accessLevel: generalAccess ? (roleType === 'editor' ? 'edit' : 'view') : accessLevel,
                         duration: duration,
-                        generalAccess: accessType === 'anyone', // true for general access
-                        generalRole: roleType // 'viewer' or 'editor'
+                        generalAccess: generalAccess,
+                        generalRole: roleType
                     };
+
+                    // If not general access, gather all userIds from People With Access list
+                    if (!generalAccess) {
+                        const userIds = [];
+                        $('#usersWithAccessContainer .user-accssrow').each(function () {
+                            const uid = $(this).find('.access-level').data('user-id');
+                            if (uid) userIds.push(uid);
+                        });
+
+                        if (!userIds.length) {
+                            showToast('Please add at least one user to share with', 'info');
+                            return;
+                        }
+
+                        shareData.userIds = userIds; // send array of userIds
+                    }
 
                     if (duration === 'custom') {
                         shareData.customEnd = customEnd;
@@ -688,7 +724,7 @@
                             showToast(response.message || 'Document shared successfully!', 'success');
                             $('#sharedoc-modal').modal('hide');
 
-                            // Reload table if exists
+                            // Optional: Reload table if exists
                             if (typeof table !== 'undefined' && table.ajax?.reload) {
                                 table.ajax.reload(null, false);
                             }
@@ -703,7 +739,7 @@
                 // -------------------------
                 $('#versionhistory-modal').on('show.bs.modal', function (event) {
                     const button = $(event.relatedTarget);
-                    const docId = button.closest('tr').find('.btn-delete').data('id'); // get from table row
+                    const docId = button.closest('tr').find('.btn-delete').data('id');
                     if (!docId) return;
 
                     currentDocId = docId;
@@ -721,6 +757,9 @@
 
                             versionList.empty();
                             res.data.versionHistory.forEach(item => {
+                                // Skip version 1.0
+                                if (item.version === "1.0") return;
+
                                 const modifiedDate = new Date(item.timestamp).toLocaleString();
 
                                 const html = `
@@ -747,7 +786,7 @@
                                         </button>
                                         <button class="btn btn-outline-light rounded-pill btn-restore-version" 
                                             data-version="${item.version}">
-                                            Restore to v${item.version}
+                                            Restore to v${item.previousVersion}
                                         </button>
                                     </div>
                                 </div>
@@ -764,14 +803,15 @@
                         }
                     });
                 });
-
                 // -------------------------
                 // Handle View & Restore buttons
                 // -------------------------
                 $(document).on('click', '.btn-view-version', function () {
                     const version = $(this).data('version');
-                    alert(`Viewing version ${version} of document ${currentDocId}`);
-                    // 👉 you can open another modal or panel here with version snapshot details
+                    if (!currentDocId || !version) return;
+
+                    // Open the version view page
+                    window.location.href = `/documents/${currentDocId}/versions/view?version=${version}`;
                 });
 
                 $(document).on('click', '.btn-restore-version', function () {
@@ -797,7 +837,7 @@
                 // Function to load users for invite dropdown
                 function loadUsersForInvite() {
                     $.ajax({
-                        url: `${baseUrl}/api/users`,
+                        url: `${baseUrl}/api/user`,
                         method: 'GET',
                         success: function (users) {
                             const select = $('#userInviteSelect');

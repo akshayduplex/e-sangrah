@@ -1,0 +1,257 @@
+<%- include('../../partials/header') %>
+
+    <!-- Page Wrapper -->
+    <div class="page-wrapper">
+        <div class="content">
+            <!-- Breadcrumb -->
+            <div class="d-flex align-items-center justify-content-between page-breadcrumb mb-3">
+                <div class="my-auto mb-2">
+                    <h2 class="mb-1">My Approvals</h2>
+                    <nav>
+                        <ol class="breadcrumb mb-0">
+                            <li class="breadcrumb-item">
+                                <a href="#"><i class="ti ti-smart-home"></i></a>
+                            </li>
+                            <li class="breadcrumb-item">
+                                Dashboard
+                            </li>
+                            <li class="breadcrumb-item">
+                                Approvals
+                            </li>
+                        </ol>
+                    </nav>
+                </div>
+            </div>
+            <!-- /Breadcrumb -->
+
+            <div class="row">
+                <div class="seprate_crdhdr mb-4">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+
+                        <!-- Left Side: Status Buttons -->
+                        <div class="d-flex flex-wrap gap-2">
+                            <button type="button" class="btn btn-primary rounded-pill status-tab">All</button>
+                            <button type="button"
+                                class="btn btn-outline-primary rounded-pill status-tab">Pending</button>
+                            <button type="button"
+                                class="btn btn-outline-primary rounded-pill status-tab">Rejected</button>
+                            <button type="button"
+                                class="btn btn-outline-primary rounded-pill status-tab">Approved</button>
+                            <button type="button" class="btn btn-outline-primary rounded-pill status-tab">Draft</button>
+                        </div>
+
+                        <!-- Right Side: Datepicker + Dropdown -->
+                        <div class="d-flex align-items-center gap-2 flex-wrap ms-auto">
+                            <div class="position-relative">
+                                <input type="text" class="form-control datetimepicker" placeholder="Select date">
+                                <span class="input-icon-addon">
+                                    <i class="ti ti-calendar text-gray-7"></i>
+                                </span>
+                            </div>
+                            <div class="dropdown">
+                                <a href="javascript:void(0);"
+                                    class="dropdown-toggle border text-black btn btn-outline-secondary fs-13"
+                                    data-bs-toggle="dropdown">
+                                    Select Department
+                                </a>
+                                <ul class="dropdown-menu dropdown-menu-end p-3">
+                                    <li><a href="javascript:void(0);" class="dropdown-item rounded-1">UI/UX Designer</a>
+                                    </li>
+                                    <li><a href="javascript:void(0);" class="dropdown-item rounded-1">HR Manager</a>
+                                    </li>
+                                    <li><a href="javascript:void(0);" class="dropdown-item rounded-1">Junior Tester</a>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+                <div class="col-xxl-12 col-xl-12">
+                    <div class="card flex-fill">
+                        <div class="card-body p-0">
+                            <div class="custom-datatable-filter table-responsive">
+                                <table id="approvalTable" class="table datatable table-striped table-bordered">
+                                    <thead>
+                                        <tr>
+                                            <th>Action</th>
+                                            <th>File Name</th>
+                                            <th>Date Submitted</th>
+                                            <th>Department</th>
+                                            <th>Approver</th>
+                                            <th>Request Status</th>
+                                            <th>Track</th>
+                                            <th>Remarks</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <!-- Data will be injected via Ajax -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- /Projects -->
+            </div>
+
+        </div>
+
+        <div class="footer mt-4 d-sm-flex align-items-center justify-content-between border-top bg-white p-3">
+            <p class="mb-0">2025 &copy; HLFPPT.</p>
+            <p>Designed & Developed by <a href="javascript:void(0);" class="text-primary">Duplex services &
+                    Technology</a></p>
+        </div>
+
+    </div>
+    <!-- /Page Wrapper -->
+
+    <%- include('../../partials/footer') %>
+        <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+        <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+        <script>
+            $(document).ready(function () {
+                const fileIcons = {
+                    ppt: "/img/icons/fn1.png",
+                    pptx: "/img/icons/fn1.png",
+                    doc: "/img/icons/fn2.png",
+                    docx: "/img/icons/fn2.png",
+                    xls: "/img/icons/fn3.png",
+                    xlsx: "/img/icons/fn3.png",
+                    pdf: "/img/icons/fn4.png",
+                    default: "/img/icons/fn1.png"
+                };
+
+                const statusClassMap = {
+                    'draft': 'bg-soft-info text-info',
+                    'pending': 'bg-soft-warning text-warning',
+                    'approved': 'bg-soft-success text-success',
+                    'rejected': 'bg-soft-danger text-danger',
+                    'underreview': 'bg-soft-warning text-warning',
+                    'archived': 'bg-soft-secondary text-secondary'
+                };
+
+                $('#approvalTable').DataTable({
+                    ajax: {
+                        url: '/api/approval-requests',
+                        dataSrc: function (json) {
+                            return json.data.map(item => {
+                                // File info
+                                const file = item.files?.[0];
+                                const fileExt = file?.originalName?.split('.').pop().toLowerCase() || '';
+                                const fileIcon = fileIcons[fileExt] || fileIcons.default;
+                                const fileSize = file?.fileSize ? formatBytes(file.fileSize) : null;
+
+                                const fileInfoHtml = file ? `
+                        <div class="d-flex align-items-center">
+                            <span class="avatar rounded bg-light me-2">
+                                <img src="${fileIcon}" alt="icon" style="height:30px; width:30px; object-fit:contain;">
+                            </span>
+                            <div>
+                                <p class="mb-0 text-dark">${file.originalName}</p>
+                                ${fileSize ? `<small class="text-muted">${fileSize}</small>` : ''}
+                            </div>
+                        </div>` : '-';
+
+                                // Status badge
+                                const statusKey = (item.status || '').toLowerCase().replace(/\s+/g, '');
+                                const statusClass = statusClassMap[statusKey] || 'bg-soft-secondary text-secondary';
+
+                                // Approvers
+                                let approversHtml = item.projectManager?.name || '';
+                                if (item.sharedWithUsers?.length) {
+                                    approversHtml += ` <span class="text-success">+${item.sharedWithUsers.length}</span>`;
+                                }
+
+                                // Actions dropdown
+                                const actionsDropdown = `
+                        <div class="btn-group" role="group">
+                            <button type="button" class="btn border-0" data-bs-toggle="dropdown">
+                                <i class="ti ti-settings"></i>
+                            </button>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="#"><i class="ti ti-eye"></i> View</a></li>
+                                <li><a class="dropdown-item" href="#"><i class="ti ti-pencil-minus"></i> Edit</a></li>
+                                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#sharedoc-modal"><i class="ti ti-share"></i> Share</a></li>
+                                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#versionhistory-modal"><i class="ti ti-history"></i> Version History</a></li>
+                                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#downloaddoc-modal"><i class="ti ti-download"></i> Download</a></li>
+                                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#trashdoc-modal"><i class="ti ti-trash"></i> Move to Trash</a></li>
+                                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#archivedoc-modal"><i class="ti ti-archive"></i> Move to Archive</a></li>
+                            </ul>
+                        </div>`;
+
+                                return {
+                                    "0": actionsDropdown,
+                                    "1": fileInfoHtml,
+                                    "2": `<p class="tbl_date">${new Date(item.documentDate).toLocaleDateString()} ${new Date(item.documentDate).toLocaleTimeString()}</p>`,
+                                    "3": item.department?.name || '-',
+                                    "4": approversHtml,
+                                    "5": `<span class="badge badge-md ${statusClass}">${item.status}</span>`,
+                                    "6": `<button class="btn btn-outline-primary">Track</button>`,
+                                    "7": `<p>${item.comment || '-'}</p>`
+                                };
+                            });
+                        }
+                    },
+                    columns: [
+                        { data: "0" },
+                        { data: "1" },
+                        { data: "2" },
+                        { data: "3" },
+                        { data: "4" },
+                        { data: "5" },
+                        { data: "6" },
+                        { data: "7" }
+                    ],
+                    "order": [[1, "asc"]],
+                    "columnDefs": [
+                        { "orderable": false, "targets": [0, 5, 6] } // disable ordering for actions, status, track
+                    ]
+                });
+
+                // Helper: format bytes
+                function formatBytes(bytes, decimals = 2) {
+                    if (!bytes) return '';
+                    const k = 1024;
+                    const dm = decimals < 0 ? 0 : decimals;
+                    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+                    const i = Math.floor(Math.log(bytes) / Math.log(k));
+                    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+                }
+            });
+
+
+            //approval modal
+            // Example of how to trigger the modal from your main page
+            // Add this to your document list or approvals page
+
+            // HTML button to trigger modal
+            <button
+                onclick="triggerApprovalModal()"
+                class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+            >
+                Review Approval
+            </button>
+
+            // JavaScript function with real data
+            function triggerApprovalModal() {
+                // In a real scenario, you'd get this data from your backend
+                const approvalData = {
+                    approvalId: '<%= approval._id %>',
+                    documentId: '<%= document._id %>',
+                    requesterName: '<%= document.owner.name %>',
+                    requesterId: '<%= document.owner._id %>',
+                    documentName: '<%= document.metadata.fileName %>',
+                    documentSize: '<%= document.files[0].size %>',
+                    requestDate: '<%= document.createdAt %>',
+                    description: '<%= document.metadata.fileDescription %>',
+                    compliance: '<%= document.compliance.isCompliance %>',
+                    expiryDate: '<%= document.compliance.expiryDate %>',
+                    fileUrl: '/api/files/<%= document.files[0]._id %>',
+                    notifyUsers: '<%= document.owner.name %> and other approver members'
+                };
+
+                showApprovalModal(approvalData);
+            }
+        </script>

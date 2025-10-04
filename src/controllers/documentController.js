@@ -12,6 +12,8 @@ import Designation from "../models/Designation.js";
 import SharedWith from "../models/SharedWith.js";
 import File from "../models/File.js";
 import { bumpVersion } from "../utils/bumpVersion.js";
+import _ from "lodash"; // for deep merging
+import Approval from "../models/Approval.js";
 
 //Page Controllers
 
@@ -50,6 +52,19 @@ export const showAddDocumentPage = async (req, res) => {
     }
 };
 
+// View Document page
+export const showViewDocumentPage = async (req, res) => {
+    try {
+        res.render("pages/document/viewDocument", {
+            title: "E-Sangrah - View-Document",
+            user: req.user,
+            documentId: req.params.id
+        });
+    } catch (err) {
+        logger.error("Error loading add-document page:", err);
+        res.status(500).send("Server Error");
+    }
+};
 // Edit Document page
 export const showEditDocumentPage = async (req, res) => {
     try {
@@ -304,7 +319,7 @@ export const getDocument = async (req, res) => {
             .populate("owner", "name email")
             .populate("projectManager", "name email")
             // .populate("department", "name")
-            .populate("sharedWith.user", "name email")
+            .populate("sharedWithUsers", "name email")
             // .populate("sharedWithDepartments.department", "name")
             .populate("files.file", "filename originalName size mimetype url")
             .populate("folderId", "name");
@@ -750,21 +765,6 @@ export const updateDocument = async (req, res) => {
                     }
                     break;
 
-                case "documentDate":
-                    try {
-                        const [day, month, year] = value.split("-");
-                        const newDate = new Date(`${year}-${month}-${day}`);
-                        if (!document.documentDate || document.documentDate.getTime() !== newDate.getTime()) {
-                            document.documentDate = newDate;
-                            hasChanges = true;
-                            changeReason = "Document date updated";
-                            changedFields.push("documentDate");
-                        }
-                    } catch (error) {
-                        console.warn("Invalid document date format:", error.message);
-                    }
-                    break;
-
                 case "compliance":
                     const newCompliance = value === "yes" || value === "true" || value === true;
                     if (document.compliance.isCompliance !== newCompliance) {
@@ -813,14 +813,6 @@ export const updateDocument = async (req, res) => {
                 case "description":
                 case "comment":
                 case "link":
-                case "status":
-                    if (document[key] !== value) {
-                        document[key] = value;
-                        hasChanges = true;
-                        changeReason = `${key.charAt(0).toUpperCase() + key.slice(1)} updated`;
-                        changedFields.push(key);
-                    }
-                    break;
 
                 case "signature":
                     // handled separately
@@ -1003,156 +995,150 @@ const createVersionHistory = async (document, user, changes, changedFields) => {
     }
 };
 
-
-
 /**
  * Restore to specific version
  */
 export const restoreVersion = async (req, res) => {
-    const session = await mongoose.startSession();
-    session.startTransaction();
-
     try {
         const { id, version } = req.params;
         const { restoreNotes = '' } = req.body;
 
-        const document = await Document.findById(id).session(session);
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return failResponse(res, "Invalid document ID", 400);
+        }
+
+        const document = await Document.findById(id).populate('files');
         if (!document) {
-            await session.abortTransaction();
             return failResponse(res, "Document not found", 404);
         }
 
-        // Find the target version
-        const targetVersion = document.versioning.versionHistory.find(
-            v => v.version === parseFloat(version)
+        // Convert version to number for comparison
+        const requestedVersion = parseFloat(version);
+
+        // Find the target version snapshot
+        const targetVersion = document.versionHistory?.find(v =>
+            parseFloat(v.version?.toString()) === requestedVersion
         );
 
         if (!targetVersion) {
-            await session.abortTransaction();
             return failResponse(res, `Version ${version} not found`, 404);
         }
 
-        // Create snapshot of CURRENT state before restore
-        const currentSnapshot = await VersionManager.createVersionSnapshot(document);
-        const previousVersion = document.versioning.currentVersion;
+        // Snapshot current state before restore
+        const currentSnapshot = {
+            description: document.description,
+            metadata: { ...document.metadata },
+            tags: [...document.tags],
+            compliance: { ...document.compliance },
+            project: document.project,
+            department: document.department,
+            projectManager: document.projectManager,
+            documentDonor: document.documentDonor,
+            documentVendor: document.documentVendor,
+            status: document.status,
+            link: document.link,
+            comment: document.comment,
+            documentDate: document.documentDate,
+            files: document.files.map(f => f._id.toString()),
+            signature: document.signature ? { ...document.signature } : null
+        };
 
-        // Calculate new version number for the restore action
-        const newVersion = VersionManager.getNextVersion(previousVersion, 'minor');
+        // Restore document fields
+        const snapshot = targetVersion.snapshot || {};
+        Object.assign(document, {
+            description: snapshot.description,
+            metadata: snapshot.metadata,
+            tags: snapshot.tags,
+            compliance: snapshot.compliance,
+            project: snapshot.project,
+            department: snapshot.department,
+            projectManager: snapshot.projectManager,
+            documentDonor: snapshot.documentDonor,
+            documentVendor: snapshot.documentVendor,
+            status: snapshot.status,
+            link: snapshot.link,
+            comment: snapshot.comment,
+            documentDate: snapshot.documentDate,
+            signature: snapshot.signature || document.signature
+        });
 
-        // Restore document fields from the target version snapshot
-        const snapshot = targetVersion.snapshot;
-
-        document.description = snapshot.description;
-        document.metadata = snapshot.metadata;
-        document.tags = snapshot.tags;
-        document.compliance = snapshot.compliance;
-        document.project = snapshot.project;
-        document.department = snapshot.department;
-        document.projectManager = snapshot.projectManager;
-        document.documentDonor = snapshot.documentDonor;
-        document.documentVendor = snapshot.documentVendor;
-        document.status = snapshot.status;
-        document.link = snapshot.link;
-        document.comment = snapshot.comment;
-        document.documentDate = snapshot.documentDate;
-
-        // Handle file restoration
+        // Restore files
         if (snapshot.files && snapshot.files.length > 0) {
-            // Get files from the target version
-            const versionFiles = await File.find({
-                _id: { $in: snapshot.files }
-            }).session(session);
-
-            // Create new file entries for the restored version (to maintain file history)
+            const oldFiles = await File.find({ _id: { $in: snapshot.files } });
             const restoredFileIds = [];
-            for (const oldFile of versionFiles) {
-                const newFile = await File.create([{
+
+            for (const oldFile of oldFiles) {
+                const newFile = await File.create({
                     document: document._id,
                     file: oldFile.file,
                     s3Url: oldFile.s3Url,
                     originalName: oldFile.originalName,
-                    version: parseFloat(newVersion),
+                    version: parseFloat(document.versioning.currentVersion) + 0.1,
                     uploadedBy: req.user._id,
                     uploadedAt: new Date(),
                     isPrimary: oldFile.isPrimary,
                     status: "active",
-                    restoredFrom: oldFile._id, // Track original file
+                    restoredFrom: oldFile._id,
                     restoredAt: new Date()
-                }], { session });
-
-                restoredFileIds.push(newFile[0]._id);
+                });
+                restoredFileIds.push(newFile._id);
             }
 
-            // Mark all current files as inactive
+            // Mark current files inactive
             await File.updateMany(
                 { document: document._id, status: "active" },
-                { $set: { isPrimary: false, status: "inactive" } },
-                { session }
+                { $set: { status: "inactive", isPrimary: false } }
             );
-
-            // Mark restored files as active and set primary
-            if (restoredFileIds.length > 0) {
-                await File.updateMany(
-                    { _id: { $in: restoredFileIds } },
-                    { $set: { status: "active", isPrimary: true } },
-                    { session }
-                );
-            }
 
             document.files = restoredFileIds;
         }
 
-        // Update versioning information
+        // Update versioning
+        const previousVersion = parseFloat(document.versioning.currentVersion || 1);
+        const newVersion = previousVersion + 0.1; // minor bump
         document.versioning.previousVersion = previousVersion;
-        document.versioning.currentVersion = parseFloat(newVersion);
+        document.versioning.currentVersion = mongoose.Types.Decimal128.fromString(newVersion.toFixed(1));
 
-        // Add restore action to version history
-        document.versioning.versionHistory.unshift({
-            version: parseFloat(newVersion),
+        // Add restore to versionHistory
+        document.versionHistory.push({
+            version: mongoose.Types.Decimal128.fromString(newVersion.toFixed(1)),
             timestamp: new Date(),
             changedBy: req.user._id,
             changes: `Restored to version ${version}${restoreNotes ? ` - ${restoreNotes}` : ''}`,
-            changesDetail: [
-                {
-                    field: 'restore_action',
-                    oldValue: `Version ${previousVersion}`,
-                    newValue: `Version ${version}`
-                }
-            ],
-            snapshot: currentSnapshot, // Store current state before restore
-            restoredFrom: parseFloat(version),
+            snapshot: currentSnapshot,
+            restoredFrom: mongoose.Types.Decimal128.fromString(version),
             isRestorePoint: true
         });
 
-        await document.save({ session });
-        await session.commitTransaction();
+        await document.save();
 
-        // Populate for response
         await document.populate([
-            { path: "versioning.versionHistory.changedBy", select: "name email" },
+            { path: "versionHistory.changedBy", select: "name email" },
             { path: "department", select: "name" },
             { path: "project", select: "projectName" },
             { path: "files", select: "originalName version uploadedAt" }
         ]);
 
-        return successResponse(res, {
-            document,
-            restoreInfo: {
-                fromVersion: version,
-                toVersion: newVersion,
-                previousVersion: previousVersion,
-                restoredAt: new Date()
-            }
-        }, `Document successfully restored to version ${version}`);
+        return successResponse(
+            res,
+            {
+                document,
+                restoreInfo: {
+                    fromVersion: version,
+                    toVersion: newVersion,
+                    previousVersion,
+                    restoredAt: new Date()
+                }
+            },
+            `Document successfully restored to version ${version}`
+        );
 
     } catch (error) {
-        await session.abortTransaction();
-        logger.error("Restore version error:", error);
+        console.error("Restore version error:", error);
         return errorResponse(res, error, "Failed to restore version");
-    } finally {
-        session.endSession();
     }
 };
+
 
 
 /**
@@ -1233,31 +1219,27 @@ export const getVersionHistory = async (req, res) => {
             return failResponse(res, "Document not found", 404);
         }
 
-        // Enhance version history with additional data
-        const enhancedHistory = await Promise.all(
-            document.versionHistory.map(async (version) => {
-                // Get files for this version
-                const versionFiles = await File.find({
-                    _id: { $in: version.snapshot?.files || [] }
-                }).select('originalName size uploadedAt version');
+        // Enhance version history with previous/next version info
+        const enhancedHistory = document.versionHistory.map((version, index, arr) => {
+            const previousVersion = index > 0 ? arr[index - 1].version?.toString() : null;
+            const nextVersion = index < arr.length - 1 ? arr[index + 1].version?.toString() : null;
 
-                return {
-                    previousVersion: version.previousVersion?.toString(),
-                    version: version.version?.toString(),
-                    nextVersion: version.nextVersion?.toString(),
-                    timestamp: version.timestamp,
-                    changedBy: version.changedBy,
-                    changes: version.changes,
-                    files: versionFiles,
-                    isCurrent: version.version?.toString() === document.versioning.currentVersion?.toString(),
-                    snapshotPreview: {
-                        description: version.snapshot?.description,
-                        mainHeading: version.snapshot?.metadata?.mainHeading,
-                        tags: version.snapshot?.tags
-                    }
-                };
-            })
-        );
+            return {
+                previousVersion,
+                version: version.version?.toString(),
+                nextVersion,
+                timestamp: version.timestamp,
+                changedBy: version.changedBy,
+                changes: version.changes,
+                files: version.file ? [{ _id: version.file }] : [], // Optionally populate File model if needed
+                isCurrent: version.version?.toString() === document.versioning.currentVersion?.toString(),
+                snapshotPreview: {
+                    description: version.snapshot?.description,
+                    mainHeading: version.snapshot?.metadata?.mainHeading,
+                    tags: version.snapshot?.tags
+                }
+            };
+        });
 
         return successResponse(res, {
             documentId: document._id,
@@ -1273,6 +1255,69 @@ export const getVersionHistory = async (req, res) => {
     }
 };
 
+// GET document by ID, optionally with a specific version
+export const viewDocumentVersion = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { version } = req.query;
+
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({ message: "Invalid document ID" });
+        }
+
+        if (!version) {
+            return res.status(400).json({ message: "Version query parameter is required" });
+        }
+
+        const document = await Document.findById(id)
+            .select("description project department folderId projectManager documentDonor documentVendor owner status tags metadata compliance files documentDate link sharedWithUsers comment versioning versionHistory createdAt updatedAt ")
+            .populate("versionHistory.changedBy", "name email")
+            .populate("projectManager", "name email")
+            .populate("owner", "name email")
+            .populate("project", "projectName")
+            .populate("department", "name")
+            .populate("folderId", "name")
+            .populate("documentDonor", "name")
+            .populate("documentVendor", "name")
+            .populate("sharedWithUsers", "name email")
+            .populate("files", "originalName")
+            .lean();
+
+        if (!document) {
+            return res.status(404).json({ message: "Document not found" });
+        }
+
+        const Decimal128 = mongoose.Types.Decimal128;
+        const requestedVersion = Decimal128.fromString(version);
+
+        const versionItem = document.versionHistory.find(v =>
+            v.version.toString() === requestedVersion.toString()
+        );
+
+        if (!versionItem) {
+            return res.status(404).json({ message: `Version ${version} not found` });
+        }
+
+        // Merge snapshot with current document
+        const snapshot = versionItem.snapshot || {};
+        const documentAtVersion = _.cloneDeep(document); // clone to avoid mutation
+        _.merge(documentAtVersion, snapshot); // merge snapshot into document
+
+        // Return merged document with version info
+        const response = {
+            version: versionItem.version.toString(),
+            timestamp: versionItem.timestamp,
+            changedBy: versionItem.changedBy,
+            changes: versionItem.changes,
+            document: documentAtVersion
+        };
+
+        return res.json(response);
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ message: "Server error", error: error.message });
+    }
+};
 
 /**
  * Delete document
@@ -1444,23 +1489,20 @@ export const shareDocument = async (req, res) => {
             customEnd,
             generalAccess = false,
             generalRole = "viewer",
-            targetUserId
+            userIds = [] // array of target users
         } = req.body;
 
         // Validate IDs
         if (!mongoose.Types.ObjectId.isValid(id) || !mongoose.Types.ObjectId.isValid(userId)) {
             return res.status(400).json({ success: false, message: "Invalid ID" });
         }
-
+        console.log("userID", userIds, generalAccess, generalRole)
         const doc = await Document.findById(id);
         if (!doc) return res.status(404).json({ success: false, message: "Document not found" });
 
-        // Check permission
+        // Permission check: only owner or existing edit access can share
         const isOwner = doc.owner.toString() === userId.toString();
-        const existingEditAccess = await SharedWith.findOne({
-            document: id,
-            user: userId,
-        });
+        const existingEditAccess = await SharedWith.findOne({ document: id, user: userId });
         if (!isOwner && !existingEditAccess) {
             return res.status(403).json({ success: false, message: "You don't have permission to share this document" });
         }
@@ -1469,7 +1511,6 @@ export const shareDocument = async (req, res) => {
         const now = new Date();
         let expiresAt = null;
         let used;
-
         switch (duration) {
             case "oneday":
                 expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
@@ -1482,11 +1523,9 @@ export const shareDocument = async (req, res) => {
                 expiresAt.setMonth(expiresAt.getMonth() + 1);
                 break;
             case "custom":
-                if (customEnd) {
-                    expiresAt = new Date(customEnd);
-                    if (expiresAt <= now)
-                        return res.status(400).json({ success: false, message: "Custom end date must be in the future" });
-                }
+                if (!customEnd) return res.status(400).json({ success: false, message: "Custom end date required" });
+                expiresAt = new Date(customEnd);
+                if (expiresAt <= now) return res.status(400).json({ success: false, message: "Custom end date must be in the future" });
                 break;
             case "onetime":
                 used = false;
@@ -1496,43 +1535,49 @@ export const shareDocument = async (req, res) => {
                 expiresAt = null;
         }
 
-        // Determine which user to share with
-        let shareUserId;
-        if (!generalAccess) {
-            if (!targetUserId || !mongoose.Types.ObjectId.isValid(targetUserId)) {
-                return res.status(400).json({ success: false, message: "Invalid target user ID" });
-            }
-            shareUserId = targetUserId;
-        }
-
-        // Prepare update data
-        const updateData = {
+        // Prepare share update data
+        const shareData = {
             accessLevel: generalAccess ? (generalRole === "editor" ? "edit" : "view") : accessLevel,
-            expiresAt,
             duration,
-            generalAccess
+            expiresAt,
+            generalAccess,
+            generalRole
         };
-        if (used !== undefined) updateData.used = used;
+        if (used !== undefined) shareData.used = used;
 
-        // Update or create sharing record
-        const updatedShare = await SharedWith.findOneAndUpdate(
-            {
-                document: id,
-                ...(generalAccess ? { generalAccess: true } : { user: shareUserId })
-            },
-            updateData,
-            { upsert: true, new: true } // Create if not exist
-        );
+        let updatedShares = [];
 
-        // Add to document's sharedWithUsers list if not general access
-        if (!generalAccess) {
-            await Document.findByIdAndUpdate(id, { $addToSet: { sharedWithUsers: shareUserId } });
+        if (generalAccess) {
+            // Create/update general access record
+            const updatedShare = await SharedWith.findOneAndUpdate(
+                { document: id, generalAccess: true },
+                shareData,
+                { upsert: true, new: true }
+            );
+            updatedShares.push(updatedShare);
+        } else {
+            // Share with specific users
+            if (!userIds.length) return res.status(400).json({ success: false, message: "No target users provided" });
+
+            for (const targetUserId of userIds) {
+                if (!mongoose.Types.ObjectId.isValid(targetUserId)) continue;
+
+                const updatedShare = await SharedWith.findOneAndUpdate(
+                    { document: id, user: targetUserId },
+                    shareData,
+                    { upsert: true, new: true }
+                );
+                updatedShares.push(updatedShare);
+
+                // Add to document.sharedWithUsers if not already present
+                await Document.findByIdAndUpdate(id, { $addToSet: { sharedWithUsers: targetUserId } });
+            }
         }
 
         return res.json({
             success: true,
-            message: "Document share settings updated successfully",
-            data: updatedShare
+            message: "Document shared successfully",
+            data: updatedShares
         });
 
     } catch (err) {
@@ -1540,6 +1585,8 @@ export const shareDocument = async (req, res) => {
         return res.status(500).json({ success: false, message: "Server error" });
     }
 };
+
+
 
 /**
  * Update user access level or download permission
@@ -1618,6 +1665,9 @@ export const getSharedUsers = async (req, res) => {
             name: sw.user.name,
             email: sw.user.email,
             accessLevel: sw.accessLevel,
+            duration: sw.duration,
+            generalAccess: sw.generalAccess,
+            generalRole: sw.generalRole,
             expiresAt: sw.expiresAt,
             canDownload: sw.canDownload,
             inviteStatus: sw.inviteStatus,
@@ -1943,5 +1993,345 @@ export const getDocumentVersions = async (req, res) => {
     } catch (error) {
         logger.error("Error fetching document versions:", error);
         return errorResponse(res, error, "Failed to retrieve document versions");
+    }
+};
+
+export const getDocumentApprovalsPage = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const user = req.user; // Assuming you have authentication middleware
+
+        // Get document with populated data
+        const document = await Document.findById(id)
+            .populate('owner', 'name email designation')
+            .populate('project', 'name')
+            .populate('department', 'name')
+            .populate('projectManager', 'name designation')
+            .populate('documentDonor', 'name designation')
+            .populate('documentVendor', 'name designation')
+            .populate({
+                path: 'files',
+                select: 'fileName originalName size url mimetype'
+            });
+
+        if (!document) {
+            return res.status(404).render('error', {
+                message: 'Document not found'
+            });
+        }
+
+        // Get approval workflow for this document
+        const approvals = await Approval.find({ document: id })
+            .populate('approver', 'name designation email')
+            .sort({ level: 1 });
+
+        // If no approvals exist, create default approval workflow
+        if (approvals.length === 0) {
+            const defaultApprovers = await createDefaultApprovalWorkflow(id, document);
+            approvals.push(...defaultApprovers);
+        }
+
+        // Calculate approval progress
+        const totalApprovals = approvals.length;
+        const completedApprovals = approvals.filter(a =>
+            a.status === 'Approved' || a.status === 'Rejected'
+        ).length;
+        const progressPercentage = totalApprovals > 0 ?
+            (completedApprovals / totalApprovals) * 100 : 0;
+
+        // Format dates for display
+        const formatDate = (date) => {
+            if (!date) return null;
+            return new Date(date).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+        };
+
+        // Get file size for display
+        const getFileSize = () => {
+            if (document.files && document.files.length > 0) {
+                const sizeInBytes = document.files[0].size;
+                const sizeInKB = Math.round(sizeInBytes / 1024);
+                return `${sizeInKB}KB`;
+            }
+            return 'N/A';
+        };
+
+        res.render('pages/employee/approval', {
+            document: {
+                ...document.toObject(),
+                formattedDate: formatDate(document.documentDate || document.createdAt),
+                fileSize: getFileSize()
+            },
+            approvals: approvals.map(approval => ({
+                ...approval.toObject(),
+                formattedApprovedOn: formatDate(approval.approvedOn),
+                isCurrentUser: user && approval.approver._id.toString() === user.id
+            })),
+            progress: {
+                percentage: Math.round(progressPercentage),
+                completed: completedApprovals,
+                total: totalApprovals
+            },
+            user: user,
+            currentUser: user // for EJS template
+        });
+
+    } catch (error) {
+        console.error('Error loading document approvals:', error);
+        res.status(500).render('error', {
+            message: 'Error loading document approvals'
+        });
+    }
+};
+
+// Helper function to create default approval workflow
+const createDefaultApprovalWorkflow = async (documentId, document) => {
+    try {
+        // Find users with specific designations for approval workflow
+        const teamLeaders = await User.find({ designation: 'Team Leader' }).limit(1);
+        const projectLeaders = await User.find({ designation: 'Project Leader' }).limit(1);
+        const managers = await User.find({ designation: 'Manager' }).limit(1);
+        const ceos = await User.find({ designation: 'CEO' }).limit(1);
+
+        const approvalWorkflow = [];
+        let level = 1;
+
+        // Team Leader approval
+        if (teamLeaders.length > 0) {
+            approvalWorkflow.push({
+                document: documentId,
+                approver: teamLeaders[0]._id,
+                level: level++,
+                designation: 'Team Leader',
+                status: 'Pending'
+            });
+        }
+
+        // Project Leader approval
+        if (projectLeaders.length > 0) {
+            approvalWorkflow.push({
+                document: documentId,
+                approver: projectLeaders[0]._id,
+                level: level++,
+                designation: 'Project Leader',
+                status: 'Pending'
+            });
+        }
+
+        // Manager approval
+        if (managers.length > 0) {
+            approvalWorkflow.push({
+                document: documentId,
+                approver: managers[0]._id,
+                level: level++,
+                designation: 'Manager',
+                status: 'Pending'
+            });
+        }
+
+        // CEO approval
+        if (ceos.length > 0) {
+            approvalWorkflow.push({
+                document: documentId,
+                approver: ceos[0]._id,
+                level: level++,
+                designation: 'CEO',
+                status: 'Pending'
+            });
+        }
+
+        // Create approvals in database
+        const createdApprovals = await Approval.insertMany(approvalWorkflow);
+
+        // Populate approver information for immediate use
+        return await Approval.find({ document: documentId })
+            .populate('approver', 'name designation email')
+            .sort({ level: 1 });
+
+    } catch (error) {
+        console.error('Error creating default approval workflow:', error);
+        return [];
+    }
+};
+
+export const updateApprovalStatus = async (req, res) => {
+    try {
+        const { approvalId } = req.params;
+        const { status, remark } = req.body;
+        const userId = req.user.id;
+
+        const approval = await Approval.findById(approvalId)
+            .populate('document');
+
+        if (!approval) {
+            return res.status(404).json({ error: 'Approval not found' });
+        }
+
+        // Check if user is the approver
+        if (approval.approver._id.toString() !== userId) {
+            return res.status(403).json({ error: 'Not authorized to approve this document' });
+        }
+
+        // Check if previous approvals are completed
+        const previousApprovals = await Approval.find({
+            document: approval.document._id,
+            level: { $lt: approval.level }
+        });
+
+        const pendingPrevious = previousApprovals.some(a => a.status === 'Pending');
+        if (pendingPrevious) {
+            return res.status(400).json({
+                error: 'Previous approvals are still pending'
+            });
+        }
+
+        // Update approval
+        approval.status = status;
+        approval.remark = remark || '';
+        approval.approvedOn = status === 'Approved' ? new Date() : null;
+        await approval.save();
+
+        // Update document status based on approvals
+        const allApprovals = await Approval.find({
+            document: approval.document._id
+        });
+
+        const allApproved = allApprovals.every(a => a.status === 'Approved');
+        const anyRejected = allApprovals.some(a => a.status === 'Rejected');
+
+        let documentStatus = 'Pending';
+        if (allApproved) {
+            documentStatus = 'Approved';
+        } else if (anyRejected) {
+            documentStatus = 'Rejected';
+        }
+
+        await Document.findByIdAndUpdate(approval.document._id, {
+            status: documentStatus
+        });
+
+        // Get updated approvals for response
+        const updatedApprovals = await Approval.find({
+            document: approval.document._id
+        })
+            .populate('approver', 'name designation email')
+            .sort({ level: 1 });
+
+        res.json({
+            message: 'Approval updated successfully',
+            approval: updatedApprovals.find(a => a._id.toString() === approvalId),
+            documentStatus: documentStatus
+        });
+
+    } catch (error) {
+        console.error('Error updating approval:', error);
+        res.status(500).json({ error: error.message });
+    }
+};
+
+export const processApprovalAction = async (req, res) => {
+    try {
+        const { approvalId, documentId, action, comment, requesterId } = req.body;
+        const userId = req.user.id;
+
+        // Validate input
+        if (!approvalId || !documentId || !action) {
+            return res.status(400).json({
+                error: 'Missing required fields: approvalId, documentId, action'
+            });
+        }
+
+        // Find the approval record
+        const approval = await Approval.findById(approvalId)
+            .populate('approver')
+            .populate('document');
+
+        if (!approval) {
+            return res.status(404).json({ error: 'Approval request not found' });
+        }
+
+        // Check if user is authorized to approve
+        if (approval.approver._id.toString() !== userId) {
+            return res.status(403).json({
+                error: 'Not authorized to approve this document'
+            });
+        }
+
+        // Check if already processed
+        if (approval.status !== 'Pending') {
+            return res.status(400).json({
+                error: 'This approval request has already been processed'
+            });
+        }
+
+        // Update approval status
+        approval.status = action === 'approve' ? 'Approved' : 'Rejected';
+        approval.remark = comment || '';
+        approval.approvedOn = new Date();
+        await approval.save();
+
+        // Update document status if all approvals are complete
+        const documentApprovals = await Approval.find({ document: documentId });
+        const allApproved = documentApprovals.every(a => a.status === 'Approved');
+        const anyRejected = documentApprovals.some(a => a.status === 'Rejected');
+
+        let documentStatus = 'Pending';
+        if (allApproved) {
+            documentStatus = 'Approved';
+        } else if (anyRejected) {
+            documentStatus = 'Rejected';
+        }
+
+        await Document.findByIdAndUpdate(documentId, {
+            status: documentStatus
+        });
+
+        // Create notification for requester
+        await Notification.create({
+            user: requesterId,
+            title: `Document ${action === 'approve' ? 'Approved' : 'Rejected'}`,
+            message: `Your document "${approval.document.metadata.fileName}" has been ${action === 'approve' ? 'approved' : 'rejected'} by ${req.user.name}`,
+            type: action === 'approve' ? 'success' : 'warning',
+            relatedDocument: documentId,
+            relatedApproval: approvalId
+        });
+
+        // Notify other approvers if document is fully processed
+        if (documentStatus === 'Approved' || documentStatus === 'Rejected') {
+            const otherApprovers = documentApprovals
+                .filter(a => a.approver.toString() !== userId && a.approver.toString() !== requesterId)
+                .map(a => a.approver);
+
+            for (const approverId of otherApprovers) {
+                await Notification.create({
+                    user: approverId,
+                    title: `Document ${documentStatus}`,
+                    message: `Document "${approval.document.metadata.fileName}" has been ${documentStatus.toLowerCase()}`,
+                    type: documentStatus === 'Approved' ? 'success' : 'warning',
+                    relatedDocument: documentId
+                });
+            }
+        }
+
+        res.json({
+            success: true,
+            message: `Document ${action === 'approve' ? 'approved' : 'declined'} successfully`,
+            approval: {
+                id: approval._id,
+                status: approval.status,
+                remark: approval.remark,
+                approvedOn: approval.approvedOn
+            },
+            documentStatus: documentStatus
+        });
+
+    } catch (error) {
+        console.error('Error processing approval action:', error);
+        res.status(500).json({
+            error: 'Internal server error processing approval'
+        });
     }
 };

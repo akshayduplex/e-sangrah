@@ -11,6 +11,7 @@ const fileSchema = new mongoose.Schema({
     uploadedAt: { type: Date, default: Date.now },
     isPrimary: { type: Boolean, default: false },
     status: { type: String, enum: ["active", "archived"], default: "active" },
+    fileSize: { type: Number, default: 0 },
     hash: { type: String }
 }, { timestamps: true });
 

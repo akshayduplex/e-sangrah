@@ -638,6 +638,23 @@
         justify-content: space-between;
     }
 
+    .modal-dialog.modal-md {
+        max-width: 600px;
+    }
+
+    .txtblue {
+        color: #2B1871;
+    }
+
+    .adminapprv_btn {
+        border-radius: 25px;
+        background: #297118;
+        box-shadow: 0 4px 4px 0 rgba(0, 0, 0, 0.25);
+        border: 0;
+        color: #fff;
+        padding: 10px 20px;
+    }
+
     /* AddedbyAkshay */
 
     #sharedoc-modal .select2-container {

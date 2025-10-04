@@ -1,0 +1,163 @@
+<%- include('../../partials/header') %>
+	<!-- Page Wrapper -->
+	<div class="page-wrapper">
+		<div class="content">
+			<!-- Breadcrumb -->
+			<div class="d-flex align-items-center justify-content-between page-breadcrumb mb-3">
+				<div class="my-auto mb-2">
+					<h2 class="mb-1">Recycle Bin</h2>
+					<nav>
+						<ol class="breadcrumb mb-0">
+							<li class="breadcrumb-item">
+								<a href="#"><i class="ti ti-smart-home"></i></a>
+							</li>
+							<li class="breadcrumb-item">
+								Recycle Bin
+							</li>
+						</ol>
+					</nav>
+				</div>
+				<div class="rtbtn">
+					<a href="#" data-bs-toggle="modal" data-bs-target="#emptybin-modal"
+						class="btn btn-primary btn-lg rounded-pill me-2 mb-2">
+						Empty Trash
+					</a>
+				</div>
+			</div>
+			<!-- /Breadcrumb -->
+
+			<div class="row">
+				<div class="seprate_crdhdr mb-4">
+					<div class="d-flex gap-2 align-items-center">
+						<div class="dropdown">
+							<a href="javascript:void(0);"
+								class="dropdown-toggle border text-black btn btn-outline-secondary fs-13 me-2"
+								data-bs-toggle="dropdown">
+								Select Department
+							</a>
+							<ul class="dropdown-menu dropdown-menu-end p-3">
+								<li>
+									<a href="javascript:void(0);" class="dropdown-item rounded-1">UI/UX Designer</a>
+								</li>
+								<li>
+									<a href="javascript:void(0);" class="dropdown-item rounded-1">HR Manager</a>
+								</li>
+								<li>
+									<a href="javascript:void(0);" class="dropdown-item rounded-1">Junior Tester</a>
+								</li>
+							</ul>
+						</div>
+					</div>
+				</div>
+				<div class="col-xxl-12 col-xl-12">
+					<div class="card flex-fill">
+						<div class="card-body p-0">
+							<div class="custom-datatable-filter table-responsive">
+								<table class="table datatable">
+									<thead>
+										<tr>
+											<th></th>
+											<th>File Name</th>
+											<th>Created on</th>
+											<th>Department</th>
+											<th>Deleted On</th>
+											<th>Actions</th>
+										</tr>
+									</thead>
+									<tbody>
+										<tr>
+											<td>
+												<div class="form-check form-check-md">
+													<input class="form-check-input" type="checkbox">
+												</div>
+											</td>
+											<td>
+												<div class="flxtblleft">
+													<span class="avatar rounded bg-light mb-2">
+														<img src="assets/img/icons/fn1.png">
+													</span>
+													<div class="flxtbltxt">
+														<p class="fs-14 mb-1 fw-normal text-neutral">Project Proposal v1
+															<span class="text-success">+2</span></p>
+														<span class="fs-11 fw-light text-black">190KB</span>
+													</div>
+												</div>
+											</td>
+											<td>
+												<p class="tbl_date">11-02-2025 &nbsp;&nbsp; 11:20</p>
+											</td>
+											<td>
+												<p>Operation Team</p>
+											</td>
+											<td>
+												<p class="tbl_date">14-02-2025 &nbsp;&nbsp; 14:20</p>
+											</td>
+											<td>
+												<div class="action-icon d-inline-flex">
+													<a href="#" data-bs-toggle="modal" data-bs-target="#restore-modal"
+														class="me-2"><i class="ti ti-restore"></i></a>
+													<a href="#" data-bs-toggle="modal"
+														data-bs-target="#trashdocfile-modal"><i
+															class="ti ti-trash"></i></a>
+												</div>
+											</td>
+										</tr>
+										<tr>
+											<td>
+												<div class="form-check form-check-md">
+													<input class="form-check-input" type="checkbox">
+												</div>
+											</td>
+											<td>
+												<div class="flxtblleft">
+													<span class="avatar rounded bg-light mb-2">
+														<img src="assets/img/icons/fn2.png">
+													</span>
+													<div class="flxtbltxt">
+														<p class="fs-14 mb-1 fw-normal text-neutral">Dev Presentation
+														</p>
+														<span class="fs-11 fw-light text-black">190KB</span>
+													</div>
+												</div>
+											</td>
+											<td>
+												<p class="tbl_date">11-02-2025 &nbsp;&nbsp; 11:20</p>
+											</td>
+											<td>
+												<p>Designing Team</p>
+											</td>
+											<td>
+												<p class="tbl_date">11-02-2025 &nbsp;&nbsp; 11:20</p>
+											</td>
+											<td>
+												<div class="action-icon d-inline-flex">
+													<a href="#" data-bs-toggle="modal" data-bs-target="#restore-modal"
+														class="me-2"><i class="ti ti-restore"></i></a>
+													<a href="#" data-bs-toggle="modal"
+														data-bs-target="#trashdocfile-modal"><i
+															class="ti ti-trash"></i></a>
+												</div>
+											</td>
+										</tr>
+									</tbody>
+								</table>
+							</div>
+						</div>
+					</div>
+				</div>
+				<!-- /Projects -->
+			</div>
+
+		</div>
+
+		<div class="footer mt-4 d-sm-flex align-items-center justify-content-between border-top bg-white p-3">
+			<p class="mb-0">2025 &copy; HLFPPT.</p>
+			<p>Designed & Developed by <a href="javascript:void(0);" class="text-primary">Duplex services &
+					Technology</a></p>
+		</div>
+
+	</div>
+	<!-- /Page Wrapper -->
+
+
+	<%- include('../../partials/footer') %>

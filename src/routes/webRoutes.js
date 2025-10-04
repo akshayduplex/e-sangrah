@@ -6,6 +6,8 @@ import { authenticate, authorize } from "../middlewares/authMiddleware.js";
 import checkPermissions from "../middlewares/checkPermission.js";
 
 import * as authController from "../controllers/authController.js";
+import * as adminController from "../controllers/adminController.js";
+import * as employeeController from "../controllers/employeeController.js";
 import * as userController from "../controllers/userController.js";
 import * as donorVendorController from "../controllers/DonerVender.js";
 import * as departmentController from "../controllers/departmentController.js";
@@ -122,6 +124,16 @@ router.get("/departments/:id", authenticate, checkPermissions, departmentControl
 
 
 /* =========================================
+   ADMIN ROUTE
+   ========================================= */
+router.get("/admin/approval", authenticate, checkPermissions, adminController.showAdminApprovalPage);
+
+/* =========================================
+   EMPLOYEE ROUTE
+   ========================================= */
+router.get("/employee/approval", authenticate, checkPermissions, employeeController.showEmployeeApprovalPage);
+
+/* =========================================
    DESIGNATIONS ROUTES
    ========================================= */
 // Add Designation page
@@ -141,11 +153,18 @@ router.get("/designations/list", authenticate, authorize("admin"), checkPermissi
 // Document List page
 router.get("/documents/list", authenticate, checkPermissions, documentController.showDocumentListPage);
 
+// View Document page
+router.get("/documents/:id/versions/view", authenticate, checkPermissions, documentController.showViewDocumentPage);
+
 // Add Document page
 router.get("/documents/add", authenticate, checkPermissions, documentController.showAddDocumentPage);
 
 // Edit Document page
 router.get("/documents/edit/:id", authenticate, checkPermissions, documentController.showEditDocumentPage);
+
+//Approvals
+// Render approval page
+router.get('/:id/approvals', authenticate, documentController.getDocumentApprovalsPage);
 
 /* =========================================
    PROJECTS ROUTES
@@ -291,6 +310,9 @@ router.get("/upload-folder", authenticate, checkPermissions, folderController.sh
 
 // Archived Folders page
 router.get("/archived", authenticate, checkPermissions, folderController.showArchivedFoldersPage);
+
+// Recycle-bin Folders page
+router.get("/recycle-bin", authenticate, checkPermissions, folderController.showRecycleBinPage);
 
 // Main Folders page
 router.get("/folders", authenticate, checkPermissions, folderController.showMainFoldersPage);

@@ -7,6 +7,8 @@ import express from "express";
 // Controller imports
 // ---------------------------
 import * as authController from "../controllers/authController.js";
+import * as adminController from "../controllers/adminController.js";
+import * as employeeController from "../controllers/employeeController.js";
 import * as userController from "../controllers/userController.js";
 import * as donorVendorController from "../controllers/DonerVender.js";
 import * as departmentController from "../controllers/departmentController.js";
@@ -82,6 +84,17 @@ router.get("/auth/profile", authenticate, authController.getProfile);
 router.patch("/auth/edit-profile", authenticate, upload.single("profile_image"), authController.updateProfile);
 router.post("/auth/logout", authenticate, authController.logout);
 
+// ---------------------------
+// Admin routes
+// ---------------------------
+router.get("/my-approvals", adminController.getMyApprovals);
+
+
+// ---------------------------
+// Employee routes
+// ---------------------------
+router.get("/approval-requests", employeeController.getApprovalRequests);
+
 
 
 // ---------------------------
@@ -112,10 +125,17 @@ router.post("/documents/:documentId/invite", documentController.inviteUser);
 //accept or reject an invite
 router.get("/documents/:documentId/invite/:userId/accept", documentController.autoAcceptInvite);
 
-// routes/documents.js
+// versioning
 router.get('/documents/:id/versions/history', documentController.getVersionHistory);
+router.get('/documents/:id/versions/view', documentController.viewDocumentVersion);
 router.get('/documents/:id/versions/:version/view', documentController.viewVersion);
 router.post('/documents/:id/versions/:version/restore', documentController.restoreVersion);
+
+//approval
+// router.get('/:documentId', getDocumentApprovals);
+router.patch('/:id/approvals/:approvalId', documentController.updateApprovalStatus);
+// Process approval action
+router.post('/action', documentController.processApprovalAction);
 
 // ---------------------------
 // Departments routes

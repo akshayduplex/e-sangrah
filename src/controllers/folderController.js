@@ -37,8 +37,16 @@ export const showUploadFolderPage = (req, res) => {
 
 // Archived Folders page
 export const showArchivedFoldersPage = (req, res) => {
-    res.render("pages/folders/archivedFolders", {
+    res.render("pages/folders/archive", {
         title: "E-Sangrah - ArchivedFolders",
+        user: req.user
+    });
+};
+
+// Recycle-bin Folders page
+export const showRecycleBinPage = (req, res) => {
+    res.render("pages/folders/recycleBin", {
+        title: "E-Sangrah - RecycleBin",
         user: req.user
     });
 };
