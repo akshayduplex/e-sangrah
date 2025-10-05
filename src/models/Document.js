@@ -11,6 +11,8 @@ const documentSchema = new mongoose.Schema({
     owner: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     status: { type: String, enum: ["Draft", "Pending", "Approved", "Rejected"], default: "Draft" },
     tags: [{ type: String, lowercase: true, trim: true }],
+    isDeleted: { type: Boolean, default: false },
+    deletedAt: { type: Date, default: null },
     metadata: {
         fileName: { type: String, trim: true },
         fileDescription: { type: String, trim: true },

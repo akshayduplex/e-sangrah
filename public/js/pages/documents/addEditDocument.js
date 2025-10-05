@@ -827,11 +827,14 @@ $(document).ready(function () {
 
             const response = await fetch(url, { method, body: formData });
             const data = await response.json();
+            console.log(data.data.document); // Correct path
 
             if (data.success) {
-                if (data.document?.metadata?.fileName) {
-                    document.getElementById('successFileName').textContent = data.document.metadata.fileName;
+                const doc = data.data.document; // extract the document
+                if (doc?.metadata?.fileName) {
+                    document.getElementById('successFileName').textContent = doc.metadata.fileName;
                 }
+
                 // Show modal
                 const successModal = new bootstrap.Modal(document.getElementById('data-success-modal'));
                 successModal.show();
@@ -839,10 +842,10 @@ $(document).ready(function () {
                 if (!isEdit) {
                     document.getElementById('data-success-modal').addEventListener('hidden.bs.modal', function () {
                         window.location.href = '/documents/add';
-                    }, { once: true }); // `once: true` ensures it runs only once
+                    }, { once: true });
                 }
             } else {
-                showToast('Error: ' + (data.message || 'Unknown error occurred', 'error'));
+                showToast('Error: ' + (data.message || 'Unknown error occurred'), 'error');
             }
         } catch (error) {
             showToast('An error occurred while submitting the form.' + error, 'error');

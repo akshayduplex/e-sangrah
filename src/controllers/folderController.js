@@ -37,18 +37,25 @@ export const showUploadFolderPage = (req, res) => {
 
 // Archived Folders page
 export const showArchivedFoldersPage = (req, res) => {
-    res.render("pages/folders/archive", {
+    res.render("pages/folders/archivedFolders", {
         title: "E-Sangrah - ArchivedFolders",
         user: req.user
     });
 };
 
 // Recycle-bin Folders page
-export const showRecycleBinPage = (req, res) => {
-    res.render("pages/folders/recycleBin", {
-        title: "E-Sangrah - RecycleBin",
-        user: req.user
-    });
+export const showRecycleBinPage = async (req, res) => {
+    try {
+        const documents = await Document.find({ isDeleted: true })
+            .select("department deletedAt tag createdAt files")
+            .populate("department", "name")
+            .populate("files", "originalName fileSize");
+
+        return res.render('pages/folders/recycleBin', { documents, user: req.user });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).send("Failed to load recycle bin documents.");
+    }
 };
 
 // Main Folders page

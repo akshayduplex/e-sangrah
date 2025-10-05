@@ -1,5 +1,6 @@
 <%- include('../../partials/header') %>
 
+    <!-- Page Wrapper -->
     <div class="page-wrapper">
         <div class="content">
             <!-- Breadcrumb -->
@@ -8,19 +9,30 @@
                     <h2 class="mb-1">Archived Folders</h2>
                     <nav>
                         <ol class="breadcrumb mb-0">
-                            <li class="breadcrumb-item"><a href="#"><i class="ti ti-smart-home"></i></a></li>
-                            <li class="breadcrumb-item">Archived Folders</li>
+                            <li class="breadcrumb-item">
+                                <a href="#"><i class="ti ti-smart-home"></i></a>
+                            </li>
+                            <li class="breadcrumb-item">
+                                Archived Folders
+                            </li>
                         </ol>
                     </nav>
                 </div>
+                <div class="rtbtn">
+                    <a href="#" data-bs-toggle="modal" data-bs-target="#emptybin-modal"
+                        class="btn btn-primary btn-lg rounded-pill me-2 mb-2">
+                        Empty Archive
+                    </a>
+                </div>
             </div>
+            <!-- /Breadcrumb -->
 
-            <!-- Folders Table -->
+            <!-- Archived Folders Table -->
             <div class="row">
                 <div class="col-xxl-12 col-xl-12">
                     <div class="card flex-fill">
                         <div class="card-body p-0">
-                            <div class="table-responsive">
+                            <div class="custom-datatable-filter table-responsive">
                                 <table class="table datatable" id="archived_folders_table">
                                     <thead>
                                         <tr>
@@ -42,32 +54,49 @@
                     </div>
                 </div>
             </div>
+            <!-- /Archived Folders Table -->
 
         </div>
+
+        <div class="footer mt-4 d-sm-flex align-items-center justify-content-between border-top bg-white p-3">
+            <p class="mb-0">2025 &copy; HLFPPT.</p>
+            <p>Designed & Developed by <a href="javascript:void(0);" class="text-primary">Duplex Services &
+                    Technology</a></p>
+        </div>
     </div>
+    <!-- /Page Wrapper -->
 
     <%- include('../../partials/footer') %>
+
+        <!-- DataTables Scripts -->
         <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
         <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
-        <script>$(document).ready(function () {
+
+        <!-- Archived Folders Logic -->
+        <script>
+            $(document).ready(function () {
                 const $table = $('#archived_folders_table');
 
                 const dataTable = $table.DataTable({
-                    processing: true,       // show processing indicator
-                    serverSide: true,       // enable server-side processing
+                    processing: true,
+                    serverSide: true,
                     ajax: {
                         url: `${baseUrl}/api/folders/archived`,
                         type: "GET",
                         dataSrc: function (res) {
-                            // Map your response to DataTables format
-                            // DataTables expects: { data: [...], recordsTotal: x, recordsFiltered: y }
                             if (!res.success) return [];
                             return res.folders.map(folder => ({
                                 id: folder._id,
-                                actions: `<div class="btn-group" role="group">
-                                <a href="#" class="dropdown-item restore-folder" data-folder-id="${folder._id}" data-bs-toggle="modal" data-bs-target="#restore-folder-modal"><i class="ti ti-arrow-back-up"></i></a>
-                                <a class="dropdown-item trash-folder" href="#" data-folder-id="${folder._id}" data-bs-toggle="modal" data-bs-target="#trashdoc-modal"><i class="ti ti-trash"></i></a>
-                              </div>`,
+                                actions: `
+                            <div class="action-icon d-inline-flex">
+                                <a href="#" class="restore-folder me-2" data-folder-id="${folder._id}" data-bs-toggle="modal" data-bs-target="#restore-folder-modal">
+                                    <i class="ti ti-arrow-back-up"></i>
+                                </a>
+                                <a href="#" class="trash-folder" data-folder-id="${folder._id}" data-bs-toggle="modal" data-bs-target="#trashdoc-modal">
+                                    <i class="ti ti-trash"></i>
+                                </a>
+                            </div>
+                        `,
                                 name: folder.name || "-",
                                 ownerName: folder.owner?.name || "-",
                                 ownerEmail: folder.owner?.email || "-",
@@ -98,7 +127,7 @@
                     autoWidth: false
                 });
 
-                // Handle restore and trash actions
+                // Trash Folder
                 $(document).on('click', '.trash-folder', function (e) {
                     e.preventDefault();
                     const folderId = $(this).data('folder-id');
@@ -115,6 +144,7 @@
                     });
                 });
 
+                // Restore Folder
                 $(document).on('click', '.restore-folder', function (e) {
                     e.preventDefault();
                     const folderId = $(this).data('folder-id');

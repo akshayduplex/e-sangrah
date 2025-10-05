@@ -48,23 +48,12 @@
                                     <i class="ti ti-calendar text-gray-7"></i>
                                 </span>
                             </div>
-                            <div class="dropdown">
-                                <a href="javascript:void(0);"
-                                    class="dropdown-toggle border text-black btn btn-outline-secondary fs-13"
-                                    data-bs-toggle="dropdown">
-                                    Select Department
-                                </a>
-                                <ul class="dropdown-menu dropdown-menu-end p-3">
-                                    <li><a href="javascript:void(0);" class="dropdown-item rounded-1">UI/UX Designer</a>
-                                    </li>
-                                    <li><a href="javascript:void(0);" class="dropdown-item rounded-1">HR Manager</a>
-                                    </li>
-                                    <li><a href="javascript:void(0);" class="dropdown-item rounded-1">Junior Tester</a>
-                                    </li>
-                                </ul>
+                            <div class="mb-0">
+                                <select id="department" class="form-select select2" style="width: 200px;">
+                                    <option value="">-- Select Department --</option>
+                                </select>
                             </div>
                         </div>
-
                     </div>
                 </div>
                 <div class="col-xxl-12 col-xl-12">
@@ -132,12 +121,20 @@
                     'archived': 'bg-soft-secondary text-secondary'
                 };
 
-                $('#approvalTable').DataTable({
+                // -------------------------
+                // Initialize DataTable
+                // -------------------------
+                const table = $('#approvalTable').DataTable({
                     ajax: {
                         url: '/api/approval-requests',
+                        data: function (d) {
+                            // send filters with every request
+                            d.status = $('.status-tab.btn-primary').text() || 'All';
+                            d.department = $('#department').val() || '';
+                            d.createdAt = $('.datetimepicker').val() || '';
+                        },
                         dataSrc: function (json) {
                             return json.data.map(item => {
-                                // File info
                                 const file = item.files?.[0];
                                 const fileExt = file?.originalName?.split('.').pop().toLowerCase() || '';
                                 const fileIcon = fileIcons[fileExt] || fileIcons.default;
@@ -154,17 +151,13 @@
                             </div>
                         </div>` : '-';
 
-                                // Status badge
                                 const statusKey = (item.status || '').toLowerCase().replace(/\s+/g, '');
                                 const statusClass = statusClassMap[statusKey] || 'bg-soft-secondary text-secondary';
-
-                                // Approvers
                                 let approversHtml = item.projectManager?.name || '';
                                 if (item.sharedWithUsers?.length) {
                                     approversHtml += ` <span class="text-success">+${item.sharedWithUsers.length}</span>`;
                                 }
 
-                                // Actions dropdown
                                 const actionsDropdown = `
                         <div class="btn-group" role="group">
                             <button type="button" class="btn border-0" data-bs-toggle="dropdown">
@@ -188,7 +181,7 @@
                                     "3": item.department?.name || '-',
                                     "4": approversHtml,
                                     "5": `<span class="badge badge-md ${statusClass}">${item.status}</span>`,
-                                    "6": `<button class="btn btn-outline-primary">Track</button>`,
+                                    "6": `<button class="btn btn-outline-primary track-btn" data-id="${item._id}">Track</button>`,
                                     "7": `<p>${item.comment || '-'}</p>`
                                 };
                             });
@@ -204,11 +197,59 @@
                         { data: "6" },
                         { data: "7" }
                     ],
-                    "order": [[1, "asc"]],
-                    "columnDefs": [
-                        { "orderable": false, "targets": [0, 5, 6] } // disable ordering for actions, status, track
+                    order: [[1, "asc"]],
+                    columnDefs: [
+                        { orderable: false, targets: [0, 5, 6] }
                     ]
                 });
+
+                // Track button
+                $('#approvalTable').on('click', '.track-btn', function () {
+                    const docId = $(this).data('id');
+                    if (docId) window.location.href = `/document/${docId}/approval/track`;
+                });
+
+                // -------------------------
+                // Filters
+                // -------------------------
+
+                // 1️⃣ Status filter
+                $('.status-tab').on('click', function () {
+                    $('.status-tab').removeClass('btn-primary').addClass('btn-outline-primary');
+                    $(this).removeClass('btn-outline-primary').addClass('btn-primary');
+                    table.ajax.reload(); // reload with new filter
+                });
+
+                // 2️⃣ Department filter
+                $('#department').on('change', function () {
+                    table.ajax.reload();
+                });
+
+                // 3️⃣ Date filter
+                $('.datetimepicker').on('change', function () {
+                    table.ajax.reload();
+                });
+
+                // -------------------------
+                // Initialize Select2 for Department
+                // -------------------------
+                function initSelect2(selector, url, textKey) {
+                    $(selector).select2({
+                        placeholder: `-- Select ${textKey} --`,
+                        allowClear: true,
+                        ajax: {
+                            url,
+                            dataType: 'json',
+                            delay: 250,
+                            data: params => ({ search: params.term }),
+                            processResults: data => {
+                                return { results: data.data.map(item => ({ id: item._id, text: item[textKey] })) };
+                            }
+                        }
+                    });
+                }
+
+                initSelect2('#department', `/api/departments/search`, 'name');
 
                 // Helper: format bytes
                 function formatBytes(bytes, decimals = 2) {
@@ -220,38 +261,4 @@
                     return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
                 }
             });
-
-
-            //approval modal
-            // Example of how to trigger the modal from your main page
-            // Add this to your document list or approvals page
-
-            // HTML button to trigger modal
-            <button
-                onclick="triggerApprovalModal()"
-                class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-            >
-                Review Approval
-            </button>
-
-            // JavaScript function with real data
-            function triggerApprovalModal() {
-                // In a real scenario, you'd get this data from your backend
-                const approvalData = {
-                    approvalId: '<%= approval._id %>',
-                    documentId: '<%= document._id %>',
-                    requesterName: '<%= document.owner.name %>',
-                    requesterId: '<%= document.owner._id %>',
-                    documentName: '<%= document.metadata.fileName %>',
-                    documentSize: '<%= document.files[0].size %>',
-                    requestDate: '<%= document.createdAt %>',
-                    description: '<%= document.metadata.fileDescription %>',
-                    compliance: '<%= document.compliance.isCompliance %>',
-                    expiryDate: '<%= document.compliance.expiryDate %>',
-                    fileUrl: '/api/files/<%= document.files[0]._id %>',
-                    notifyUsers: '<%= document.owner.name %> and other approver members'
-                };
-
-                showApprovalModal(approvalData);
-            }
         </script>

@@ -132,7 +132,10 @@ router.get("/admin/approval", authenticate, checkPermissions, adminController.sh
    EMPLOYEE ROUTE
    ========================================= */
 router.get("/employee/approval", authenticate, checkPermissions, employeeController.showEmployeeApprovalPage);
-
+// router.get("/employee/track", authenticate, checkPermissions, employeeController.showEmployeeApprovalPage);
+//Approvals
+// Render approval page
+router.get('/document/:id/approval/track', authenticate, documentController.getDocumentApprovalsPage);
 /* =========================================
    DESIGNATIONS ROUTES
    ========================================= */
@@ -162,9 +165,6 @@ router.get("/documents/add", authenticate, checkPermissions, documentController.
 // Edit Document page
 router.get("/documents/edit/:id", authenticate, checkPermissions, documentController.showEditDocumentPage);
 
-//Approvals
-// Render approval page
-router.get('/:id/approvals', authenticate, documentController.getDocumentApprovalsPage);
 
 /* =========================================
    PROJECTS ROUTES
@@ -312,7 +312,7 @@ router.get("/upload-folder", authenticate, checkPermissions, folderController.sh
 router.get("/archived", authenticate, checkPermissions, folderController.showArchivedFoldersPage);
 
 // Recycle-bin Folders page
-router.get("/recycle-bin", authenticate, checkPermissions, folderController.showRecycleBinPage);
+router.get("/recyclebin", authenticate, checkPermissions, folderController.showRecycleBinPage);
 
 // Main Folders page
 router.get("/folders", authenticate, checkPermissions, folderController.showMainFoldersPage);

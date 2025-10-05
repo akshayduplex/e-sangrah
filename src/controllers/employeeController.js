@@ -29,11 +29,30 @@ export const showEmployeeApprovalPage = (req, res) => {
  */
 export const getApprovalRequests = async (req, res) => {
     try {
-        const { status, department } = req.query;
+        const { status, department, createdAt } = req.query;
+        console.log("Query params:", req.query);
 
         const filter = {};
+
         if (status && status !== "All") filter.status = status;
-        if (department && mongoose.Types.ObjectId.isValid(department)) filter.department = department;
+
+        if (department && mongoose.Types.ObjectId.isValid(department))
+            filter.department = department;
+
+        if (createdAt) {
+            // Parse DD-MM-YYYY (from your datepicker)
+            const [day, month, year] = createdAt.split("-").map(Number);
+
+            if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
+                const selectedDate = new Date(year, month - 1, day);
+
+                // Match only documents where the DATE part of createdAt == selected date
+                // (since Mongo stores with time, this ensures same date)
+                const start = new Date(selectedDate.setHours(0, 0, 0, 0));
+                const end = new Date(selectedDate.setHours(23, 59, 59, 999));
+                filter.createdAt = { $gte: start, $lte: end };
+            }
+        }
 
         const documents = await Document.find(filter)
             .populate("department", "name")

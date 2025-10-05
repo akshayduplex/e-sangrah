@@ -102,21 +102,27 @@ router.get("/approval-requests", employeeController.getApprovalRequests);
 // ---------------------------
 router.get("/documents", documentController.getDocuments);
 router.get("/documents/search", documentController.searchDocuments);
+router.get("/documents/recyclebin", documentController.recycleBinDocuments);
 router.get("/documents/folder/:folderId", authenticate, documentController.getDocumentsByFolder);
 // Only accept signature file
 router.post("/documents", upload.fields([{ name: "signatureFile", maxCount: 1 }]), documentController.createDocument);
 router.get("/documents/:id", documentController.getDocument);
 router.patch("/documents/:id", upload.fields([{ name: "signature", maxCount: 1 }]), documentController.updateDocument);
-router.delete("/documents/:id", documentController.deleteDocument);
+// Soft delete (recycle bin)
+router.delete("/documents/:id", documentController.softDeleteDocument);
+
+// Hard delete (permanent removal)
+router.delete("/documents/:id/permanent", documentController.deleteDocument);
+
 router.patch("/documents/:id/status", documentController.updateDocumentStatus);
 // List all users document is shared with
-router.get("/:documentId/shared-users", documentController.getSharedUsers);
+router.get("/documents/:documentId/shared-users", documentController.getSharedUsers);
 // Update user access level
 router.put("/documents/share/:documentId", documentController.updateSharedUser);
 
 // Remove user from shared list
 router.delete("/documents/share/:documentId", documentController.removeSharedUser);
-router.put("/documents/:id/share", documentController.shareDocument);
+router.patch("/documents/:id/share", documentController.shareDocument);
 router.get("/documents/:id/audit-logs", documentController.getDocumentAuditLogs);
 router.get("/documents/:id/access-logs", documentController.getDocumentAccessLogs);
 // Invite a user to a document (sends email)
@@ -129,7 +135,7 @@ router.get("/documents/:documentId/invite/:userId/accept", documentController.au
 router.get('/documents/:id/versions/history', documentController.getVersionHistory);
 router.get('/documents/:id/versions/view', documentController.viewDocumentVersion);
 router.get('/documents/:id/versions/:version/view', documentController.viewVersion);
-router.post('/documents/:id/versions/:version/restore', documentController.restoreVersion);
+router.patch('/documents/:id/versions/:version/restore', documentController.restoreVersion);
 
 //approval
 // router.get('/:documentId', getDocumentApprovals);
