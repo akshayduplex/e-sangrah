@@ -103,6 +103,7 @@ router.get("/approval-requests", employeeController.getApprovalRequests);
 router.get("/documents", documentController.getDocuments);
 router.get("/documents/search", documentController.searchDocuments);
 router.get("/documents/recyclebin", documentController.recycleBinDocuments);
+router.patch("/documents/:id/restore", documentController.restoreDocument);
 router.get("/documents/folder/:folderId", authenticate, documentController.getDocumentsByFolder);
 // Only accept signature file
 router.post("/documents", upload.fields([{ name: "signatureFile", maxCount: 1 }]), documentController.createDocument);
@@ -112,9 +113,9 @@ router.patch("/documents/:id", upload.fields([{ name: "signature", maxCount: 1 }
 router.delete("/documents/:id", documentController.softDeleteDocument);
 
 // Hard delete (permanent removal)
-router.delete("/documents/:id/permanent", documentController.deleteDocument);
-
+router.delete("/documents/permanent", documentController.deleteDocument);
 router.patch("/documents/:id/status", documentController.updateDocumentStatus);
+
 // List all users document is shared with
 router.get("/documents/:documentId/shared-users", documentController.getSharedUsers);
 // Update user access level
@@ -139,9 +140,10 @@ router.patch('/documents/:id/versions/:version/restore', documentController.rest
 
 //approval
 // router.get('/:documentId', getDocumentApprovals);
-router.patch('/:id/approvals/:approvalId', documentController.updateApprovalStatus);
+router.patch('/documents/:documentId/approvals/:approver', documentController.updateApprovalStatus);
 // Process approval action
-router.post('/action', documentController.processApprovalAction);
+router.post('/documents/:documentId/add', documentController.createApprovalRequest);
+router.get('/documents/:documentId/approval/track', documentController.getApprovals);
 
 // ---------------------------
 // Departments routes

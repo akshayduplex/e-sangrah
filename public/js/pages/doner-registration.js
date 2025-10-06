@@ -45,7 +45,7 @@ $(document).ready(function () {
             // Check file type
             const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg'];
             if (!allowedTypes.includes(file.type)) {
-                alert('Only JPEG, PNG, and JPG image formats are allowed.');
+                showToast('Only JPEG, PNG, and JPG image formats are allowed.', 'info');
                 fileInput.val(''); // Clear input
                 preview.empty(); // Clear preview
                 uploadIcon.show();

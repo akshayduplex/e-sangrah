@@ -339,7 +339,7 @@
         background: #2B1871;
         color: #fff;
         padding: 8px 25px;
-        font-size: 17.639px;
+        font-size: 16.639px;
         font-weight: 400;
     }
 
@@ -632,12 +632,6 @@
         padding: 5px;
     }
 
-    .pjcrdbody {
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-    }
-
     .modal-dialog.modal-md {
         max-width: 600px;
     }
@@ -653,6 +647,124 @@
         border: 0;
         color: #fff;
         padding: 10px 20px;
+    }
+
+
+    .approval-switch {
+        background: #f8f9fa;
+        border-color: #dcdcdc;
+    }
+
+    .approval-switch .btn {
+        border: none;
+        background: transparent;
+        font-weight: 500;
+        transition: all 0.3s ease;
+    }
+
+    .approval-switch .btn.active i {
+        color: #198754;
+    }
+
+    .approval-switch .btn:not(.active):hover {
+        background: #f1f1f1;
+    }
+
+    #declineBtn.active i {
+        color: #dc3545;
+    }
+
+    .approval-switch {
+        border-radius: 10px;
+        border: 1px solid rgba(0, 0, 0, 0.20);
+        background: rgba(94, 94, 94, 0.16);
+        padding: 10px;
+    }
+
+    .approval-switch button {
+        border-radius: 7.164px;
+        font-size: 20px;
+        color: #000 !important;
+        font-weight: 400 !important;
+    }
+
+    .approval-switch button.active {
+        background: #fff !important;
+    }
+
+
+    .progresscard {
+        border-radius: 20px;
+        background: #FFF;
+        box-shadow: 0 1px 4px 0 rgba(0, 0, 0, 0.25);
+        text-align: center;
+        padding: 15px;
+    }
+
+    .progresscard h5 {
+        margin-bottom: 10px;
+    }
+
+    .approval-table {
+        width: 100%;
+    }
+
+    .approval-table td {
+        vertical-align: middle;
+        padding: 1rem 0.5rem;
+    }
+
+    .role-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        color: #28a745;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        position: relative;
+        z-index: 1;
+    }
+
+    .role-icon.pending {
+        color: #f0ad4e;
+    }
+
+    .status-badge {
+        font-size: 14px;
+        padding: 6px 12px;
+        border-radius: 8px;
+        font-weight: 500;
+    }
+
+    .status-approved {
+        background-color: #e9f8ec;
+        color: #198754;
+    }
+
+    .status-pending {
+        background-color: #fff3cd;
+        color: #856404;
+    }
+
+    .approval-tracker table th {
+        background: #2b1871 !important;
+        color: #fff !important;
+    }
+
+    .role-icon.done:after {
+        content: '';
+        position: absolute;
+        left: 17px;
+        top: 24px;
+        width: 2px;
+        height: 40px;
+        background: #3C951C;
+    }
+
+    .signimg {
+        max-width: 55px;
     }
 
     /* AddedbyAkshay */

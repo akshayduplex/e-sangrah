@@ -33,7 +33,10 @@ const documentSchema = new mongoose.Schema({
         fileUrl: { type: String, trim: true }
     },
     link: { type: String },
-
+    approvalHistory: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Approval"
+    }],
     // Flattened sharedWith for safe indexing
     sharedWithUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     comment: { type: String, trim: true, maxlength: 1000 },

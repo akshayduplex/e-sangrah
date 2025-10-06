@@ -74,7 +74,7 @@
                         url: `${baseUrl}/api/departments`,
                         method: 'GET',
                         success: function (res) {
-                            if (!res.success) return alert('Failed to fetch departments');
+                            if (!res.success) return showToast('Failed to fetch departments', 'error');
 
                             let tbody = '';
                             res.data.forEach((dept, index) => {

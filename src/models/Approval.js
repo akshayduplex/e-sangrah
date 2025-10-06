@@ -7,6 +7,7 @@ const approvalSchema = new mongoose.Schema({
         ref: "Document",
         required: true
     },
+    designation: { type: String },
     approver: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
@@ -14,10 +15,6 @@ const approvalSchema = new mongoose.Schema({
     },
     level: {
         type: Number,
-        required: true
-    },
-    designation: {
-        type: String,
         required: true
     },
     status: {

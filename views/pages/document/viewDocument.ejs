@@ -237,8 +237,7 @@
                             : '-';
 
                 } catch (err) {
-                    console.error(err);
-                    alert('Failed to load document version');
+                    showToast('Failed to load document version', 'error');
                 }
             });
         </script>

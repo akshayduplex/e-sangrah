@@ -504,7 +504,7 @@ function initializeFileUpload() {
     // Handle file uploads
     async function handleFileUpload(files) {
         const folderId = document.getElementById('selectedFolderId').value;
-        if (!folderId) return alert("Please select a folder.");
+        if (!folderId) return showToast("Please select a folder.", 'info');
 
         for (const file of files) {
             const tempId = 'temp_' + Date.now() + Math.random().toString(36).substring(2, 8);
@@ -699,7 +699,7 @@ function initializeSignature() {
     $('#clearSignBtn').on('click', () => { paths = []; redraw(); });
 
     $('#saveSignBtn').on('click', () => {
-        if (paths.length === 0) { alert('Please draw a signature first.'); return; }
+        if (paths.length === 0) { showToast('Please draw a signature first.', 'info'); return; }
         const dataURL = canvas.toDataURL('image/png');
         signaturePreview.innerHTML = `<img src="${dataURL}" style="max-height:100%; max-width:100%; object-fit:contain;">`;
         signatureData.value = dataURL; // save base64

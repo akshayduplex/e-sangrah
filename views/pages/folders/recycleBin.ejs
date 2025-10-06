@@ -57,7 +57,7 @@
 									<thead>
 										<tr>
 											<th></th>
-											<th>File Name</th>
+											<th>Files</th>
 											<th>Created on</th>
 											<th>Department</th>
 											<th>Deleted On</th>
@@ -66,15 +66,19 @@
 									</thead>
 									<tbody>
 										<% documents.forEach(doc=> { %>
-											<% doc.files.forEach(file=> { %>
-												<tr>
-													<td>
-														<div class="form-check form-check-md">
-															<input class="form-check-input" type="checkbox">
-														</div>
-													</td>
-													<td>
-														<div class="flxtblleft">
+											<tr>
+												<!-- Checkbox for selecting document -->
+												<td>
+													<div class="form-check form-check-md">
+														<input class="form-check-input select-document" type="checkbox"
+															data-document-id="<%= doc._id %>">
+													</div>
+												</td>
+
+												<!-- List all files within the document -->
+												<td>
+													<% doc.files.forEach(file=> { %>
+														<div class="flxtblleft mb-1">
 															<span class="avatar rounded bg-light mb-2">
 																<img src="assets/img/icons/fn1.png">
 															</span>
@@ -87,47 +91,57 @@
 																</span>
 															</div>
 														</div>
-													</td>
-													<td>
-														<p class="tbl_date">
-															<%= new Date(doc.createdAt).toLocaleDateString() %>
-																&nbsp;&nbsp; <%= new
-																	Date(doc.createdAt).toLocaleTimeString() %>
-														</p>
-													</td>
-													<td>
-														<p>
-															<%= doc.department.name %>
-														</p>
-													</td>
-													<td>
-														<p class="tbl_date">
-															<%= new Date(doc.deletedAt).toLocaleDateString() %>
-																&nbsp;&nbsp; <%= new
-																	Date(doc.deletedAt).toLocaleTimeString() %>
-														</p>
-													</td>
-													<td>
-														<div class="action-icon d-inline-flex">
-															<a href="#" data-bs-toggle="modal"
-																data-bs-target="#restore-modal" class="me-2">
-																<i class="ti ti-restore"></i>
-															</a>
-															<a href="#" class="delete-permanent-btn"
-																data-id="<%= file._id %>"
-																data-name="<%= file.originalName %>"
-																data-size="<%= file.fileSize %> KB">
-																<i class="ti ti-trash"></i>
-															</a>
-														</div>
-													</td>
-												</tr>
-												<% }) %>
-													<% }) %>
-									</tbody>
+														<% }) %>
+												</td>
 
+												<!-- Created date -->
+												<td>
+													<p class="tbl_date">
+														<%= new Date(doc.createdAt).toLocaleDateString() %>
+															&nbsp;&nbsp;
+															<%= new Date(doc.createdAt).toLocaleTimeString() %>
+													</p>
+												</td>
+
+												<!-- Department -->
+												<td>
+													<p>
+														<%= doc.department?.name || '-' %>
+													</p>
+												</td>
+
+												<!-- Deleted date -->
+												<td>
+													<p class="tbl_date">
+														<%= new Date(doc.deletedAt).toLocaleDateString() %>
+															&nbsp;&nbsp;
+															<%= new Date(doc.deletedAt).toLocaleTimeString() %>
+													</p>
+												</td>
+
+												<!-- Actions -->
+												<td>
+													<div class="action-icon d-inline-flex">
+														<!-- Restore document -->
+														<a href="#" data-bs-toggle="modal"
+															data-bs-target="#restore-modal" class="me-2">
+															<i class="ti ti-restore"></i>
+														</a>
+
+														<!-- Permanent delete document -->
+														<a href="#" class="delete-permanent-btn"
+															data-document-id="<%= doc._id %>"
+															data-document-name="Document">
+															<i class="ti ti-trash"></i>
+														</a>
+													</div>
+												</td>
+											</tr>
+											<% }) %>
+									</tbody>
 								</table>
 							</div>
+
 						</div>
 					</div>
 				</div>
@@ -150,7 +164,8 @@
 		<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 		<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
 		<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
-		<script>$(document).ready(function () {
+		<script>
+			$(document).ready(function () {
 
 				let documentIdToDelete = null;
 
@@ -158,19 +173,19 @@
 				$('.delete-permanent-btn').on('click', function (e) {
 					e.preventDefault();
 
-					const fileId = $(this).data('id');
-					const fileName = $(this).data('name');
-					const fileSize = $(this).data('size');
+					// ✅ Use document ID now
+					const documentId = $(this).data('document-id');
+					const documentName = $(this).data('document-name'); // optional for modal display
 
-					documentIdToDelete = fileId;
+					documentIdToDelete = documentId;
 
 					// Update modal title and body
 					const modal = $('#emptybin-modal');
 					modal.find('.modal-title').text('Permanent Delete');
 					modal.find('.modal-body').html(`
             Are you sure you want to permanently 
-            <span class="txtblue">delete "${fileName}"</span> 
-            (${fileSize})? This action cannot be undone.
+            <span class="txtblue">delete "${documentName}"</span>? 
+            This action cannot be undone.
         `);
 
 					// Update confirm button
@@ -183,12 +198,12 @@
 						if (!documentIdToDelete) return;
 
 						$.ajax({
-							url: `/documents/${documentIdToDelete}/permanent`,
+							url: `/api/documents/permanent?id=${documentIdToDelete}`,
 							method: 'DELETE',
 							success: function (response) {
 								modal.modal('hide');
-								alert(`"${fileName}" has been permanently deleted.`);
-								location.reload(); // or remove the row from table dynamically
+								alert(`"${documentName}" has been permanently deleted.`);
+								location.reload(); // or remove the row dynamically
 							},
 							error: function (err) {
 								console.error('Permanent delete failed:', err);

@@ -189,13 +189,12 @@ window.testEditPage = function () {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                alert('Test Update Successful!');
+                showToast('Test Update Successful!');
             } else {
-                alert('Test Update Failed: ' + data.message);
+                showToast('Test Update Failed: ' + data.message, 'success');
             }
         })
         .catch(error => {
-            console.error('Test Update Error:', error);
-            alert('Test Update Error: ' + error.message);
+            showToast('Test Update Error: ' + error.message, 'error');
         });
 };

@@ -22,7 +22,6 @@ class VersionManager {
 
             return result.data;
         } catch (error) {
-            console.error('Error viewing version:', error);
             showToast('Failed to load version', 'error');
         }
     }
@@ -60,7 +59,6 @@ class VersionManager {
 
             return result.data;
         } catch (error) {
-            console.error('Error restoring version:', error);
             showToast('Failed to restore version', 'error');
         }
     }

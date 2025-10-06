@@ -896,7 +896,7 @@
         // Show Share Modal
         $('#sharedoc-modal').on('show.bs.modal', function (event) {
             currentDocId = $(event.relatedTarget).data('doc-id');
-            if (!currentDocId) return alert('Error: No document selected');
+            if (!currentDocId) return showToast('Error: No document selected', 'info');
 
             const modal = $(this);
             modal.find('input[type="text"]').val('');

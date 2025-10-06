@@ -337,7 +337,7 @@
                         tags,
                         metadata,
                         description,
-                        doc.remark || '-',
+                        doc.comment || '-',
                         doc.signature?.fileUrl ? `<img src="${doc.signature.fileUrl}" style="height:40px;">` : '-',
                         `<span class="badge ${statusClass}">${doc.status}</span>`
                     ];
@@ -772,44 +772,47 @@
 
                             versionList.empty();
                             res.data.versionHistory.forEach(item => {
-                                // Skip version 1.0
-                                if (item.version === "1.0") return;
-
                                 const modifiedDate = new Date(item.timestamp).toLocaleString();
 
+                                // Only show restore button if not version 1.0
+                                const restoreButton = item.version !== "1.0"
+                                    ? `<button class="btn btn-outline-light rounded-pill btn-restore-version" 
+        data-version="${item.version}" 
+        data-previous-version="${item.previousVersion}">
+        Restore to v${item.previousVersion}
+    </button>`
+                                    : '';
+
                                 const html = `
-                    <div class="version-item border-bottom pb-3 mb-3">
-                        <div class="dflexbtwn align-items-start">
-                            <div class="flxtblleft">
-                                <span class="avatar rounded bg-light mb-2">
-                                    <img src="${item.changedBy?.avatar || '/img/icons/fn2.png'}" alt="User">
-                                </span>
-                                <div class="flxtbltxt">
-                                    <p class="fs-18 mb-1 fw-normal">
-                                        ${res.data.documentName} v${item.version}
-                                        ${item.isCurrent ? '<span class="badge bg-success ms-2">Current</span>' : ''}
-                                    </p>
-                                    <span class="fs-16 fw-normal d-block mb-2">
-                                        Modified by ${item.changedBy?.name || 'Unknown'}
-                                    </span>
-                                    <h5 class="fs-18 fw-light text-black mb-3">
-                                        ${item.changes || 'Updated document'}
-                                    </h5>
-                                    <div class="version-actions">
-                                        <button class="site-btnmd fw-light btn-view-version" data-version="${item.version}">
-                                            View
-                                        </button>
-                                        <button class="btn btn-outline-light rounded-pill btn-restore-version" 
-                                            data-version="${item.version}">
-                                            Restore to v${item.previousVersion}
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                            <p class="text-muted">Modified on ${modifiedDate}</p>
+        <div class="version-item border-bottom pb-3 mb-3">
+            <div class="dflexbtwn align-items-start">
+                <div class="flxtblleft">
+                    <span class="avatar rounded bg-light mb-2">
+                        <img src="${item.changedBy?.avatar || '/img/icons/fn2.png'}" alt="User">
+                    </span>
+                    <div class="flxtbltxt">
+                        <p class="fs-18 mb-1 fw-normal">
+                            ${res.data.documentName} v${item.version}
+                            ${item.isCurrent ? '<span class="badge bg-success ms-2">Current</span>' : ''}
+                        </p>
+                        <span class="fs-16 fw-normal d-block mb-2">
+                            Modified by ${item.changedBy?.name || 'Unknown'}
+                        </span>
+                        <h5 class="fs-18 fw-light text-black mb-3">
+                            ${item.changes || 'Updated document'}
+                        </h5>
+                        <div class="version-actions">
+                            <button class="site-btnmd fw-light btn-view-version" data-version="${item.version}">
+                                View
+                            </button>
+                            ${restoreButton}
                         </div>
                     </div>
-                `;
+                </div>
+                <p class="text-muted">Modified on ${modifiedDate}</p>
+            </div>
+        </div>
+    `;
                                 versionList.append(html);
                             });
                         },
@@ -829,18 +832,37 @@
                     window.location.href = `/documents/${currentDocId}/versions/view?version=${version}`;
                 });
 
+                let restoreTarget = {}; // Temporarily store doc ID and version
+
                 $(document).on('click', '.btn-restore-version', function () {
                     const version = $(this).data('version');
-                    if (!confirm(`Restore document to version ${version}?`)) return;
+                    const previousVersion = $(this).data('previous-version');
+                    if (!currentDocId || !previousVersion) return;
+
+                    restoreTarget = { docId: currentDocId, version: previousVersion };
+
+                    // Update modal title and body dynamically
+                    $('#restore-folder-modal .modal-title').html(`
+        <img src="/img/icons/restore.png" alt="Restore Icon" width="32" class="me-2">
+        Restore Version
+    `);
+
+                    $('#restore-folder-modal .modal-body').text(
+                        `Are you sure you want to restore this document to version ${previousVersion}?`
+                    );
+
+                    // Show the modal
+                    $('#restore-folder-modal').modal('show');
+                });
+                $('#confirm-restore-folder').on('click', function () {
+                    if (!restoreTarget.docId || !restoreTarget.version) return;
 
                     $.ajax({
-                        url: `${baseUrl}/api/documents/${currentDocId}/versions/restore`,
-                        method: 'POST',
-                        contentType: 'application/json',
-                        data: JSON.stringify({ version }),
+                        url: `${baseUrl}/api/documents/${restoreTarget.docId}/versions/${restoreTarget.version}/restore`,
+                        method: 'PATCH',
                         success: function (res) {
-                            showToast(res.message || `Restored to version ${version}`, 'success');
-                            $('#versionhistory-modal').modal('hide');
+                            showToast(res.message || `Restored to version ${restoreTarget.version}`, 'success');
+                            $('#restore-folder-modal').modal('hide');
                             table.ajax.reload(); // reload table so status/files update
                         },
                         error: function (err) {

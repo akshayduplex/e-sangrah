@@ -65,9 +65,9 @@ $(document).ready(function () {
 
         if (!isValid) {
             if (typeof showToast === 'function') {
-                showToast('Please fill all required fields correctly.', 'error');
+                showToast('Please fill all required fields correctly.', 'info');
             } else {
-                alert('Please fill all required fields correctly.');
+                showToast('Please fill all required fields correctly.', 'info');
             }
             return;
         }

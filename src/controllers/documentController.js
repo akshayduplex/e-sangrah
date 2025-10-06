@@ -225,7 +225,7 @@ export const getDocuments = async (req, res) => {
             .populate("sharedWithUsers", "name")
             .populate("files")
             .sort(sort)
-            .select("metadata signature description sharedWithUsers documentVendor documentDonor project department owner status tags files link createdAt updatedAt remark compliance")
+            .select("metadata signature description sharedWithUsers documentVendor documentDonor project department owner status tags files link createdAt updatedAt comment compliance")
             .skip(skip)
             .limit(limitNum)
             .lean();
@@ -337,6 +337,7 @@ export const recycleBinDocuments = async (req, res) => {
 
     try {
         const query = { isDeleted: true };
+
         if (search) {
             query["files.originalName"] = { $regex: search, $options: "i" };
         }
@@ -349,19 +350,40 @@ export const recycleBinDocuments = async (req, res) => {
             .populate("department", "name")
             .populate("files", "originalName fileSize");
 
-        // Flatten documents for DataTables
-        const data = [];
-        documents.forEach(doc => {
-            doc.files.forEach(file => {
-                data.push([
-                    `<div class="form-check form-check-md"><input class="form-check-input" type="checkbox"></div>`,
-                    `<div class="flxtblleft"><span class="avatar rounded bg-light mb-2"><img src="assets/img/icons/fn1.png"></span><div class="flxtbltxt"><p class="fs-14 mb-1 fw-normal text-neutral">${file.originalName}</p><span class="fs-11 fw-light text-black">${file.fileSize} KB</span></div></div>`,
-                    `<p class="tbl_date">${new Date(doc.createdAt).toLocaleDateString()} &nbsp;&nbsp; ${new Date(doc.createdAt).toLocaleTimeString()}</p>`,
-                    `<p>${doc.department.name}</p>`,
-                    `<p class="tbl_date">${new Date(doc.deletedAt).toLocaleDateString()} &nbsp;&nbsp; ${new Date(doc.deletedAt).toLocaleTimeString()}</p>`,
-                    `<div class="action-icon d-inline-flex"><a href="#" data-bs-toggle="modal" data-bs-target="#restore-modal" class="me-2"><i class="ti ti-restore"></i></a><a href="#" data-bs-toggle="modal" data-bs-target="#trashdocfile-modal"><i class="ti ti-trash"></i></a></div>`
-                ]);
-            });
+        // Build DataTables row per document (not per file)
+        const data = documents.map(doc => {
+            // Concatenate all file names and sizes for display
+            const filesHtml = doc.files.map(file => `
+                <div class="flxtblleft mb-1">
+                    <span class="avatar rounded bg-light mb-2">
+                        <img src="assets/img/icons/fn1.png">
+                    </span>
+                    <div class="flxtbltxt">
+                        <p class="fs-14 mb-1 fw-normal text-neutral">${file.originalName}</p>
+                        <span class="fs-11 fw-light text-black">${file.fileSize} KB</span>
+                    </div>
+                </div>
+            `).join("");
+
+            return [
+                `<div class="form-check form-check-md">
+                    <input class="form-check-input" type="checkbox" data-document-id="${doc._id}">
+                </div>`,
+                filesHtml,
+                `<p class="tbl_date">${new Date(doc.createdAt).toLocaleDateString()} &nbsp;&nbsp; ${new Date(doc.createdAt).toLocaleTimeString()}</p>`,
+                `<p>${doc.department?.name || '-'}</p>`,
+                `<p class="tbl_date">${new Date(doc.deletedAt).toLocaleDateString()} &nbsp;&nbsp; ${new Date(doc.deletedAt).toLocaleTimeString()}</p>`,
+                `<div class="action-icon d-inline-flex">
+                    <a href="#" data-bs-toggle="modal" data-bs-target="#restore-modal" class="me-2">
+                        <i class="ti ti-restore"></i>
+                    </a>
+                    <a href="#" class="delete-permanent-btn"
+                       data-document-id="${doc._id}"
+                       data-document-name="Document">
+                        <i class="ti ti-trash"></i>
+                    </a>
+                </div>`
+            ];
         });
 
         res.json({
@@ -371,7 +393,42 @@ export const recycleBinDocuments = async (req, res) => {
             data
         });
     } catch (err) {
+        console.error("Recycle bin fetch error:", err);
         res.status(500).json({ error: "Failed to fetch deleted documents" });
+    }
+};
+
+
+// Restore a soft-deleted document
+export const restoreDocument = async (req, res) => {
+    const { id } = req.params;
+
+    // Validate ObjectId
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+        return res.status(400).json({ message: "Invalid document ID." });
+    }
+
+    try {
+        // Find the document that is soft-deleted
+        const document = await Document.findOne({ _id: id, isDeleted: true });
+
+        if (!document) {
+            return res.status(404).json({ message: "Document not found or not deleted." });
+        }
+
+        // Restore the document
+        document.isDeleted = false;
+        document.deletedAt = null;
+
+        await document.save();
+
+        return res.status(200).json({
+            message: "Document restored successfully.",
+            document
+        });
+    } catch (error) {
+        console.error("Error restoring document:", error);
+        return res.status(500).json({ message: "Server error while restoring document." });
     }
 };
 /**
@@ -518,6 +575,7 @@ export const createDocument = async (req, res) => {
                     version: 1,
                     uploadedBy: req.user._id,
                     uploadedAt: new Date(),
+                    fileSize: tempFile.size,
                     isPrimary: fileDocs.length === 0,
                     status: "active"
                 });
@@ -1014,12 +1072,9 @@ const handleSignatureUpdate = async (document, req) => {
 const createVersionHistory = async (document, user, changes, changedFields) => {
     const snapshot = {};
     changedFields.forEach(field => {
-        if (field === "metadata") snapshot[field] = { ...document.metadata };
-        else if (field === "tags") snapshot[field] = [...document.tags];
-        else if (field === "files") snapshot[field] = document.files.map(f => f.toString());
-        else if (field === "compliance") snapshot[field] = { ...document.compliance };
-        else if (field === "signature") snapshot[field] = document.signature ? { ...document.signature } : null;
-        else snapshot[field] = document[field];
+        if (document[field] !== undefined) {
+            snapshot[field] = JSON.parse(JSON.stringify(document[field])); // deep copy
+        }
     });
 
     document.versionHistory.push({
@@ -1034,13 +1089,11 @@ const createVersionHistory = async (document, user, changes, changedFields) => {
         document.versionHistory = document.versionHistory.slice(-50);
     }
 };
-
 /**
  * Restore to specific version
  */
 export const restoreVersion = async (req, res) => {
     const { id, version } = req.params;
-
     if (!mongoose.Types.ObjectId.isValid(id)) {
         return res.status(400).json({ message: "Invalid document ID" });
     }
@@ -1302,46 +1355,64 @@ export const softDeleteDocument = async (req, res) => {
 
 
 /**
- * Permanent Delete document(s)
+ * Delete document(s) permanently
+ * 1️⃣ Single delete: via query ?id=<documentId>
+ * 2️⃣ Multiple delete: via body { ids: [] }
+ * 3️⃣ Empty trash: via query ?empty=true
  */
 export const deleteDocument = async (req, res) => {
     try {
-        // Accept single ID or multiple IDs
-        const { id, ids } = req.body; // ids = array of document IDs for bulk delete
         let documentIds = [];
 
-        if (ids && Array.isArray(ids) && ids.length > 0) {
-            documentIds = ids;
-        } else if (id) {
-            documentIds = [id];
-        } else {
+        // 1️⃣ Single document delete via query ?id=<documentId>
+        if (req.query.id) {
+            documentIds = [req.query.id];
+        }
+        // 2️⃣ Multiple document delete via body { ids: ["docId1", "docId2"] }
+        else if (Array.isArray(req.body.ids) && req.body.ids.length > 0) {
+            documentIds = req.body.ids;
+        }
+        // 3️⃣ Empty trash (all user-owned deleted documents)
+        else if (req.query.empty === "true") {
+            const userDocs = await Document.find({ owner: req.user._id, isDeleted: true });
+            if (!userDocs.length) {
+                return failResponse(res, "No deleted documents to remove", 404);
+            }
+            documentIds = userDocs.map(doc => doc._id.toString());
+        }
+        // 4️⃣ Invalid request
+        else {
             return failResponse(res, "No document ID(s) provided", 400);
         }
 
-        // Validate all IDs
-        for (const docId of documentIds) {
-            if (!mongoose.Types.ObjectId.isValid(docId)) {
-                return failResponse(res, `Invalid document ID: ${docId}`, 400);
-            }
+        // Validate ObjectIDs
+        documentIds = documentIds
+            .map(id => id?.trim())
+            .filter(id => mongoose.Types.ObjectId.isValid(id));
+
+        if (!documentIds.length) {
+            return failResponse(res, "No valid document IDs provided", 400);
         }
 
-        // Fetch documents
+        // Fetch documents and ensure ownership
         const documents = await Document.find({ _id: { $in: documentIds } });
         if (!documents.length) {
             return failResponse(res, "Document(s) not found", 404);
         }
 
-        // Check ownership
-        const unauthorized = documents.some(doc => doc.owner.toString() !== req.user._id.toString());
+        const unauthorized = documents.some(
+            doc => doc.owner.toString() !== req.user._id.toString()
+        );
         if (unauthorized) {
             return failResponse(res, "Only the owner can delete these documents", 403);
         }
 
-        // Delete all documents
+        // Permanent delete at document level
         await Document.deleteMany({ _id: { $in: documentIds } });
 
         return successResponse(res, {}, "Document(s) deleted permanently");
     } catch (error) {
+        console.error("Delete error:", error);
         return errorResponse(res, error, "Failed to delete document(s)");
     }
 };
@@ -2349,34 +2420,25 @@ const createDefaultApprovalWorkflow = async (documentId, document) => {
 
 export const updateApprovalStatus = async (req, res) => {
     try {
-        const { approvalId } = req.params;
+        const { approver } = req.params;
         const { status, remark } = req.body;
         const userId = req.user.id;
+        console.log(approver, status, remark)
+        const approval = await Approval.find(approver).populate('document');
 
-        const approval = await Approval.findById(approvalId)
-            .populate('document');
+        if (!approval) return res.status(404).json({ error: 'Approval not found' });
 
-        if (!approval) {
-            return res.status(404).json({ error: 'Approval not found' });
-        }
-
-        // Check if user is the approver
-        if (approval.approver._id.toString() !== userId) {
+        // Approver check
+        if (approval.approver.toString() !== userId)
             return res.status(403).json({ error: 'Not authorized to approve this document' });
-        }
 
-        // Check if previous approvals are completed
+        // Previous approvals check
         const previousApprovals = await Approval.find({
             document: approval.document._id,
             level: { $lt: approval.level }
         });
-
         const pendingPrevious = previousApprovals.some(a => a.status === 'Pending');
-        if (pendingPrevious) {
-            return res.status(400).json({
-                error: 'Previous approvals are still pending'
-            });
-        }
+        if (pendingPrevious) return res.status(400).json({ error: 'Previous approvals are still pending' });
 
         // Update approval
         approval.status = status;
@@ -2384,37 +2446,27 @@ export const updateApprovalStatus = async (req, res) => {
         approval.approvedOn = status === 'Approved' ? new Date() : null;
         await approval.save();
 
-        // Update document status based on approvals
-        const allApprovals = await Approval.find({
-            document: approval.document._id
-        });
-
+        // Update document status
+        const allApprovals = await Approval.find({ document: approval.document._id });
         const allApproved = allApprovals.every(a => a.status === 'Approved');
         const anyRejected = allApprovals.some(a => a.status === 'Rejected');
 
         let documentStatus = 'Pending';
-        if (allApproved) {
-            documentStatus = 'Approved';
-        } else if (anyRejected) {
-            documentStatus = 'Rejected';
-        }
+        if (allApproved) documentStatus = 'Approved';
+        else if (anyRejected) documentStatus = 'Rejected';
 
-        await Document.findByIdAndUpdate(approval.document._id, {
-            status: documentStatus
-        });
+        await Document.findByIdAndUpdate(approval.document._id, { status: documentStatus });
 
-        // Get updated approvals for response
-        const updatedApprovals = await Approval.find({
-            document: approval.document._id
-        })
+        const updatedApprovals = await Approval.find({ document: approval.document._id })
             .populate('approver', 'name designation email')
             .sort({ level: 1 });
 
         res.json({
             message: 'Approval updated successfully',
-            approval: updatedApprovals.find(a => a._id.toString() === approvalId),
-            documentStatus: documentStatus
+            approval: updatedApprovals.find(a => a._id.toString() === approver),
+            documentStatus
         });
+
 
     } catch (error) {
         console.error('Error updating approval:', error);
@@ -2422,106 +2474,114 @@ export const updateApprovalStatus = async (req, res) => {
     }
 };
 
-export const processApprovalAction = async (req, res) => {
+export const getApprovals = async (req, res) => {
     try {
-        const { approvalId, documentId, action, comment, requesterId } = req.body;
-        const userId = req.user.id;
+        const { documentId } = req.params;
 
-        // Validate input
-        if (!approvalId || !documentId || !action) {
-            return res.status(400).json({
-                error: 'Missing required fields: approvalId, documentId, action'
-            });
+        // Fetch approvals with approver info
+        const approvals = await Approval.find({ document: documentId })
+            .populate("approver", "name ") // Populate name and role from User
+            .sort({ level: 1 }); // Sort by approval level
+
+        if (!approvals) {
+            return res.status(404).json({ message: "No approvals found" });
         }
 
-        // Find the approval record
-        const approval = await Approval.findById(approvalId)
-            .populate('approver')
-            .populate('document');
-
-        if (!approval) {
-            return res.status(404).json({ error: 'Approval request not found' });
-        }
-
-        // Check if user is authorized to approve
-        if (approval.approver._id.toString() !== userId) {
-            return res.status(403).json({
-                error: 'Not authorized to approve this document'
-            });
-        }
-
-        // Check if already processed
-        if (approval.status !== 'Pending') {
-            return res.status(400).json({
-                error: 'This approval request has already been processed'
-            });
-        }
-
-        // Update approval status
-        approval.status = action === 'approve' ? 'Approved' : 'Rejected';
-        approval.remark = comment || '';
-        approval.approvedOn = new Date();
-        await approval.save();
-
-        // Update document status if all approvals are complete
-        const documentApprovals = await Approval.find({ document: documentId });
-        const allApproved = documentApprovals.every(a => a.status === 'Approved');
-        const anyRejected = documentApprovals.some(a => a.status === 'Rejected');
-
-        let documentStatus = 'Pending';
-        if (allApproved) {
-            documentStatus = 'Approved';
-        } else if (anyRejected) {
-            documentStatus = 'Rejected';
-        }
-
-        await Document.findByIdAndUpdate(documentId, {
-            status: documentStatus
-        });
-
-        // Create notification for requester
-        await Notification.create({
-            user: requesterId,
-            title: `Document ${action === 'approve' ? 'Approved' : 'Rejected'}`,
-            message: `Your document "${approval.document.metadata.fileName}" has been ${action === 'approve' ? 'approved' : 'rejected'} by ${req.user.name}`,
-            type: action === 'approve' ? 'success' : 'warning',
-            relatedDocument: documentId,
-            relatedApproval: approvalId
-        });
-
-        // Notify other approvers if document is fully processed
-        if (documentStatus === 'Approved' || documentStatus === 'Rejected') {
-            const otherApprovers = documentApprovals
-                .filter(a => a.approver.toString() !== userId && a.approver.toString() !== requesterId)
-                .map(a => a.approver);
-
-            for (const approverId of otherApprovers) {
-                await Notification.create({
-                    user: approverId,
-                    title: `Document ${documentStatus}`,
-                    message: `Document "${approval.document.metadata.fileName}" has been ${documentStatus.toLowerCase()}`,
-                    type: documentStatus === 'Approved' ? 'success' : 'warning',
-                    relatedDocument: documentId
-                });
-            }
-        }
+        // Optional: fetch document info
+        const document = await Document.findById(documentId)
+            .populate('project')               // populate project details
+            .populate('department')            // populate department
+            .populate('folderId')              // populate folder
+            .populate('projectManager')        // populate project manager (user)
+            .populate('documentDonor')         // populate document donor (user)
+            .populate('documentVendor')        // populate vendor (user)
+            .populate('owner')                 // populate owner (user)
+            .populate('files')                 // populate all files
+            .populate({
+                path: 'approvalHistory',       // populate approvals
+                populate: { path: 'approver', model: 'User' } // nested populate for approver in approvals
+            })
+            .populate({
+                path: 'versionHistory.changedBy', // populate who made changes
+                model: 'User'
+            })
+            .lean(); // optional: convert to plain JS object
 
         res.json({
+            document,
+            approvals
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Server Error" });
+    }
+};
+
+export const createApprovalRequest = async (req, res) => {
+    try {
+        const documentId = req.params.documentId
+        const { approverId, level, dueDate, remark } = req.body;
+        const requesterId = req.user.id;
+        console.log(documentId, approverId, level)
+        // Validate input
+        if (!approverId || level == null) {
+            return res.status(400).json({
+                error: "Missing required fields: documentId, approverId, level"
+            });
+        }
+
+        // Check if document exists
+        const document = await Document.findById(documentId);
+        if (!document) {
+            return res.status(404).json({ error: "Document not found" });
+        }
+
+        // Check if approval already exists for same level and approver
+        const existingApproval = await Approval.findOne({ document: documentId, approver: approverId, level });
+        if (existingApproval) {
+            return res.status(400).json({ error: "Approval request already exists for this approver and level" });
+        }
+
+        // Create approval request
+        const approval = await Approval.create({
+            document: documentId,
+            approver: approverId,
+            level,
+            status: "Pending",
+            remark: remark || "",
+            dueDate: dueDate || null
+        });
+
+        // Add approval to document's approval history
+        document.approvalHistory.push(approval._id);
+        await document.save();
+
+        // Notify the approver
+        // await Notification.create({
+        //     user: approverId,
+        //     title: "New Approval Request",
+        //     message: `You have a new approval request for document "${document.metadata?.fileName}"`,
+        //     type: "info",
+        //     relatedDocument: documentId,
+        //     relatedApproval: approval._id
+        // });
+
+        res.status(201).json({
             success: true,
-            message: `Document ${action === 'approve' ? 'approved' : 'declined'} successfully`,
+            message: "Approval request created successfully",
             approval: {
                 id: approval._id,
+                document: approval.document,
+                approver: approval.approver,
+                level: approval.level,
                 status: approval.status,
                 remark: approval.remark,
-                approvedOn: approval.approvedOn
-            },
-            documentStatus: documentStatus
+                dueDate: approval.dueDate
+            }
         });
 
     } catch (error) {
-        console.error('Error processing approval action:', error);
-        res.status(500).json({
-            error: 'Internal server error processing approval'
-        });
+        console.error("Error creating approval request:", error);
+        res.status(500).json({ error: "Internal server error creating approval request" });
     }
 };

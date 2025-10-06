@@ -127,6 +127,7 @@ router.get("/departments/:id", authenticate, checkPermissions, departmentControl
    ADMIN ROUTE
    ========================================= */
 router.get("/admin/approval", authenticate, checkPermissions, adminController.showAdminApprovalPage);
+router.get("/document/:id/admin/approval/track", authenticate, checkPermissions, adminController.showApprovalTrackPage);
 
 /* =========================================
    EMPLOYEE ROUTE

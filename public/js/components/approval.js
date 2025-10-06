@@ -86,7 +86,7 @@ async function submitApproval() {
     const comment = document.getElementById('approvalComment').value;
 
     if (!selectedAction || !currentApprovalData) {
-        alert('Please select an approval action.');
+        showToast('Please select an approval action.', 'info');
         return;
     }
 
@@ -127,7 +127,6 @@ async function submitApproval() {
             throw new Error(result.error || 'Failed to process approval');
         }
     } catch (error) {
-        console.error('Error submitting approval:', error);
         showNotification('Error processing approval: ' + error.message, 'error');
 
         // Reset button state
@@ -146,8 +145,8 @@ function showNotification(message, type = 'info') {
 
     const notification = document.createElement('div');
     notification.className = `fixed-notification fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg text-white font-medium z-50 transform transition-transform duration-300 ${type === 'success' ? 'bg-green-500' :
-            type === 'error' ? 'bg-red-500' :
-                'bg-blue-500'
+        type === 'error' ? 'bg-red-500' :
+            'bg-blue-500'
         }`;
     notification.textContent = message;
 

@@ -3,21 +3,16 @@
     <!-- Page Wrapper -->
     <div class="page-wrapper">
         <div class="content">
+
             <!-- Breadcrumb -->
             <div class="d-flex align-items-center justify-content-between page-breadcrumb mb-3">
                 <div class="my-auto mb-2">
                     <h2 class="mb-1">Approvals Requests</h2>
                     <nav>
                         <ol class="breadcrumb mb-0">
-                            <li class="breadcrumb-item">
-                                <a href="#"><i class="ti ti-smart-home"></i></a>
-                            </li>
-                            <li class="breadcrumb-item">
-                                Dashboard
-                            </li>
-                            <li class="breadcrumb-item">
-                                Approvals
-                            </li>
+                            <li class="breadcrumb-item"><a href="#"><i class="ti ti-smart-home"></i></a></li>
+                            <li class="breadcrumb-item">Dashboard</li>
+                            <li class="breadcrumb-item">Approvals</li>
                         </ol>
                     </nav>
                 </div>
@@ -25,10 +20,11 @@
             <!-- /Breadcrumb -->
 
             <div class="row">
+                <!-- Filters -->
                 <div class="seprate_crdhdr mb-4">
                     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
 
-                        <!-- Left Side: Status Buttons -->
+                        <!-- Status Tabs -->
                         <div class="d-flex flex-wrap gap-2">
                             <button type="button" class="btn btn-primary rounded-pill status-tab">All</button>
                             <button type="button"
@@ -40,7 +36,7 @@
                             <button type="button" class="btn btn-outline-primary rounded-pill status-tab">Draft</button>
                         </div>
 
-                        <!-- Right Side: Datepicker + Dropdown -->
+                        <!-- Date Picker + Department -->
                         <div class="d-flex align-items-center gap-2 flex-wrap ms-auto">
                             <div class="position-relative">
                                 <input type="text" class="form-control datetimepicker" placeholder="Select date">
@@ -48,25 +44,17 @@
                                     <i class="ti ti-calendar text-gray-7"></i>
                                 </span>
                             </div>
-                            <div class="dropdown">
-                                <a href="javascript:void(0);"
-                                    class="dropdown-toggle border text-black btn btn-outline-secondary fs-13"
-                                    data-bs-toggle="dropdown">
-                                    Select Department
-                                </a>
-                                <ul class="dropdown-menu dropdown-menu-end p-3">
-                                    <li><a href="javascript:void(0);" class="dropdown-item rounded-1">UI/UX Designer</a>
-                                    </li>
-                                    <li><a href="javascript:void(0);" class="dropdown-item rounded-1">HR Manager</a>
-                                    </li>
-                                    <li><a href="javascript:void(0);" class="dropdown-item rounded-1">Junior Tester</a>
-                                    </li>
-                                </ul>
+                            <div class="mb-0">
+                                <select id="department" class="form-select select2" style="width: 200px;">
+                                    <option value="">-- Select Department --</option>
+                                </select>
                             </div>
                         </div>
 
                     </div>
                 </div>
+
+                <!-- Approvals Table -->
                 <div class="col-xxl-12 col-xl-12">
                     <div class="card flex-fill">
                         <div class="card-body p-0">
@@ -85,7 +73,7 @@
                                         </tr>
                                     </thead>
                                     <tbody id="approvals-tbody">
-                                        <!-- Rows will be dynamically added here -->
+                                        <!-- Dynamic rows will be injected here -->
                                     </tbody>
                                 </table>
                             </div>
@@ -93,10 +81,12 @@
                     </div>
                 </div>
                 <!-- /Projects -->
+
             </div>
 
         </div>
 
+        <!-- Footer -->
         <div class="footer mt-4 d-sm-flex align-items-center justify-content-between border-top bg-white p-3">
             <p class="mb-0">2025 &copy; HLFPPT.</p>
             <p>Designed & Developed by <a href="javascript:void(0);" class="text-primary">Duplex services &
@@ -107,44 +97,50 @@
     <!-- /Page Wrapper -->
 
     <%- include('../../partials/footer') %>
+
+        <!-- JS: DataTables & Dynamic Rendering -->
         <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
         <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
-        <script>$(document).ready(function () {
+        <script>
+            $(document).ready(function () {
+                const fileIcons = {
+                    ppt: "/img/icons/fn1.png",
+                    pptx: "/img/icons/fn1.png",
+                    doc: "/img/icons/fn2.png",
+                    docx: "/img/icons/fn2.png",
+                    xls: "/img/icons/fn3.png",
+                    xlsx: "/img/icons/fn3.png",
+                    pdf: "/img/icons/fn4.png",
+                    default: "/img/icons/fn1.png"
+                };
+
+                const statusClassMap = {
+                    Draft: 'bg-soft-info text-info',
+                    Pending: 'bg-soft-warning text-warning',
+                    Approved: 'bg-soft-success text-success',
+                    Rejected: 'bg-soft-danger text-danger',
+                };
+
                 // Initialize DataTable
-                var table = $('.datatable').DataTable({
-                    "order": [[1, "asc"]], // sort by File Name
-                    "columnDefs": [
-                        { "orderable": false, "targets": [0, 5, 6] } // disable ordering for action columns
-                    ]
-                });
+                const table = $('.datatable').DataTable({
+                    ajax: {
+                        url: '/api/my-approvals',
+                        data: function (d) {
+                            d.status = $('.status-tab.btn-primary').text() || 'All';
+                            d.department = $('#department').val() || '';
+                            d.createdAt = $('.datetimepicker').val() || '';
+                        },
+                        dataSrc: function (json) {
+                            return json.data.map(doc => {
+                                const file = doc.files?.[0];
+                                const fileExt = file?.originalName?.split('.').pop().toLowerCase() || '';
+                                const fileIcon = fileIcons[fileExt] || fileIcons.default;
+                                const fileSize = file?.fileSize ? `${(file.fileSize / 1024).toFixed(2)} KB` : '-';
+                                const statusClass = statusClassMap[doc.status] || 'bg-soft-secondary text-secondary';
 
-                // Fetch data from API
-                $.ajax({
-                    url: '/api/my-approvals',
-                    type: 'GET',
-                    success: function (response) {
-                        if (response.success && response.data.length > 0) {
-                            response.data.forEach(function (doc) {
-                                // Prepare file size display
-                                var fileSizeKB = doc.files[0]?.fileSize ? (doc.files[0].fileSize / 1024).toFixed(2) + ' KB' : '-';
-
-                                // Approval Status Badge
-                                var statusClass = 'bg-secondary';
-                                if (doc.status === 'Approved') statusClass = 'bg-soft-success text-success';
-                                else if (doc.status === 'Pending') statusClass = 'bg-soft-warning text-warning';
-                                else if (doc.status === 'Rejected') statusClass = 'bg-soft-danger text-danger';
-                                else if (doc.status === 'Draft') statusClass = 'bg-soft-info text-info';
-
-                                // Action buttons (can expand as needed)
-                                var actionBtn = `<button class="btn btn-sm btn-outline-primary rounded-pill px-4 py-2">Review</button>`;
-                                if (doc.status === 'Approved') actionBtn = `<button class="btn btn-sm btn-success rounded-pill px-4 py-2">Approve</button>`;
-                                else if (doc.status === 'Rejected') actionBtn = `<button class="btn btn-sm btn-outline-danger rounded-pill px-4 py-2">Revise</button>`;
-                                else if (doc.status === 'Draft') actionBtn = `<button class="btn btn-sm btn-outline-secondary rounded-pill px-4 py-2">Edit</button>`;
-
-                                // Append row to table
-                                table.row.add([
-                                    `<div class="btn-group" role="group">
-                            <button type="button" class="btn border-0" data-bs-toggle="dropdown" aria-expanded="false">
+                                return {
+                                    action: `<div class="btn-group" role="group">
+                            <button type="button" class="btn border-0" data-bs-toggle="dropdown">
                                 <i class="ti ti-settings"></i>
                             </button>
                             <ul class="dropdown-menu">
@@ -152,38 +148,77 @@
                                 <li><a class="dropdown-item" href="#"><i class="ti ti-pencil-minus"></i> Edit</a></li>
                                 <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#sharedoc-modal">
                                     <i class="ti ti-share"></i> Share</a></li>
-                                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#versionhistory-modal">
-                                    <i class="ti ti-history"></i> Version History</a></li>
-                                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#downloaddoc-modal">
-                                    <i class="ti ti-download"></i> Download</a></li>
-                                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#trashdoc-modal">
-                                    <i class="ti ti-trash"></i> Move to Trash</a></li>
-                                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#archivedoc-modal">
-                                    <i class="ti ti-archive"></i> Move to Archive</a></li>
                             </ul>
                         </div>`,
-                                    `<div class="d-flex align-items-center">
+                                    fileName: `<div class="d-flex align-items-center">
                             <span class="avatar rounded bg-light me-2">
-                                <img src="/img/icons/fn1.png" alt="file icon">
+                                <img src="${fileIcon}" style="height:30px;width:30px;object-fit:contain;">
                             </span>
                             <div>
-                                <p class="mb-0 text-dark">${doc.metadata.fileName} v${doc.versioning.currentVersion.$numberDecimal}</p>
-                                <small class="text-muted">${fileSizeKB}</small>
+                                <p class="mb-0 text-dark">${file?.originalName || 'Untitled'}</p>
+                                <small class="text-muted">${fileSize}</small>
                             </div>
                         </div>`,
-                                    doc.documentDonor.name,
-                                    doc.department.name,
-                                    `<span class="badge ${statusClass} p-2">${doc.status}</span>`,
-                                    actionBtn,
-                                    `<button class="btn btn-status btn-outline-primary px-4 rounded-pill">Track</button>`,
-                                    doc.comment || '-'
-                                ]).draw(false);
+                                    submittedBy: doc.documentDonor?.name || '-',
+                                    department: doc.department?.name || '-',
+                                    status: `<span class="badge ${statusClass}">${doc.status}</span>`,
+                                    actionBtn: `<button class="btn btn-sm btn-outline-primary rounded-pill px-3 py-1">Review</button>`,
+                                    track: `<button class="btn btn-sm btn-outline-primary rounded-pill px-3 py-1 track-btn" data-id="${doc._id}">Track</button>`,
+                                    remark: doc.comment || '-'
+                                };
                             });
                         }
                     },
-                    error: function (err) {
-                        console.error('Error fetching approvals:', err);
+                    columns: [
+                        { data: "action" },
+                        { data: "fileName" },
+                        { data: "submittedBy" },
+                        { data: "department" },
+                        { data: "status" },
+                        { data: "actionBtn" },
+                        { data: "track" },
+                        { data: "remark" }
+                    ],
+                    order: [[1, "asc"]],
+                    columnDefs: [{ orderable: false, targets: [0, 4, 5, 6] }]
+                });
+
+                // Status Filter
+                $('.status-tab').on('click', function () {
+                    $('.status-tab').removeClass('btn-primary').addClass('btn-outline-primary');
+                    $(this).removeClass('btn-outline-primary').addClass('btn-primary');
+                    table.ajax.reload();
+                });
+
+                // Date Filter
+                $('.datetimepicker').on('change', function () {
+                    table.ajax.reload();
+                });
+
+                // Department Filter
+                $('#department').on('change', function () {
+                    table.ajax.reload();
+                });
+
+                // Initialize Select2
+                $('#department').select2({
+                    placeholder: "-- Select Department --",
+                    allowClear: true,
+                    ajax: {
+                        url: '/api/departments/search',
+                        dataType: 'json',
+                        delay: 250,
+                        data: params => ({ search: params.term }),
+                        processResults: data => ({
+                            results: data.data.map(item => ({ id: item._id, text: item.name }))
+                        })
                     }
+                });
+
+                // Track button click
+                $('.datatable').on('click', '.track-btn', function () {
+                    const docId = $(this).data('id');
+                    if (docId) window.location.href = `/document/${docId}/approval/track`;
                 });
             });
         </script>

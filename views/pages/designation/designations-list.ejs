@@ -70,7 +70,7 @@
                         url: `${baseUrl}/api/designations`,
                         method: 'GET',
                         success: function (res) {
-                            if (!res.success) return alert('Failed to fetch designations');
+                            if (!res.success) return showToast('Failed to fetch designations', 'error');
 
                             let tbody = '';
                             res.data.forEach((desig, index) => {
