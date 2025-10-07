@@ -1362,58 +1362,36 @@ export const softDeleteDocument = async (req, res) => {
  */
 export const deleteDocument = async (req, res) => {
     try {
-        let documentIds = [];
+        const { ids } = req.body;
 
-        // 1️⃣ Single document delete via query ?id=<documentId>
-        if (req.query.id) {
-            documentIds = [req.query.id];
+        if (!ids || !Array.isArray(ids) || ids.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: "Please provide an array of document IDs to delete.",
+            });
         }
-        // 2️⃣ Multiple document delete via body { ids: ["docId1", "docId2"] }
-        else if (Array.isArray(req.body.ids) && req.body.ids.length > 0) {
-            documentIds = req.body.ids;
-        }
-        // 3️⃣ Empty trash (all user-owned deleted documents)
-        else if (req.query.empty === "true") {
-            const userDocs = await Document.find({ owner: req.user._id, isDeleted: true });
-            if (!userDocs.length) {
-                return failResponse(res, "No deleted documents to remove", 404);
-            }
-            documentIds = userDocs.map(doc => doc._id.toString());
-        }
-        // 4️⃣ Invalid request
-        else {
-            return failResponse(res, "No document ID(s) provided", 400);
+        console.log("IDs to delete:", ids);
+        // Delete all documents matching the given IDs
+        const result = await Document.deleteMany({ _id: { $in: ids } });
+
+        if (result.deletedCount === 0) {
+            return res.status(404).json({
+                success: false,
+                message: "No documents found for the provided IDs.",
+            });
         }
 
-        // Validate ObjectIDs
-        documentIds = documentIds
-            .map(id => id?.trim())
-            .filter(id => mongoose.Types.ObjectId.isValid(id));
-
-        if (!documentIds.length) {
-            return failResponse(res, "No valid document IDs provided", 400);
-        }
-
-        // Fetch documents and ensure ownership
-        const documents = await Document.find({ _id: { $in: documentIds } });
-        if (!documents.length) {
-            return failResponse(res, "Document(s) not found", 404);
-        }
-
-        const unauthorized = documents.some(
-            doc => doc.owner.toString() !== req.user._id.toString()
-        );
-        if (unauthorized) {
-            return failResponse(res, "Only the owner can delete these documents", 403);
-        }
-
-        // Permanent delete at document level
-        await Document.deleteMany({ _id: { $in: documentIds } });
-
-        return successResponse(res, {}, "Document(s) deleted permanently");
+        return res.status(200).json({
+            success: true,
+            message: `${result.deletedCount} document(s) permanently deleted.`,
+        });
     } catch (error) {
-        console.error("Delete error:", error);
-        return errorResponse(res, error, "Failed to delete document(s)");
+        console.error("Error deleting documents permanently:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Server error while deleting documents.",
+            error: error.message,
+        });
     }
 };
 
@@ -2519,15 +2497,29 @@ export const getApprovals = async (req, res) => {
 
 export const createApprovalRequest = async (req, res) => {
     try {
-        const documentId = req.params.documentId
-        const { approverId, level, dueDate, remark } = req.body;
-        const requesterId = req.user.id;
-        console.log(documentId, approverId, level)
-        // Validate input
-        if (!approverId || level == null) {
+        // Trim and validate IDs
+        const documentId = req.params.documentId?.trim();
+        const { approverId: rawApproverId, level, dueDate, remark, designation: rawDesignation } = req.body;
+
+        const approverId = rawApproverId?.trim();
+        const designation = rawDesignation?.trim();
+
+        // Validate required fields
+        if (!documentId || !approverId || level == null) {
             return res.status(400).json({
-                error: "Missing required fields: documentId, approverId, level"
+                error: "Missing required fields: documentId, approverId, or level"
             });
+        }
+
+        // Validate ObjectId format
+        if (!mongoose.Types.ObjectId.isValid(documentId)) {
+            return res.status(400).json({ error: "Invalid documentId" });
+        }
+        if (!mongoose.Types.ObjectId.isValid(approverId)) {
+            return res.status(400).json({ error: "Invalid approverId" });
+        }
+        if (designation && !mongoose.Types.ObjectId.isValid(designation)) {
+            return res.status(400).json({ error: "Invalid designation" });
         }
 
         // Check if document exists
@@ -2547,25 +2539,18 @@ export const createApprovalRequest = async (req, res) => {
             document: documentId,
             approver: approverId,
             level,
+            designation: designation || null,
             status: "Pending",
-            remark: remark || "",
-            dueDate: dueDate || null
+            remark: remark?.trim() || "",
+            dueDate: dueDate ? new Date(dueDate) : null
         });
 
         // Add approval to document's approval history
+        document.approvalHistory = document.approvalHistory || [];
         document.approvalHistory.push(approval._id);
         await document.save();
 
-        // Notify the approver
-        // await Notification.create({
-        //     user: approverId,
-        //     title: "New Approval Request",
-        //     message: `You have a new approval request for document "${document.metadata?.fileName}"`,
-        //     type: "info",
-        //     relatedDocument: documentId,
-        //     relatedApproval: approval._id
-        // });
-
+        // Respond success
         res.status(201).json({
             success: true,
             message: "Approval request created successfully",

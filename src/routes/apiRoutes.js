@@ -103,6 +103,7 @@ router.get("/approval-requests", employeeController.getApprovalRequests);
 router.get("/documents", documentController.getDocuments);
 router.get("/documents/search", documentController.searchDocuments);
 router.get("/documents/recyclebin", documentController.recycleBinDocuments);
+router.delete("/documents/permanent", documentController.deleteDocument);
 router.patch("/documents/:id/restore", documentController.restoreDocument);
 router.get("/documents/folder/:folderId", authenticate, documentController.getDocumentsByFolder);
 // Only accept signature file
@@ -113,7 +114,6 @@ router.patch("/documents/:id", upload.fields([{ name: "signature", maxCount: 1 }
 router.delete("/documents/:id", documentController.softDeleteDocument);
 
 // Hard delete (permanent removal)
-router.delete("/documents/permanent", documentController.deleteDocument);
 router.patch("/documents/:id/status", documentController.updateDocumentStatus);
 
 // List all users document is shared with
