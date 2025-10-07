@@ -25,43 +25,8 @@ export const showApprovalTrackPage = async (req, res) => {
     try {
         const documentId = req.params.id;
 
-        // if (!documentId) {
-        //     return res.status(400).send("Document ID is required");
-        // }
-
-        // // Fetch document and populate all references
-        // const document = await Document.findById(documentId)
-        //     .populate('project')               // project details
-        //     .populate('department')            // department details
-        //     .populate('folderId')              // folder details
-        //     .populate('projectManager')        // project manager
-        //     .populate('documentDonor')         // donor
-        //     .populate('documentVendor')        // vendor
-        //     .populate('owner')                 // document owner
-        //     .populate('files')                 // all files
-        //     .populate({
-        //         path: 'approvalHistory',       // approvals
-        //         populate: { path: 'approver', model: 'User' } // nested approver details
-        //     })
-        //     .populate({
-        //         path: 'versionHistory.changedBy', // who made version changes
-        //         model: 'User'
-        //     })
-        //     .lean(); // convert to plain JS object
-
-        // if (!document) {
-        //     return res.status(404).send("Document not found");
-        // }
-
-        // // Fetch approvals separately if needed for filtering by user
-        // const approvals = await Approval.find({ document: documentId })
-        //     .populate("approver", "name role")
-        //     .sort({ level: 1 });
-
         res.render('pages/admin/approval-tracking', {
             documentId: documentId,
-            // document,
-            // approvals,
             user: req.user
         });
 

@@ -104,7 +104,7 @@
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <div class="flxtblleft">
                             <span class="avatar rounded bg-light mb-2">
-                                <img src="assets/img/icons/fn1.png">
+                                <img src="/img/icons/fn1.png">
                             </span>
                             <div class="flxtbltxt">
                                 <p class="fs-14 mb-1 fw-normal text-neutral">Project Proposal v1<span
@@ -265,7 +265,7 @@
                                 return `
                         <div class="flxtblleft">
                             <span class="avatar rounded bg-light mb-2">
-                                <img src="assets/img/icons/fn1.png" alt="icon">
+                                <img src="/img/icons/fn1.png" alt="icon">
                             </span>
                             <div class="flxtbltxt">
                                 <p class="fs-14 mb-1 fw-normal text-neutral">${data} <span class="text-success">v${row.versioning.currentVersion.$numberDecimal}</span></p>
@@ -307,8 +307,8 @@
                         },
                         {
                             data: "_id",
-                            render: function () {
-                                return `<a href="approval-tracking.php" class="site-btnmd">Track</a>`;
+                            render: function (data, type, row) {
+                                return `<a href="/document/${data}/admin/approval/track" class="site-btnmd">Track</a>`;
                             }
                         },
                         { data: "comment", render: data => `<p>${data || '-'}</p>` }

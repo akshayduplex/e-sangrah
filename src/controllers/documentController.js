@@ -14,6 +14,7 @@ import File from "../models/File.js";
 import { bumpVersion } from "../utils/bumpVersion.js";
 import _ from "lodash"; // for deep merging
 import Approval from "../models/Approval.js";
+import { getObjectUrl } from "../utils/s3Helpers.js";
 
 //Page Controllers
 
@@ -109,6 +110,80 @@ export const showEditDocumentPage = async (req, res) => {
         });
     }
 };
+
+
+/**
+ * GET /documents/:id/view
+ * Render a page to view files of a document
+ */
+export const viewDocumentFiles = async (req, res) => {
+    try {
+        const { fileId, id } = req.params;
+
+        // Find the file and populate related data
+        const file = await File.findById(fileId)
+            .populate('document')
+            .populate('uploadedBy', 'name email')
+            .exec();
+
+        if (!file) {
+            return res.status(404).render('error', {
+                message: 'File not found'
+            });
+        }
+        // Generate presigned URL for S3 file
+        let fileUrl = file.s3Url;
+        if (!fileUrl && file.file) {
+            try {
+                // Generate a fresh signed URL for better compatibility
+                fileUrl = await getObjectUrl(file.file, 3600); // 1 hour expiry
+            } catch (s3Error) {
+                console.error('Error generating S3 URL:', s3Error);
+                fileUrl = null;
+            }
+        }
+
+        // Format file size for display
+        const formatFileSize = (bytes) => {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        };
+
+        // Determine file type for preview
+        const getFileType = (filename) => {
+            const ext = filename.split('.').pop().toLowerCase();
+            return {
+                isPDF: ext === 'pdf',
+                isWord: ['doc', 'docx'].includes(ext),
+                isExcel: ['xls', 'xlsx'].includes(ext),
+                isPowerPoint: ['ppt', 'pptx'].includes(ext),
+                isText: ['txt', 'md', 'json', 'xml', 'html', 'csv'].includes(ext),
+                extension: ext
+            };
+        };
+
+        const fileType = getFileType(file.originalName);
+
+        res.render('pages/viewDocumentFiles', {
+            file: {
+                ...file.toObject(),
+                formattedSize: formatFileSize(file.fileSize),
+                fileUrl: fileUrl,
+                fileType: fileType
+            }, user: req.user,
+        });
+
+    } catch (error) {
+        console.error('Error fetching file:', error);
+        res.status(500).render('error', {
+            message: 'Server error while fetching file'
+        });
+    }
+};
+
 
 //API Controllers
 
@@ -552,7 +627,6 @@ export const createDocument = async (req, res) => {
                 parsedFileIds = fileIds;
             }
         }
-
         parsedFileIds = parsedFileIds
             .filter(id => mongoose.Types.ObjectId.isValid(id))
             .map(id => new mongoose.Types.ObjectId(id));
@@ -561,7 +635,6 @@ export const createDocument = async (req, res) => {
         for (const fileId of parsedFileIds) {
             try {
                 const tempFile = await TempFile.findById(fileId);
-                console.log("TempFile", tempFile);
                 if (!tempFile || tempFile.status !== "temp") continue;
 
                 tempFile.status = "permanent";
@@ -2456,44 +2529,56 @@ export const getApprovals = async (req, res) => {
     try {
         const { documentId } = req.params;
 
-        // Fetch approvals with approver info
         const approvals = await Approval.find({ document: documentId })
-            .populate("approver", "name ") // Populate name and role from User
-            .sort({ level: 1 }); // Sort by approval level
+            .populate({
+                path: "approver",
+                select: "name email phone_number profile_type userDetails",
+                populate: [
+                    {
+                        path: "userDetails.designation",
+                        model: "Designation",
+                        select: "name"
+                    },
+                    {
+                        path: "userDetails.department",
+                        model: "Department",
+                        select: "name"
+                    }
+                ]
+            })
+            .sort({ level: 1 });
 
-        if (!approvals) {
+        if (!approvals || approvals.length === 0) {
             return res.status(404).json({ message: "No approvals found" });
         }
 
-        // Optional: fetch document info
         const document = await Document.findById(documentId)
-            .populate('project')               // populate project details
-            .populate('department')            // populate department
-            .populate('folderId')              // populate folder
-            .populate('projectManager')        // populate project manager (user)
-            .populate('documentDonor')         // populate document donor (user)
-            .populate('documentVendor')        // populate vendor (user)
-            .populate('owner')                 // populate owner (user)
-            .populate('files')                 // populate all files
+            .populate("project department folderId projectManager documentDonor documentVendor owner files")
             .populate({
-                path: 'approvalHistory',       // populate approvals
-                populate: { path: 'approver', model: 'User' } // nested populate for approver in approvals
+                path: "approvalHistory",
+                populate: {
+                    path: "approver",
+                    model: "User",
+                    populate: {
+                        path: "userDetails.designation",
+                        model: "Designation",
+                        select: "name"
+                    }
+                }
             })
             .populate({
-                path: 'versionHistory.changedBy', // populate who made changes
-                model: 'User'
+                path: "versionHistory.changedBy",
+                model: "User"
             })
-            .lean(); // optional: convert to plain JS object
+            .lean();
 
-        res.json({
-            document,
-            approvals
-        });
+        res.json({ document, approvals });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: "Server Error" });
     }
 };
+
 
 export const createApprovalRequest = async (req, res) => {
     try {

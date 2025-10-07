@@ -165,7 +165,7 @@ router.get("/documents/add", authenticate, checkPermissions, documentController.
 
 // Edit Document page
 router.get("/documents/edit/:id", authenticate, checkPermissions, documentController.showEditDocumentPage);
-
+router.get('/documents/view/:id/:fileId', authenticate, checkPermissions, documentController.viewDocumentFiles)
 
 /* =========================================
    PROJECTS ROUTES

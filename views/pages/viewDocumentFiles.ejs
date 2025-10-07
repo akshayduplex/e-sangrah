@@ -1,0 +1,72 @@
+<%- include('../partials/header') %>
+
+    <!-- Page Wrapper -->
+    <div class="page-wrapper">
+        <div class="content">
+            <div class="file-container">
+                <!-- File Preview -->
+                <div class="file-preview">
+                    <% if (file.fileUrl) { %>
+
+                        <!-- PDF Preview -->
+                        <% if (file.fileType.isPDF) { %>
+                            <iframe src="<%= file.fileUrl %>" class="preview-iframe"
+                                title="PDF Preview of <%= file.originalName %>">
+                                <p>Your browser does not support PDFs.
+                                    <a href="<%= file.fileUrl %>" download>Download the PDF</a> instead.
+                                </p>
+                            </iframe>
+
+                            <!-- Office Files using Microsoft Office Online -->
+                            <% } else if (file.fileType.isWord || file.fileType.isExcel || file.fileType.isPowerPoint) {
+                                %>
+                                <div style="position: relative; height: 600px;">
+                                    <iframe
+                                        src="https://view.officeapps.live.com/op/embed.aspx?src=<%= encodeURIComponent(file.fileUrl) %>"
+                                        class="preview-iframe" style="width: 100%; height: 100%; border: none;"
+                                        title="Office Preview of <%= file.originalName %>" frameborder="0">
+                                    </iframe>
+                                </div>
+                                <div style="margin-top: 10px; font-size: 12px; color: #666;">
+                                    <em>Powered by Microsoft Office Online Viewer</em>
+                                </div>
+
+                                <!-- Text / Code Files -->
+                                <% } else if (file.fileType.isText) { %>
+                                    <iframe src="<%= file.fileUrl %>" class="preview-iframe"
+                                        title="Text Preview of <%= file.originalName %>">
+                                    </iframe>
+
+                                    <!-- Images -->
+                                    <% } else if (file.originalName.match(/\.(jpg|jpeg|png|gif|webp)$/i)) { %>
+                                        <div style="text-align: center;">
+                                            <img src="<%= file.fileUrl %>" alt="<%= file.originalName %>"
+                                                style="max-width: 100%; max-height: 600px; border: 1px solid #ddd; border-radius: 4px;">
+                                        </div>
+
+                                        <!-- Fallback for unsupported file types -->
+                                        <% } else { %>
+                                            <div style="text-align: center; padding: 40px;">
+                                                <h4>Preview not available</h4>
+                                                <p>This file type (.<%= file.fileType.extension %>) cannot be previewed
+                                                        in the browser.</p>
+                                                <a href="<%= file.fileUrl %>" class="download-btn"
+                                                    download="<%= file.originalName %>">
+                                                    Download File
+                                                </a>
+                                            </div>
+                                            <% } %>
+
+                                                <% } else { %>
+                                                    <div style="text-align: center; padding: 40px;">
+                                                        <h4>File not available</h4>
+                                                        <p>The file could not be loaded.</p>
+                                                    </div>
+                                                    <% } %>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <%- include('../partials/footer') %>

@@ -18,22 +18,18 @@
 
 			<div class="dflexbtwn align-items-start">
 				<div class="docstatus">
-					<h5 class="fs-20 mb-3 fw-medium" id="doc-name">Loading...</h5>
+					<h5 class="fs-20 mb-3 fw-medium">Document Status</h5>
 					<div class="flxtblleft">
 						<span class="avatar rounded bg-light mb-2">
-							<img id="doc-icon" src="assets/img/icons/fn1.png" alt="Document Icon">
+							<img id="doc-icon" src="/img/icons/fn1.png" alt="Document Icon">
 						</span>
 						<div class="flxtbltxt">
-							<p class="fs-14 mb-1 fw-normal text-neutral" id="doc-desc">-</p>
+							<p class="fs-14 mb-1 fw-normal text-neutral" id="doc-name">-</p>
 							<span class="fs-11 fw-light text-black" id="doc-size">-</span><br>
-							<span class="fs-11 fw-light text-black" id="doc-version">Version: -</span>
 						</div>
 					</div>
 					<p class="fs-20 fw-medium" id="doc-submitted">Submitted on: -</p>
-					<a href="#" id="doc-link" class="btn-primary btn rounded-pill" target="_blank">View File</a>
-					<div class="mt-2">
-						<img id="doc-signature" src="" alt="Signature" style="height:50px;">
-					</div>
+					<a id="doc-link" class="btn-primary btn rounded-pill" target="_blank">View File</a>
 				</div>
 
 				<div class="progresscard">
@@ -76,71 +72,110 @@
 	<%- include('../../partials/footer') %>
 
 		<script>
-			// Use your JSON data
-			const data = {
-				document: { /* insert document JSON here */ },
-				approvals: [ /* insert approvals JSON here */]
-			};
+			document.addEventListener('DOMContentLoaded', async () => {
+				const pathParts = window.location.pathname.split('/');
+				const documentIndex = pathParts.indexOf('document');
+				const documentId = documentIndex !== -1 ? pathParts[documentIndex + 1] : null;
 
-			const doc = data.document;
-			const approvals = data.approvals;
+				if (!documentId) {
+					showToast("Document ID not found in URL", 'error');
+					return;
+				}
+				//Fetch the API dynamically
+				try {
+					const response = await fetch(`/api/documents/${documentId}/approval/track`);
+					if (!response.ok) throw new Error(`HTTP ${response.status}`);
+					const data = await response.json();
 
-			// --- Document Info ---
-			document.getElementById('doc-name').innerText = doc.metadata?.fileName || "Unnamed Document";
-			document.getElementById('doc-desc').innerText = doc.metadata?.fileDescription || "-";
-			document.getElementById('doc-size').innerText = doc.files?.length ? `${doc.files.length} file(s)` : "-";
-			document.getElementById('doc-submitted').innerText = `Submitted on: ${new Date(doc.createdAt).toDateString()}`;
-			document.getElementById('doc-link').href = doc.files?.[0]?.s3Url || doc.link || "#";
-			document.getElementById('doc-version').innerText = `Version: ${doc.versioning?.currentVersion?.$numberDecimal || '-'}`;
-			document.getElementById('doc-signature').src = doc.signature?.fileUrl || '';
+					const doc = data.document;
+					const approvals = data.approvals || [];
 
-			// Optional: Set document icon based on file type
-			const docIcon = document.getElementById('doc-icon');
-			if (doc.files?.length) {
-				const fileType = doc.files[0].file.split('.').pop().toLowerCase();
-				if (fileType === 'ppt' || fileType === 'pptx') docIcon.src = 'assets/img/icons/ppt.png';
-				else if (fileType === 'pdf') docIcon.src = 'assets/img/icons/pdf.png';
-				else docIcon.src = 'assets/img/icons/fn1.png';
-			}
+					// Fill Document Info
+					if (doc.files?.length > 0) {
+						const file = doc.files[0];
+						document.getElementById('doc-name').innerText = file.originalName || "-";
+						document.getElementById('doc-size').innerText = file.fileSize ? `${(file.fileSize / 1024).toFixed(2)} KB` : "-";
+						document.getElementById('doc-link').href = file.s3Url || "#";
 
-			// --- Populate Approvals Table ---
-			const tbody = document.getElementById('approval-table');
-			if (approvals.length === 0) {
-				tbody.innerHTML = `<tr><td colspan="5" class="text-center">No approvals yet</td></tr>`;
-			} else {
-				tbody.innerHTML = approvals.map(appr => `
-      <tr>
-        <td class="d-flex align-items-center">
-          <div class="role-icon ${appr.status === 'Approved' ? 'done' : 'pending'}">
-            <i class="ti ${appr.status === 'Approved' ? 'ti-circle-check' : 'ti-hourglass-low'}"></i>
-          </div>
-          <span class="ms-2">${appr.approver.role || '-'}</span>
-        </td>
-        <td>${appr.approver.name || '-'}</td>
-        <td>${appr.approvedOn ? new Date(appr.approvedOn).toDateString() : 'In Review'}</td>
-        <td><span class="status-badge status-${appr.status.toLowerCase()}">${appr.status}</span></td>
-        <td>${appr.remark || '-'}</td>
-      </tr>
+						const fileType = file.file.split('.').pop().toLowerCase();
+						const docIcon = document.getElementById('doc-icon');
+						if (fileType === 'ppt' || fileType === 'pptx') docIcon.src = '/img/icons/ppt.png';
+						else if (fileType === 'pdf') docIcon.src = '/img/icons/pdf.png';
+						else docIcon.src = '/img/icons/fn1.png';
+					} else {
+						document.getElementById('doc-name').innerText = "-";
+						document.getElementById('doc-size').innerText = "-";
+					}
+					document.getElementById('doc-submitted').innerText = `Submitted on: ${new Date(doc.createdAt).toDateString()}`;
+					document.getElementById('doc-link').href = doc.files?.[0]?.s3Url || doc.link || "#";
+
+					//Set Document Icon
+					const docIcon = document.getElementById('doc-icon');
+					// Set "View File" link dynamically
+					if (doc.files?.length) {
+						const file = doc.files[0]; // first file
+						const fileId = file._id;
+						const documentId = doc._id;
+
+						document.getElementById('doc-link').href = `/documents/view/${documentId}/${fileId}`;
+					}
+
+					if (doc.files?.length) {
+						const fileType = doc.files[0].file.split('.').pop().toLowerCase();
+						if (fileType === 'ppt' || fileType === 'pptx') docIcon.src = '/img/icons/ppt.png';
+						else if (fileType === 'pdf') docIcon.src = '/img/icons/pdf.png';
+						else docIcon.src = '/img/icons/fn1.png';
+					}
+
+					// Populate Approvals Table
+					// Populate Approvals Table
+					const tbody = document.getElementById('approval-table');
+					if (approvals.length === 0) {
+						tbody.innerHTML = `<tr><td colspan="5" class="text-center">No approvals yet</td></tr>`;
+					} else {
+						// Sort approvals: Approved first, Pending next, others (if any) last
+						approvals.sort((a, b) => {
+							const statusPriority = { 'Approved': 1, 'Pending': 2 };
+							return (statusPriority[a.status] || 99) - (statusPriority[b.status] || 99);
+						});
+
+						tbody.innerHTML = approvals.map(appr => `
+        <tr>
+            <td class="d-flex align-items-center">
+                <div class="role-icon ${appr.status === 'Approved' ? 'done' : 'pending'}">
+                    <i class="ti ${appr.status === 'Approved' ? 'ti-circle-check' : 'ti-hourglass-low'}"></i>
+                </div>
+                <span class="ms-2">${appr.approver?.userDetails?.designation?.name || '-'}</span>
+            </td>
+            <td>${appr.approver?.name || '-'}</td>
+            <td>${appr.approvedOn ? new Date(appr.approvedOn).toDateString() : 'In Review'}</td>
+            <td><span class="status-badge status-${appr.status.toLowerCase()}">${appr.status}</span></td>
+            <td>${appr.remark || '-'}</td>
+        </tr>
     `).join('');
-			}
+					}
+					// Render Approval Progress Chart
+					const approvedCount = approvals.filter(a => a.status === 'Approved').length;
+					const totalCount = approvals.length;
+					const ctx = document.getElementById('chartprogress').getContext('2d');
 
-			// --- Approval Progress Chart ---
-			const approvedCount = approvals.filter(a => a.status === 'Approved').length;
-			const totalCount = approvals.length;
-			const ctx = document.getElementById('chartprogress').getContext('2d');
+					new Chart(ctx, {
+						type: 'doughnut',
+						data: {
+							// labels: ['Approved', 'Pending'],
+							datasets: [{
+								data: [approvedCount, totalCount - approvedCount],
+								backgroundColor: ['#28a745', '#ffc107'],
+							}]
+						},
+						options: {
+							cutout: '70%',
+							plugins: { legend: { display: true } }
+						}
+					});
 
-			new Chart(ctx, {
-				type: 'doughnut',
-				data: {
-					labels: ['Approved', 'Pending'],
-					datasets: [{
-						data: [approvedCount, totalCount - approvedCount],
-						backgroundColor: ['#28a745', '#ffc107'],
-					}]
-				},
-				options: {
-					cutout: '70%',
-					plugins: { legend: { display: true } }
+				} catch (error) {
+					showToast("Failed to load approval tracking data", 'error');
 				}
 			});
 		</script>

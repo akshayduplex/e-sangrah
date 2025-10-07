@@ -1,4 +1,5 @@
 import { PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { s3Client } from "../config/s3Client.js";
 
 export const putObject = async (fileBuffer, fileName, contentType, folderName) => {
@@ -38,13 +39,17 @@ export const deleteObject = async (key) => {
     return { status: 204 };
 };
 
-export const getObjectUrl = async (key, expiresIn = 300) => {
-    const command = new GetObjectCommand({
-        Bucket: process.env.AWS_BUCKET,
-        Key: key,
-    });
+export const getObjectUrl = async (key, expiresIn = 3600) => { // Increased to 1 hour
+    try {
+        const command = new GetObjectCommand({
+            Bucket: process.env.AWS_BUCKET,
+            Key: key,
+        });
 
-    // Expires in 300 seconds (5 minutes) by default
-    const url = await getSignedUrl(s3Client, command, { expiresIn });
-    return url;
+        const url = await getSignedUrl(s3Client, command, { expiresIn });
+        return url;
+    } catch (error) {
+        console.error('Error generating signed URL:', error);
+        throw error;
+    }
 };
