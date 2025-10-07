@@ -2,7 +2,6 @@ document.addEventListener('DOMContentLoaded', function () {
     // Show loading spinner initially
     const $table = $('#donorTable');
 
-    // console.log($table , 'this is TAble instances why its happening in that to ');
     const $loadingSpinner = $('#loadingSpinner');
 
     // Notification helpers (use showToast if available, else console)

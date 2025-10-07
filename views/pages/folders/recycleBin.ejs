@@ -80,14 +80,14 @@
 													<% doc.files.forEach(file=> { %>
 														<div class="flxtblleft mb-1">
 															<span class="avatar rounded bg-light mb-2">
-																<img src="assets/img/icons/fn1.png">
+																<img src="/img/icons/fn1.png">
 															</span>
 															<div class="flxtbltxt">
 																<p class="fs-14 mb-1 fw-normal text-neutral">
 																	<%= file.originalName %>
 																</p>
 																<span class="fs-11 fw-light text-black">
-																	<%= file.fileSize %> KB
+																	<%= (file.fileSize / 1024).toFixed(2)%> KB
 																</span>
 															</div>
 														</div>
@@ -166,55 +166,164 @@
 		<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
 		<script>
 			$(document).ready(function () {
-
+				// Function to format bytes to MB
+				function formatBytesToMB(bytes) {
+					return (bytes / 1024).toFixed(2) + ' MB';
+				}
 				let documentIdToDelete = null;
+				let documentIdToRestore = null;
 
-				// When trash icon is clicked
+				// Empty Recycle Bin
+				$('[data-bs-target="#emptybin-modal"]').on('click', function () {
+					const modal = $('#emptybin-modal');
+					const confirmBtn = modal.find('button.btn-primary');
+
+					// Collect all document IDs and calculate total size
+					const docIds = [];
+					let totalSizeKB = 0;
+
+					$('.select-document').each(function () {
+						const row = $(this).closest('tr');
+						const docId = $(this).data('document-id');
+						if (docId) docIds.push(docId);
+
+						row.find('td:nth-child(2) .flxtbltxt span').each(function () {
+							const sizeText = $(this).text().trim(); // e.g., "190 KB"
+							const sizeValue = parseFloat(sizeText.replace('KB', '').trim());
+							if (!isNaN(sizeValue)) totalSizeKB += sizeValue;
+						});
+					});
+
+					const totalSizeMB = formatBytesToMB(totalSizeKB);
+
+					modal.find('.modal-body').html(`
+        Are you sure you want to permanently 
+        <span class="txtblue">delete all files</span> in the recycle bin 
+        (${totalSizeMB})? This action cannot be undone.
+    `);
+
+					confirmBtn.off('click').on('click', function () {
+						if (docIds.length === 0) {
+							showToast('No documents to delete.', 'error');
+							modal.modal('hide');
+							return;
+						}
+
+						$.ajax({
+							url: '/api/documents/permanent', // Use the backend route
+							method: 'DELETE',
+							contentType: 'application/json',
+							data: JSON.stringify({ ids: docIds }),
+							success: function (res) {
+								modal.modal('hide');
+								// Remove all rows from the table dynamically
+								$('.datatable tbody').empty();
+								showToast(res.message || 'Recycle Bin emptied successfully.', 'success');
+							},
+							error: function (err) {
+								console.error(err);
+								showToast('Failed to empty Recycle Bin.', 'error');
+							}
+						});
+					});
+
+					modal.modal('show');
+				});
+
+				// Restore document
+				$('.ti-restore').closest('a').on('click', function (e) {
+					e.preventDefault();
+
+					const row = $(this).closest('tr');
+					documentIdToRestore = row.find('.select-document').data('document-id');
+
+					// Get file info from the row
+					const files = [];
+					row.find('td:nth-child(2) .flxtblleft').each(function () {
+						const fileName = $(this).find('.flxtbltxt p').text().trim();
+						const fileSize = $(this).find('.flxtbltxt span').text().trim();
+						files.push({ name: fileName, size: fileSize });
+					});
+
+					// Update modal content dynamically
+					const modal = $('#restore-modal');
+					const fileListHtml = files.map(f => `
+            <div class="flxtblleft mb-1">
+                <span class="avatar rounded bg-light mb-2">
+                    <img src="/img/icons/fn1.png">
+                </span>
+                <div class="flxtbltxt">
+                    <p class="fs-14 mb-1 fw-normal text-neutral">${f.name}</p>
+                    <span class="fs-11 fw-light text-black">${f.size}</span>
+                </div>
+            </div>
+        `).join('');
+
+					modal.find('.flxtblleft').parent().html(fileListHtml);
+
+					// Show modal
+					modal.modal('show');
+
+					// Handle restore button
+					modal.find('button.btn-primary').off('click').on('click', function () {
+						if (!documentIdToRestore) return;
+						$.ajax({
+							url: `/api/documents/${documentIdToRestore}/restore`,
+							method: 'PATCH',
+							success: function () {
+								modal.modal('hide');
+								// Remove the restored row from the table
+								row.remove();
+								showToast('Document has been restored successfully.', 'success');
+							},
+							error: function (err) {
+								console.error('Restore failed:', err);
+								showToast('Failed to restore document. Please try again.', 'error');
+							}
+						});
+					});
+				});
+
+				// Permanent delete without full page reload
 				$('.delete-permanent-btn').on('click', function (e) {
 					e.preventDefault();
 
-					// ✅ Use document ID now
-					const documentId = $(this).data('document-id');
-					const documentName = $(this).data('document-name'); // optional for modal display
+					const row = $(this).closest('tr');
+					const documentIdToDelete = $(this).data('document-id');
+					const documentName = $(this).data('document-name');
 
-					documentIdToDelete = documentId;
-
-					// Update modal title and body
-					const modal = $('#emptybin-modal');
-					modal.find('.modal-title').text('Permanent Delete');
+					const modal = $('#trashdoc-modal');
+					modal.find('.modal-title').html(`
+            <img src="/img/icons/bin.png"> <br> Permanent Delete
+        `);
 					modal.find('.modal-body').html(`
             Are you sure you want to permanently 
             <span class="txtblue">delete "${documentName}"</span>? 
             This action cannot be undone.
         `);
 
-					// Update confirm button
-					const confirmBtn = modal.find('.modal-footer button[type="submit"]');
-					confirmBtn.text('Yes, Delete');
-					confirmBtn.removeClass('btn-primary').addClass('btn-danger');
-
-					// Remove previous click handlers
+					const confirmBtn = modal.find('#confirm-trash-folder');
 					confirmBtn.off('click').on('click', function () {
-						if (!documentIdToDelete) return;
-
 						$.ajax({
-							url: `/api/documents/permanent?id=${documentIdToDelete}`,
+							url: `/api/documents/permanent`,
 							method: 'DELETE',
-							success: function (response) {
+							contentType: 'application/json',
+							data: JSON.stringify({ ids: [documentIdToDelete] }),
+							success: function () {
 								modal.modal('hide');
-								alert(`"${documentName}" has been permanently deleted.`);
-								location.reload(); // or remove the row dynamically
+								// Remove the deleted row from the table
+								row.remove();
+								showToast(`"${documentName}" has been permanently deleted.`, 'success');
 							},
-							error: function (err) {
-								console.error('Permanent delete failed:', err);
-								alert('Failed to delete document. Please try again.');
+							error: function () {
+								showToast('Failed to delete document. Please try again.', 'error');
 							}
 						});
 					});
 
-					// Show the modal
 					modal.modal('show');
 				});
 
 			});
+
 		</script>

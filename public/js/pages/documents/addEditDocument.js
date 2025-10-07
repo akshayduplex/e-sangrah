@@ -827,7 +827,6 @@ $(document).ready(function () {
 
             const response = await fetch(url, { method, body: formData });
             const data = await response.json();
-            console.log(data.data.document); // Correct path
 
             if (data.success) {
                 const doc = data.data.document; // extract the document

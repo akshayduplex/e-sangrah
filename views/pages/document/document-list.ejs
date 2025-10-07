@@ -262,6 +262,13 @@
                     stateSave: true,
                     dom: 'lfrtip'
                 });
+                // Enable Bootstrap tooltips on table redraw
+                $('#documents_table').on('draw.dt', function () {
+                    const tooltipTriggerList = [].slice.call(document.querySelectorAll('#documents_table [title]'));
+                    tooltipTriggerList.map(function (tooltipTriggerEl) {
+                        return new bootstrap.Tooltip(tooltipTriggerEl);
+                    });
+                });
 
                 // -------------------------
                 // Render each row
@@ -281,7 +288,16 @@
                         : '-';
                     const metadata = doc.metadata ? `${doc.metadata.fileName || '-'}, ${doc.metadata.fileDescription || '-'}` : '-';
                     const sharedWith = doc.sharedWithUsers?.length
-                        ? doc.sharedWithUsers.map(sw => sw.name).join(', ')
+                        ? (() => {
+                            const names = doc.sharedWithUsers.map(sw => sw.name);
+                            if (names.length > 2) {
+                                const remainingCount = names.length - 2;
+                                const displayedNames = names.slice(0, 2).join(', ') +
+                                    ` <span style="color:green; font-weight:bold;">+${remainingCount}</span>`;
+                                return `<span title="${names.join(', ')}">${displayedNames}</span>`;
+                            }
+                            return names.join(', ');
+                        })()
                         : '-';
                     const donor = doc.documentDonor?.name || '-';
                     const vendor = doc.documentVendor?.name || '-';

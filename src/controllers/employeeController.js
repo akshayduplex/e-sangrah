@@ -30,7 +30,6 @@ export const showEmployeeApprovalPage = (req, res) => {
 export const getApprovalRequests = async (req, res) => {
     try {
         const { status, department, createdAt } = req.query;
-        console.log("Query params:", req.query);
 
         const filter = {};
 

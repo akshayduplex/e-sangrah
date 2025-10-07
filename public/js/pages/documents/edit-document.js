@@ -110,7 +110,6 @@ function initializeFormSubmission() {
             });
 
             const data = await response.json();
-            console.log('📨 Update response:', data);
 
             if (data.success) {
 

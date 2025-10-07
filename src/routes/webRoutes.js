@@ -57,11 +57,6 @@ const router = express.Router();
 
 /* --- Home Route --- */
 
-// Home Page
-router.get("/", authenticate, (req, res) => {
-    res.render("pages/temp", { title: "E-Sangrah - Home" });
-});
-
 /* --- Authentication Pages --- */
 
 // Login page
@@ -165,7 +160,7 @@ router.get("/documents/add", authenticate, checkPermissions, documentController.
 
 // Edit Document page
 router.get("/documents/edit/:id", authenticate, checkPermissions, documentController.showEditDocumentPage);
-router.get('/documents/view/:id/:fileId', authenticate, checkPermissions, documentController.viewDocumentFiles)
+router.get('/documents/view/:id/:fileId', authenticate, documentController.viewDocumentFiles)
 
 /* =========================================
    PROJECTS ROUTES

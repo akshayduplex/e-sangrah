@@ -16,7 +16,6 @@ function debounce(fn, delay) {
 
 function showToast(message, type = 'info') {
     // You can implement your toast notification here
-    console.log(`${type.toUpperCase()}: ${message}`);
     // Example with Bootstrap toast
     const toast = new bootstrap.Toast(document.getElementById('liveToast'));
     if (toast) toast.show();

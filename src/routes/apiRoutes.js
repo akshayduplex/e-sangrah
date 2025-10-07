@@ -77,6 +77,30 @@ router.get('/auth/verify-reset/:token', authController.verifyResetLink);
 // Apply authentication to all routes
 router.use(authenticate);
 
+//encryption
+
+router.get('/documents/download/:fileId/:token', authenticate, async (req, res) => {
+    const { fileId, token } = req.params;
+
+    // Check if token exists in session
+    if (!req.session.fileTokens || req.session.fileTokens[fileId] !== token) {
+        return res.status(403).send('Access Denied');
+    }
+
+    const file = await File.findById(fileId).exec();
+    if (!file) return res.status(404).send('File not found');
+
+    const decryptedUrl = decrypt(token);
+    // For S3
+    // res.redirect(decryptedUrl);
+    // For local files:
+    // res.sendFile(path.resolve(decryptedUrl));
+
+    res.redirect(decryptedUrl); // S3 presigned URL
+});
+
+
+
 // ---------------------------
 // Session-protected routes
 // ---------------------------
@@ -130,12 +154,14 @@ router.get("/documents/:id/access-logs", documentController.getDocumentAccessLog
 router.post("/documents/:documentId/invite", documentController.inviteUser);
 
 //accept or reject an invite
-router.get("/documents/:documentId/invite/:userId/accept", documentController.autoAcceptInvite);
+router.get("/documents/:documentId/invite/:userId/auto-accept", documentController.autoAcceptInvite);
+router.post("/documents/request-access", documentController.requestAccessAgain);
 
 // versioning
 router.get('/documents/:id/versions/history', documentController.getVersionHistory);
 router.get('/documents/:id/versions/view', documentController.viewDocumentVersion);
 router.get('/documents/:id/versions/:version/view', documentController.viewVersion);
+// router.get('/documents/:id/versions/:version/download', documentController.download);
 router.patch('/documents/:id/versions/:version/restore', documentController.restoreVersion);
 
 //approval

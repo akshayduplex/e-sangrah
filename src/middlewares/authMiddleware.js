@@ -1,3 +1,4 @@
+import SharedWith from "../models/SharedWith.js";
 import User from "../models/User.js"; // note the .js extension
 import logger from "../utils/logger.js";
 
@@ -8,10 +9,7 @@ export const authenticate = async (req, res, next) => {
     try {
         if (!req.session.user) {
             if (req.originalUrl.startsWith("/api")) {
-                return res.status(401).json({
-                    success: false,
-                    message: "Access denied. Please log in.",
-                });
+                return res.redirect("/login");
             } else {
                 return res.redirect("/login");
             }
@@ -64,4 +62,13 @@ export const authorize = (...allowedProfiles) => {
         }
         next();
     };
+};
+
+export const canAccessDocument = async (userId, documentId) => {
+    const shared = await SharedWith.findOne({
+        document: documentId,
+        user: userId,
+        inviteStatus: 'accepted'
+    });
+    return !!shared;
 };

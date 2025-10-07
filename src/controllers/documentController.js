@@ -15,6 +15,8 @@ import { bumpVersion } from "../utils/bumpVersion.js";
 import _ from "lodash"; // for deep merging
 import Approval from "../models/Approval.js";
 import { getObjectUrl } from "../utils/s3Helpers.js";
+import jwt from "jsonwebtoken";
+import { canAccessDocument } from "../middlewares/authMiddleware.js";
 
 //Page Controllers
 
@@ -70,7 +72,6 @@ export const showViewDocumentPage = async (req, res) => {
 export const showEditDocumentPage = async (req, res) => {
     try {
         const { id } = req.params;
-        console.log("Editing document ID:", id);
 
         if (!mongoose.Types.ObjectId.isValid(id)) {
             return res.status(400).render("pages/error", {
@@ -94,8 +95,6 @@ export const showEditDocumentPage = async (req, res) => {
             });
         }
 
-        console.log("Document found:", document._id);
-
         res.render("pages/document/add-document", {
             title: "E-Sangrah - Edit Document",
             user: req.user,
@@ -118,71 +117,125 @@ export const showEditDocumentPage = async (req, res) => {
  */
 export const viewDocumentFiles = async (req, res) => {
     try {
-        const { fileId, id } = req.params;
+        const { fileId, id } = req.params; // id = documentId
+        const userId = req.user?._id;
+        // Find shared access
+        const sharedAccess = await SharedWith.findOne({
+            document: id,
+            $and: [
+                { user: userId },
+                { generalAccess: true }
+            ]
+        }).populate("document");
+        // If not shared, deny access
+        if (!sharedAccess) {
+            return res.render("pages/viewDocumentFiles", {
+                expiredMessage: "Access denied.",
+                documentTitle: "Document",
+                user: req.user,
+                file: null
+            });
+        }
 
-        // Find the file and populate related data
+        // Check expiration
+        if (sharedAccess.expiresAt && new Date() > sharedAccess.expiresAt) {
+            return res.render("pages/viewDocumentFiles", {
+                expiredMessage: "This shared link has expired.",
+                documentTitle: sharedAccess.document?.title || "Document",
+                user: req.user,
+                file: null
+            });
+        }
+
+        // Check one-time use
+        if (sharedAccess.duration === "onetime" && sharedAccess.used) {
+            return res.render("pages/viewDocumentFiles", {
+                expiredMessage: "This one-time link has already been used.",
+                documentTitle: sharedAccess.document?.title || "Document",
+                user: req.user,
+                file: null
+            });
+        }
+
+        // Fetch file
         const file = await File.findById(fileId)
-            .populate('document')
-            .populate('uploadedBy', 'name email')
+            .populate("document")
+            .populate("uploadedBy", "name email")
             .exec();
 
         if (!file) {
-            return res.status(404).render('error', {
-                message: 'File not found'
+            return res.render("pages/viewDocumentFiles", {
+                expiredMessage: "File not found.",
+                documentTitle: sharedAccess.document?.title || "Document",
+                user: req.user,
+                file: null
             });
         }
-        // Generate presigned URL for S3 file
-        let fileUrl = file.s3Url;
+
+        // Generate pre-signed URL if not already present
+        let fileUrl = file.s3Url || null;
         if (!fileUrl && file.file) {
             try {
-                // Generate a fresh signed URL for better compatibility
-                fileUrl = await getObjectUrl(file.file, 3600); // 1 hour expiry
-            } catch (s3Error) {
-                console.error('Error generating S3 URL:', s3Error);
-                fileUrl = null;
+                fileUrl = await getObjectUrl(file.file, 3600); // 1-hour expiry
+            } catch (err) {
+                console.error("Error generating S3 URL:", err);
             }
         }
 
-        // Format file size for display
+        // Format file size
         const formatFileSize = (bytes) => {
-            if (bytes === 0) return '0 Bytes';
+            if (!bytes) return "0 Bytes";
             const k = 1024;
-            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const sizes = ["Bytes", "KB", "MB", "GB"];
             const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
         };
 
-        // Determine file type for preview
+        // Detect file type
         const getFileType = (filename) => {
-            const ext = filename.split('.').pop().toLowerCase();
+            const ext = filename.split(".").pop().toLowerCase();
             return {
-                isPDF: ext === 'pdf',
-                isWord: ['doc', 'docx'].includes(ext),
-                isExcel: ['xls', 'xlsx'].includes(ext),
-                isPowerPoint: ['ppt', 'pptx'].includes(ext),
-                isText: ['txt', 'md', 'json', 'xml', 'html', 'csv'].includes(ext),
+                isPDF: ext === "pdf",
+                isWord: ["doc", "docx"].includes(ext),
+                isExcel: ["xls", "xlsx"].includes(ext),
+                isPowerPoint: ["ppt", "pptx"].includes(ext),
+                isText: ["txt", "md", "json", "xml", "html", "csv"].includes(ext),
                 extension: ext
             };
         };
 
         const fileType = getFileType(file.originalName);
 
-        res.render('pages/viewDocumentFiles', {
+        // Mark one-time link as used
+        if (sharedAccess.duration === "onetime" && !sharedAccess.used) {
+            sharedAccess.used = true;
+            await sharedAccess.save();
+        }
+
+        // Render the page with file info
+        res.render("pages/viewDocumentFiles", {
+            expiredMessage: null,
+            documentTitle: file.document?.title || "Document",
+            user: req.user,
             file: {
                 ...file.toObject(),
                 formattedSize: formatFileSize(file.fileSize),
-                fileUrl: fileUrl,
-                fileType: fileType
-            }, user: req.user,
+                fileUrl,
+                fileType
+            }
         });
 
     } catch (error) {
-        console.error('Error fetching file:', error);
-        res.status(500).render('error', {
-            message: 'Server error while fetching file'
+        console.error("Error fetching file:", error);
+        res.render("pages/viewDocumentFiles", {
+            expiredMessage: "Server error while fetching file.",
+            documentTitle: "Document",
+            user: req.user,
+            file: null
         });
     }
 };
+
 
 
 //API Controllers
@@ -1420,7 +1473,7 @@ export const softDeleteDocument = async (req, res) => {
             { new: true }
         );
 
-        return successResponse(res, { document: updatedDocument }, "Document deleted successfully");
+        return successResponse(res, { document: updatedDocument }, "Document moved to recycle-bin");
     } catch (error) {
         return errorResponse(res, error, "Failed to delete document");
     }
@@ -1443,7 +1496,6 @@ export const deleteDocument = async (req, res) => {
                 message: "Please provide an array of document IDs to delete.",
             });
         }
-        console.log("IDs to delete:", ids);
         // Delete all documents matching the given IDs
         const result = await Document.deleteMany({ _id: { $in: ids } });
 
@@ -1612,10 +1664,6 @@ export const shareDocument = async (req, res) => {
             userIds = []
         } = req.body;
 
-        console.log("🟢 SHARE DEBUG START");
-        console.log("→ Params:", { id, userId });
-        console.log("→ Body:", { accessLevel, duration, customEnd, generalAccess, userIds });
-
         // --- Validate IDs ---
         if (!mongoose.Types.ObjectId.isValid(id) || !mongoose.Types.ObjectId.isValid(userId)) {
             return res.status(400).json({ success: false, message: "Invalid document or user ID" });
@@ -1711,9 +1759,6 @@ export const shareDocument = async (req, res) => {
         if (!updatedShares.length) {
             return res.status(404).json({ success: false, message: "No share records found or created" });
         }
-
-        console.log("→ Final updated shares:", updatedShares.length);
-        console.log("✅ SHARE DEBUG END");
 
         return res.json({ success: true, message: "Share data updated successfully", data: updatedShares });
     } catch (err) {
@@ -1928,229 +1973,306 @@ export const getSharedUsers = async (req, res) => {
 // };
 
 export const inviteUser = async (req, res) => {
+    // try {
+    //     const { documentId } = req.params;
+    //     const { userEmail, accessLevel = "view", duration = "lifetime", customEnd } = req.body;
+    //     const inviterId = req.user._id;
+
+    //     // Validation
+    //     if (!userEmail) return res.status(400).json({ success: false, message: "User email is required" });
+    //     if (!mongoose.Types.ObjectId.isValid(documentId)) return res.status(400).json({ success: false, message: "Invalid document ID" });
+
+    //     const doc = await Document.findById(documentId);
+    //     if (!doc) return res.status(404).json({ success: false, message: "Document not found" });
+
+    //     // Check permissions: owner or edit access
+    //     const isOwner = doc.owner.toString() === inviterId.toString();
+    //     const existingShare = await SharedWith.findOne({
+    //         document: documentId,
+    //         user: inviterId,
+    //         accessLevel: "edit"
+    //     });
+
+    //     if (!isOwner && !existingShare) {
+    //         return res.status(403).json({ success: false, message: "You don't have permission to share this document" });
+    //     }
+
+    //     // Find or create user by email
+    //     let user = await User.findOne({ email: userEmail.toLowerCase().trim() });
+    //     if (!user) {
+    //         const tempPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8);
+    //         user = new User({
+    //             email: userEmail.toLowerCase().trim(),
+    //             name: userEmail.split('@')[0],
+    //             password: tempPassword,
+    //             isTemporary: true
+    //         });
+    //         await user.save();
+    //     }
+
+    //     const userId = user._id;
+
+    //     // Compute expiresAt
+    //     let expiresAt = null;
+    //     const now = new Date();
+    //     switch (duration) {
+    //         case "oneday":
+    //             expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    //             break;
+    //         case "oneweek":
+    //             expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    //             break;
+    //         case "onemonth":
+    //             expiresAt = new Date(now);
+    //             expiresAt.setMonth(expiresAt.getMonth() + 1);
+    //             break;
+    //         case "custom":
+    //             if (customEnd) {
+    //                 expiresAt = new Date(customEnd);
+    //                 if (expiresAt <= now) return res.status(400).json({ success: false, message: "Custom end date must be in the future" });
+    //             }
+    //             break;
+    //         case "lifetime":
+    //         case "onetime":
+    //         default:
+    //             expiresAt = null;
+    //     }
+
+    //     // Create or update SharedWith entry
+    //     await SharedWith.findOneAndUpdate(
+    //         { document: documentId, user: userId },
+    //         {
+    //             document: documentId,
+    //             user: userId,
+    //             accessLevel,
+    //             expiresAt,
+    //             duration,
+    //             inviteStatus: "pending",
+    //             used: false,
+    //             canDownload: accessLevel === "edit" // Allow download for edit access by default
+    //         },
+    //         { upsert: true, new: true }
+    //     );
+
+    //     // Keep document.sharedWithUsers synced
+    //     await Document.findByIdAndUpdate(documentId, {
+    //         $addToSet: { sharedWithUsers: userId }
+    //     });
+
+    //     // Send invite email
+    //     const inviteLink = `${process.env.FRONTEND_URL || 'http://localhost:5000'}/api/documents/${documentId}/invite/${userId}/accept`;
+
+    //     await sendEmail({
+    //         to: userEmail,
+    //         subject: "Document Invitation - E-Sangrah",
+    //         html: `
+    //             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+    //                 <h2 style="color: #333;">Document Sharing Invitation</h2>
+    //                 <p>You have been invited to access a document on E-Sangrah.</p>
+    //                 <p><strong>Document:</strong> ${doc.metadata?.fileName || 'Unnamed Document'}</p>
+    //                 <p><strong>Access Level:</strong> ${accessLevel}</p>
+    //                 ${expiresAt ? `<p><strong>Expires:</strong> ${expiresAt.toLocaleDateString()}</p>` : ''}
+    //                 <div style="margin: 20px 0;">
+    //                     <a href="${inviteLink}" style="background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">
+    //                         Accept Invitation & View Document
+    //                     </a>
+    //                 </div>
+    //                 <p style="color: #666; font-size: 14px;">
+    //                     Clicking this link will automatically accept the invitation and redirect you to your documents list.
+    //                 </p>
+    //                 <hr>
+    //                 <p style="color: #999; font-size: 12px;">
+    //                     If the button doesn't work, copy and paste this link in your browser:<br>
+    //                     ${inviteLink}
+    //                 </p>
+    //             </div>
+    //         `,
+    //         fromName: "E-Sangrah Support"
+    //     });
+
+    //     return res.json({ success: true, message: "Invite sent successfully" });
+    // } catch (err) {
+    //     console.error("Invite user error:", err);
+    //     return res.status(500).json({ success: false, message: "Server error: " + err.message });
+    // }
     try {
         const { documentId } = req.params;
-        const { userEmail, accessLevel = "view", duration = "lifetime", customEnd } = req.body;
-        const inviterId = req.user._id;
+        const { userEmail, accessLevel = "view", duration = "oneweek", customEnd } = req.body;
+        const inviterId = req.session.user?._id; // session-based user
 
-        // Validation
+        if (!inviterId) return res.status(401).json({ success: false, message: "Unauthorized" });
         if (!userEmail) return res.status(400).json({ success: false, message: "User email is required" });
         if (!mongoose.Types.ObjectId.isValid(documentId)) return res.status(400).json({ success: false, message: "Invalid document ID" });
 
         const doc = await Document.findById(documentId);
         if (!doc) return res.status(404).json({ success: false, message: "Document not found" });
 
-        // Check permissions: owner or edit access
+        // Only owner or editor can share
         const isOwner = doc.owner.toString() === inviterId.toString();
-        const existingShare = await SharedWith.findOne({
-            document: documentId,
-            user: inviterId,
-            accessLevel: "edit"
-        });
-
+        const existingShare = await SharedWith.findOne({ document: documentId, user: inviterId, accessLevel: "edit" });
         if (!isOwner && !existingShare) {
-            return res.status(403).json({ success: false, message: "You don't have permission to share this document" });
+            return res.status(403).json({ success: false, message: "No permission to share this document" });
         }
 
-        // Find or create user by email
+        // Find or create user
         let user = await User.findOne({ email: userEmail.toLowerCase().trim() });
         if (!user) {
-            const tempPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8);
             user = new User({
-                email: userEmail.toLowerCase().trim(),
-                name: userEmail.split('@')[0],
-                password: tempPassword,
-                isTemporary: true
+                email: userEmail,
+                name: userEmail.split("@")[0],
+                password: Math.random().toString(36).slice(-8),
+                isTemporary: true,
             });
             await user.save();
         }
 
-        const userId = user._id;
-
-        // Compute expiresAt
-        let expiresAt = null;
+        // Calculate expiry
         const now = new Date();
+        let expiresAt = null;
         switch (duration) {
-            case "oneday":
-                expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-                break;
-            case "oneweek":
-                expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-                break;
-            case "onemonth":
-                expiresAt = new Date(now);
-                expiresAt.setMonth(expiresAt.getMonth() + 1);
-                break;
-            case "custom":
-                if (customEnd) {
-                    expiresAt = new Date(customEnd);
-                    if (expiresAt <= now) return res.status(400).json({ success: false, message: "Custom end date must be in the future" });
-                }
-                break;
-            case "lifetime":
-            case "onetime":
-            default:
-                expiresAt = null;
+            case "oneday": expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); break;
+            case "oneweek": expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); break;
+            case "onemonth": expiresAt = new Date(now.setMonth(now.getMonth() + 1)); break;
+            case "custom": if (customEnd) expiresAt = new Date(customEnd); break;
         }
-
-        // Create or update SharedWith entry
-        await SharedWith.findOneAndUpdate(
-            { document: documentId, user: userId },
-            {
-                document: documentId,
-                user: userId,
-                accessLevel,
-                expiresAt,
-                duration,
-                inviteStatus: "pending",
-                used: false,
-                canDownload: accessLevel === "edit" // Allow download for edit access by default
-            },
-            { upsert: true, new: true }
+        // Create or update share entry
+        const share = await SharedWith.findOneAndUpdate(
+            { document: documentId, user: user._id },
+            { accessLevel, expiresAt, duration, inviteStatus: "pending", generalAccess: true },
+            { new: true, upsert: true }
         );
 
-        // Keep document.sharedWithUsers synced
-        await Document.findByIdAndUpdate(documentId, {
-            $addToSet: { sharedWithUsers: userId }
-        });
+        await Document.findByIdAndUpdate(documentId, { $addToSet: { sharedWithUsers: user._id } });
 
-        // Send invite email
-        const inviteLink = `${process.env.FRONTEND_URL || 'http://localhost:5000'}/api/documents/${documentId}/invite/${userId}/accept`;
+        // Link using session-based route
+        const inviteLink = `http://localhost:5000/api/documents/${documentId}/invite/${user._id}/auto-accept`;
 
         await sendEmail({
             to: userEmail,
-            subject: "Document Invitation - E-Sangrah",
+            subject: "Document Access Invitation - E-Sangrah",
             html: `
-                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                    <h2 style="color: #333;">Document Sharing Invitation</h2>
-                    <p>You have been invited to access a document on E-Sangrah.</p>
-                    <p><strong>Document:</strong> ${doc.metadata?.fileName || 'Unnamed Document'}</p>
-                    <p><strong>Access Level:</strong> ${accessLevel}</p>
-                    ${expiresAt ? `<p><strong>Expires:</strong> ${expiresAt.toLocaleDateString()}</p>` : ''}
-                    <div style="margin: 20px 0;">
-                        <a href="${inviteLink}" style="background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">
-                            Accept Invitation & View Document
-                        </a>
-                    </div>
-                    <p style="color: #666; font-size: 14px;">
-                        Clicking this link will automatically accept the invitation and redirect you to your documents list.
-                    </p>
-                    <hr>
-                    <p style="color: #999; font-size: 12px;">
-                        If the button doesn't work, copy and paste this link in your browser:<br>
-                        ${inviteLink}
-                    </p>
-                </div>
-            `,
-            fromName: "E-Sangrah Support"
+                <h2>You've been invited to access a document</h2>
+                <p><strong>Document:</strong> ${doc.metadata?.fileName || "Untitled Document"}</p>
+                <p><strong>Access:</strong> ${accessLevel}</p>
+                ${expiresAt ? `<p><strong>Expires:</strong> ${expiresAt.toLocaleString()}</p>` : ""}
+                <a href="${inviteLink}" style="background:#007bff;color:white;padding:10px 20px;border-radius:5px;text-decoration:none;">Open Document</a>
+                <p>If the button doesn't work, copy this link:<br>${inviteLink}</p>
+            `
         });
 
-        return res.json({ success: true, message: "Invite sent successfully" });
+        res.json({ success: true, message: "Invite sent successfully" });
+
     } catch (err) {
-        console.error("Invite user error:", err);
-        return res.status(500).json({ success: false, message: "Server error: " + err.message });
+        console.error("inviteUser error:", err);
+        res.status(500).json({ success: false, message: "Server error: " + err.message });
     }
 };
 
-// Auto-accept invite when email link is clicked
-// export const autoAcceptInvite = async (req, res) => {
-//     try {
-//         const { documentId, userId } = req.params;
-
-//         // Validate IDs
-//         if (!mongoose.Types.ObjectId.isValid(documentId) || !mongoose.Types.ObjectId.isValid(userId)) {
-//             return res.status(400).json({ success: false, message: "Invalid document or user ID" });
-//         }
-
-//         // Find the document
-//         const doc = await Document.findById(documentId);
-//         if (!doc) {
-//             return res.status(404).json({ success: false, message: "Document not found" });
-//         }
-
-//         // Find the shared entry
-//         const share = await SharedWith.findOne({ document: documentId, user: userId });
-//         if (!share) return res.status(404).json({ success: false, message: "Invite not found" });
-
-//         // Already accepted
-//         if (share.inviteStatus === "accepted") {
-//             return res.redirect("/documents/list");
-//         }
-
-//         // Expired
-//         if (share.expiresAt && new Date() > share.expiresAt) {
-//             return res.status(400).json({ success: false, message: "This invitation has expired" });
-//         }
-
-//         // Rejected
-//         if (share.inviteStatus === "rejected") {
-//             return res.status(400).json({ success: false, message: "This invitation was rejected" });
-//         }
-
-//         // Accept
-//         share.inviteStatus = "accepted";
-//         share.acceptedAt = new Date();
-//         await share.save();
-
-//         // Make sure user exists in quick lookup
-//         await Document.findByIdAndUpdate(documentId, { $addToSet: { sharedWithUsers: userId } });
-
-//         // Redirect to documents list page
-//         res.redirect('/documents/list');
-
-//     } catch (err) {
-//         console.error("Auto accept invite error:", err);
-//         res.status(500).json({ success: false, message: "Server error" });
-//     }
-// };
 export const autoAcceptInvite = async (req, res) => {
+    // try {
+    //     const { documentId, userId } = req.params;
+
+    //     // Validate IDs
+    //     if (!mongoose.Types.ObjectId.isValid(documentId) || !mongoose.Types.ObjectId.isValid(userId)) {
+    //         return res.status(400).json({ success: false, message: "Invalid document or user ID" });
+    //     }
+
+    //     // Find the shared entry
+    //     const share = await SharedWith.findOne({
+    //         document: documentId,
+    //         user: userId
+    //     }).populate('document');
+
+    //     if (!share) return res.status(404).json({ success: false, message: "Invite not found" });
+
+    //     // Already accepted
+    //     if (share.inviteStatus === "accepted") {
+    //         return res.redirect("/documents/list");
+    //     }
+
+    //     // Expired
+    //     if (share.expiresAt && new Date() > share.expiresAt) {
+    //         return res.status(400).json({ success: false, message: "This invitation has expired" });
+    //     }
+
+    //     // Rejected
+    //     if (share.inviteStatus === "rejected") {
+    //         return res.status(400).json({ success: false, message: "This invitation was rejected" });
+    //     }
+
+    //     // Accept the invite
+    //     share.inviteStatus = "accepted";
+    //     share.acceptedAt = new Date();
+    //     await share.save();
+
+    //     // Make sure user exists in quick lookup
+    //     await Document.findByIdAndUpdate(documentId, {
+    //         $addToSet: { sharedWithUsers: userId }
+    //     });
+
+    //     // Redirect to documents list page
+    //     res.redirect('/documents/list');
+
+    // } catch (err) {
+    //     console.error("Auto accept invite error:", err);
+    //     res.status(500).json({ success: false, message: "Server error: " + err.message });
+    // }
     try {
         const { documentId, userId } = req.params;
 
-        // Validate IDs
         if (!mongoose.Types.ObjectId.isValid(documentId) || !mongoose.Types.ObjectId.isValid(userId)) {
-            return res.status(400).json({ success: false, message: "Invalid document or user ID" });
+            return res.status(400).send("<script>alert('Invalid link.');window.location.href='/documents/list';</script>");
         }
 
-        // Find the shared entry
-        const share = await SharedWith.findOne({
-            document: documentId,
-            user: userId
-        }).populate('document');
-
-        if (!share) return res.status(404).json({ success: false, message: "Invite not found" });
-
-        // Already accepted
-        if (share.inviteStatus === "accepted") {
-            return res.redirect("/documents/list");
-        }
+        const share = await SharedWith.findOne({ document: documentId, user: userId }).populate("document");
+        if (!share) return res.status(404).send("<script>alert('Invitation not found.');window.location.href='/documents/list';</script>");
 
         // Expired
         if (share.expiresAt && new Date() > share.expiresAt) {
-            return res.status(400).json({ success: false, message: "This invitation has expired" });
+            return res.send(`
+                <html>
+                <head>
+                    <title>Access Expired</title>
+                    <style>
+                        body { font-family: Arial; text-align: center; background:#f8f9fa; padding:60px; }
+                        .modal { background:#fff; border-radius:10px; padding:30px; display:inline-block; box-shadow:0 2px 8px rgba(0,0,0,0.1); }
+                        button { background:#007bff; color:#fff; padding:10px 20px; border:none; border-radius:5px; cursor:pointer; margin-top:20px; }
+                    </style>
+                </head>
+                <body>
+                    <div class="modal">
+                        <h2>Access Expired</h2>
+                        <p>This invitation has expired. Please request access again from the document owner.</p>
+                        <button onclick="window.location.href='/documents/request-access?doc=${documentId}'">Request Access</button>
+                    </div>
+                </body>
+                </html>
+            `);
         }
 
-        // Rejected
+        // Reject handling
         if (share.inviteStatus === "rejected") {
-            return res.status(400).json({ success: false, message: "This invitation was rejected" });
+            return res.status(403).send("<script>alert('This invitation was rejected.');window.location.href='/documents/list';</script>");
         }
 
-        // Accept the invite
-        share.inviteStatus = "accepted";
-        share.acceptedAt = new Date();
-        await share.save();
+        // Auto accept
+        if (share.inviteStatus !== "accepted") {
+            share.inviteStatus = "accepted";
+            share.acceptedAt = new Date();
+            await share.save();
+        }
 
-        // Make sure user exists in quick lookup
-        await Document.findByIdAndUpdate(documentId, {
-            $addToSet: { sharedWithUsers: userId }
-        });
+        await Document.findByIdAndUpdate(documentId, { $addToSet: { sharedWithUsers: userId } });
 
-        // Redirect to documents list page
-        res.redirect('/documents/list');
+        // Save user session
+        req.session.user = await User.findById(userId);
+
+        const fileId = share.document?.files?.[0]?._id || "default";
+        return res.redirect(`/documents/view/${documentId}/${fileId}`);
 
     } catch (err) {
-        console.error("Auto accept invite error:", err);
-        res.status(500).json({ success: false, message: "Server error: " + err.message });
+        console.error("autoAcceptInvite error:", err);
+        return res.status(500).send("<script>alert('Something went wrong.');window.location.href='/documents/list';</script>");
     }
 };
 
@@ -2182,6 +2304,39 @@ export const getDocumentAuditLogs = async (req, res) => {
         return successResponse(res, { auditLogs: document.auditLog }, "Audit logs retrieved successfully");
     } catch (error) {
         return errorResponse(res, error, "Failed to retrieve audit logs");
+    }
+};
+
+/**
+ * RE-REQUEST ACCESS
+ * Allows a user to request new access after expiration.
+ */
+export const requestAccessAgain = async (req, res) => {
+    try {
+        const { documentId } = req.body;
+        const userId = req.session.user?._id;
+        if (!userId) return res.status(401).json({ success: false, message: "Not logged in" });
+
+        const user = await User.findById(userId);
+        const doc = await Document.findById(documentId);
+        if (!doc) return res.status(404).json({ success: false, message: "Document not found" });
+
+        // Reuse inviteUser logic
+        const inviteLink = `http://localhost:5000/api/documents/${documentId}/invite/${user._id}/auto-accept`;
+        await sendEmail({
+            to: user.email,
+            subject: "Access Request for Document - E-Sangrah",
+            html: `
+                <p>${user.name} has requested access to your document "${doc.metadata?.fileName || "Document"}".</p>
+                <p><a href="${inviteLink}" style="background:#007bff;color:#fff;padding:10px 20px;border-radius:5px;text-decoration:none;">Grant Access</a></p>
+            `
+        });
+
+        res.json({ success: true, message: "Access request sent successfully" });
+
+    } catch (err) {
+        console.error("requestAccessAgain error:", err);
+        res.status(500).json({ success: false, message: "Server error: " + err.message });
     }
 };
 
@@ -2474,7 +2629,6 @@ export const updateApprovalStatus = async (req, res) => {
         const { approver } = req.params;
         const { status, remark } = req.body;
         const userId = req.user.id;
-        console.log(approver, status, remark)
         const approval = await Approval.find(approver).populate('document');
 
         if (!approval) return res.status(404).json({ error: 'Approval not found' });
