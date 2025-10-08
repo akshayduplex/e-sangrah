@@ -1,8 +1,15 @@
 import path from 'path'
 import crypto from 'crypto'
+import { encrypt } from './SymmetricEncryption.js';
 export function generateUniqueFileName(originalName) {
     const ext = path.extname(originalName);
     const base = path.basename(originalName, ext);
     const id = crypto.randomBytes(8).toString("hex");
     return `${base}_${id}${ext}`;
+}
+
+export function generateShareLink(documentId, fileId) {
+    const payload = JSON.stringify({ id: documentId, fileId });
+    const token = encrypt(payload);
+    return `${process.env.BASE_URL || 'http://localhost:5000'}/documents/view/${encodeURIComponent(token)}`;
 }

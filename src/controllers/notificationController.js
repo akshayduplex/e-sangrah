@@ -1,4 +1,4 @@
-import Notification from "../models/notification.js";
+import Notification from "../models/Notification.js";
 import logger from "../utils/logger.js";
 import { successResponse, failResponse, errorResponse } from "../utils/responseHandler.js";
 

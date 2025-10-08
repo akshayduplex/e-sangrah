@@ -1,10 +1,10 @@
 import fs from "fs"
 import { putObject, deleteObject, getObjectUrl } from "../utils/s3Helpers.js";
-import TempFile from "../models/tempFile.js";
+import TempFile from "../models/TempFile.js";
 import crypto from "crypto";
 import path from "path";
 import Folder from "../models/Folder.js";
-import { generateUniqueFileName } from "../helper/generateUniquename.js";
+import { generateUniqueFileName } from "../helper/GenerateUniquename.js";
 import mongoose from "mongoose";
 import logger from "../utils/logger.js";
 // Unique filename generator

@@ -1,489 +1,260 @@
-<?php include 'header.php' ?>
-		<!-- Page Wrapper -->
-		<div class="page-wrapper">
-			<div class="content">
-				<!-- Breadcrumb -->
-				<div class="d-flex align-items-center justify-content-between page-breadcrumb mb-3">
-					<div class="my-auto mb-2">
-						<h2 class="mb-1">Reports</h2>
-						<nav>
-							<ol class="breadcrumb mb-0">
-								<li class="breadcrumb-item">
-									<a href="#"><i class="ti ti-smart-home"></i></a>
-								</li>
-								<li class="breadcrumb-item">
-									Reports
-								</li>
-							</ol>
-						</nav>
+<%- include('../../partials/header') %>
+	<!-- Page Wrapper -->
+	<div class="page-wrapper">
+		<div class="content">
+			<!-- Breadcrumb -->
+			<div class="d-flex align-items-center justify-content-between page-breadcrumb mb-3">
+				<div class="my-auto mb-2">
+					<h2 class="mb-1">Reports</h2>
+					<nav>
+						<ol class="breadcrumb mb-0">
+							<li class="breadcrumb-item">
+								<a href="#"><i class="ti ti-smart-home"></i></a>
+							</li>
+							<li class="breadcrumb-item">
+								Reports
+							</li>
+						</ol>
+					</nav>
+				</div>
+			</div>
+			<!-- /Breadcrumb -->
+
+			<div class="row">
+				<div class="seprate_crdhdr mb-4">
+					<h4 class="mb-3">Uploaded Documents</h4>
+					<div class="d-flex gap-2 align-items-center">
+						<div class="select-dropdown">
+							<select class="select">
+								<option>Select Role</option>
+								<option>UI/UX Designer</option>
+								<option>HR Manager</option>
+							</select>
+						</div>
+						<div class="select-dropdown">
+							<select class="select">
+								<option>Select Department</option>
+								<option>UI/UX Designer</option>
+								<option>HR Manager</option>
+							</select>
+						</div>
+						<div class="select-dropdown">
+							<select class="select">
+								<option>Sort by: Doc type</option>
+								<option>UI/UX Designer</option>
+								<option>HR Manager</option>
+							</select>
+						</div>
+
+						<div class="select-dropdown">
+							<select class="select">
+								<option>Select Designation</option>
+								<option>UI/UX Designer</option>
+								<option>HR Manager</option>
+							</select>
+						</div>
+						<div class="input-icon-end position-relative">
+							<input type="text" class="form-control datetimepicker" placeholder="dd/mm/yyyy"
+								value="02-05-2024">
+							<span class="input-icon-addon">
+								<i class="ti ti-calendar text-gray-7"></i>
+							</span>
+						</div>
+					</div>
+					<div class="w-100 text-end">
+						<button class="btn btn-primary btn-lg rounded-pill me-2 mb-2">Export Report</button>
+						<p class="sbtxt">XLSX/ODS/CSV/PDF</p>
 					</div>
 				</div>
-				<!-- /Breadcrumb -->
+				<div class="col-xxl-12 col-xl-12">
+					<div class="card flex-fill">
+						<div class="card-body p-0">
+							<div class="custom-datatable-filter table-responsive">
+								<table id="documentsTable" class="table datatable">
+									<thead>
+										<tr>
+											<th>File Name</th>
+											<th>Owner</th>
+											<th>Designation</th>
+											<th>Department</th>
+											<th>Role</th>
+											<th>Approver</th>
+											<th>Last Modified On</th>
+											<th>Tags</th>
+											<th>Meta data</th>
+											<th>Shared with</th>
+											<th>Created on</th>
+											<th>Description</th>
+											<th>Signature</th>
+											<th>Status</th>
+										</tr>
+									</thead>
+									<tbody>
+									</tbody>
+								</table>
 
-				<div class="row">
-					<div class="seprate_crdhdr mb-4">
-						<h4 class="mb-3">Uploaded Documents</h4>  
-						<div class="d-flex gap-2 align-items-center">
-								<div class="select-dropdown">
-										<select class="select">
-												<option>Select Role</option>
-												<option>UI/UX Designer</option>
-												<option>HR Manager</option>
-										</select>
-								</div>
-								<div class="select-dropdown">
-										<select class="select">
-												<option>Select Department</option>
-												<option>UI/UX Designer</option>
-												<option>HR Manager</option>
-										</select>
-								</div>
-								<div class="select-dropdown">
-										<select class="select">
-												<option>Sort by: Doc type</option>
-												<option>UI/UX Designer</option>
-												<option>HR Manager</option>
-										</select>
-								</div>
-								
-								<div class="select-dropdown">
-										<select class="select">
-												<option>Select Designation</option>
-												<option>UI/UX Designer</option>
-												<option>HR Manager</option>
-										</select>
-								</div>
-								<div class="input-icon-end position-relative">
-									<input type="text" class="form-control datetimepicker" placeholder="dd/mm/yyyy" value="02-05-2024">
-									<span class="input-icon-addon">
-										<i class="ti ti-calendar text-gray-7"></i>
-									</span>
-								</div>
-						</div>
-						<div class="w-100 text-end">
-							 <button class="btn btn-primary btn-lg rounded-pill me-2 mb-2">Export Report</button>
-							 <p class="sbtxt">XLSX/ODS/CSV/PDF</p>
-						</div>
-					</div>
-					<div class="col-xxl-12 col-xl-12">
-						<div class="card flex-fill">
-							<div class="card-body p-0">
-								<div class="custom-datatable-filter table-responsive">	
-									<table class="table datatable">
-										<thead>
-											<tr>
-												<th>File Name</th>
-												<th>Owner</th>
-												<th>Designation</th>
-												<th>Department</th>
-												<th>Role</th>
-												<th>Approver</th>
-												<th>Last Modified On</th>
-												<th>Tags</th>
-												<th>Meta data</th>
-												<th>Shared with</th>
-												<th>Created on</th>
-												<th>Description</th>
-												<th>Signature</th>
-												<th>Status</th>
-											</tr>
-										</thead>
-										<tbody>
-											<tr>
-												<td>
-													<div class="flxtblleft">
-														<div class="flxtbltxt">
-															<p class="fs-14 mb-1 fw-normal text-neutral">Project Proposal v1</p>
-															<span class="fs-11 fw-light text-black">190KB</span>
-														</div>
-													</div>
-												</td>
-												<td>
-													<p>Ashish</p>
-												</td>
-												<td>
-													<p>CEO</p>
-												</td>
-												<td>
-													<p>Operation Team</p>
-												</td>
-												<td>
-													<p>Admin</p>
-												</td>
-												<td>
-													<p>Project Manager <span class="text-success">+2</span></p>
-												</td>
-												<td>
-													<p class="tbl_date">11-02-2025 &nbsp;&nbsp; 11:20</p>
-												</td>
-												<td>
-													<p>Tag 1, Tag 2, Tag 3</p>
-												</td>
-												<td>
-													<p> Document, Proposal</p>
-												</td>
-												<td>
-													<p>Nikhil, Akshara <span class="text-success">+2</span></p>
-												</td>
-												<td>
-													<p class="tbl_date">11-02-2025 &nbsp;&nbsp; 11:20</p>
-												</td>
-												<td>
-													<p>DMS project Files..</p>
-												</td>
-												<td>
-													<img src="assets/img/sign.png"/ class="signimg">
-												</td>
-												<td>
-													<span class="status-badge bg-soft-success">Approved</span>
-												</td>
-											</tr>
-											<tr>
-												<td>
-													<div class="flxtblleft">
-														<div class="flxtbltxt">
-															<p class="fs-14 mb-1 fw-normal text-neutral">Project Proposal v1</p>
-															<span class="fs-11 fw-light text-black">190KB</span>
-														</div>
-													</div>
-												</td>
-												<td>
-													<p>Ashish</p>
-												</td>
-												<td>
-													<p>CEO</p>
-												</td>
-												<td>
-													<p>Operation Team</p>
-												</td>
-												<td>
-													<p>Admin</p>
-												</td>
-												<td>
-													<p>Project Manager <span class="text-success">+2</span></p>
-												</td>
-												<td>
-													<p class="tbl_date">11-02-2025 &nbsp;&nbsp; 11:20</p>
-												</td>
-												<td>
-													<p>Tag 1, Tag 2, Tag 3</p>
-												</td>
-												<td>
-													<p> Document, Proposal</p>
-												</td>
-												<td>
-													<p>Nikhil, Akshara <span class="text-success">+2</span></p>
-												</td>
-												<td>
-													<p class="tbl_date">11-02-2025 &nbsp;&nbsp; 11:20</p>
-												</td>
-												<td>
-													<p>DMS project Files..</p>
-												</td>
-												<td>
-													<img src="assets/img/sign.png"/ class="signimg">
-												</td>
-												<td>
-													<span class="status-badge bg-soft-success">Approved</span>
-												</td>
-												
-											</tr>
-											<tr>
-												<td>
-													<div class="flxtblleft">
-														<div class="flxtbltxt">
-															<p class="fs-14 mb-1 fw-normal text-neutral">Project Proposal v1</p>
-															<span class="fs-11 fw-light text-black">190KB</span>
-														</div>
-													</div>
-												</td>
-												<td>
-													<p>Ashish</p>
-												</td>
-												<td>
-													<p>CEO</p>
-												</td>
-												<td>
-													<p>Operation Team</p>
-												</td>
-												<td>
-													<p>Admin</p>
-												</td>
-												<td>
-													<p>Project Manager <span class="text-success">+2</span></p>
-												</td>
-												<td>
-													<p class="tbl_date">11-02-2025 &nbsp;&nbsp; 11:20</p>
-												</td>
-												<td>
-													<p>Tag 1, Tag 2, Tag 3</p>
-												</td>
-												<td>
-													<p> Document, Proposal</p>
-												</td>
-												<td>
-													<p>Nikhil, Akshara <span class="text-success">+2</span></p>
-												</td>
-												<td>
-													<p class="tbl_date">11-02-2025 &nbsp;&nbsp; 11:20</p>
-												</td>
-												<td>
-													<p>DMS project Files..</p>
-												</td>
-												<td>
-													<img src="assets/img/sign.png"/ class="signimg">
-												</td>
-												<td>
-													<span class="status-badge bg-soft-success">Approved</span>
-												</td>
-												
-											</tr>
-											<tr>
-												<td>
-													<div class="flxtblleft">
-														<div class="flxtbltxt">
-															<p class="fs-14 mb-1 fw-normal text-neutral">Project Proposal v1</p>
-															<span class="fs-11 fw-light text-black">190KB</span>
-														</div>
-													</div>
-												</td>
-												<td>
-													<p>Ashish</p>
-												</td>
-												<td>
-													<p>CEO</p>
-												</td>
-												<td>
-													<p>Operation Team</p>
-												</td>
-												<td>
-													<p>Admin</p>
-												</td>
-												<td>
-													<p>Project Manager <span class="text-success">+2</span></p>
-												</td>
-												<td>
-													<p class="tbl_date">11-02-2025 &nbsp;&nbsp; 11:20</p>
-												</td>
-												<td>
-													<p>Tag 1, Tag 2, Tag 3</p>
-												</td>
-												<td>
-													<p> Document, Proposal</p>
-												</td>
-												<td>
-													<p>Nikhil, Akshara <span class="text-success">+2</span></p>
-												</td>
-												<td>
-													<p class="tbl_date">11-02-2025 &nbsp;&nbsp; 11:20</p>
-												</td>
-												<td>
-													<p>DMS project Files..</p>
-												</td>
-												<td>
-													<img src="assets/img/sign.png"/ class="signimg">
-												</td>
-												<td>
-													<span class="status-badge bg-soft-success">Approved</span>
-												</td>
-												
-											</tr>
-											<tr>
-												<td>
-													<div class="flxtblleft">
-														<div class="flxtbltxt">
-															<p class="fs-14 mb-1 fw-normal text-neutral">Project Proposal v1</p>
-															<span class="fs-11 fw-light text-black">190KB</span>
-														</div>
-													</div>
-												</td>
-												<td>
-													<p>Ashish</p>
-												</td>
-												<td>
-													<p>CEO</p>
-												</td>
-												<td>
-													<p>Operation Team</p>
-												</td>
-												<td>
-													<p>Admin</p>
-												</td>
-												<td>
-													<p>Project Manager <span class="text-success">+2</span></p>
-												</td>
-												<td>
-													<p class="tbl_date">11-02-2025 &nbsp;&nbsp; 11:20</p>
-												</td>
-												<td>
-													<p>Tag 1, Tag 2, Tag 3</p>
-												</td>
-												<td>
-													<p> Document, Proposal</p>
-												</td>
-												<td>
-													<p>Nikhil, Akshara <span class="text-success">+2</span></p>
-												</td>
-												<td>
-													<p class="tbl_date">11-02-2025 &nbsp;&nbsp; 11:20</p>
-												</td>
-												<td>
-													<p>DMS project Files..</p>
-												</td>
-												<td>
-													<img src="assets/img/sign.png"/ class="signimg">
-												</td>
-												<td>
-													<span class="status-badge bg-soft-success">Approved</span>
-												</td>
-												
-											</tr>
-											<tr>
-												<td>
-													<div class="flxtblleft">
-														<div class="flxtbltxt">
-															<p class="fs-14 mb-1 fw-normal text-neutral">Project Proposal v1</p>
-															<span class="fs-11 fw-light text-black">190KB</span>
-														</div>
-													</div>
-												</td>
-												<td>
-													<p>Ashish</p>
-												</td>
-												<td>
-													<p>CEO</p>
-												</td>
-												<td>
-													<p>Operation Team</p>
-												</td>
-												<td>
-													<p>Admin</p>
-												</td>
-												<td>
-													<p>Project Manager <span class="text-success">+2</span></p>
-												</td>
-												<td>
-													<p class="tbl_date">11-02-2025 &nbsp;&nbsp; 11:20</p>
-												</td>
-												<td>
-													<p>Tag 1, Tag 2, Tag 3</p>
-												</td>
-												<td>
-													<p> Document, Proposal</p>
-												</td>
-												<td>
-													<p>Nikhil, Akshara <span class="text-success">+2</span></p>
-												</td>
-												<td>
-													<p class="tbl_date">11-02-2025 &nbsp;&nbsp; 11:20</p>
-												</td>
-												<td>
-													<p>DMS project Files..</p>
-												</td>
-												<td>
-													<img src="assets/img/sign.png"/ class="signimg">
-												</td>
-												<td>
-													<span class="status-badge bg-soft-success">Approved</span>
-												</td>
-												
-											</tr>
-										</tbody>
-									</table>
-								</div>
 							</div>
 						</div>
 					</div>
-					<!-- /Projects -->
 				</div>
-				
+				<!-- /Projects -->
 			</div>
 
-			<div class="footer mt-4 d-sm-flex align-items-center justify-content-between border-top bg-white p-3">
-				<p class="mb-0">2025 &copy; HLFPPT.</p>
-				<p>Designed & Developed by <a href="javascript:void(0);" class="text-primary">Duplex services & Technology</a></p>
-		    </div>
-
 		</div>
-		<!-- /Page Wrapper -->
+
+		<div class="footer mt-4 d-sm-flex align-items-center justify-content-between border-top bg-white p-3">
+			<p class="mb-0">2025 &copy; HLFPPT.</p>
+			<p>Designed & Developed by <a href="javascript:void(0);" class="text-primary">Duplex services &
+					Technology</a></p>
+		</div>
+
+	</div>
+	<!-- /Page Wrapper -->
 
 
 
-<!-- Bootstrap 5 Modal -->
-<div class="modal fade" id="approvalModal" tabindex="-1" aria-labelledby="approvalModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-lg modal-dialog-centered">
-    <div class="modal-content rounded-4 shadow">
-      <div class="modal-header border-0 pt-4 pb-0">
-        <h5 class="modal-title fw-bold" id="approvalModalLabel">Action Approval Request</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
+	<!-- Bootstrap 5 Modal -->
+	<div class="modal fade" id="approvalModal" tabindex="-1" aria-labelledby="approvalModalLabel" aria-hidden="true">
+		<div class="modal-dialog modal-lg modal-dialog-centered">
+			<div class="modal-content rounded-4 shadow">
+				<div class="modal-header border-0 pt-4 pb-0">
+					<h5 class="modal-title fw-bold" id="approvalModalLabel">Action Approval Request</h5>
+					<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+				</div>
 
-      <div class="modal-body">
-        <!-- Request Info -->
-        <p class="fs-16"><i class="ti ti-user"></i> <strong>Arun</strong> has requested for the document approvals</p>
+				<div class="modal-body">
+					<!-- Request Info -->
+					<p class="fs-16"><i class="ti ti-user"></i> <strong>Arun</strong> has requested for the document
+						approvals</p>
 
-        <div class="d-flex justify-content-between align-items-center mb-3">
-        	<div class="flxtblleft">
-        		<span class="avatar rounded bg-light mb-2">
-        			<img src="assets/img/icons/fn1.png">
-        		</span>
-        		<div class="flxtbltxt">
-        			<p class="fs-14 mb-1 fw-normal text-neutral">Project Proposal v1<span class="text-success">+2</span></p>
-        			<span class="fs-11 fw-light text-black">190KB</span>
-        		</div>
-        	</div>
-          <a href="#" class="text-primary fs-16 text-primary">View File</a>
-        </div>
+					<div class="d-flex justify-content-between align-items-center mb-3">
+						<div class="flxtblleft">
+							<span class="avatar rounded bg-light mb-2">
+								<img src="assets/img/icons/fn1.png">
+							</span>
+							<div class="flxtbltxt">
+								<p class="fs-14 mb-1 fw-normal text-neutral">Project Proposal v1<span
+										class="text-success">+2</span></p>
+								<span class="fs-11 fw-light text-black">190KB</span>
+							</div>
+						</div>
+						<a href="#" class="text-primary fs-16 text-primary">View File</a>
+					</div>
 
-        <p class="fs-16 small mb-1">Approval Request on <strong class="fw-semibold">July 17th, 2025</strong></p>
+					<p class="fs-16 small mb-1">Approval Request on <strong class="fw-semibold">July 17th, 2025</strong>
+					</p>
 
-        <!-- Description -->
-        <div class="mb-3">
-          <label class="form-label fs-16 fw-semibold">Description</label>
-          <textarea class="form-control text-left rounded" rows="2" readonly>This document is about the project proposal which need to sent to the client</textarea>
-        </div>
+					<!-- Description -->
+					<div class="mb-3">
+						<label class="form-label fs-16 fw-semibold">Description</label>
+						<textarea class="form-control text-left rounded" rows="2"
+							readonly>This document is about the project proposal which need to sent to the client</textarea>
+					</div>
 
-        <!-- Approve/Decline -->
-				<div class="approval-switch d-flex mb-3">
-				  <button type="button" class="btn flex-fill border-0 py-2 active" id="approveBtn">
-				    <i class="ti ti-circle-check me-1"></i> Approve
-				  </button>
-				  <button type="button" class="btn flex-fill border-0 py-2" id="declineBtn">
-				    <i class="ti ti-circle-x me-1"></i> Decline
-				  </button>
-        </div>
+					<!-- Approve/Decline -->
+					<div class="approval-switch d-flex mb-3">
+						<button type="button" class="btn flex-fill border-0 py-2 active" id="approveBtn">
+							<i class="ti ti-circle-check me-1"></i> Approve
+						</button>
+						<button type="button" class="btn flex-fill border-0 py-2" id="declineBtn">
+							<i class="ti ti-circle-x me-1"></i> Decline
+						</button>
+					</div>
 
-        <!-- Compliance & Expiry -->
-        <div class="row mb-3">
-          <div class="col">
-            <p class="mb-1 fs-16">Compliance and Retention File</p>
-            <p>Yes</p>
-          </div>
-          <div class="col">
-            <p class="mb-1 fs-16">Expiry Date</p>
-            <p>21st August 2025</p>
-          </div>
-        </div>
+					<!-- Compliance & Expiry -->
+					<div class="row mb-3">
+						<div class="col">
+							<p class="mb-1 fs-16">Compliance and Retention File</p>
+							<p>Yes</p>
+						</div>
+						<div class="col">
+							<p class="mb-1 fs-16">Expiry Date</p>
+							<p>21st August 2025</p>
+						</div>
+					</div>
 
-        <!-- Comment -->
-        <div class="mb-3">
-          <label class="fs-16 mb-2">Leave a comment (optional)</label>
-          <textarea class="form-control" rows="2"></textarea>
-        </div>
+					<!-- Comment -->
+					<div class="mb-3">
+						<label class="fs-16 mb-2">Leave a comment (optional)</label>
+						<textarea class="form-control" rows="2"></textarea>
+					</div>
 
-        <p class="text-muted fs-16 ">Arun and other approver members will be notified</p>
-      </div>
+					<p class="text-muted fs-16 ">Arun and other approver members will be notified</p>
+				</div>
 
-      <div class="modal-footer border-0 pb-4">
-        <button type="button" class="btn btn-lg btn-light rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" class="btn btn-lg btn-success rounded-pill px-4">Approve</button>
-      </div>
-    </div>
-  </div>
-</div>
+				<div class="modal-footer border-0 pb-4">
+					<button type="button" class="btn btn-lg btn-light rounded-pill px-4"
+						data-bs-dismiss="modal">Cancel</button>
+					<button type="button" class="btn btn-lg btn-success rounded-pill px-4">Approve</button>
+				</div>
+			</div>
+		</div>
+	</div>
 
+	<%- include('../../partials/footer') %>
+		<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+		<script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+		<script>
+			$(document).ready(function () {
+				$('#documentsTable').DataTable({
+					processing: true,
+					serverSide: true,
+					pageLength: 10,  // rows per page
+					lengthMenu: [10, 25, 50, 100],
+					ajax: {
+						url: `${baseUrl}/api/documents`,
+						type: 'GET',
+						data: function (d) {
+							// Convert DataTables params to your API query
+							return {
+								page: Math.ceil(d.start / d.length) + 1,
+								limit: d.length,
+								search: d.search.value,
+								orderColumn: d.order.length ? d.order[0].column + 1 : undefined,
+								orderDir: d.order.length ? d.order[0].dir : undefined
+							};
+						},
+						dataSrc: function (json) {
+							// Update DataTables paging info
+							json.recordsTotal = json.data.pagination.totalDocuments;
+							json.recordsFiltered = json.data.pagination.totalDocuments;
 
-
-
-<?php include 'footer.php';?>
-
+							// Map API data to table rows
+							return json.data.documents.map(doc => ({
+								fileName: `${doc.metadata.fileName} <br><small>${doc.files[0]?.fileSize ? (doc.files[0].fileSize / 1024).toFixed(2) + ' KB' : ''}</small>`,
+								owner: doc.owner?.name || '',
+								designation: doc.owner?.designation || '',
+								department: doc.department?.name || '',
+								role: 'Admin', // Adjust if needed
+								approver: doc.projectManager || '',
+								lastModified: new Date(doc.updatedAt).toLocaleString(),
+								tags: doc.tags.join(', '),
+								metadata: doc.metadata.fileDescription || '',
+								sharedWith: doc.sharedWithUsers.map(u => u.name).join(', '),
+								createdOn: new Date(doc.createdAt).toLocaleString(),
+								description: doc.description.replace(/<\/?[^>]+(>|$)/g, ""),
+								signature: `<img src="${doc.signature?.fileUrl || ''}" class="signimg" />`,
+								status: `<span class="status-badge bg-soft-success">${doc.status}</span>`
+							}));
+						}
+					},
+					columns: [
+						{ data: 'fileName' },
+						{ data: 'owner' },
+						{ data: 'designation' },
+						{ data: 'department' },
+						{ data: 'role' },
+						{ data: 'approver' },
+						{ data: 'lastModified' },
+						{ data: 'tags' },
+						{ data: 'metadata' },
+						{ data: 'sharedWith' },
+						{ data: 'createdOn' },
+						{ data: 'description' },
+						{ data: 'signature' },
+						{ data: 'status' }
+					],
+					order: [[6, 'desc']] // default sort by Last Modified
+				});
+			});
+		</script>

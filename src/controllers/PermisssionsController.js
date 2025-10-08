@@ -5,7 +5,7 @@ import MenuAssignment from "../models/menuAssignment.js";
 
 import { buildMenuTree } from "../utils/buildMenuTree.js";
 import logger from "../utils/logger.js";
-import { profile_type } from "../constant/constant.js";
+import { profile_type } from "../constant/Constant.js";
 import Department from "../models/Departments.js";
 import User from "../models/User.js";
 import UserPermission from "../models/UserPermission.js";

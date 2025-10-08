@@ -7,143 +7,68 @@
             <div class="d-md-flex d-block align-items-center justify-content-between page-breadcrumb mb-4">
                 <div class="mb-2 mb-md-0">
                     <h2 class="mb-1 fw-bold">Document Version Details</h2>
-                    <nav aria-label="breadcrumb">
-                        <ol class="breadcrumb mb-0">
-                            <li class="breadcrumb-item"><a href="#"><i class="ti ti-smart-home"></i></a></li>
-                            <li class="breadcrumb-item active" aria-current="page">View Document Version</li>
-                        </ol>
-                    </nav>
                 </div>
             </div>
 
             <div class="card shadow-sm mb-4">
                 <div class="card-body">
 
-                    <!-- Version Info -->
-                    <div class="mb-4 p-3 bg-light rounded-3 border">
-                        <h5 class="mb-3 fw-semibold">Version Information</h5>
-                        <div class="row g-3">
-                            <div class="col-md-3">
-                                <p class="mb-1 text-muted">Version</p>
-                                <p id="versionNumber" class="fw-medium">Loading...</p>
-                            </div>
-                            <div class="col-md-3">
-                                <p class="mb-1 text-muted">Changed By</p>
-                                <p id="versionChangedBy" class="fw-medium">Loading...</p>
-                            </div>
-                            <div class="col-md-3">
-                                <p class="mb-1 text-muted">Timestamp</p>
-                                <p id="versionTimestamp" class="fw-medium">Loading...</p>
-                            </div>
-                            <div class="col-md-3">
-                                <p class="mb-1 text-muted">Changes</p>
-                                <p id="versionChanges" class="fw-medium">Loading...</p>
-                            </div>
+                    <!-- Expired/Used Message -->
+                    <% if (expiredMessage) { %>
+                        <div class="alert alert-warning">
+                            <%= expiredMessage %>
                         </div>
-                    </div>
+                        <% } %>
 
-                    <form id="documentForm">
-                        <div class="row g-3">
+                            <!-- Renew Button -->
+                            <% if (canRenew) { %>
+                                <div class="mb-3">
+                                    <button id="renewExpiryBtn" class="btn btn-primary">Renew Expiry</button>
+                                </div>
+                                <% } %>
 
-                            <!-- Project Info -->
-                            <div class="col-md-4">
-                                <label class="form-label fw-semibold">Project Name</label>
-                                <input type="text" id="projectName" class="form-control" readonly>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label fw-semibold">Department</label>
-                                <input type="text" id="department" class="form-control" readonly>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label fw-semibold">Project Manager</label>
-                                <input type="text" id="projectManager" class="form-control" readonly>
-                            </div>
-
-                            <!-- Dates and Donor/Vendor -->
-                            <div class="col-md-4">
-                                <label class="form-label fw-semibold">Document Date</label>
-                                <input type="text" id="docDate" class="form-control" readonly>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label fw-semibold">Donor Name</label>
-                                <input type="text" id="donor" class="form-control" readonly>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label fw-semibold">Vendor Name</label>
-                                <input type="text" id="vendor" class="form-control" readonly>
-                            </div>
-
-                            <!-- Tags -->
-                            <div class="col-12">
-                                <label class="form-label fw-semibold">Tags</label>
-                                <input type="text" id="tags" class="form-control" readonly>
-                            </div>
-
-                            <!-- Metadata -->
-                            <div class="col-md-4">
-                                <label class="form-label fw-semibold">File Name</label>
-                                <input type="text" id="fileName" class="form-control" readonly>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label fw-semibold">Description</label>
-                                <input type="text" id="fileDesc" class="form-control" readonly>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label fw-semibold">Main Heading</label>
-                                <input type="text" id="mainHeading" class="form-control" readonly>
-                            </div>
-
-                            <!-- Description -->
-                            <div class="col-12">
-                                <label class="form-label fw-semibold">Description</label>
-                                <div id="descriptionDiv" class="border p-3 rounded bg-light">Loading...</div>
-                            </div>
-
-                            <!-- Compliance -->
-                            <div class="col-md-4">
-                                <label class="form-label fw-semibold">Compliance Document</label>
-                                <input type="text" id="complianceStatus" class="form-control" readonly>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label fw-semibold">Expiry Date</label>
-                                <input type="text" id="expiryDate" class="form-control" readonly>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label fw-semibold">Retention Period</label>
-                                <input type="text" id="retentionPeriod" class="form-control" readonly>
-                            </div>
-
-                            <!-- Files -->
-                            <div class="col-12">
-                                <label class="form-label fw-semibold">Files</label>
-                                <div id="fileList" class="d-flex flex-wrap gap-2">Loading...</div>
-                            </div>
-
-                            <!-- Comments -->
-                            <div class="col-12">
-                                <label class="form-label fw-semibold">Comment</label>
-                                <input type="text" id="commentDiv" class="form-control" readonly>
-                            </div>
-
-                            <!-- Link -->
-                            <div class="col-12">
-                                <label class="form-label fw-semibold">Link</label>
-                                <div id="linkDiv"><a href="#">Loading...</a></div>
-                            </div>
-
-                        </div>
-                    </form>
+                                    <!-- Version & Document Info -->
+                                    <form id="documentForm">
+                                        <div class="row g-3">
+                                            <div class="col-md-4">
+                                                <label class="form-label fw-semibold">Project Name</label>
+                                                <input type="text" id="projectName" class="form-control" readonly>
+                                            </div>
+                                            <!-- Add other fields like Department, Project Manager, etc. -->
+                                        </div>
+                                    </form>
 
                 </div>
             </div>
         </div>
+    </div>
 
-        <!-- Footer -->
-        <footer class="footer mt-4 d-sm-flex align-items-center justify-content-between border-top bg-white p-3">
-            <p class="mb-0">2025 &copy; HLFPPT.</p>
-            <p>Designed & Developed by <a href="javascript:void(0);" class="text-primary fw-semibold">Duplex Services &
-                    Technology</a></p>
-        </footer>
+    <!-- Renew Modal -->
+    <div class="modal fade" id="renewModal" tabindex="-1" aria-labelledby="renewModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="renewModalLabel">Renew Share Expiry</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <label for="renewDuration" class="form-label">Choose Duration:</label>
+                    <select id="renewDuration" class="form-select">
+                        <option value="oneday">1 Day</option>
+                        <option value="oneweek">1 Week</option>
+                        <option value="onemonth">1 Month</option>
+                        <option value="lifetime">Lifetime</option>
+                        <option value="onetime">One-time</option>
+                        <option value="custom">Custom (pick date below)</option>
+                    </select>
+                    <input type="date" id="customExpiry" class="form-control mt-2" style="display:none;">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" id="confirmRenewBtn" class="btn btn-primary">Renew</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <%- include('../../partials/footer') %>
@@ -151,93 +76,68 @@
         <script>
             document.addEventListener('DOMContentLoaded', async () => {
                 const documentId = "<%= documentId %>";
-                const urlParams = new URLSearchParams(window.location.search);
-                const version = urlParams.get('version');
+                const sharedId = "<%= sharedId %>";
+                const version = new URLSearchParams(window.location.search).get('version');
 
                 if (!documentId || !version) return;
 
+                // Load document version details
                 try {
                     const res = await fetch(`/api/documents/${documentId}/versions/view?version=${version}`);
                     if (!res.ok) throw new Error('Version not found');
-
                     const data = await res.json();
                     const doc = data.document;
-                    const snapshot = doc.snapshot || {}; // snapshot may be partial
+                    const snapshot = doc.snapshot || {};
 
-                    // --- Version Info ---
-                    document.getElementById('versionNumber').textContent = data.version || '-';
-                    document.getElementById('versionChangedBy').textContent = data.changedBy?.name || '-';
-                    document.getElementById('versionTimestamp').textContent = data.timestamp
-                        ? new Date(data.timestamp).toLocaleString()
-                        : '-';
-                    document.getElementById('versionChanges').textContent = data.changes || '-';
-
-                    // --- Basic Info ---
                     document.getElementById('projectName').value = snapshot.projectName || doc.project?.projectName || '-';
-                    document.getElementById('department').value = snapshot.departmentName || doc.department?.name || '-';
-                    document.getElementById('projectManager').value = snapshot.projectManagerName || doc.projectManager?.name || '-';
-                    document.getElementById('docDate').value = snapshot.documentDate
-                        ? new Date(snapshot.documentDate).toLocaleDateString('en-GB')
-                        : doc.documentDate
-                            ? new Date(doc.documentDate).toLocaleDateString('en-GB')
-                            : '-';
-                    document.getElementById('donor').value = snapshot.documentDonorName || doc.documentDonor?.name || '-';
-                    document.getElementById('vendor').value = snapshot.documentVendorName || doc.documentVendor?.name || '-';
-                    document.getElementById('tags').value = snapshot.tags?.join(', ') || doc.tags?.join(', ') || '-';
+                } catch (err) {
+                    console.error(err);
+                    alert('Failed to load document details.');
+                }
 
-                    // --- Metadata ---
-                    document.getElementById('fileName').value = snapshot.metadata?.fileName || doc.metadata?.fileName || '-';
-                    document.getElementById('fileDesc').value = snapshot.metadata?.fileDescription || doc.metadata?.fileDescription || '-';
-                    document.getElementById('mainHeading').value = snapshot.metadata?.mainHeading || doc.metadata?.mainHeading || '-';
+                // Renew button shows modal
+                const renewBtn = document.getElementById('renewExpiryBtn');
+                const renewModal = new bootstrap.Modal(document.getElementById('renewModal'));
+                const renewDuration = document.getElementById('renewDuration');
+                const customExpiry = document.getElementById('customExpiry');
 
-                    // --- Description ---
-                    document.getElementById('descriptionDiv').innerHTML = snapshot.description || doc.description || '-';
+                renewDuration.addEventListener('change', () => {
+                    customExpiry.style.display = renewDuration.value === 'custom' ? 'block' : 'none';
+                });
 
-                    // --- Compliance ---
-                    document.getElementById('complianceStatus').value = snapshot.compliance?.isCompliance !== undefined
-                        ? (snapshot.compliance.isCompliance ? 'Yes' : 'No')
-                        : (doc.compliance?.isCompliance ? 'Yes' : 'No');
+                renewBtn?.addEventListener('click', () => {
+                    renewModal.show();
+                });
 
-                    document.getElementById('expiryDate').value = snapshot.compliance?.expiryDate
-                        ? new Date(snapshot.compliance.expiryDate).toLocaleDateString('en-GB')
-                        : doc.compliance?.expiryDate
-                            ? new Date(doc.compliance.expiryDate).toLocaleDateString('en-GB')
-                            : '-';
+                // Confirm renewal
+                document.getElementById('confirmRenewBtn').addEventListener('click', async () => {
+                    let duration = renewDuration.value;
+                    let body = { duration };
 
-                    document.getElementById('retentionPeriod').value = snapshot.compliance?.retentionPeriod
-                        || doc.compliance?.retentionPeriod
-                        || '-';
-
-                    // --- Files ---
-                    const fileList = document.getElementById('fileList');
-                    fileList.innerHTML = '';
-
-                    const files = snapshot.files || doc.files || [];
-                    if (files.length > 0) {
-                        files.forEach(file => {
-                            const a = document.createElement('a');
-                            // Use s3Url if available, else fallback to placeholder
-                            a.href = file.s3Url || file.file || '#';
-                            a.target = '_blank';
-                            a.textContent = file.originalName || 'Unnamed File';
-                            a.className = 'me-3 mb-2';
-                            fileList.appendChild(a);
-                        });
-                    } else {
-                        fileList.textContent = 'No files uploaded.';
+                    if (duration === 'custom') {
+                        const customDate = customExpiry.value;
+                        if (!customDate) return alert('Please select a custom expiry date.');
+                        body.customDate = customDate;
                     }
 
-                    // --- Comment & Link ---
-                    document.getElementById('commentDiv').value = snapshot.comment || doc.comment || '-';
-                    const linkDiv = document.getElementById('linkDiv');
-                    linkDiv.innerHTML = snapshot.link
-                        ? `<a href="${snapshot.link}" target="_blank">${snapshot.link}</a>`
-                        : doc.link
-                            ? `<a href="${doc.link}" target="_blank">${doc.link}</a>`
-                            : '-';
+                    try {
+                        const res = await fetch(`/api/shared/${sharedId}/renew`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(body)
+                        });
+                        const data = await res.json();
 
-                } catch (err) {
-                    showToast('Failed to load document version', 'error');
-                }
+                        if (res.ok) {
+                            alert('Expiry renewed successfully!');
+                            location.reload();
+                        } else {
+                            alert(data.message || 'Failed to renew.');
+                        }
+                    } catch (err) {
+                        console.error(err);
+                        alert('Server error while renewing expiry.');
+                    }
+                });
             });
         </script>

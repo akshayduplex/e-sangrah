@@ -6,20 +6,20 @@ import express from "express";
 // ---------------------------
 // Controller imports
 // ---------------------------
-import * as authController from "../controllers/authController.js";
-import * as adminController from "../controllers/adminController.js";
-import * as employeeController from "../controllers/employeeController.js";
-import * as userController from "../controllers/userController.js";
-import * as donorVendorController from "../controllers/DonerVender.js";
-import * as departmentController from "../controllers/departmentController.js";
-import * as designationController from "../controllers/designationController.js";
-import * as documentController from "../controllers/documentController.js";
-import * as projectController from "../controllers/projectController.js";
-import * as permissionController from "../controllers/permisssions.js";
-import * as folderController from "../controllers/folderController.js";
-import * as notificationController from "../controllers/notificationController.js";
-// import * as dashboardController from "../controllers/dashboardController.js";
-import * as tempController from "../controllers/tempFileController.js";
+import * as AuthController from "../controllers/AuthController.js";
+import * as AdminController from "../controllers/AdminController.js";
+import * as EmployeeController from "../controllers/EmployeeController.js";
+import * as UserController from "../controllers/UserController.js";
+import * as DonerVenderController from "../controllers/DonerVenderController.js";
+import * as DepartmentController from "../controllers/DepartmentController.js";
+import * as DesignationController from "../controllers/DesignationController.js";
+import * as DocumentController from "../controllers/DocumentController.js";
+import * as DocumentHandlerController from "../controllers/DocumentHandlerController.js";
+import * as ProjectController from "../controllers/ProjectController.js";
+import * as PermissionController from "../controllers/PermisssionsController.js";
+import * as FolderController from "../controllers/FolderController.js";
+import * as NotificationController from "../controllers/NotificationController.js";
+import * as TempController from "../controllers/TempFileController.js";
 
 // ---------------------------
 // Middleware imports
@@ -38,7 +38,6 @@ import {
     resetPasswordValidator
 } from "../middlewares/validation/authValidators.js";
 import { createProjectValidator, donorValidator, projectIdValidator, searchProjectsValidator, updateProjectValidator, vendorValidator } from '../middlewares/validation/projectValidator.js';
-import { registrationValidation, updateValidation } from "../middlewares/validation/userValidator.js";
 import { registerVendor, registerVendorOrDonor } from "../middlewares/validation/venderDonorValidation.js";
 import { assignMenusValidator, getAssignedMenusValidator, unAssignMenusValidator } from "../middlewares/validation/permissionValidator.js";
 
@@ -52,6 +51,7 @@ import logger from "../utils/logger.js";
 import { createS3Uploader } from "../middlewares/multer-s3.js";
 import Folder from "../models/Folder.js";
 import mongoose from "mongoose";
+import { generateShareLink } from "../helper/GenerateUniquename.js";
 
 
 const router = express.Router();
@@ -60,18 +60,18 @@ const router = express.Router();
 // ---------------------------
 // Auth routes
 // ---------------------------
-router.post("/auth/register", registerValidator, authController.register);
+router.post("/auth/register", registerValidator, AuthController.register);
 
-router.post("/auth/login", loginValidator, authController.login);
+router.post("/auth/login", AuthController.login);
 
-router.post("/auth/send-otp", sendOtpValidator, validate, authController.sendOtp);
+router.post("/auth/send-otp", sendOtpValidator, validate, AuthController.sendOtp);
 
-router.post("/auth/verify-otp", verifyOtpValidator, validate, authController.verifyOtp);
+router.post("/auth/verify-otp", verifyOtpValidator, validate, AuthController.verifyOtp);
 
-router.post("/auth/reset-password", resetPasswordValidator, validate, authController.resetPassword);
+router.post("/auth/reset-password", resetPasswordValidator, validate, AuthController.resetPassword);
 // In your routes file
-router.post('/auth/send-reset-link', authController.sendResetLink);
-router.get('/auth/verify-reset/:token', authController.verifyResetLink);
+router.post('/auth/send-reset-link', AuthController.sendResetLink);
+router.get('/auth/verify-reset/:token', AuthController.verifyResetLink);
 
 
 // Apply authentication to all routes
@@ -104,99 +104,116 @@ router.get('/documents/download/:fileId/:token', authenticate, async (req, res) 
 // ---------------------------
 // Session-protected routes
 // ---------------------------
-router.get("/auth/profile", authenticate, authController.getProfile);
-router.patch("/auth/edit-profile", authenticate, upload.single("profile_image"), authController.updateProfile);
-router.post("/auth/logout", authenticate, authController.logout);
+router.get("/auth/profile", authenticate, AuthController.getProfile);
+router.patch("/auth/edit-profile", authenticate, upload.single("profile_image"), AuthController.updateProfile);
+router.post("/auth/logout", authenticate, AuthController.logout);
 
 // ---------------------------
 // Admin routes
 // ---------------------------
-router.get("/my-approvals", adminController.getMyApprovals);
+router.get("/my-approvals", AdminController.getMyApprovals);
 
 
 // ---------------------------
 // Employee routes
 // ---------------------------
-router.get("/approval-requests", employeeController.getApprovalRequests);
+router.get("/approval-requests", EmployeeController.getApprovalRequests);
 
 
 
 // ---------------------------
 // Documents routes
 // ---------------------------
-router.get("/documents", documentController.getDocuments);
-router.get("/documents/search", documentController.searchDocuments);
-router.get("/documents/recyclebin", documentController.recycleBinDocuments);
-router.delete("/documents/permanent", documentController.deleteDocument);
-router.patch("/documents/:id/restore", documentController.restoreDocument);
-router.get("/documents/folder/:folderId", authenticate, documentController.getDocumentsByFolder);
+router.get("/documents", DocumentController.getDocuments);
+router.get("/documents/search", DocumentController.searchDocuments);
+router.get("/documents/recyclebin", DocumentController.recycleBinDocuments);
+router.delete("/documents/permanent", DocumentController.deleteDocument);
+router.patch("/documents/:id/restore", DocumentController.restoreDocument);
+router.get("/documents/folder/:folderId", authenticate, DocumentController.getDocumentsByFolder);
 // Only accept signature file
-router.post("/documents", upload.fields([{ name: "signatureFile", maxCount: 1 }]), documentController.createDocument);
-router.get("/documents/:id", documentController.getDocument);
-router.patch("/documents/:id", upload.fields([{ name: "signature", maxCount: 1 }]), documentController.updateDocument);
+router.post("/documents", upload.fields([{ name: "signatureFile", maxCount: 1 }]), DocumentController.createDocument);
+router.get("/documents/:id", DocumentController.getDocument);
+router.patch("/documents/:id", upload.fields([{ name: "signature", maxCount: 1 }]), DocumentController.updateDocument);
 // Soft delete (recycle bin)
-router.delete("/documents/:id", documentController.softDeleteDocument);
+router.delete("/documents/:id", DocumentController.softDeleteDocument);
 
 // Hard delete (permanent removal)
-router.patch("/documents/:id/status", documentController.updateDocumentStatus);
+router.patch("/documents/:id/status", DocumentController.updateDocumentStatus);
 
 // List all users document is shared with
-router.get("/documents/:documentId/shared-users", documentController.getSharedUsers);
+router.get("/documents/:documentId/shared-users", DocumentController.getSharedUsers);
 // Update user access level
-router.put("/documents/share/:documentId", documentController.updateSharedUser);
+router.put("/documents/share/:documentId", DocumentController.updateSharedUser);
 
 // Remove user from shared list
-router.delete("/documents/share/:documentId", documentController.removeSharedUser);
-router.patch("/documents/:id/share", documentController.shareDocument);
-router.get("/documents/:id/audit-logs", documentController.getDocumentAuditLogs);
-router.get("/documents/:id/access-logs", documentController.getDocumentAccessLogs);
+router.delete("/documents/share/:documentId", DocumentController.removeSharedUser);
+router.patch("/documents/:id/share", DocumentController.shareDocument);
+router.get("/documents/:id/audit-logs", DocumentController.getDocumentAuditLogs);
+router.get("/documents/:id/access-logs", DocumentController.getDocumentAccessLogs);
 // Invite a user to a document (sends email)
-router.post("/documents/:documentId/invite", documentController.inviteUser);
-
+router.post("/documents/:documentId/invite", DocumentController.inviteUser);
+router.post("/documents/:documentId/request-access-again", DocumentController.requestAccessAgain);
+router.get("/documents/grant-access/:token", DocumentController.grantAccessViaToken);
 //accept or reject an invite
-router.get("/documents/:documentId/invite/:userId/auto-accept", documentController.autoAcceptInvite);
-router.post("/documents/request-access", documentController.requestAccessAgain);
+router.get("/documents/:documentId/invite/:userId/auto-accept", DocumentController.autoAcceptInvite);
+
+router.get('/documents/:documentId/:fileId/share-link', async (req, res) => {
+    const { documentId, fileId } = req.params;
+    console.log("sharelink", documentId, fileId)
+    try {
+        const link = generateShareLink(documentId, fileId);
+        res.json({ success: true, link });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Failed to generate share link' });
+    }
+});
 
 // versioning
-router.get('/documents/:id/versions/history', documentController.getVersionHistory);
-router.get('/documents/:id/versions/view', documentController.viewDocumentVersion);
-router.get('/documents/:id/versions/:version/view', documentController.viewVersion);
-// router.get('/documents/:id/versions/:version/download', documentController.download);
-router.patch('/documents/:id/versions/:version/restore', documentController.restoreVersion);
+router.get('/documents/:id/versions/history', DocumentController.getVersionHistory);
+router.get('/documents/:id/versions/view', DocumentController.viewDocumentVersion);
+router.get('/documents/:id/versions/:version/view', DocumentController.viewVersion);
+// router.get('/documents/:id/versions/:version/download', DocumentController.download);
+router.patch('/documents/:id/versions/:version/restore', DocumentController.restoreVersion);
 
 //approval
 // router.get('/:documentId', getDocumentApprovals);
-router.patch('/documents/:documentId/approvals/:approver', documentController.updateApprovalStatus);
+router.patch('/documents/:documentId/approvals/:approver', DocumentController.updateApprovalStatus);
 // Process approval action
-router.post('/documents/:documentId/add', documentController.createApprovalRequest);
-router.get('/documents/:documentId/approval/track', documentController.getApprovals);
+router.post('/documents/:documentId/add', DocumentController.createApprovalRequest);
+router.get('/documents/:documentId/approval/track', DocumentController.getApprovals);
 
 // ---------------------------
 // Departments routes
 // ---------------------------
 // Publicly exposed API routes
-router.get('/departments', departmentController.getAllDepartments);
-router.get('/departments/search', departmentController.searchDepartments);
-router.get('/departments/:id', authenticate, departmentController.getDepartmentById);
+router.get('/departments', DepartmentController.getAllDepartments);
+router.get('/departments/search', DepartmentController.searchDepartments);
+router.get('/departments/:id', authenticate, DepartmentController.getDepartmentById);
 
 // Admin-only routes (CRUD)
-router.post('/departments', authenticate, authorize('admin', 'user'), checkPermissions, departmentController.createDepartment);
-router.patch('/departments/:id', authenticate, authorize('admin', 'user'), checkPermissions, departmentController.updateDepartment);
-router.delete('/departments/:id', authenticate, authorize('admin', 'user'), checkPermissions, departmentController.deleteDepartment);
+router.post('/departments', authenticate, authorize('admin', 'user'), checkPermissions, DepartmentController.createDepartment);
+router.patch('/departments/:id', authenticate, authorize('admin', 'user'), checkPermissions, DepartmentController.updateDepartment);
+router.delete('/departments/:id', authenticate, authorize('admin', 'user'), checkPermissions, DepartmentController.deleteDepartment);
 
 
+// ---------------------------
+// DocumentHandler routes
+// ---------------------------
 
+// PATCH /shared/:sharedId/renew
+router.patch("/shared/:sharedId/renew", authenticate, DocumentHandlerController.renewAccess);
 // ---------------------------
 // Designation routes
 // ---------------------------
 // Public API
-router.get('/designations', designationController.getAllDesignations);
-router.get('/designations/search', authenticate, designationController.searchDesignations)
-router.get('/designations/:id', authenticate, designationController.getDesignationById);
+router.get('/designations', DesignationController.getAllDesignations);
+router.get('/designations/search', authenticate, DesignationController.searchDesignations)
+router.get('/designations/:id', authenticate, DesignationController.getDesignationById);
 // Admin-only CRUD
-router.post('/designations', authenticate, authorize('admin'), designationController.createDesignation);
-router.patch('/designations/:id', authenticate, authorize('admin'), designationController.updateDesignation);
-router.delete('/designations/:id', authenticate, authorize('admin'), designationController.deleteDesignation);
+router.post('/designations', authenticate, authorize('admin'), DesignationController.createDesignation);
+router.patch('/designations/:id', authenticate, authorize('admin'), DesignationController.updateDesignation);
+router.delete('/designations/:id', authenticate, authorize('admin'), DesignationController.deleteDesignation);
 
 
 
@@ -228,76 +245,76 @@ router.get("/session/project", (req, res) => {
 router.route('/projects')
     .get(
         authorize('superadmin', 'admin', 'manager', 'employee', 'viewer', "user"),
-        projectController.getAllProjects
+        ProjectController.getAllProjects
     )
     .post(
         createProjectValidator,
-        authorize('superadmin', 'admin', 'manager'), upload.single('projectLogo'), projectController.createProject);
+        authorize('superadmin', 'admin', 'manager'), upload.single('projectLogo'), ProjectController.createProject);
 
 router.route('/projects/:id/status')
-    .patch(authorize('superadmin', 'admin', 'manager'), projectController.updateProjectStatus);
+    .patch(authorize('superadmin', 'admin', 'manager'), ProjectController.updateProjectStatus);
 // Filtered project routes
 router.route('/projects/status/:projectStatus')
-    .get(authorize('superadmin', 'admin', 'manager', 'employee', 'viewer'), projectController.getProjectsByStatus);
+    .get(authorize('superadmin', 'admin', 'manager', 'employee', 'viewer'), ProjectController.getProjectsByStatus);
 
 router.route('/projects/department/:departmentId')
-    .get(authorize('superadmin', 'admin', 'manager', 'employee', 'viewer'), projectController.getProjectsByDepartment);
+    .get(authorize('superadmin', 'admin', 'manager', 'employee', 'viewer'), ProjectController.getProjectsByDepartment);
 
 router.route('/projects/manager/:managerId')
-    .get(authorize('superadmin', 'admin', 'manager', 'employee', 'viewer'), projectController.getProjectsByManager);
+    .get(authorize('superadmin', 'admin', 'manager', 'employee', 'viewer'), ProjectController.getProjectsByManager);
 
 router.route('/projects/overdue')
-    .get(authorize('superadmin', 'admin', 'manager'), projectController.getOverdueProjects);
+    .get(authorize('superadmin', 'admin', 'manager'), ProjectController.getOverdueProjects);
 
 router.route('/projects/upcoming-deadlines')
-    .get(authorize('superadmin', 'admin', 'manager', 'employee'), projectController.getUpcomingDeadlines);
+    .get(authorize('superadmin', 'admin', 'manager', 'employee'), ProjectController.getUpcomingDeadlines);
 
 // Search route
 router.route('/projects/search')
-    .get(authorize('superadmin', 'admin', 'manager', 'employee', 'viewer'), searchProjectsValidator, projectController.searchProjects);
+    .get(authorize('superadmin', 'admin', 'manager', 'employee', 'viewer'), searchProjectsValidator, ProjectController.searchProjects);
 
 // Bulk operations
 router.route('/projects/bulk/update')
-    .patch(authorize('superadmin', 'admin'), projectController.bulkUpdateProjects);
+    .patch(authorize('superadmin', 'admin'), ProjectController.bulkUpdateProjects);
 
 // Export route
 router.route('/projects/export')
-    .get(authorize('superadmin', 'admin', 'manager'), projectController.exportProjects);
+    .get(authorize('superadmin', 'admin', 'manager'), ProjectController.exportProjects);
 
 // Project timeline
 router.route('/projects/:id/timeline')
-    .get(authorize('superadmin', 'admin', 'manager', 'employee', 'viewer'), projectController.getProjectTimeline);
+    .get(authorize('superadmin', 'admin', 'manager', 'employee', 'viewer'), ProjectController.getProjectTimeline);
 
 // Donor management routes
 router.route('/projects/:id/donors')
-    .post(authorize('superadmin', 'admin', 'manager'), projectController.addDonorToProject);
+    .post(authorize('superadmin', 'admin', 'manager'), ProjectController.addDonorToProject);
 
 router.route('/projects/:id/donors/:donorId')
-    .put(authorize('superadmin', 'admin', 'manager'), projectController.updateDonorInProject)
-    .delete(authorize('superadmin', 'admin', 'manager'), projectController.removeDonorFromProject);
+    .put(authorize('superadmin', 'admin', 'manager'), ProjectController.updateDonorInProject)
+    .delete(authorize('superadmin', 'admin', 'manager'), ProjectController.removeDonorFromProject);
 
 // Vendor management routes
 router.route('/projects/:id/vendors')
-    .post(donorValidator, authorize('superadmin', 'admin', 'manager'), vendorValidator, projectController.addVendorToProject);
+    .post(donorValidator, authorize('superadmin', 'admin', 'manager'), vendorValidator, ProjectController.addVendorToProject);
 
 router.route('/projects/:id/vendors/:vendorId')
-    .put(authorize('superadmin', 'admin', 'manager'), projectController.updateVendorInProject)
-    .delete(authorize('superadmin', 'admin', 'manager'), projectController.removeVendorFromProject);
+    .put(authorize('superadmin', 'admin', 'manager'), ProjectController.updateVendorInProject)
+    .delete(authorize('superadmin', 'admin', 'manager'), ProjectController.removeVendorFromProject);
 
 
 router.route('/projects/:id/clone')
-    .post(authorize('superadmin', 'admin', 'manager'), projectController.cloneProject);
+    .post(authorize('superadmin', 'admin', 'manager'), ProjectController.cloneProject);
 
 router.route('/projects/:id/archive')
-    .patch(authorize('superadmin', 'admin'), projectController.archiveProject);
+    .patch(authorize('superadmin', 'admin'), ProjectController.archiveProject);
 
 // Single project operations
 router.route('/projects/:id')
-    .get(authorize('superadmin', 'admin', 'manager', 'employee', 'viewer'), projectController.getProject)
-    .patch(authorize('superadmin', 'admin', 'manager'), upload.single('projectLogo'), projectController.updateProject)
-    .delete(projectIdValidator, authorize('superadmin', 'admin'), projectController.deleteProject);
+    .get(authorize('superadmin', 'admin', 'manager', 'employee', 'viewer'), ProjectController.getProject)
+    .patch(authorize('superadmin', 'admin', 'manager'), upload.single('projectLogo'), ProjectController.updateProject)
+    .delete(projectIdValidator, authorize('superadmin', 'admin'), ProjectController.deleteProject);
 router.route('/projects/:id/restore')
-    .patch(authorize('superadmin', 'admin'), projectController.restoreProject);
+    .patch(authorize('superadmin', 'admin'), ProjectController.restoreProject);
 
 
 
@@ -306,12 +323,12 @@ router.route('/projects/:id/restore')
 // ---------------------------
 
 // CRUD endpoints
-router.post("/notifications", notificationController.createNotification);
-router.get("/notifications", notificationController.getUserNotifications);
-router.get("/notifications/unread-count", notificationController.getUnreadCount);
-router.patch("/notifications/:id/read", notificationController.markAsRead);
-router.patch("/notifications/mark-all-read", notificationController.markAllAsRead);
-router.delete("/notifications/:id", notificationController.deleteNotification);
+router.post("/notifications", NotificationController.createNotification);
+router.get("/notifications", NotificationController.getUserNotifications);
+router.get("/notifications/unread-count", NotificationController.getUnreadCount);
+router.patch("/notifications/:id/read", NotificationController.markAsRead);
+router.patch("/notifications/mark-all-read", NotificationController.markAllAsRead);
+router.delete("/notifications/:id", NotificationController.deleteNotification);
 
 
 // ---------------------------
@@ -577,12 +594,12 @@ router.post("/menu/assign", authenticate, async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 });
-router.delete("/assign-menu/unselect", authenticate, unAssignMenusValidator, permissionController.unAssignMenu)
+router.delete("/assign-menu/unselect", authenticate, unAssignMenusValidator, PermissionController.unAssignMenu)
 // For logged-in user’s sidebar
-router.get("/sidebar", authenticate, permissionController.getSidebarForUser);
+router.get("/sidebar", authenticate, PermissionController.getSidebarForUser);
 // Get assigned menus for a designation
-router.get("/assign-menu/designation/:designation_id/menus", authenticate, getAssignedMenusValidator, permissionController.getAssignedMenus);
-router.post("/assign-menu/assign", authenticate, assignMenusValidator, permissionController.assignMenusToDesignation);
+router.get("/assign-menu/designation/:designation_id/menus", authenticate, getAssignedMenusValidator, PermissionController.getAssignedMenus);
+router.post("/assign-menu/assign", authenticate, assignMenusValidator, PermissionController.assignMenusToDesignation);
 
 // Save user permissions
 router.post("permisssions/user/permissions/:userId", authenticate, async (req, res) => {
@@ -635,12 +652,12 @@ router.get("/permissions/user/:id/permissions", async (req, res) => {
 
 // Get user permissions
 
-router.post("/user/register", upload.single("profile_image"), userController.registerUser);
-router.get("/user", userController.getAllUsers);
-router.get("/user/search", userController.searchUsers);
-router.get("/user/:id", userController.getUserById);
-router.put("/user/:id", userController.updateUser);
-router.delete("/user/:id", userController.deleteUser);
+router.post("/user/register", upload.single("profile_image"), UserController.registerUser);
+router.get("/user", UserController.getAllUsers);
+router.get("/user/search", UserController.searchUsers);
+router.get("/user/:id", UserController.getUserById);
+router.put("/user/:id", UserController.updateUser);
+router.delete("/user/:id", UserController.deleteUser);
 
 
 // ---------------------------
@@ -656,16 +673,16 @@ router.post("/files/upload/:folderId", async (req, res, next) => {
         const uploader = createS3Uploader(folder.name);
         uploader.array("file")(req, res, (err) => {
             if (err) return next(err);
-            tempController.uploadFile(req, res); // call your controller
+            TempController.uploadFile(req, res); // call your controller
         });
     } catch (err) {
         next(err);
     }
 });
-router.get("/files/download/:fileName", tempController.download);
-router.post("/files/submit-form", tempController.submitForm);
-router.delete("/files/:fileId", tempController.deleteFile);
-router.get("/files/:fileId/status", tempController.getFileStatus);
+router.get("/files/download/:fileName", TempController.download);
+router.post("/files/submit-form", TempController.submitForm);
+router.delete("/files/:fileId", TempController.deleteFile);
+router.get("/files/:fileId/status", TempController.getFileStatus);
 
 
 
@@ -673,37 +690,37 @@ router.get("/files/:fileId/status", tempController.getFileStatus);
 // Folders routes
 // ---------------------------
 // Create folder
-router.post('/folders', folderController.createFolder);
+router.post('/folders', FolderController.createFolder);
 
 // List folders (optionally by parent)
-router.get('/folders', folderController.listFolders);
-router.get('/folders/all', folderController.getAllFolders);
+router.get('/folders', FolderController.listFolders);
+router.get('/folders/all', FolderController.getAllFolders);
 
 // Get folder details with contents
-router.get('/folders/details/:id', folderController.getFolder);
+router.get('/folders/details/:id', FolderController.getFolder);
 
 // router.get('', getFoldersProjectDepartment)
 
 // Rename folder
-router.patch('/folders/:id/rename', folderController.renameFolder);
+router.patch('/folders/:id/rename', FolderController.renameFolder);
 
 // Move folder
-router.patch('/folders/:id/move', folderController.moveFolder);
+router.patch('/folders/:id/move', FolderController.moveFolder);
 
 // Delete folder (soft delete)
-router.delete('/folders/:id', folderController.deleteFolder);
+router.delete('/folders/:id', FolderController.deleteFolder);
 
 // Upload files to folder
-router.post('/folders/:folderId/upload', upload.array("files"), folderController.uploadToFolder);
+router.post('/folders/:folderId/upload', upload.array("files"), FolderController.uploadToFolder);
 
 // Get folder tree structure
-router.get('/folders/tree/structure', folderController.getFolderTree);
+router.get('/folders/tree/structure', FolderController.getFolderTree);
 
-router.patch('/folders/:id/archive', folderController.archiveFolder);
+router.patch('/folders/:id/archive', FolderController.archiveFolder);
 // Get all archived folders for the current user
-router.get('/folders/archived', folderController.getArchivedFolders);
+router.get('/folders/archived', FolderController.getArchivedFolders);
 
-router.patch('/folders/:id/restore', folderController.restoreFolder);
+router.patch('/folders/:id/restore', FolderController.restoreFolder);
 
 
 
@@ -715,22 +732,22 @@ router.patch('/folders/:id/restore', folderController.restoreFolder);
 router.post("/add-vendor-donor",
     upload.single('profile_image'),
     registerVendorOrDonor,
-    donorVendorController.registerDonorVendor
+    DonerVenderController.registerDonorVendor
 );
 
 router.post("/add-vendor",
     upload.single('profile_image'),
     registerVendor,
-    donorVendorController.registerVendor
+    DonerVenderController.registerVendor
 );
 
 
 // get all donor base on the DataTable api (use POST for DataTables server-side)
-router.post("/donors-list", donorVendorController.getAllDonors);
+router.post("/donors-list", DonerVenderController.getAllDonors);
 // get all vendors based on the DataTable api
-router.post("/vendors-list", donorVendorController.getAllVendor);
+router.post("/vendors-list", DonerVenderController.getAllVendor);
 // delete donor by id
-router.delete("/donor-delete/:id", donorVendorController.deleteDonorVendor);
+router.delete("/donor-delete/:id", DonerVenderController.deleteDonorVendor);
 
 
 export default router;

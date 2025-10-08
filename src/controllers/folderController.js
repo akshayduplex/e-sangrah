@@ -2,10 +2,10 @@
 import Folder from '../models/Folder.js';
 import Document from '../models/Document.js';
 import mongoose from 'mongoose';
-import { generateUniqueFileName } from '../helper/generateUniquename.js';
+import { generateUniqueFileName } from '../helper/GenerateUniquename.js';
 import { putObject } from '../utils/s3Helpers.js';
 import logger from '../utils/logger.js';
-import TempFile from '../models/tempFile.js';
+import TempFile from '../models/TempFile.js';
 
 //Page controlers
 

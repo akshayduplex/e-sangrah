@@ -455,16 +455,6 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <!-- Search User -->
-                <div class="d-flex mb-3">
-                    <select id="userInviteSelect" class="form-select me-2" style="width: 200px;"></select>
-                    <select class="form-select me-2" id="accessLevelSelect" style="width: 140px;">
-                        <option value="view">View Only</option>
-                        <option value="edit">Edit</option>
-                    </select>
-                    <button id="inviteUserBtn" class="site-btnmd ">Invite</button>
-                </div>
-
                 <!-- Time Duration -->
                 <h6 class="fw-normal fs-20 mb-3">Time Duration</h6>
                 <div class="d-flex flex-wrap gap-3 mb-3">
@@ -480,6 +470,15 @@
                             class="form-check-label" for="onetime">One Time</label></div>
                     <div class="form-check"><input class="form-check-input" type="radio" name="time" id="custom"><label
                             class="form-check-label" for="custom">Custom</label></div>
+                </div>
+                <!-- Search User -->
+                <div class="d-flex mb-3">
+                    <select id="userInviteSelect" class="form-select me-2" style="width: 200px;"></select>
+                    <select class="form-select me-2" id="accessLevelSelect" style="width: 140px;">
+                        <option value="view">View Only</option>
+                        <option value="edit">Edit</option>
+                    </select>
+                    <button id="inviteUserBtn" class="site-btnmd ">Invite</button>
                 </div>
 
                 <!-- Hidden date range -->
@@ -517,8 +516,9 @@
                     </select>
                 </div>
                 <div class="input-group mb-3">
-                    <input type="text" class="form-control" value="https://duplextech.com/" readonly>
-                    <button class="btn btn-outline-secondary">Copy link</button>
+                    <input type="text" id="sharelink" class="form-control" readonly
+                        placeholder="Shareable link will appear here">
+                    <button class="btn btn-outline-secondary" type="button" id="copyLinkBtn">Copy link</button>
                 </div>
             </div>
             <div class="modal-footer">

@@ -69,13 +69,12 @@ async function handleLogin({ emailInput, passwordInput, loginBtn }) {
     // Disable button while processing
     loginBtn.disabled = true;
     loginBtn.textContent = "Logging in...";
-
+    console.log("login", email, password)
     try {
         const response = await fetch(`${baseUrl}/api/auth/login`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email, password }),
-            credentials: "include"
+            body: JSON.stringify({ email, password })
         });
 
         const data = await response.json().catch(() => ({}));

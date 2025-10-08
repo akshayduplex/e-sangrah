@@ -4,7 +4,7 @@ import { successResponse, failResponse, errorResponse } from "../utils/responseH
 import Department from "../models/Departments.js";
 import User from "../models/User.js";
 import Project from "../models/Project.js";
-import { normalizeToArray, validateObjectIdArray } from "../helper/validateobjectId.js";
+import { normalizeToArray, validateObjectIdArray } from "../helper/ValidateObjectId.js";
 import logger from "../utils/logger.js";
 import { parseDateDDMMYYYY } from "../utils/formatDate.js";
 import { renderProjectDetails } from "../utils/renderProjectDetails.js";

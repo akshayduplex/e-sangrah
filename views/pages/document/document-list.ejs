@@ -155,14 +155,16 @@
     <!-- /Page Wrapper -->
 
     <%- include('../../partials/footer') %>
-        <link href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+        <!-- <link href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" rel="stylesheet"> -->
         <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
         <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
 
         <script>
             (function ($) {
                 "use strict";
-                let currentDocId = null; // Track currently selected document
+                let currentDocId = null;
+                let isModalInitializing = false;
+                const baseUrl = window.location.origin;
                 const fileIcons = {
                     ppt: "/img/icons/fn1.png",
                     pptx: "/img/icons/fn1.png",
@@ -347,7 +349,7 @@
                     <li><a class="dropdown-item" href="${doc.link || '#'}"><i class="ti ti-eye"></i> View</a></li>
                     <li><a class="dropdown-item" href="/documents/edit/${doc._id}"><i class="ti ti-pencil-minus"></i> Edit</a></li>
                     <li>
-                        <a class="dropdown-item share-btn" href="#" data-doc-id="${doc._id}" data-bs-toggle="modal" data-bs-target="#sharedoc-modal">
+                        <a class="dropdown-item share-btn" href="#" data-doc-id="${doc._id}"  data-file-id="${doc.files?.[0]?._id || ''}"  data-bs-toggle="modal" data-bs-target="#sharedoc-modal">
                             <i class="ti ti-share"></i> Share
                         </a>
                     </li>
@@ -442,6 +444,7 @@
                 $('#sharedoc-modal').on('show.bs.modal', function (event) {
                     const button = $(event.relatedTarget);
                     currentDocId = button.data('doc-id');
+                    const fileId = button.data('file-id');
                     const modal = $(this);
 
                     // Reset form
@@ -459,7 +462,16 @@
                     const container = modal.find('#usersWithAccessContainer');
                     container.empty();
 
-                    if (!currentDocId) return;
+                    if (!currentDocId || !fileId) return;
+
+                    // Fetch share link
+                    $.ajax({
+                        url: `${baseUrl}/api/documents/${currentDocId}/${fileId}/share-link`,
+                        method: 'GET',
+                        success: function (res) {
+                            if (res.success && res.link) modal.find('#sharelink').val(res.link);
+                        }
+                    });
 
                     // Load shared users
                     $.ajax({
@@ -705,14 +717,6 @@
                     });
                 });
 
-                // Copy link functionality
-                $('#sharedoc-modal').on('click', '.btn-outline-secondary', function () {
-                    const linkInput = $(this).closest('.input-group').find('input[type="text"]');
-                    linkInput.select();
-                    document.execCommand('copy');
-                    showToast('Link copied to clipboard!', 'success');
-                });
-
                 // Share button in footer
                 $('#sharedoc-modal .modal-footer .site-btnmd').on('click', function () {
                     const accessLevel = $('#accessLevelSelect').val();
@@ -903,6 +907,28 @@
                             showToast(err.responseJSON?.message || 'Failed to restore version', 'error');
                         }
                     });
+                });
+
+                // Copy share link to clipboard
+                $('#sharedoc-modal').on('click', '#copyLinkBtn', function () {
+                    const linkInput = $('#sharelink');
+                    if (!linkInput.val()) {
+                        showToast('No link available to copy', 'info');
+                        return;
+                    }
+
+                    // Select the text
+                    linkInput.select();
+                    linkInput[0].setSelectionRange(0, 99999); // For mobile devices
+
+                    // Copy to clipboard
+                    navigator.clipboard.writeText(linkInput.val())
+                        .then(() => {
+                            showToast('Link copied to clipboard!', 'success');
+                        })
+                        .catch(() => {
+                            showToast('Failed to copy link', 'error');
+                        });
                 });
 
                 // Function to load users for invite dropdown

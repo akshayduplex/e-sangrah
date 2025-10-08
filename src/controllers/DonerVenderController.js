@@ -1,4 +1,4 @@
-import { generateRandomPassword } from "../helper/generateRandomPassword.js";
+import { generateRandomPassword } from "../helper/GenerateRandomPassword.js";
 import User from "../models/User.js";
 import { sendEmail } from "../services/emailService.js";
 

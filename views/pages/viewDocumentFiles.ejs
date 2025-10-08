@@ -109,8 +109,51 @@
                                                     <% } else { %>
                                                         <p>The file could not be loaded.</p>
                                                         <% } %>
+
+                                                            <% if (canRenew && documentId) { %>
+                                                                <div style="margin-top: 20px;">
+                                                                    <button id="request-access-btn" style="background-color:#007bff;color:#fff;border:none;padding:10px 20px;
+                           border-radius:5px;cursor:pointer;font-size:15px;">
+                                                                        Request Access Again
+                                                                    </button>
+                                                                    <p id="access-status"
+                                                                        style="margin-top:10px;color:#666;font-size:14px;">
+                                                                    </p>
+                                                                </div>
+
+                                                                <script>
+                                                                    document.getElementById('request-access-btn').addEventListener('click', async () => {
+                                                                        const btn = document.getElementById('request-access-btn');
+                                                                        const status = document.getElementById('access-status');
+                                                                        btn.disabled = true;
+                                                                        btn.textContent = 'Requesting...';
+
+                                                                        try {
+                                                                            const res = await fetch(`/api/documents/<%= documentId %>/request-access-again`, {
+                                                                                method: 'POST',
+                                                                                headers: { 'Content-Type': 'application/json' }
+                                                                            });
+                                                                            const data = await res.json();
+                                                                            if (data.success) {
+                                                                                status.textContent = '✅ Access request sent to the owner!';
+                                                                                btn.style.display = 'none';
+                                                                            } else {
+                                                                                status.textContent = '❌ ' + (data.message || 'Failed to send request.');
+                                                                                btn.disabled = false;
+                                                                                btn.textContent = 'Request Access Again';
+                                                                            }
+                                                                        } catch (err) {
+                                                                            status.textContent = '❌ Network error. Please try again.';
+                                                                            btn.disabled = false;
+                                                                            btn.textContent = 'Request Access Again';
+                                                                        }
+                                                                    });
+                                                                </script>
+                                                                <% } %>
+
                                             </div>
                                             <% } %>
+
         </div>
     </div>
 </body>

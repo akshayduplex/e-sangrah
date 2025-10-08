@@ -1,6 +1,6 @@
 import { PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { s3Client } from "../config/s3Client.js";
+import { s3Client } from "../config/S3Client.js";
 
 export const putObject = async (fileBuffer, fileName, contentType, folderName) => {
     const s3Key = `folders/${folderName}/${fileName}`;

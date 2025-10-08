@@ -6,10 +6,9 @@ import {
     failResponse,
     errorResponse,
 } from "../utils/responseHandler.js";
-import { getOtpEmailHtml } from "../emailTemplates/otpEmailTemplate.js";
+import { getOtpEmailHtml } from "../emailTemplates/OtpEmailTemplate.js";
 // Configure multer for file uploads
 import crypto from "crypto"
-import Designation from "../models/Designation.js";
 import { sendEmail } from "../services/emailService.js";
 import logger from "../utils/logger.js";
 
@@ -90,7 +89,7 @@ export const getLoginPage = (req, res) => {
 export const login = async (req, res) => {
     try {
         const { email, password } = req.body;
-
+        console.log("login", email, password)
         const user = await User.findOne({ email }).select("+password");
         if (!user) {
             return failResponse(res, "User Not Found", 401);
@@ -104,7 +103,7 @@ export const login = async (req, res) => {
             );
         }
 
-        const isPasswordValid = bcrypt.compare(password, user.password);
+        const isPasswordValid = await bcrypt.compare(password, user.password);
         if (!isPasswordValid) {
             return failResponse(res, "Password incorrect", 401);
         }

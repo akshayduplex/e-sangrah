@@ -1,7 +1,7 @@
 import User from "../models/User.js";
 import { validationResult } from "express-validator";
-import { generateEmployeeId } from "../helper/generateEmployeeId.js";
-import { generateRandomPassword } from "../helper/generateRandomPassword.js";
+import { generateEmployeeId } from "../helper/GenerateEmployeeId.js";
+import { generateRandomPassword } from "../helper/GenerateRandomPassword.js";
 import { sendEmail } from "../services/emailService.js";
 import logger from "../utils/logger.js";
 import Department from "../models/Departments.js";

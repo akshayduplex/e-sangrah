@@ -18,6 +18,7 @@ export const API_ENDPOINTS = {
 // Centralized API config
 export const API_CONFIG = {
     baseUrl: process.env.BASE_URL || 'http://localhost:5000/api',
+    encryptedKey: process.env.URL_ENCRYPTION_KEY || '12345678901234567890123456789012',
     timeout: Number(process.env.API_TIMEOUT) || 5000,
     headers: {
         'Content-Type': 'application/json',

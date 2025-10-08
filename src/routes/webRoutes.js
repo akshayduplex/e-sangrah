@@ -5,19 +5,20 @@ import mongoose from "mongoose";
 import { authenticate, authorize } from "../middlewares/authMiddleware.js";
 import checkPermissions from "../middlewares/checkPermission.js";
 
-import * as authController from "../controllers/authController.js";
-import * as adminController from "../controllers/adminController.js";
-import * as employeeController from "../controllers/employeeController.js";
-import * as userController from "../controllers/userController.js";
-import * as donorVendorController from "../controllers/DonerVender.js";
-import * as departmentController from "../controllers/departmentController.js";
-import * as designationController from "../controllers/designationController.js";
-import * as documentController from "../controllers/documentController.js";
-import * as projectController from "../controllers/projectController.js";
-import * as permissionController from "../controllers/permisssions.js";
-import * as folderController from "../controllers/folderController.js";
-import * as notificationController from "../controllers/notificationController.js";
-import * as dashboardController from "../controllers/dashboardController.js";
+import * as AuthController from "../controllers/AuthController.js";
+import * as AdminController from "../controllers/AdminController.js";
+import * as EmployeeController from "../controllers/EmployeeController.js";
+import * as UserController from "../controllers/UserController.js";
+import * as DonorVendorController from "../controllers/DonerVenderController.js";
+import * as DepartmentController from "../controllers/DepartmentController.js";
+import * as DesignationController from "../controllers/DesignationController.js";
+import * as DocumentController from "../controllers/DocumentController.js";
+import * as ProjectController from "../controllers/ProjectController.js";
+import * as PermissionController from "../controllers/PermisssionsController.js";
+import * as FolderController from "../controllers/FolderController.js";
+import * as NotificationController from "../controllers/NotificationController.js";
+import * as DashboardController from "../controllers/DashboardController.js";
+import * as ReportsController from "../controllers/ReportsController.js"
 
 // ===== Validators =====
 
@@ -36,7 +37,7 @@ import {
     getAssignMenuPage,
     getEditMenu,
     getMenuList,
-} from "../controllers/permisssions.js";
+} from "../controllers/PermisssionsController.js";
 
 // ===== Models =====
 import User from "../models/User.js";
@@ -47,7 +48,7 @@ import Document from "../models/Document.js";
 import Menu from "../models/Menu.js";
 
 // ===== Utils & Constants =====
-import { profile_type } from "../constant/constant.js";
+import { profile_type } from "../constant/Constant.js";
 import { buildMenuTree } from "../utils/buildMenuTree.js";
 import { renderProjectDetails } from "../utils/renderProjectDetails.js";
 import logger from "../utils/logger.js";
@@ -60,23 +61,23 @@ const router = express.Router();
 /* --- Authentication Pages --- */
 
 // Login page
-router.get("/login", authController.getLoginPage);
+router.get("/login", AuthController.getLoginPage);
 
 // Registration page
-router.get("/register", authController.getRegisterPage);
+router.get("/register", AuthController.getRegisterPage);
 
 // Forgot password page
-router.get("/forgot-password", authController.getForgotPasswordPage);
+router.get("/forgot-password", AuthController.getForgotPasswordPage);
 
 // Reset password page
-router.get("/reset-password", authenticate, authController.getResetPasswordPage);
+router.get("/reset-password", authenticate, AuthController.getResetPasswordPage);
 
 
 // router.use(checkPermissions); // Apply RBAC middleware to all routes below
 /* --- User Management --- */
 
 // User list page
-router.get("/users/list", authenticate, checkPermissions, userController.listUsers);
+router.get("/users/list", authenticate, checkPermissions, UserController.listUsers);
 
 // Register new user form
 router.get(
@@ -84,65 +85,73 @@ router.get(
     authenticate,
     authorize('admin', 'superadmin'),
     checkPermissions,
-    userController.showRegisterForm
+    UserController.showRegisterForm
 );
 
 // Combined view/edit user form
-router.get("/users/:mode/:id", authenticate, checkPermissions, userController.viewOrEditUser);
+router.get("/users/:mode/:id", authenticate, checkPermissions, UserController.viewOrEditUser);
 
 /* --- Donors --- */
 // Donor registration page (create or edit)
-router.get("/donors/register", authenticate, checkPermissions, donorVendorController.showDonorForm);
+router.get("/donors/register", authenticate, checkPermissions, DonorVendorController.showDonorForm);
 
 // Donor list page
-router.get("/donors/list", authenticate, checkPermissions, donorVendorController.listDonors);
+router.get("/donors/list", authenticate, checkPermissions, DonorVendorController.listDonors);
 
 /* --- Vendors --- */
 // Vendor registration page (create/edit)
-router.get("/vendors/register", authenticate, checkPermissions, donorVendorController.showVendorForm);
+router.get("/vendors/register", authenticate, checkPermissions, DonorVendorController.showVendorForm);
 
 // Vendor list page
-router.get("/vendors/list", authenticate, checkPermissions, donorVendorController.listVendors);
+router.get("/vendors/list", authenticate, checkPermissions, DonorVendorController.listVendors);
 
 
 /* =========================================
    DEPARTMENTS ROUTES
    ========================================= */
 // Add Department page
-router.get("/departments", authenticate, checkPermissions, departmentController.showAddDepartmentPage);
+router.get("/departments", authenticate, checkPermissions, DepartmentController.showAddDepartmentPage);
 
 // Department List page
-router.get("/departments/list", authenticate, checkPermissions, departmentController.showDepartmentListPage);
+router.get("/departments/list", authenticate, checkPermissions, DepartmentController.showDepartmentListPage);
 
 // Edit Department page
-router.get("/departments/:id", authenticate, checkPermissions, departmentController.showEditDepartmentPage);
+router.get("/departments/:id", authenticate, checkPermissions, DepartmentController.showEditDepartmentPage);
 
 
 /* =========================================
    ADMIN ROUTE
    ========================================= */
-router.get("/admin/approval", authenticate, checkPermissions, adminController.showAdminApprovalPage);
-router.get("/document/:id/admin/approval/track", authenticate, checkPermissions, adminController.showApprovalTrackPage);
+router.get("/admin/approval", authenticate, checkPermissions, AdminController.showAdminApprovalPage);
+router.get("/document/:id/admin/approval/track", authenticate, checkPermissions, AdminController.showApprovalTrackPage);
 
 /* =========================================
    EMPLOYEE ROUTE
    ========================================= */
-router.get("/employee/approval", authenticate, checkPermissions, employeeController.showEmployeeApprovalPage);
-// router.get("/employee/track", authenticate, checkPermissions, employeeController.showEmployeeApprovalPage);
+router.get("/employee/approval", authenticate, checkPermissions, EmployeeController.showEmployeeApprovalPage);
+// router.get("/employee/track", authenticate, checkPermissions, EmployeeController.showEmployeeApprovalPage);
 //Approvals
 // Render approval page
-router.get('/document/:id/approval/track', authenticate, documentController.getDocumentApprovalsPage);
+router.get('/document/:id/approval/track', authenticate, DocumentController.getDocumentApprovalsPage);
+
+/* =========================================
+   Reports ROUTES
+   ========================================= */
+// Add Designation page
+router.get("/report", authenticate, authorize("admin"), checkPermissions, ReportsController.showReportPage);
+
+
 /* =========================================
    DESIGNATIONS ROUTES
    ========================================= */
 // Add Designation page
-router.get("/designations", authenticate, authorize("admin"), checkPermissions, designationController.showAddDesignationPage);
+router.get("/designations", authenticate, authorize("admin"), checkPermissions, DesignationController.showAddDesignationPage);
 
 // Edit Designation page
-router.get("/designations/edit/:id", authenticate, authorize("admin"), checkPermissions, designationController.showEditDesignationPage);
+router.get("/designations/edit/:id", authenticate, authorize("admin"), checkPermissions, DesignationController.showEditDesignationPage);
 
 // Designation List page
-router.get("/designations/list", authenticate, authorize("admin"), checkPermissions, designationController.showDesignationListPage);
+router.get("/designations/list", authenticate, authorize("admin"), checkPermissions, DesignationController.showDesignationListPage);
 
 
 /* =========================================
@@ -150,32 +159,32 @@ router.get("/designations/list", authenticate, authorize("admin"), checkPermissi
    ========================================= */
 
 // Document List page
-router.get("/documents/list", authenticate, checkPermissions, documentController.showDocumentListPage);
+router.get("/documents/list", authenticate, checkPermissions, DocumentController.showDocumentListPage);
 
 // View Document page
-router.get("/documents/:id/versions/view", authenticate, checkPermissions, documentController.showViewDocumentPage);
+router.get("/documents/:id/versions/view", authenticate, checkPermissions, DocumentController.showViewDocumentPage);
 
 // Add Document page
-router.get("/documents/add", authenticate, checkPermissions, documentController.showAddDocumentPage);
+router.get("/documents/add", authenticate, checkPermissions, DocumentController.showAddDocumentPage);
 
 // Edit Document page
-router.get("/documents/edit/:id", authenticate, checkPermissions, documentController.showEditDocumentPage);
-router.get('/documents/view/:id/:fileId', authenticate, documentController.viewDocumentFiles)
+router.get("/documents/edit/:id", authenticate, checkPermissions, DocumentController.showEditDocumentPage);
+router.get('/documents/view/:token', authenticate, DocumentController.viewDocumentFiles)
 
 /* =========================================
    PROJECTS ROUTES
    ========================================= */
 // Projects List page
-router.get("/projects/list", authenticate, projectController.showProjectListPage);
+router.get("/projects/list", authenticate, ProjectController.showProjectListPage);
 
 // Project details (new)
-router.get("/projects/details", authenticate, checkPermissions, projectController.showNewProjectDetails);
+router.get("/projects/details", authenticate, checkPermissions, ProjectController.showNewProjectDetails);
 
 // Project details (existing)
-router.get("/projects/:id/details", authenticate, checkPermissions, projectController.showExistingProjectDetails);
+router.get("/projects/:id/details", authenticate, checkPermissions, ProjectController.showExistingProjectDetails);
 
 // Main Projects page
-router.get("/projects", authenticate, checkPermissions, projectController.showMainProjectsPage);
+router.get("/projects", authenticate, checkPermissions, ProjectController.showMainProjectsPage);
 
 /* =========================================
    PERMISSIONS ROUTES
@@ -293,36 +302,36 @@ router.post("/permissions/user/save", authenticate, checkPermissions, async (req
 /* =========================================
    DASHBOARD ROUTE
    ========================================= */
-router.get("/dashboard", authenticate, checkPermissions, dashboardController.showDashboard);
+router.get("/dashboard", authenticate, checkPermissions, DashboardController.showDashboard);
 
 /* =========================================
    FOLDERS AND DOCUMENTS ROUTES
    ========================================= */
 // Folder list by ID
-router.get("/:folderId/list", authenticate, checkPermissions, folderController.showFolderListById);
+router.get("/:folderId/list", authenticate, checkPermissions, FolderController.showFolderListById);
 
 // Upload Folder page
-router.get("/upload-folder", authenticate, checkPermissions, folderController.showUploadFolderPage);
+router.get("/upload-folder", authenticate, checkPermissions, FolderController.showUploadFolderPage);
 
 // Archived Folders page
-router.get("/archived", authenticate, checkPermissions, folderController.showArchivedFoldersPage);
+router.get("/archived", authenticate, checkPermissions, FolderController.showArchivedFoldersPage);
 
 // Recycle-bin Folders page
-router.get("/recyclebin", authenticate, checkPermissions, folderController.showRecycleBinPage);
+router.get("/recyclebin", authenticate, checkPermissions, FolderController.showRecycleBinPage);
 
 // Main Folders page
-router.get("/folders", authenticate, checkPermissions, folderController.showMainFoldersPage);
+router.get("/folders", authenticate, checkPermissions, FolderController.showMainFoldersPage);
 
 /* =========================================
    NOTIFICATIONS ROUTE
    ========================================= */
 // Notifications page
-router.get("/notifications", authenticate, checkPermissions, notificationController.showNotificationsPage);
+router.get("/notifications", authenticate, checkPermissions, NotificationController.showNotificationsPage);
 
 /* =========================================
    MY PROFILE ROUTE
    ========================================= */
-router.get("/my-profile", authenticate, checkPermissions, authController.showMyProfile);
+router.get("/my-profile", authenticate, checkPermissions, AuthController.showMyProfile);
 
 
 /* ===========================
@@ -330,16 +339,16 @@ router.get("/my-profile", authenticate, checkPermissions, authController.showMyP
 =========================== */
 
 // Assign Permissions page
-router.get("/assign-permissions", authenticate, checkPermissions, permissionController.showAssignPermissionsPage);
+router.get("/assign-permissions", authenticate, checkPermissions, PermissionController.showAssignPermissionsPage);
 
 // Get user permissions page
-router.get("/user-permissions/:id", authenticate, checkPermissions, permissionController.showUserPermissionsPage);
+router.get("/user-permissions/:id", authenticate, checkPermissions, PermissionController.showUserPermissionsPage);
 
 // Get user permissions API
-router.get("/user/:id/permissions", authenticate, checkPermissions, permissionController.getUserPermissions);
+router.get("/user/:id/permissions", authenticate, checkPermissions, PermissionController.getUserPermissions);
 
 // Save user permissions
-router.post("/user/permissions", authenticate, checkPermissions, permissionController.saveUserPermissions);
+router.post("/user/permissions", authenticate, checkPermissions, PermissionController.saveUserPermissions);
 
 
 export default router;
