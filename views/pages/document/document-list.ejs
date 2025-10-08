@@ -180,7 +180,7 @@
                 function initSelect2(selector, url, textKey) {
                     $(selector).select2({
                         placeholder: `-- Select ${textKey} --`,
-                        allowClear: false,
+                        allowClear: true,
                         ajax: {
                             url,
                             dataType: 'json',
@@ -188,7 +188,7 @@
                             data: params => ({ search: params.term }),
                             processResults: data => {
                                 const results = [
-                                    { id: 'clear', text: `-- Select ${textKey} --` },
+                                    { id: '', text: `-- Select ${textKey} --` }, // empty string for reset
                                     ...data.data.map(item => ({ id: item._id, text: item[textKey] }))
                                 ];
                                 return { results };
@@ -197,14 +197,16 @@
                     });
 
                     $(selector).on('select2:select', function (e) {
-                        if (e.params.data.id === 'clear') {
+                        if (!e.params.data.id) { // empty string selected
                             $(this).val(null).trigger('change');
                         }
                     });
                 }
 
+
                 initSelect2('#department', `${baseUrl}/api/departments/search`, 'name');
                 initSelect2('#projectName', `${baseUrl}/api/projects`, 'projectName');
+
 
                 // -------------------------
                 // Initialize DataTable
@@ -216,9 +218,15 @@
                         url: `${baseUrl}/api/documents`,
                         type: 'GET',
                         data: function (d) {
+                            // Determine active status tab
                             const activeTab = $('.status-tab.btn-primary').text().trim();
                             const searchValue = $('#searchInput').val()?.trim() || '';
                             const selectedDate = $('.datetimepicker').val();
+
+                            // Column sorting info
+                            const orderColumn = d.order[0]?.column;
+                            const orderDir = d.order[0]?.dir || 'desc';
+
                             return {
                                 page: (d.start / d.length) + 1,
                                 limit: d.length,
@@ -227,6 +235,8 @@
                                 project: $('#projectName').val(),
                                 date: selectedDate,
                                 search: searchValue,
+                                orderColumn,
+                                orderDir
                             };
                         },
                         dataSrc: function (json) {
@@ -238,29 +248,37 @@
                     },
                     columns: [
                         { title: '', orderable: false },
-                        { title: 'File Name' },
-                        { title: 'Last Modified on' },
-                        { title: 'Owner' },
-                        { title: 'Department' },
-                        { title: 'Project Name' },
-                        { title: 'Shared With' },
-                        { title: 'Donor' },
-                        { title: 'Vendor' },
-                        { title: 'Tags' },
-                        { title: 'Metadata' },
-                        { title: 'Description' },
-                        { title: 'Remark' },
-                        { title: 'Signature' },
-                        { title: 'Status' }
+                        { title: 'File Name', orderable: true },
+                        { title: 'Last Modified on', orderable: true },
+                        { title: 'Owner', orderable: true },
+                        { title: 'Department', orderable: true },
+                        { title: 'Project Name', orderable: true },
+                        { title: 'Shared With', orderable: false },
+                        { title: 'Donor', orderable: true },
+                        { title: 'Vendor', orderable: true },
+                        { title: 'Tags', orderable: true },
+                        { title: 'Metadata', orderable: true },
+                        { title: 'Description', orderable: false },
+                        { title: 'Remark', orderable: false },
+                        { title: 'Signature', orderable: false },
+                        { title: 'Status', orderable: true }
                     ],
                     searching: false,
                     lengthChange: true,
                     pageLength: 10,
                     lengthMenu: [10, 25, 50, 100],
-                    order: [[2, 'desc']],
+                    order: [[2, 'desc']], // default sort
                     deferRender: true,
                     stateSave: true,
-                    dom: 'lfrtip'
+                    // dom: 'lfrtip'
+                    dom: "<'row'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6'f>>" +
+                        "<'row'<'col-sm-12'tr>>" +
+                        "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
+                    drawCallback: function () {
+                        // Align info & pagination properly
+                        $('#documents_table_wrapper .dataTables_paginate').addClass('float-end mt-2');
+                        $('#documents_table_wrapper .dataTables_info').addClass('text-start mt-2');
+                    }
                 });
                 // Enable Bootstrap tooltips on table redraw
                 $('#documents_table').on('draw.dt', function () {

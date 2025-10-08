@@ -253,23 +253,24 @@ export const getDocuments = async (req, res) => {
             status,
             department,
             project,
-            owner,
-            tags,
-            category,
             date,
-            sortBy = "createdAt",
-            sortOrder = "desc"
+            orderColumn,
+            orderDir
         } = req.query;
 
         const filter = { isDeleted: false };
-
-        // Text search
+        // Helper to convert query param to array safely
+        const toArray = val => {
+            if (!val) return [];
+            if (Array.isArray(val)) return val;
+            return val.split(',').map(v => v.trim()).filter(Boolean); // remove empty strings
+        };
+        // --- Search ---
         if (search?.trim()) {
             const safeSearch = search.trim();
             filter.$or = [
                 { "metadata.fileName": { $regex: safeSearch, $options: "i" } },
                 { "metadata.fileDescription": { $regex: safeSearch, $options: "i" } },
-                { "metadata.mainHeading": { $regex: safeSearch, $options: "i" } },
                 { description: { $regex: safeSearch, $options: "i" } },
                 { tags: { $in: [new RegExp(safeSearch, "i")] } },
                 { "files.originalName": { $regex: safeSearch, $options: "i" } },
@@ -277,51 +278,32 @@ export const getDocuments = async (req, res) => {
             ];
         }
 
-        // Helper to convert query param to array
-        const toArray = val => {
-            if (!val) return [];
-            if (Array.isArray(val)) return val;
-            return val.split(',').map(v => v.trim());
-        };
-
-        // Status filter with special case for "Compliance and Retention"
+        // --- Status ---
         if (status) {
-            const statusArray = toArray(status).map(s => s.replace(/\s+/g, ' ').trim());
-            if (statusArray.includes("Compliance and Retention")) {
+            if (status === "Compliance and Retention") {
                 filter["compliance.isCompliance"] = true;
             } else {
-                filter.status = statusArray.length === 1 ? statusArray[0] : { $in: statusArray };
+                filter.status = status;
             }
         }
 
         // Department filter
         if (department) {
             const deptArray = toArray(department).filter(id => mongoose.Types.ObjectId.isValid(id));
-            if (deptArray.length > 0) filter.department = deptArray.length === 1 ? deptArray[0] : { $in: deptArray };
+            if (deptArray.length > 0) {
+                filter.department = deptArray.length === 1 ? deptArray[0] : { $in: deptArray };
+            }
         }
 
         // Project filter
         if (project) {
-            const projectArray = toArray(project).filter(id => mongoose.Types.ObjectId.isValid(id));
-            if (projectArray.length > 0) filter.project = projectArray.length === 1 ? projectArray[0] : { $in: projectArray };
+            const projArray = toArray(project).filter(id => mongoose.Types.ObjectId.isValid(id));
+            if (projArray.length > 0) {
+                filter.project = projArray.length === 1 ? projArray[0] : { $in: projArray };
+            }
         }
 
-        // Owner filter
-        if (owner) {
-            const ownerArray = toArray(owner).filter(id => mongoose.Types.ObjectId.isValid(id));
-            if (ownerArray.length > 0) filter.owner = ownerArray.length === 1 ? ownerArray[0] : { $in: ownerArray };
-        }
-
-        // Tags filter
-        if (tags) {
-            const tagsArray = toArray(tags);
-            filter.tags = { $in: tagsArray.map(tag => new RegExp(tag, "i")) };
-        }
-
-        // Category filter
-        if (category) filter.category = category;
-
-        // Date filter
+        // --- Date filter ---
         if (date) {
             const [day, month, year] = date.split('-').map(Number);
             const selectedDate = new Date(year, month - 1, day);
@@ -332,12 +314,22 @@ export const getDocuments = async (req, res) => {
             }
         }
 
-        // Sorting
-        const allowedSortFields = ["createdAt", "updatedAt", "metadata.fileName", "status"];
-        const sortField = allowedSortFields.includes(sortBy) ? sortBy : "createdAt";
-        const sort = { [sortField]: sortOrder === "desc" ? -1 : 1 };
+        // --- Column Sorting ---
+        const columnMap = {
+            1: "metadata.fileName",
+            2: "updatedAt",
+            3: "owner.name",
+            4: "department.name",
+            5: "project.projectName",
+            9: "tags",
+            10: "metadata",
+            14: "status"
+        };
 
-        // Pagination
+        const sortField = columnMap[orderColumn] || "createdAt";
+        const sortOrder = orderDir === "asc" ? 1 : -1;
+
+        // --- Pagination ---
         const pageNum = Math.max(1, parseInt(page));
         const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
         const skip = (pageNum - 1) * limitNum;
@@ -348,12 +340,9 @@ export const getDocuments = async (req, res) => {
             .populate("owner", "name email")
             .populate("documentDonor", "name")
             .populate("documentVendor", "name")
-            .populate("projectManager", "name")
-            .populate("folderId", "name")
             .populate("sharedWithUsers", "name")
             .populate("files")
-            .sort(sort)
-            .select("metadata signature description sharedWithUsers documentVendor documentDonor project department owner status tags files link createdAt updatedAt comment compliance")
+            .sort({ [sortField]: sortOrder })
             .skip(skip)
             .limit(limitNum)
             .lean();
@@ -372,10 +361,11 @@ export const getDocuments = async (req, res) => {
         }, "Documents retrieved successfully");
 
     } catch (error) {
-        logger.error("Error fetching documents:", error);
+        console.error(error);
         return errorResponse(res, error, "Failed to retrieve documents");
     }
 };
+
 
 /**
  * @desc Get all documents by folderId
