@@ -775,3 +775,18 @@
         width: 100% !important;
         /* if you want it responsive */
     }
+
+    .share-link-box {
+        background: #f6f8fb;
+        border-radius: 12px;
+        border: 1px solid #e6e9ee;
+        padding: 6px 12px;
+    }
+
+    .share-link-box .form-control:focus {
+        box-shadow: none;
+    }
+
+    .copy-btn {
+        text-decoration: none;
+    }

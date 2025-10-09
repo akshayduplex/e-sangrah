@@ -60,3 +60,4 @@ export const renewAccess = async (req, res) => {
     }
 
 };
+

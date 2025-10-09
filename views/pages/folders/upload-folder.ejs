@@ -22,7 +22,8 @@
 					</nav>
 				</div>
 			</div>
-			<!-- /Breadcrumb -->
+
+			<!-- Upload Box -->
 			<div class="my-4">
 				<div class="col-md-12">
 					<div class="upload-box mb-3" id="uploadBox">
@@ -31,11 +32,27 @@
 						<small class="text-muted">Max 10GB total storage. DOCX / PPTX / CSV / PDF</small>
 						<input type="file" class="form-control d-none" id="fileInput" multiple>
 					</div>
-					<div id="fileList"></div>
+					<div id="fileList" class="row g-2"></div>
+				</div>
+
+				<!-- Folder Display -->
+				<div class="mb-3 p-2 bg-light rounded" id="folderPathContainer">
+					<div id="folder-no-project" class="text-center py-2 d-none">
+						<h6 class="text-muted mb-0">Please select a project first</h6>
+					</div>
+					<div id="folder-container" class="row g-2"></div>
+					<div id="folder-loading" class="text-center py-3 d-none">
+						<div class="spinner-border spinner-border-sm text-primary"></div>
+						<p class="mt-1 text-muted small">Loading folders...</p>
+					</div>
+					<div id="folder-empty" class="text-center py-3 d-none">
+						<i class="ti ti-folder-off fs-3 text-muted"></i>
+						<p class="mt-1 text-muted small">No subfolders found</p>
+					</div>
 				</div>
 				<div class="col-md-12 ">
 					<div class="my-4">
-						<button class="btn btn-primary rounded-pill">Upload Folder</button>
+						<button id="uploadBtn" class="btn btn-primary rounded-pill">Upload Folder</button>
 					</div>
 				</div>
 			</div>
@@ -52,42 +69,126 @@
 
 
 		<script>
+			// ---------------- FOLDER LOADING ----------------
+			const folderState = { selectedFolders: [], currentFolderId: null };
+			const elements = {
+				container: document.getElementById('folder-container'),
+				loading: document.getElementById('folder-loading'),
+				empty: document.getElementById('folder-empty'),
+				noProject: document.getElementById('folder-no-project')
+			};
+
+			const setLoadingState = (loading) => {
+				elements.loading.classList.toggle('d-none', !loading);
+				elements.container.classList.toggle('d-none', loading);
+				elements.empty.classList.add('d-none');
+			};
+			const setEmptyState = (empty) => {
+				elements.empty.classList.toggle('d-none', !empty);
+				elements.container.classList.toggle('d-none', empty);
+				elements.loading.classList.add('d-none');
+			};
+			const showNoProject = (show) => elements.noProject.classList.toggle('d-none', !show);
+
+			const fetchFolders = async (projectId) => {
+				if (!projectId) return [];
+				try {
+					const res = await fetch(`/api/folders/tree/structure?projectId=${projectId}`, { credentials: 'include' });
+					const data = await res.json();
+					return data.success ? data.tree || [] : [];
+				} catch (err) {
+					console.error("Error fetching folders:", err);
+					return [];
+				}
+			};
+
+			const getSubfolders = (folders, id) => {
+				if (!id) return folders;
+				const find = (list) => {
+					for (const f of list) {
+						if (f._id === id) return f.children || [];
+						if (f.children?.length) {
+							const res = find(f.children);
+							if (res) return res;
+						}
+					}
+					return [];
+				};
+				return find(folders);
+			};
+
+			const loadFolders = async (parentId = null, parentPath = [], projectId = null) => {
+				projectId = projectId || window.selectedProjectId;
+				if (!projectId) { showNoProject(true); return; }
+
+				showNoProject(false);
+				setLoadingState(true);
+
+				try {
+					const allFolders = await fetchFolders(projectId);
+					setLoadingState(false);
+
+					const subfolders = getSubfolders(allFolders, parentId);
+					if (!subfolders.length) { setEmptyState(true); return; }
+					setEmptyState(false);
+					elements.container.innerHTML = '';
+
+					subfolders.forEach(f => {
+						const div = document.createElement('div');
+						div.className = "col-6 col-md-4 col-lg-2 text-center p-2 bg-white rounded shadow-sm cursor-pointer";
+						div.dataset.id = f._id;
+						div.innerHTML = `
+                <img src="/img/icons/folder.png" class="mb-1" style="width:50px">
+                <p class="mb-0 small">${f.name}</p>
+            `;
+						div.addEventListener('dblclick', () => loadFolders(f._id, [...parentPath, { id: f._id, name: f.name }], projectId));
+						elements.container.appendChild(div);
+					});
+
+					folderState.currentFolderId = parentId;
+					folderState.selectedFolders = parentPath;
+				} catch (err) { console.error(err); setLoadingState(false); }
+			};
+
+			// ---------------- UPLOAD BOX ----------------
 			const uploadBox = document.getElementById("uploadBox");
 			const fileInput = document.getElementById("fileInput");
 			const fileList = document.getElementById("fileList");
+			const totalProgressBar = document.getElementById("totalProgressBar");
 
-			// Open file dialog on click
+			let totalBytes = 0;
+			let uploadedBytes = 0;
+
+			// Open file dialog
 			uploadBox.addEventListener("click", () => fileInput.click());
-
-			// Handle file selection
-			fileInput.addEventListener("change", () => handleFiles(fileInput.files));
-
-			// Drag and drop events
-			uploadBox.addEventListener("dragover", (e) => {
-				e.preventDefault();
-				uploadBox.classList.add("dragover");
-			});
-
-			uploadBox.addEventListener("dragleave", () => {
-				uploadBox.classList.remove("dragover");
-			});
-
+			uploadBox.addEventListener("dragover", (e) => { e.preventDefault(); uploadBox.classList.add("dragover"); });
+			uploadBox.addEventListener("dragleave", () => uploadBox.classList.remove("dragover"));
 			uploadBox.addEventListener("drop", (e) => {
 				e.preventDefault();
 				uploadBox.classList.remove("dragover");
 				handleFiles(e.dataTransfer.files);
 			});
+			fileInput.addEventListener("change", () => {
+				handleFiles(fileInput.files);
+				fileInput.value = ""; // allow reselecting same file
+			});
 
-			// Handle uploaded files
+			// ---------------- HANDLE FILES ----------------
 			function handleFiles(files) {
-				[...files].forEach((file) => {
-					const fileId = Date.now() + Math.random(); // unique id
-					const fileItem = document.createElement("div");
-					fileItem.classList.add("file-item");
-					fileItem.classList.add("col-sm-5");
-					fileItem.setAttribute("data-id", fileId);
+				const folderId = folderState.currentFolderId;
+				if (!folderId) {
+					alert("Please select a folder first.");
+					return;
+				}
 
-					// Choose icon based on type
+				[...files].forEach((file) => {
+					const fileId = Date.now() + Math.random();
+					totalBytes += file.size;
+
+					const fileItem = document.createElement("div");
+					fileItem.classList.add("file-item", "col-sm-5", "mb-2");
+					fileItem.dataset.id = fileId;
+
 					let iconClass = "fa-folder";
 					if (file.type.includes("word")) iconClass = "fa-file-word text-primary";
 					else if (file.type.includes("pdf")) iconClass = "fa-file-pdf text-danger";
@@ -95,40 +196,100 @@
 					else if (file.type.includes("sheet") || file.name.endsWith(".xls") || file.name.endsWith(".xlsx")) iconClass = "fa-file-excel text-success";
 
 					fileItem.innerHTML = `
-	        <div class="file-info">
-	          <i class="fa-solid ${iconClass} fa-2x"></i>
-	          <div>
-	            <h6 class="mb-0">${file.name}</h6>
-	            <small class="text-muted">${(file.size / 1024 / 1024).toFixed(2)} MB</small>
-	          </div>
-	        </div>
-	        <div class="file-progress">
-	          <div class="progress">
-	            <div class="progress-bar bg-success" role="progressbar" style="width: 0%">0%</div>
-	          </div>
-	        </div>
-	        <button class="remove-btn"><i class="fa-solid fa-xmark"></i></button>
-      `;
-
+            <div class="file-info d-flex align-items-center gap-2">
+                <i class="fa-solid ${iconClass} fa-2x"></i>
+                <div>
+                    <h6 class="mb-0">${file.name}</h6>
+                    <small class="text-muted">${(file.size / 1024 / 1024).toFixed(2)} MB</small>
+                </div>
+            </div>
+            <div class="file-progress mt-1">
+                <div class="progress">
+                    <div class="progress-bar bg-success" role="progressbar" style="width: 0%">0%</div>
+                </div>
+            </div>
+            <button class="remove-btn btn btn-sm btn-outline-danger mt-1"><i class="fa-solid fa-xmark"></i></button>
+        `;
 					fileList.appendChild(fileItem);
 
-					// Fake progress animation
-					let progress = 0;
-					const interval = setInterval(() => {
-						if (progress >= 100) {
-							clearInterval(interval);
-						} else {
-							progress += 10;
-							const progressBar = fileItem.querySelector(".progress-bar");
-							progressBar.style.width = progress + "%";
-							progressBar.textContent = progress + "%";
-						}
-					}, 200);
+					const progressBar = fileItem.querySelector(".progress-bar");
 
 					// Remove file
-					fileItem.querySelector(".remove-btn").addEventListener("click", () => {
+					fileItem.querySelector(".remove-btn").addEventListener("click", async () => {
+						const serverFileId = fileItem.dataset.fileId;
+						if (serverFileId) {
+							try {
+								const res = await fetch(`/files/${serverFileId}`, { method: "DELETE" });
+								const data = await res.json();
+								if (!data.success) alert("Failed to delete file: " + data.message);
+							} catch (err) {
+								console.error(err);
+								alert("Error deleting file from server.");
+							}
+						}
+						uploadedBytes += file.size; // remove from total bytes
+						updateTotalProgress();
 						fileItem.remove();
 					});
+
+					// Upload immediately
+					const formData = new FormData();
+					formData.append("file", file);
+
+					const xhr = new XMLHttpRequest();
+					xhr.open("POST", `/files/upload/${folderId}`, true);
+
+					xhr.upload.onprogress = (e) => {
+						if (e.lengthComputable) {
+							const percent = Math.round((e.loaded / e.total) * 100);
+							progressBar.style.width = percent + "%";
+							progressBar.textContent = percent + "%";
+
+							updateTotalProgress(uploadedBytes + e.loaded);
+						}
+					};
+
+					xhr.onload = () => {
+						if (xhr.status === 200) {
+							const response = JSON.parse(xhr.responseText);
+							progressBar.classList.add("bg-success");
+							progressBar.textContent = "Uploaded";
+
+							if (response.fileId) fileItem.dataset.fileId = response.fileId;
+
+							uploadedBytes += file.size;
+							updateTotalProgress();
+						} else {
+							progressBar.classList.add("bg-danger");
+							progressBar.textContent = "Failed";
+						}
+					};
+
+					xhr.onerror = () => {
+						progressBar.classList.add("bg-danger");
+						progressBar.textContent = "Error";
+						uploadedBytes += file.size;
+						updateTotalProgress();
+					};
+
+					xhr.send(formData);
 				});
 			}
+
+			// ---------------- TOTAL PROGRESS ----------------
+			function updateTotalProgress(currentUploaded = uploadedBytes) {
+				const percent = totalBytes > 0 ? Math.round((currentUploaded / totalBytes) * 100) : 0;
+				totalProgressBar.style.width = percent + "%";
+				totalProgressBar.textContent = percent + "%";
+			}
+
+			// ---------------- INITIAL LOAD ----------------
+			document.addEventListener("DOMContentLoaded", () => {
+				if (window.selectedProjectId) loadFolders();
+				else showNoProject(true);
+			});
+
+			document.addEventListener("projectChanged", () => {
+				if (window.selectedProjectId) loadFolders();
+			});
 		</script>

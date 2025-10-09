@@ -9,7 +9,10 @@
     "start": "node server.js",
     "dev": "nodemon server.js",
     "build": "webpack --mode production",
-    "lint": "eslint src --fix"
+    "lint": "eslint src --fix",
+    "migrate:up": "migrate-mongo up",
+    "migrate:down": "migrate-mongo down",
+    "migrate:create": "migrate-mongo create"
   },
   "keywords": [],
   "author": "",

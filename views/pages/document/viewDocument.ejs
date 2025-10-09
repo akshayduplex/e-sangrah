@@ -14,12 +14,11 @@
                 <div class="card-body">
 
                     <!-- Expired/Used Message -->
-                    <% if (expiredMessage) { %>
+                    <% if (typeof expiredMessage !=='undefined' && expiredMessage) { %>
                         <div class="alert alert-warning">
                             <%= expiredMessage %>
                         </div>
                         <% } %>
-
                             <!-- Renew Button -->
                             <% if (canRenew) { %>
                                 <div class="mb-3">

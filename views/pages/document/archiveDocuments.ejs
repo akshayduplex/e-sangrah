@@ -48,21 +48,19 @@
                     <div class="card flex-fill">
                         <div class="card-body p-0">
                             <div class="custom-datatable-filter table-responsive">
-                                <table class="table datatable" id="archived_folders_table">
+                                <table class="table datatable" id="archived_documents_table">
                                     <thead>
                                         <tr>
                                             <th></th>
-                                            <th>Folder Name</th>
-                                            <th>Owner Name</th>
-                                            <th>Owner Email</th>
+                                            <th>File Name</th>
+                                            <th>Created on</th>
                                             <th>Department</th>
-                                            <th>Project</th>
-                                            <th>Status</th>
-                                            <th>Created By</th>
-                                            <th>Last Modified By</th>
+                                            <th>Deleted on</th>
+                                            <th>Tags</th>
+                                            <th>Meta data</th>
                                         </tr>
                                     </thead>
-                                    <tbody id="archived_folders_table_body"></tbody>
+                                    <tbody id="archived_documents_table_body"></tbody>
                                 </table>
                             </div>
                         </div>
@@ -89,58 +87,92 @@
         <!-- Archived Folders Logic -->
         <script>
             $(document).ready(function () {
-                const $table = $('#archived_folders_table');
+                const fileIcons = {
+                    ppt: "/img/icons/fn1.png",
+                    pptx: "/img/icons/fn1.png",
+                    doc: "/img/icons/fn2.png",
+                    docx: "/img/icons/fn2.png",
+                    xls: "/img/icons/fn3.png",
+                    xlsx: "/img/icons/fn3.png",
+                    pdf: "/img/icons/fn4.png",
+                    default: "/img/icons/fn1.png"
+                };
 
-                // Initialize DataTable
+                const $table = $('#archived_documents_table');
+
                 const dataTable = $table.DataTable({
                     processing: true,
                     serverSide: true,
                     ajax: {
-                        url: `${baseUrl}/api/folders/archived`,
+                        url: `${baseUrl}/api/documents/archive`,
                         type: "GET",
+                        data: function (d) {
+                            d.page = (d.start / d.length) + 1;
+                            d.limit = d.length;
+                        },
                         dataSrc: function (res) {
                             if (!res.success) return [];
-                            // Populate department dropdown dynamically
-                            const departments = new Set();
-                            res.folders.forEach(f => {
-                                if (f.departmentId?.name) departments.add(f.departmentId.name);
-                            });
-                            $('#departmentFilter').append([...departments].map(d => `<li><a href="javascript:void(0);" class="dropdown-item rounded-1" data-dept="${d}">${d}</a></li>`));
+                            return res.data.map(doc => {
+                                const filesInfo = doc.files?.[0]
+                                    ? (() => {
+                                        const file = doc.files[0];
+                                        const ext = file.originalName.split('.').pop().toLowerCase();
+                                        const fileSizeKB = (file.fileSize / 1024).toFixed(2) + ' KB';
+                                        return `
+                                    <div class="d-flex align-items-center">
+                                        <span class="avatar rounded bg-light me-2">
+                                            <img src="${fileIcons[ext] || fileIcons.default}" style="height:30px;">
+                                        </span>
+                                        <div>
+                                            <p class="mb-0 text-dark">${file.originalName}</p>
+                                            <small class="text-muted">${fileSizeKB}</small>
+                                        </div>
+                                    </div>
+                                `;
+                                    })()
+                                    : '-';
 
-                            return res.folders.map(folder => ({
-                                id: folder._id,
-                                actions: `
-						<div class="action-icon d-inline-flex">
-							<a href="#" class="restore-folder me-2" data-folder-id="${folder._id}" data-bs-toggle="modal" data-bs-target="#restore-folder-modal">
-								<i class="ti ti-restore"></i>
-							</a>
-							<a href="#" class="trash-folder" data-folder-id="${folder._id}" data-bs-toggle="modal" data-bs-target="#trashdocfile-modal">
-								<i class="ti ti-trash"></i>
-							</a>
-						</div>`,
-                                name: folder.name || "-",
-                                ownerName: folder.owner?.name || "-",
-                                ownerEmail: folder.owner?.email || "-",
-                                department: folder.departmentId?.name || "-",
-                                project: folder.projectId?.projectName || "-",
-                                status: folder.status || "-",
-                                createdBy: folder.createdBy?.name || "-",
-                                updatedBy: folder.updatedBy?.name || "-"
-                            }));
+                                return {
+                                    actions: `
+                                <div class="action-icon d-inline-flex">
+                                    <a href="#" class="restore-folder me-2" data-folder-id="${doc._id}" data-bs-toggle="modal" data-bs-target="#restore-modal">
+                                        <i class="ti ti-restore"></i>
+                                    </a>
+                                    <a href="#" class="trash-folder" data-folder-id="${doc._id}" data-bs-toggle="modal" data-bs-target="#trashdocfile-modal">
+                                        <i class="ti ti-trash"></i>
+                                    </a>
+                                </div>`,
+                                    fileName: filesInfo,
+                                    createdAt: new Date(doc.createdAt).toLocaleDateString(),
+                                    department: doc.department?.name || "-",
+                                    deletedOn: new Date(doc.updatedAt || doc.createdAt).toLocaleDateString(),
+                                    tags: doc.tags.join(", "),
+                                    metaData: `
+                                <strong>Description:</strong> ${doc.metadata.fileDescription}<br>
+                                <strong>Heading:</strong> ${doc.metadata.mainHeading}
+                            `,
+                                };
+                            });
                         }
                     },
                     columns: [
                         { data: 'actions', orderable: false, searchable: false },
-                        { data: 'name' },
-                        { data: 'ownerName' },
-                        { data: 'ownerEmail' },
+                        { data: 'fileName' },
+                        { data: 'createdAt' },
                         { data: 'department' },
-                        { data: 'project' },
-                        { data: 'status' },
-                        { data: 'createdBy' },
-                        { data: 'updatedBy' }
+                        { data: 'deletedOn' },
+                        { data: 'tags' },
+                        { data: 'metaData' }
                     ],
-                    order: [[1, 'asc']],
+                    columnDefs: [
+                        {
+                            targets: 6, // files column
+                            render: function (data) {
+                                return data; // DataTables will render HTML
+                            }
+                        }
+                    ],
+                    order: [[1, 'desc']],
                     paging: true,
                     searching: true,
                     ordering: true,
@@ -152,9 +184,9 @@
                 $(document).on('click', '#departmentFilter a', function () {
                     const dept = $(this).data('dept');
                     if (dept === 'all') {
-                        dataTable.column(4).search('').draw();
+                        dataTable.column(3).search('').draw(); // department column index
                     } else {
-                        dataTable.column(4).search(dept).draw();
+                        dataTable.column(3).search(dept).draw();
                     }
                 });
 
@@ -175,18 +207,35 @@
                     });
                 });
 
-                // Restore Folder
+                // Restore File
+                // Restore File / Folder using existing #restore-modal
                 $(document).on('click', '.restore-folder', function (e) {
                     e.preventDefault();
+
                     const folderId = $(this).data('folder-id');
-                    $('#confirm-restore-folder').off('click').on('click', function () {
+                    const $row = $(this).closest('tr');
+
+                    // Get the full HTML of the filesInfo column
+                    const filesInfoHTML = $row.find('td:eq(1)').html() || '-';
+
+                    // Inject full filesInfo into modal body
+                    $('#restore-modal .modal-body').html(filesInfoHTML);
+
+                    // Handle restore action
+                    $('#restore-modal .btn-primary').off('click').on('click', function () {
                         $.ajax({
                             url: `${baseUrl}/api/folders/${folderId}/restore`,
                             type: 'PATCH',
                             success: function (res) {
                                 if (res.success) {
-                                    dataTable.ajax.reload();
+                                    $('#restore-modal').modal('hide'); // Close modal
+                                    $('#archived_documents_table').DataTable().ajax.reload(); // Refresh table
+                                } else {
+                                    showToast('Failed to restore file.', 'success');
                                 }
+                            },
+                            error: function () {
+                                showToast('Something went wrong!', 'error');
                             }
                         });
                     });

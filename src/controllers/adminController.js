@@ -1,5 +1,7 @@
 import mongoose from "mongoose";
 import Document from "../models/Document.js";
+import logger from "../utils/logger.js";
+import Designation from "../models/Designation.js";
 
 //Page controllers
 
@@ -37,6 +39,24 @@ export const showApprovalTrackPage = async (req, res) => {
     }
 };
 
+export const showRecycleBinPage = async (req, res) => {
+    try {
+        const designations = await Designation.find({ status: "Active" })
+            .sort({ name: 1 })
+            .lean();
+
+        res.render("pages/admin/adminRecycleBin", {
+            user: req.user,
+            designations
+        });
+    } catch (err) {
+        logger.error("Admin render error:", err);
+        res.status(500).render("pages/error", {
+            user: req.user,
+            message: "Unable to load dashboard"
+        });
+    }
+};
 
 //API Controllers
 

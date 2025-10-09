@@ -80,12 +80,13 @@
             window.selectedProjectId = val || null;
 
             const addBtn = document.getElementById("btnAddFolder");
+
             if (val) {
-                addBtn.classList.remove("disabled");
+                if (addBtn) addBtn.classList.remove("disabled"); // safely check
                 loadFolders(null, [], val); // load folders for the new project
             } else {
-                addBtn.classList.add("disabled");
-                elements.container.innerHTML = "";
+                if (addBtn) addBtn.classList.add("disabled"); // safely check
+                if (elements?.container) elements.container.innerHTML = "";
                 setEmptyState(false);
                 showNoProject(true); // show "please select project"
             }
@@ -102,6 +103,5 @@
                 showToast("Failed to save project in session: " + err, "error");
             }
         });
-
     });
 })(jQuery);

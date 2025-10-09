@@ -124,12 +124,14 @@ router.get("/departments/:id", authenticate, checkPermissions, DepartmentControl
    ========================================= */
 router.get("/admin/approval", authenticate, checkPermissions, AdminController.showAdminApprovalPage);
 router.get("/document/:id/admin/approval/track", authenticate, checkPermissions, AdminController.showApprovalTrackPage);
+router.get("/documents/admin/recyclebin", authenticate, checkPermissions, AdminController.showRecycleBinPage);
 
 /* =========================================
    EMPLOYEE ROUTE
    ========================================= */
 router.get("/employee/approval", authenticate, checkPermissions, EmployeeController.showEmployeeApprovalPage);
 // router.get("/employee/track", authenticate, checkPermissions, EmployeeController.showEmployeeApprovalPage);
+router.get("/documents/employee/recyclebin", authenticate, checkPermissions, EmployeeController.showEmployeeRecycleBinPage);
 //Approvals
 // Render approval page
 router.get('/document/:id/approval/track', authenticate, DocumentController.getDocumentApprovalsPage);
@@ -163,6 +165,8 @@ router.get("/documents/list", authenticate, checkPermissions, DocumentController
 
 // View Document page
 router.get("/documents/:id/versions/view", authenticate, checkPermissions, DocumentController.showViewDocumentPage);
+router.get("/documents/archived", authenticate, checkPermissions, DocumentController.showArchivedDocumentPage);
+
 
 // Add Document page
 router.get("/documents/add", authenticate, checkPermissions, DocumentController.showAddDocumentPage);

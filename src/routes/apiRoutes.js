@@ -126,13 +126,15 @@ router.get("/approval-requests", EmployeeController.getApprovalRequests);
 // ---------------------------
 router.get("/documents", DocumentController.getDocuments);
 router.get("/documents/search", DocumentController.searchDocuments);
-router.get("/documents/recyclebin", DocumentController.recycleBinDocuments);
+router.get("/documents/recyclebin", DocumentController.getRecycleBinDocuments);
+router.patch("/documents/:id/archive", DocumentController.archiveDocuments);
+router.get("/documents/archive", DocumentController.getArchivedDocuments);
 router.delete("/documents/permanent", DocumentController.deleteDocument);
 router.patch("/documents/:id/restore", DocumentController.restoreDocument);
 router.get("/documents/folder/:folderId", authenticate, DocumentController.getDocumentsByFolder);
 // Only accept signature file
 router.post("/documents", upload.fields([{ name: "signatureFile", maxCount: 1 }]), DocumentController.createDocument);
-router.get("/documents/:id", DocumentController.getDocument);
+// router.get("/documents/:id", DocumentController.getDocument);
 router.patch("/documents/:id", upload.fields([{ name: "signature", maxCount: 1 }]), DocumentController.updateDocument);
 // Soft delete (recycle bin)
 router.delete("/documents/:id", DocumentController.softDeleteDocument);

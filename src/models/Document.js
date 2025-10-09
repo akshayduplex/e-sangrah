@@ -13,6 +13,10 @@ const documentSchema = new mongoose.Schema({
     tags: [{ type: String, lowercase: true, trim: true }],
     isDeleted: { type: Boolean, default: false },
     deletedAt: { type: Date, default: null },
+    isArchived: {
+        type: Boolean,
+        default: false
+    },
     metadata: {
         fileName: { type: String, trim: true },
         fileDescription: { type: String, trim: true },

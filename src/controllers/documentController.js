@@ -59,20 +59,6 @@ export const showAddDocumentPage = async (req, res) => {
         res.status(500).send("Server Error");
     }
 };
-
-// View Document page
-export const showViewDocumentPage = async (req, res) => {
-    try {
-        res.render("pages/document/viewDocument", {
-            title: "E-Sangrah - View-Document",
-            user: req.user,
-            documentId: req.params.id
-        });
-    } catch (err) {
-        logger.error("Error loading add-document page:", err);
-        res.status(500).send("Server Error");
-    }
-};
 // Edit Document page
 export const showEditDocumentPage = async (req, res) => {
     try {
@@ -85,12 +71,15 @@ export const showEditDocumentPage = async (req, res) => {
             });
         }
 
-        const document = await Document.findById(id)
-            .populate("department", "name _id")
-            .populate("project", "projectName _id")
-            .populate("projectManager", "name _id")
-            .populate("owner", "name _id")
-            .populate("files")
+        // In your controller
+        const document = await Document.findById(req.params.id)
+            .populate('project')
+            .populate('department')
+            .populate('projectManager')
+            .populate('documentDonor')
+            .populate('documentVendor')
+            .populate('folderId')
+            .populate('files')
             .lean();
 
         if (!document) {
@@ -112,6 +101,32 @@ export const showEditDocumentPage = async (req, res) => {
             title: "Error",
             message: "Unable to load edit document page",
         });
+    }
+};
+// View Document page
+export const showViewDocumentPage = async (req, res) => {
+    try {
+        res.render("pages/document/viewDocument", {
+            title: "E-Sangrah - View-Document",
+            user: req.user,
+            documentId: req.params.id
+        });
+    } catch (err) {
+        logger.error("Error loading add-document page:", err);
+        res.status(500).send("Server Error");
+    }
+};
+
+// Archived Document page
+export const showArchivedDocumentPage = async (req, res) => {
+    try {
+        res.render("pages/document/archiveDocuments", {
+            title: "E-Sangrah - Archive-Document",
+            user: req.user,
+        });
+    } catch (err) {
+        logger.error("Error loading add-document page:", err);
+        res.status(500).send("Server Error");
     }
 };
 
@@ -276,7 +291,7 @@ export const getDocuments = async (req, res) => {
             orderDir
         } = req.query;
 
-        const filter = { isDeleted: false };
+        const filter = { isDeleted: false, isArchived: false };
         // Helper to convert query param to array safely
         const toArray = val => {
             if (!val) return [];
@@ -353,13 +368,14 @@ export const getDocuments = async (req, res) => {
         const skip = (pageNum - 1) * limitNum;
 
         const documents = await Document.find(filter)
+            .select("files updatedAt createdAt signature isDeleted isArchived comment sharedWithUsers compliance metadata tags owner documentVendor documentDonor department project description")
             .populate("department", "name")
             .populate("project", "projectName")
             .populate("owner", "name email")
             .populate("documentDonor", "name")
             .populate("documentVendor", "name")
             .populate("sharedWithUsers", "name")
-            .populate("files")
+            .populate("files", "originalName version fileSize")
             .sort({ [sortField]: sortOrder })
             .skip(skip)
             .limit(limitNum)
@@ -446,6 +462,7 @@ export const getDocument = async (req, res) => {
         }
 
         const document = await Document.findById(id)
+            .select("")
             .populate("department", "name")
             .populate("project", "name")
             .populate("owner", "name email")
@@ -466,71 +483,138 @@ export const getDocument = async (req, res) => {
     }
 };
 
-export const recycleBinDocuments = async (req, res) => {
-    const start = Number(req.query.start) || 0;
-    const length = Number(req.query.length) || 10;
-    const search = req.query.search?.value || "";
-
+/**
+ * Get all documents in Recycle Bin
+ * @route GET /api/documents/recycle-bin
+ * @query page, limit, search (optional), department (optional)
+ */
+export const getRecycleBinDocuments = async (req, res) => {
     try {
-        const query = { isDeleted: true };
+        // Parse pagination params
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const skip = (page - 1) * limit;
+
+        // Search and filter
+        const search = req.query.search ? req.query.search.trim() : "";
+        const department = req.query.department || "";
+
+        const query = {
+            isDeleted: false,
+            isArchived: true
+        };
 
         if (search) {
-            query["files.originalName"] = { $regex: search, $options: "i" };
+            query.$or = [
+                { "metadata.fileName": { $regex: search, $options: "i" } },
+                { tags: { $regex: search, $options: "i" } },
+                { description: { $regex: search, $options: "i" } }
+            ];
         }
 
-        const totalRecords = await Document.countDocuments(query);
+        if (department) {
+            query.department = department;
+        }
 
-        const documents = await Document.find(query)
-            .skip(start)
-            .limit(length)
-            .populate("department", "name")
-            .populate("files", "originalName fileSize");
+        // Fetch documents and total count in parallel
+        const [documents, total] = await Promise.all([
+            Document.find(query)
+                .select(" files tags createdAt deletedAt department metadata")
+                .populate("department", "name")
+                .populate("files", "originalName version fileSize")
+                .populate("owner", "name email")
+                .sort({ deletedAt: -1 })
+                .skip(skip)
+                .limit(limit),
+            Document.countDocuments(query)
+        ]);
 
-        // Build DataTables row per document (not per file)
-        const data = documents.map(doc => {
-            // Concatenate all file names and sizes for display
-            const filesHtml = doc.files.map(file => `
-                <div class="flxtblleft mb-1">
-                    <span class="avatar rounded bg-light mb-2">
-                        <img src="assets/img/icons/fn1.png">
-                    </span>
-                    <div class="flxtbltxt">
-                        <p class="fs-14 mb-1 fw-normal text-neutral">${file.originalName}</p>
-                        <span class="fs-11 fw-light text-black">${file.fileSize} KB</span>
-                    </div>
-                </div>
-            `).join("");
-
-            return [
-                `<div class="form-check form-check-md">
-                    <input class="form-check-input" type="checkbox" data-document-id="${doc._id}">
-                </div>`,
-                filesHtml,
-                `<p class="tbl_date">${new Date(doc.createdAt).toLocaleDateString()} &nbsp;&nbsp; ${new Date(doc.createdAt).toLocaleTimeString()}</p>`,
-                `<p>${doc.department?.name || '-'}</p>`,
-                `<p class="tbl_date">${new Date(doc.deletedAt).toLocaleDateString()} &nbsp;&nbsp; ${new Date(doc.deletedAt).toLocaleTimeString()}</p>`,
-                `<div class="action-icon d-inline-flex">
-                    <a href="#" data-bs-toggle="modal" data-bs-target="#restore-modal" class="me-2">
-                        <i class="ti ti-restore"></i>
-                    </a>
-                    <a href="#" class="delete-permanent-btn"
-                       data-document-id="${doc._id}"
-                       data-document-name="Document">
-                        <i class="ti ti-trash"></i>
-                    </a>
-                </div>`
-            ];
-        });
-
-        res.json({
-            draw: Number(req.query.draw),
-            recordsTotal: totalRecords,
-            recordsFiltered: totalRecords,
-            data
+        return res.json({
+            success: true,
+            message: "Recycle bin documents fetched successfully",
+            data: documents,
+            total,
+            page,
+            limit
         });
     } catch (err) {
-        console.error("Recycle bin fetch error:", err);
-        res.status(500).json({ error: "Failed to fetch deleted documents" });
+        console.error("Get recycle bin documents error:", err);
+        return res.status(500).json({ success: false, message: "Failed to fetch documents", error: err.message });
+    }
+};
+
+/**
+ * Archive or unarchive a document
+ * @route PATCH /api/documents/:id/archive?isArchived=true|false
+ */
+export const archiveDocuments = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { isArchived } = req.query;
+
+        if (typeof isArchived === "undefined") {
+            return failResponse(res, "Missing query parameter: isArchived", 400);
+        }
+
+        // Convert isArchived to boolean
+        const archiveStatus = isArchived === "true";
+
+        // Find and update document
+        const updatedDoc = await Document.findByIdAndUpdate(
+            id,
+            { isArchived: archiveStatus },
+            { new: true }
+        );
+
+        if (!updatedDoc) {
+            return failResponse(res, "Document not found", 404);
+        }
+
+        return successResponse(
+            res,
+            updatedDoc,
+            archiveStatus
+                ? "Document archived successfully"
+                : "Document unarchived successfully"
+        );
+    } catch (err) {
+        console.error("Archive document error:", err);
+        return errorResponse(res, err, "Failed to archive/unarchive document");
+    }
+};
+
+/**
+ * Get archived or unarchived documents
+ * @route GET /api/documents/archive?isArchived=true|false
+ */
+export const getArchivedDocuments = async (req, res) => {
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const skip = (page - 1) * limit;
+
+        const [documents, total] = await Promise.all([
+            Document.find({ isArchived: true, isDeleted: false })
+                .select("files metadata tags createdAt department")
+                .populate("department", "name")
+                .populate("files", "originalName version isPrimary fileSize")
+                .sort({ updatedAt: -1 })
+                .skip(skip)
+                .limit(limit),
+            Document.countDocuments({ isArchived: true, isDeleted: false })
+        ]);
+
+        return res.json({
+            success: true,
+            message: "Archive documents fetched successfully",
+            data: documents,
+            total,
+            page,
+            limit
+        });
+    } catch (err) {
+        console.error("Get archived documents error:", err);
+        return res.status(500).json({ success: false, message: "Failed to fetch documents", error: err.message });
     }
 };
 
@@ -1663,13 +1747,7 @@ export const getSharedUsers = async (req, res) => {
             name: sw.user.name,
             email: sw.user.email,
             accessLevel: sw.accessLevel,
-            duration: sw.duration,
-            generalAccess: sw.generalAccess,
-            generalRole: sw.generalRole,
-            expiresAt: sw.expiresAt,
             canDownload: sw.canDownload,
-            inviteStatus: sw.inviteStatus,
-            sharedAt: sw.sharedAt
         }));
 
         return res.json({ success: true, data });

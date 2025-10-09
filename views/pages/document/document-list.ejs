@@ -158,11 +158,14 @@
         <!-- <link href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" rel="stylesheet"> -->
         <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
         <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+        <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 
         <script>
             (function ($) {
                 "use strict";
                 let currentDocId = null;
+                let customFlatpickr = null;
                 let isModalInitializing = false;
                 const baseUrl = window.location.origin;
                 const fileIcons = {
@@ -356,6 +359,7 @@
                     <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#versionhistory-modal"><i class="ti ti-history"></i> Version History</a></li>
                     <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#downloaddoc-modal"><i class="ti ti-download"></i> Download</a></li>
                     <li><a class="dropdown-item btn-delete" href="#" data-id="${doc._id}" data-bs-toggle="modal" data-bs-target="#trashdoc-modal"><i class="ti ti-trash"></i> Move to Trash</a></li>
+                    <li><a class="dropdown-item archive-document" href="#"  data-id="${doc._id}" data-bs-toggle="modal" data-bs-target="#archivedoc-modal"><i class="ti ti-archive"></i> Move to Archive</a></li>
                 </ul>
             </div>
         `;
@@ -438,6 +442,45 @@
                         });
                     });
                 });
+
+                // -------------------------
+                // Archive Document
+                // -------------------------
+                $(document).on('click', '.archive-document', function (e) {
+                    e.preventDefault();
+
+                    const docId = $(this).data('id');
+                    const docName = $(this).closest('tr').find('td:nth-child(2) p').text().trim() || 'this document';
+                    const isArchived = true;
+
+                    // Update modal text before showing
+                    $('#archivedoc-modal .modal-body').text(`Are you sure you want to archive ${docName}?`);
+                    $('#archivedoc-modal .modal-title').html(`<img src="/img/icons/archvbin.png"> <br>Move to Archive`);
+
+                    // Show modal
+                    $('#archivedoc-modal').modal('show');
+
+                    // Confirm action on "Yes, Move"
+                    $('#archivedoc-modal .btn-primary').off('click').on('click', function () {
+                        $.ajax({
+                            url: `${baseUrl}/api/documents/${docId}/archive?isArchived=${isArchived}`,
+                            type: 'PATCH',
+                            success: function (response) {
+                                $('#archivedoc-modal').modal('hide');
+                                table.ajax.reload(null, false); // ✅ keeps pagination intact
+                                showToast(response.message || 'Document moved to archive successfully!', 'success');
+                            },
+                            error: function (xhr) {
+                                let msg = 'Error moving document to archive.';
+                                if (xhr.responseJSON && xhr.responseJSON.message) {
+                                    msg = xhr.responseJSON.message;
+                                }
+                                showToast(msg, 'error');
+                            }
+                        });
+                    });
+                });
+
                 // -------------------------
                 // Share document modal
                 // -------------------------
@@ -454,13 +497,11 @@
                     modal.find('#customDateWrapper').hide();
                     modal.find('#startDate').val('');
                     modal.find('#endDate').val('');
-                    modal.find('#accessType').val('specific'); // Default to specific users
-                    modal.find('#roleType').val('viewer');
-                    modal.find('#infoText').text('Only people with access can view');
+                    // modal.find('#infoText').text('Only people with access can view');
 
                     // Clear previous dynamic rows
                     const container = modal.find('#usersWithAccessContainer');
-                    container.empty();
+                    container.empty()
 
                     if (!currentDocId || !fileId) return;
 
@@ -469,6 +510,8 @@
                         url: `${baseUrl}/api/documents/${currentDocId}/${fileId}/share-link`,
                         method: 'GET',
                         success: function (res) {
+                            modal.find('#accessType').val('anyone'); // Default to specific users
+                            modal.find('#roleType').val('viewer');
                             if (res.success && res.link) modal.find('#sharelink').val(res.link);
                         }
                     });
@@ -520,9 +563,18 @@
 
 
                 // Time duration radio buttons
+                // Initialize Flatpickr when "Custom" is selected
                 $('#sharedoc-modal input[name="time"]').on('change', function () {
                     if ($(this).attr('id') === 'custom') {
                         $('#customDateWrapper').show();
+
+                        if (!customFlatpickr) {
+                            customFlatpickr = flatpickr("#flatpickr-range", {
+                                mode: "range",
+                                dateFormat: "Y-m-d"
+                            });
+                        }
+
                     } else {
                         $('#customDateWrapper').hide();
                     }
@@ -565,7 +617,15 @@
                     const userEmail = $('#userInviteSelect').val();
                     const accessLevel = $('#accessLevelSelect').val();
                     const duration = $('input[name="time"]:checked').attr('id');
-                    const customEnd = $('#endDate').val();
+
+                    let customStart = null;
+                    let customEnd = null;
+
+                    // Read dates from Flatpickr range if "Custom" is selected
+                    if (duration === 'custom' && customFlatpickr?.selectedDates.length === 2) {
+                        customStart = customFlatpickr.selectedDates[0].toISOString();
+                        customEnd = customFlatpickr.selectedDates[1].toISOString();
+                    }
 
                     if (!currentDocId) {
                         showToast('No document selected', 'info');
@@ -585,8 +645,8 @@
                         return;
                     }
 
-                    if (duration === 'custom' && !customEnd) {
-                        showToast('Please select an end date for custom duration', 'info');
+                    if (duration === 'custom' && (!customStart || !customEnd)) {
+                        showToast('Please select a start and end date for custom duration', 'info');
                         resetBtn();
                         return;
                     }
@@ -598,6 +658,7 @@
                     };
 
                     if (duration === 'custom') {
+                        inviteData.customStart = customStart;
                         inviteData.customEnd = customEnd;
                     }
 
@@ -623,8 +684,7 @@
                     function resetBtn() {
                         $btn.prop('disabled', false).removeClass('btn-light').addClass('btn-primary');
                     }
-                });
-                // Remove user access using custom confirmation modal
+                });                // Remove user access using custom confirmation modal
                 $('#sharedoc-modal').on('click', '.remove-user', function () {
                     const userId = $(this).data('user-id');
                     const userRow = $(this).closest('.user-accssrow');

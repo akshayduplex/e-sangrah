@@ -18,7 +18,19 @@ export const showEmployeeApprovalPage = (req, res) => {
     }
 };
 
-
+export const showEmployeeRecycleBinPage = async (req, res) => {
+    try {
+        res.render("pages/employee/employeeRecycleBin", {
+            user: req.user
+        });
+    } catch (err) {
+        logger.error("Admin render error:", err);
+        res.status(500).render("pages/error", {
+            user: req.user,
+            message: "Unable to load dashboard"
+        });
+    }
+};
 //API Controllers
 
 /**
