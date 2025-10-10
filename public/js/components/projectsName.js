@@ -21,7 +21,7 @@
 
         $select.select2({
             placeholder: 'Select project',
-            allowClear: false,
+            allowClear: true,
             width: 'resolve',
             ajax: {
                 transport: async function (params, success, failure) {

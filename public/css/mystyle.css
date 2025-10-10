@@ -790,3 +790,146 @@
     .copy-btn {
         text-decoration: none;
     }
+
+    .folder-card.selected {
+        border: 2px solid #0d6efd;
+        background-color: #e7f1ff;
+    }
+
+    #breadcrumb a {
+        text-decoration: none;
+        color: #0d6efd;
+    }
+
+    #breadcrumb a.selected {
+        font-weight: bold;
+        text-decoration: underline;
+    }
+
+    /* Folder & File Cards */
+    .folder-card,
+    .file-card {
+        transition: transform 0.2s, box-shadow 0.2s;
+        cursor: pointer;
+    }
+
+    .folder-card:hover,
+    .file-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+    }
+
+    .file-card img,
+    .folder-card img {
+        border-radius: 6px;
+    }
+
+    .folder-footer {
+        font-size: 0.8rem;
+        color: #6c757d;
+    }
+
+    .cursor-pointer {
+        cursor: pointer;
+    }
+
+    /* Breadcrumb */
+    #breadcrumb a {
+        color: #0d6efd;
+        text-decoration: none;
+        font-weight: 500;
+    }
+
+    #breadcrumb a:hover {
+        text-decoration: underline;
+    }
+
+    /* Pending uploads */
+    .pending-item {
+        background: #f8f9fa;
+        padding: 10px;
+        border-radius: 6px;
+        margin-bottom: 5px;
+        transition: background 0.2s;
+    }
+
+    .pending-item:hover {
+        background: #e9ecef;
+    }
+
+    .progress-bar {
+        transition: width 0.3s ease;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+
+        .file-card span.text-truncate,
+        .folder-card h6.text-truncate {
+            max-width: 80px;
+        }
+    }
+
+    /* Folder & File Cards */
+    .folder-card,
+    .file-card {
+        transition: transform 0.2s, box-shadow 0.2s;
+        cursor: pointer;
+    }
+
+    .folder-card:hover,
+    .file-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+    }
+
+    .file-card img,
+    .folder-card img {
+        border-radius: 6px;
+    }
+
+    .folder-footer {
+        font-size: 0.8rem;
+        color: #6c757d;
+    }
+
+    .cursor-pointer {
+        cursor: pointer;
+    }
+
+    /* Breadcrumb */
+    #breadcrumb a {
+        color: #0d6efd;
+        text-decoration: none;
+        font-weight: 500;
+    }
+
+    #breadcrumb a:hover {
+        text-decoration: underline;
+    }
+
+    /* Pending uploads */
+    .pending-item {
+        background: #f8f9fa;
+        padding: 10px;
+        border-radius: 6px;
+        margin-bottom: 5px;
+        transition: background 0.2s;
+    }
+
+    .pending-item:hover {
+        background: #e9ecef;
+    }
+
+    .progress-bar {
+        transition: width 0.3s ease;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+
+        .file-card span.text-truncate,
+        .folder-card h6.text-truncate {
+            max-width: 80px;
+        }
+    }

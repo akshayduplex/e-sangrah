@@ -500,7 +500,7 @@ export const getRecycleBinDocuments = async (req, res) => {
         const department = req.query.department || "";
 
         const query = {
-            isDeleted: false,
+            isDeleted: true,
             // isArchived: false
         };
 
@@ -519,7 +519,7 @@ export const getRecycleBinDocuments = async (req, res) => {
         // Fetch documents and total count in parallel
         const [documents, total] = await Promise.all([
             Document.find(query)
-                .select(" files tags createdAt deletedAt department metadata")
+                .select(" files tags createdAt isDeleted deletedAt department metadata")
                 .populate("department", "name")
                 .populate("files", "originalName version fileSize")
                 .populate("owner", "name email")

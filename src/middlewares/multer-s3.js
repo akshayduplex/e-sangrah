@@ -38,3 +38,22 @@ export const createS3Uploader = (folderName) => {
         },
     });
 };
+
+
+export function createS3FolderUploader(selectedFolderName) {
+    return multer({
+        storage: multerS3({
+            s3: s3Client, // Reuse existing S3 client
+            bucket: process.env.AWS_BUCKET,
+            contentType: multerS3.AUTO_CONTENT_TYPE,
+            key: (req, file, cb) => {
+                const relativePath = file.originalname; // Includes folder structure
+                const finalPath = `${selectedFolderName}/${relativePath}`;
+                console.log("Uploading to:", finalPath);
+                cb(null, finalPath);
+            }
+        })
+    });
+}
+
+

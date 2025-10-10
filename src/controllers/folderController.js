@@ -431,7 +431,6 @@ export const uploadToFolder = async (req, res) => {
         if (!req.files || req.files.length === 0) {
             return res.status(400).json({ success: false, message: "No files uploaded" });
         }
-
         const uploadedFiles = [];
 
         for (const file of req.files) {
@@ -480,6 +479,55 @@ export const uploadToFolder = async (req, res) => {
 };
 
 // Get folder tree structure
+// export const getFolderTree = async (req, res) => {
+//     try {
+//         const { rootId, departmentId, projectId } = req.query;
+
+//         const buildTree = async (parentId = null) => {
+//             // Build query dynamically
+//             const query = { parent: parentId, status: "active", isArchived: false };
+
+//             if (departmentId && departmentId !== 'all') query.departmentId = departmentId;
+//             if (projectId && projectId !== 'all') query.projectId = projectId;
+
+//             const folders = await Folder.find(query)
+//                 // .select('name slug path createdAt updatedAt projectId departmentId files')
+//                 .populate('projectId', 'name')
+//                 .populate('departmentId', 'name')
+//                 .sort({ name: 1 });
+
+//             const tree = await Promise.all(folders.map(async (folder) => {
+//                 const children = await buildTree(folder._id);
+//                 return {
+//                     _id: folder._id,
+//                     name: folder.name,
+//                     slug: folder.slug,
+//                     path: folder.path,
+//                     projectId: folder.projectId,
+//                     departmentId: folder.departmentId,
+//                     children: children.length > 0 ? children : null
+//                 };
+//             }));
+
+//             return tree;
+//         };
+
+//         const tree = rootId ? await buildTree(rootId) : await buildTree();
+
+//         res.json({
+//             success: true,
+//             tree
+//         });
+//     } catch (err) {
+//         logger.error('Get folder tree error:', err);
+//         res.status(500).json({
+//             success: false,
+//             message: 'Server error while fetching folder tree'
+//         });
+//     }
+// };
+
+// Get folder tree structure including files with selected fields
 export const getFolderTree = async (req, res) => {
     try {
         const { rootId, departmentId, projectId } = req.query;
@@ -492,13 +540,23 @@ export const getFolderTree = async (req, res) => {
             if (projectId && projectId !== 'all') query.projectId = projectId;
 
             const folders = await Folder.find(query)
-                .select('name slug path createdAt updatedAt projectId departmentId')
                 .populate('projectId', 'name')
                 .populate('departmentId', 'name')
-                .sort({ name: 1 });
+                .sort({ name: 1 })
+                .lean();
 
             const tree = await Promise.all(folders.map(async (folder) => {
                 const children = await buildTree(folder._id);
+
+                // Map files to only include the desired fields
+                const files = (folder.files || []).map(f => ({
+                    _id: f._id,
+                    file: f.file,
+                    originalName: f.originalName,
+                    fileType: f.fileType,
+                    size: f.size
+                }));
+
                 return {
                     _id: folder._id,
                     name: folder.name,
@@ -506,6 +564,7 @@ export const getFolderTree = async (req, res) => {
                     path: folder.path,
                     projectId: folder.projectId,
                     departmentId: folder.departmentId,
+                    files,
                     children: children.length > 0 ? children : null
                 };
             }));

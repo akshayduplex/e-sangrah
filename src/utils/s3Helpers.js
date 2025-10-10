@@ -23,6 +23,40 @@ export const putObject = async (fileBuffer, fileName, contentType, folderName) =
     return { url, key: s3Key };
 };
 
+export const folderUpload = async (fileBuffer, fileName, contentType, folderName) => {
+    try {
+        // Sanitize folder name and file name
+        const sanitizedFolderName = folderName.replace(/[^a-zA-Z0-9-_]/g, '_');
+        const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9-_.]/g, '_');
+
+        const s3Key = `folders/${sanitizedFolderName}/${sanitizedFileName}`;
+
+        const params = {
+            Bucket: process.env.AWS_BUCKET,
+            Key: s3Key,
+            Body: fileBuffer,
+            ContentType: contentType,
+            // Add metadata for better organization
+            Metadata: {
+                'uploaded-at': new Date().toISOString(),
+                'original-filename': fileName
+            }
+        };
+
+        const command = new PutObjectCommand(params);
+        const data = await s3Client.send(command);
+
+        if (data.$metadata.httpStatusCode !== 200) {
+            throw new Error(`S3 upload failed with status: ${data.$metadata.httpStatusCode}`);
+        }
+
+        const url = `${process.env.AWS_URL}${s3Key}`;
+        return { url, key: s3Key };
+    } catch (error) {
+        console.error('S3 Upload Error:', error);
+        throw new Error(`Failed to upload to S3: ${error.message}`);
+    }
+};
 
 export const deleteObject = async (key) => {
     const params = {
@@ -51,41 +85,5 @@ export const getObjectUrl = async (key, expiresIn = 3600) => { // Increased to 1
     } catch (error) {
         console.error('Error generating signed URL:', error);
         throw error;
-    }
-};
-
-export const getBucketUsedSpace = async (prefix = "") => {
-    try {
-        let totalSize = 0;
-        let isTruncated = true;
-        let continuationToken;
-
-        while (isTruncated) {
-            const params = {
-                Bucket: process.env.AWS_BUCKET,
-                Prefix: prefix, // optional, for folder/project
-                ContinuationToken: continuationToken,
-            };
-
-            const command = new ListObjectsV2Command(params);
-            const data = await s3Client.send(command);
-
-            if (data.Contents) {
-                data.Contents.forEach(obj => totalSize += obj.Size);
-            }
-
-            isTruncated = data.IsTruncated;
-            continuationToken = data.NextContinuationToken;
-        }
-
-        return totalSize; // in bytes
-    } catch (error) {
-        console.error("Error calculating bucket size:", error);
-        if (error.name === "AccessDenied") {
-            console.warn("User does not have permission to list the bucket.");
-            return 0;
-        }
-
-        return 0;
     }
 };

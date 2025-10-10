@@ -48,11 +48,10 @@ import Menu from "../models/Menu.js";
 import DesignationMenu from "../models/menuAssignment.js";
 import UserPermission from "../models/UserPermission.js";
 import logger from "../utils/logger.js";
-import { createS3Uploader } from "../middlewares/multer-s3.js";
+import { createS3FolderUploader, createS3Uploader } from "../middlewares/multer-s3.js";
 import Folder from "../models/Folder.js";
 import mongoose from "mongoose";
 import { generateShareLink } from "../helper/GenerateUniquename.js";
-import { getBucketUsedSpace } from "../utils/s3Helpers.js";
 
 
 const router = express.Router();
@@ -98,24 +97,6 @@ router.get('/documents/download/:fileId/:token', authenticate, async (req, res) 
     // res.sendFile(path.resolve(decryptedUrl));
 
     res.redirect(decryptedUrl); // S3 presigned URL
-});
-
-router.get("/storage/usage", async (req, res) => {
-    try {
-        const usedBytes = await getBucketUsedSpace();
-        const MAX_STORAGE_BYTES = 10 * 1024 ** 3; // 10GB
-
-        res.json({
-            success: true,
-            usedBytes,
-            remainingBytes: MAX_STORAGE_BYTES - usedBytes,
-            usedGB: (usedBytes / 1024 ** 3).toFixed(2),
-            remainingGB: ((MAX_STORAGE_BYTES - usedBytes) / 1024 ** 3).toFixed(2),
-            maxGB: 10
-        });
-    } catch (err) {
-        res.status(500).json({ success: false, message: err.message });
-    }
 });
 
 // ---------------------------
@@ -698,6 +679,24 @@ router.post("/files/upload/:folderId", async (req, res, next) => {
         next(err);
     }
 });
+
+router.post("/files/upload-folder/:folderId", async (req, res, next) => {
+    try {
+        const { folderId } = req.params;
+        const folder = await Folder.findById(folderId); // f2
+        if (!folder) return res.status(404).json({ success: false, message: "Folder not found" });
+
+        const uploader = createS3FolderUploader(folder.name);
+
+        uploader.array("folder")(req, res, (err) => {
+            if (err) return next(err);
+            TempController.uploadFile(req, res);
+        });
+    } catch (err) {
+        next(err);
+    }
+});
+
 router.get("/files/download/:fileName", TempController.download);
 router.post("/files/submit-form", TempController.submitForm);
 router.delete("/files/:fileId", TempController.deleteFile);

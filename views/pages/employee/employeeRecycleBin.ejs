@@ -121,14 +121,19 @@
 					const departmentName = doc.department?.name || '-';
 
 					const actions = `
-            <div class="action-icon d-inline-flex">
-                <a href="#" data-document-id="${doc._id}" class="restore-btn me-2" data-bs-toggle="modal" data-bs-target="#restore-modal">
-                    <i class="ti ti-restore"></i>
-                </a>
-                <a href="#" class="delete-permanent-btn" data-document-id="${doc._id}" data-document-name="${file?.originalName || 'Document'}">
-                    <i class="ti ti-trash"></i>
-                </a>
-            </div>`;
+<div class="action-icon d-inline-flex">
+    <a href="#" data-document-id="${doc._id}" class="restore-btn me-2" data-bs-toggle="modal" data-bs-target="#restore-modal">
+        <i class="ti ti-restore"></i>
+    </a>
+    <a href="#" 
+       class="delete-permanent-btn" 
+       data-document-id="${doc._id}" 
+       data-document-name="${file?.originalName || 'Document'}"
+       data-document-size="${fileSizeKB}">
+        <i class="ti ti-trash"></i>
+    </a>
+</div>`;
+
 
 					return [actions, filesInfo, createdOn, departmentName, deletedOn];
 				}
@@ -136,6 +141,7 @@
 				$('#department, #projectName').on('change', function () {
 					table.ajax.reload();
 				});
+				// Restore document
 				// Restore document
 				$(document).on('click', '.restore-btn', function () {
 					const row = $(this).closest('tr');
@@ -171,19 +177,23 @@
 						});
 					});
 				});
-				// Permanent delete
+
+
 				$(document).on('click', '.delete-permanent-btn', function () {
 					const row = $(this).closest('tr');
 					const documentId = $(this).data('document-id');
 					const documentName = $(this).data('document-name');
-					const modal = $('#trashdoc-modal');
+					const documentSize = $(this).data('document-size') || 'Unknown';
+					const modal = $('#fileDelete-modal');
 
-					modal.find('.modal-body').html(`
-            Are you sure you want to permanently delete 
-            <span class="txtblue">"${documentName}"</span>? This action cannot be undone.
-        `);
+					// Update modal content dynamically
+					modal.find('.flxtbltxt p').text(documentName); // filename
+					modal.find('.flxtbltxt span').text(documentSize); // file size
+
+					// Show the modal
 					modal.modal('show');
 
+					// Handle permanent delete
 					modal.find('button.btn-primary').off('click').on('click', function () {
 						$.ajax({
 							url: '/api/documents/permanent',
@@ -201,54 +211,5 @@
 						});
 					});
 				});
-
-				// Empty recycle bin for selected documents
-				$('[data-bs-target="#emptybin-modal"]').on('click', function () {
-					const modal = $('#emptybin-modal');
-					const confirmBtn = modal.find('button.btn-primary');
-
-					const selectedDocs = $('.select-document:checked');
-					if (selectedDocs.length === 0) {
-						showToast('No documents selected.', 'error');
-						return;
-					}
-
-					const docIds = [];
-					let totalSizeKB = 0;
-
-					selectedDocs.each(function () {
-						const row = $(this).closest('tr');
-						docIds.push($(this).data('document-id'));
-						const sizeText = row.find('td:nth-child(2) span').text().replace('KB', '').trim();
-						totalSizeKB += parseFloat(sizeText) || 0;
-					});
-
-					const totalSizeMB = formatBytesToMB(totalSizeKB);
-
-					modal.find('.modal-body').html(`
-            Are you sure you want to permanently delete 
-            <span class="txtblue">selected files</span> (${totalSizeMB})? This action cannot be undone.
-        `);
-
-					confirmBtn.off('click').on('click', function () {
-						$.ajax({
-							url: '/api/documents/permanent',
-							method: 'DELETE',
-							contentType: 'application/json',
-							data: JSON.stringify({ ids: docIds }),
-							success: function (res) {
-								modal.modal('hide');
-								table.ajax.reload();
-								showToast(res.message || 'Selected documents deleted successfully.', 'success');
-							},
-							error: function () {
-								showToast('Failed to delete selected documents.', 'error');
-							}
-						});
-					});
-
-					modal.modal('show');
-				});
-
 			});
 		</script>
