@@ -175,13 +175,13 @@
                     });
                 });
 
-                // Restore Folder
+                // Restore File
                 $(document).on('click', '.restore-folder', function (e) {
                     e.preventDefault();
                     const folderId = $(this).data('folder-id');
                     $('#confirm-restore-folder').off('click').on('click', function () {
                         $.ajax({
-                            url: `${baseUrl}/api/folders/${folderId}/restore`,
+                            url: `${baseUrl}/api/documents/${folderId}/restore`,
                             type: 'PATCH',
                             success: function (res) {
                                 if (res.success) {

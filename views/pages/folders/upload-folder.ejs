@@ -29,7 +29,8 @@
 					<div class="upload-box mb-3" id="uploadBox">
 						<i class="ti ti-cloud-upload fa-2x text-primary mb-2"></i>
 						<p class="mb-1"><strong>Click to upload folder</strong> or drag and drop file here</p>
-						<small class="text-muted">Max 10GB total storage. DOCX / PPTX / CSV / PDF</small>
+						<small class="text-muted" id="storageInfo">Max 10GB total storage. DOCX / PPTX / CSV /
+							PDF</small>
 						<input type="file" class="form-control d-none" id="fileInput" multiple>
 					</div>
 					<div id="fileList" class="row g-2"></div>
@@ -71,13 +72,25 @@
 		<script>
 			// ---------------- FOLDER LOADING ----------------
 			const folderState = { selectedFolders: [], currentFolderId: null };
+			const storageInfoEl = document.getElementById("storageInfo");
 			const elements = {
 				container: document.getElementById('folder-container'),
 				loading: document.getElementById('folder-loading'),
 				empty: document.getElementById('folder-empty'),
 				noProject: document.getElementById('folder-no-project')
 			};
-
+			async function updateStorageInfo() {
+				try {
+					const res = await fetch(`/api/storage/usage`, { credentials: 'include' });
+					const data = await res.json();
+					if (data.success) {
+						storageInfoEl.textContent = `Used: ${data.usedGB} GB / Total: ${data.maxGB} GB / Remaining: ${data.remainingGB} GB`;
+					}
+				} catch (err) {
+					console.error(err);
+					storageInfoEl.textContent = "Failed to load storage info";
+				}
+			}
 			const setLoadingState = (loading) => {
 				elements.loading.classList.toggle('d-none', !loading);
 				elements.container.classList.toggle('d-none', loading);
@@ -132,19 +145,28 @@
 					if (!subfolders.length) { setEmptyState(true); return; }
 					setEmptyState(false);
 					elements.container.innerHTML = '';
-
+					// After folder load
 					subfolders.forEach(f => {
 						const div = document.createElement('div');
 						div.className = "col-6 col-md-4 col-lg-2 text-center p-2 bg-white rounded shadow-sm cursor-pointer";
 						div.dataset.id = f._id;
 						div.innerHTML = `
-                <img src="/img/icons/folder.png" class="mb-1" style="width:50px">
-                <p class="mb-0 small">${f.name}</p>
-            `;
+        <img src="/img/icons/folder.png" class="mb-1" style="width:50px">
+        <p class="mb-0 small">${f.name}</p>
+    `;
+
+						// Click to select
+						div.addEventListener('click', () => {
+							folderState.currentFolderId = f._id;
+							highlightSelectedFolder(div);
+							updateUploadState();
+						});
+
+						// Double-click to open
 						div.addEventListener('dblclick', () => loadFolders(f._id, [...parentPath, { id: f._id, name: f.name }], projectId));
+
 						elements.container.appendChild(div);
 					});
-
 					folderState.currentFolderId = parentId;
 					folderState.selectedFolders = parentPath;
 				} catch (err) { console.error(err); setLoadingState(false); }
@@ -161,7 +183,12 @@
 
 			// Open file dialog
 			uploadBox.addEventListener("click", () => fileInput.click());
-			uploadBox.addEventListener("dragover", (e) => { e.preventDefault(); uploadBox.classList.add("dragover"); });
+			uploadBox.addEventListener("dragover", (e) => {
+				e.preventDefault();
+				if (!folderState.currentFolderId) return;
+				uploadBox.classList.add("dragover");
+			});
+
 			uploadBox.addEventListener("dragleave", () => uploadBox.classList.remove("dragover"));
 			uploadBox.addEventListener("drop", (e) => {
 				e.preventDefault();
@@ -171,6 +198,24 @@
 			fileInput.addEventListener("change", () => {
 				handleFiles(fileInput.files);
 				fileInput.value = ""; // allow reselecting same file
+			});
+			const updateUploadState = () => {
+				if (folderState.currentFolderId) {
+					uploadBox.classList.remove('disabled');
+				} else {
+					uploadBox.classList.add('disabled');
+				}
+			};
+			function highlightSelectedFolder(folderDiv) {
+				document.querySelectorAll('#folder-container .selected').forEach(el => el.classList.remove('selected'));
+				folderDiv.classList.add('selected');
+			}
+
+			// Inside folder rendering
+			div.addEventListener('click', () => {
+				folderState.currentFolderId = f._id;
+				highlightSelectedFolder(div);
+				updateUploadState();
 			});
 
 			// ---------------- HANDLE FILES ----------------
@@ -217,19 +262,34 @@
 					// Remove file
 					fileItem.querySelector(".remove-btn").addEventListener("click", async () => {
 						const serverFileId = fileItem.dataset.fileId;
-						if (serverFileId) {
-							try {
-								const res = await fetch(`/files/${serverFileId}`, { method: "DELETE" });
-								const data = await res.json();
-								if (!data.success) alert("Failed to delete file: " + data.message);
-							} catch (err) {
-								console.error(err);
-								alert("Error deleting file from server.");
-							}
+
+						if (!serverFileId) {
+							// File hasn't been uploaded yet
+							totalBytes -= file.size;
+							updateTotalProgress();
+							fileItem.remove();
+							return;
 						}
-						uploadedBytes += file.size; // remove from total bytes
-						updateTotalProgress();
-						fileItem.remove();
+
+						if (!confirm("Are you sure you want to delete this file?")) return;
+
+						try {
+							const res = await fetch(`/files/${serverFileId}`, { method: "DELETE" });
+							const data = await res.json();
+
+							if (data.success) {
+								// Remove file from UI and adjust totals
+								totalBytes -= file.size;
+								uploadedBytes -= file.size;
+								updateTotalProgress();
+								fileItem.remove();
+							} else {
+								alert("Failed to delete file: " + data.message);
+							}
+						} catch (err) {
+							console.error(err);
+							alert("Error deleting file from server.");
+						}
 					});
 
 					// Upload immediately
@@ -237,7 +297,7 @@
 					formData.append("file", file);
 
 					const xhr = new XMLHttpRequest();
-					xhr.open("POST", `/files/upload/${folderId}`, true);
+					xhr.open("POST", `/api/files/upload/${folderId}`, true);
 
 					xhr.upload.onprogress = (e) => {
 						if (e.lengthComputable) {
@@ -250,7 +310,7 @@
 					};
 
 					xhr.onload = () => {
-						if (xhr.status === 200) {
+						if (xhr.status === 201) {
 							const response = JSON.parse(xhr.responseText);
 							progressBar.classList.add("bg-success");
 							progressBar.textContent = "Uploaded";
@@ -285,6 +345,7 @@
 
 			// ---------------- INITIAL LOAD ----------------
 			document.addEventListener("DOMContentLoaded", () => {
+				updateStorageInfo();
 				if (window.selectedProjectId) loadFolders();
 				else showNoProject(true);
 			});

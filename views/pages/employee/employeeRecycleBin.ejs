@@ -68,58 +68,67 @@
 				function formatBytesToMB(kb) {
 					return (kb / 1024).toFixed(2) + ' MB';
 				}
-				// Initialize DataTable
+
+				// Initialize DataTable with server-side processing
 				const table = $('#recyclinbindocuments_table').DataTable({
 					serverSide: true,
 					processing: true,
 					ajax: {
 						url: '/api/documents/recyclebin',
 						type: 'GET',
+						data: function (d) {
+							return {
+								page: Math.floor(d.start / d.length) + 1,
+								limit: d.length
+							};
+						},
 						dataSrc: function (json) {
+							// Map API data to rows
+							json.recordsTotal = json.total;
+							json.recordsFiltered = json.total;
 							return (json.data || []).map(doc => renderRow(doc));
 						}
 					},
 					columns: [
-						{ title: "", orderable: false },  // Actions first
+						{ title: "Actions", orderable: false },
 						{ title: "Files" },
 						{ title: "Created On" },
 						{ title: "Department" },
 						{ title: "Deleted On" }
 					],
-					searching: true,
+					searching: false,
 					pageLength: 10,
 					lengthMenu: [10, 25, 50, 100],
-					order: [[2, 'desc']]  // Created On column
+					order: [[2, 'desc']] // default sort by Created On
 				});
 
-				// Render each row
 				function renderRow(doc) {
 					const file = doc.files?.[0];
 					const fileSizeKB = file ? (file.fileSize / 1024).toFixed(2) + ' KB' : '-';
 					const filesInfo = file ? `
-        <div class="flxtblleft mb-1">
-            <span class="avatar rounded bg-light mb-2">
-                <img src="/img/icons/fn1.png">
-            </span>
-            <div class="flxtbltxt">
-                <p class="fs-14 mb-1 fw-normal text-neutral">${file.originalName}</p>
-                <span class="fs-11 fw-light text-black">${fileSizeKB}</span>
-            </div>
-        </div>` : '-';
+            <div class="flxtblleft mb-1">
+                <span class="avatar rounded bg-light mb-2">
+                    <img src="/img/icons/fn1.png">
+                </span>
+                <div class="flxtbltxt">
+                    <p class="fs-14 mb-1 fw-normal text-neutral">${file.originalName}</p>
+                    <span class="fs-11 fw-light text-black">${fileSizeKB}</span>
+                </div>
+            </div>` : '-';
 
 					const createdOn = new Date(doc.createdAt).toLocaleString();
 					const deletedOn = new Date(doc.deletedAt).toLocaleString();
 					const departmentName = doc.department?.name || '-';
 
 					const actions = `
-        <div class="action-icon d-inline-flex">
-            <a href="#" data-document-id="${doc._id}" class="restore-btn me-2" data-bs-toggle="modal" data-bs-target="#restore-modal">
-                <i class="ti ti-restore"></i>
-            </a>
-            <a href="#" class="delete-permanent-btn" data-document-id="${doc._id}" data-document-name="${file?.originalName || 'Document'}">
-                <i class="ti ti-trash"></i>
-            </a>
-        </div>`;
+            <div class="action-icon d-inline-flex">
+                <a href="#" data-document-id="${doc._id}" class="restore-btn me-2" data-bs-toggle="modal" data-bs-target="#restore-modal">
+                    <i class="ti ti-restore"></i>
+                </a>
+                <a href="#" class="delete-permanent-btn" data-document-id="${doc._id}" data-document-name="${file?.originalName || 'Document'}">
+                    <i class="ti ti-trash"></i>
+                </a>
+            </div>`;
 
 					return [actions, filesInfo, createdOn, departmentName, deletedOn];
 				}

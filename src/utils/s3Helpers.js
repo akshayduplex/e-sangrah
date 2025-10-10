@@ -1,4 +1,4 @@
-import { PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { PutObjectCommand, DeleteObjectCommand, GetObjectCommand, ListObjectsV2Command } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { s3Client } from "../config/S3Client.js";
 
@@ -51,5 +51,41 @@ export const getObjectUrl = async (key, expiresIn = 3600) => { // Increased to 1
     } catch (error) {
         console.error('Error generating signed URL:', error);
         throw error;
+    }
+};
+
+export const getBucketUsedSpace = async (prefix = "") => {
+    try {
+        let totalSize = 0;
+        let isTruncated = true;
+        let continuationToken;
+
+        while (isTruncated) {
+            const params = {
+                Bucket: process.env.AWS_BUCKET,
+                Prefix: prefix, // optional, for folder/project
+                ContinuationToken: continuationToken,
+            };
+
+            const command = new ListObjectsV2Command(params);
+            const data = await s3Client.send(command);
+
+            if (data.Contents) {
+                data.Contents.forEach(obj => totalSize += obj.Size);
+            }
+
+            isTruncated = data.IsTruncated;
+            continuationToken = data.NextContinuationToken;
+        }
+
+        return totalSize; // in bytes
+    } catch (error) {
+        console.error("Error calculating bucket size:", error);
+        if (error.name === "AccessDenied") {
+            console.warn("User does not have permission to list the bucket.");
+            return 0;
+        }
+
+        return 0;
     }
 };

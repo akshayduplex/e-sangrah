@@ -52,6 +52,7 @@ import { createS3Uploader } from "../middlewares/multer-s3.js";
 import Folder from "../models/Folder.js";
 import mongoose from "mongoose";
 import { generateShareLink } from "../helper/GenerateUniquename.js";
+import { getBucketUsedSpace } from "../utils/s3Helpers.js";
 
 
 const router = express.Router();
@@ -99,7 +100,23 @@ router.get('/documents/download/:fileId/:token', authenticate, async (req, res) 
     res.redirect(decryptedUrl); // S3 presigned URL
 });
 
+router.get("/storage/usage", async (req, res) => {
+    try {
+        const usedBytes = await getBucketUsedSpace();
+        const MAX_STORAGE_BYTES = 10 * 1024 ** 3; // 10GB
 
+        res.json({
+            success: true,
+            usedBytes,
+            remainingBytes: MAX_STORAGE_BYTES - usedBytes,
+            usedGB: (usedBytes / 1024 ** 3).toFixed(2),
+            remainingGB: ((MAX_STORAGE_BYTES - usedBytes) / 1024 ** 3).toFixed(2),
+            maxGB: 10
+        });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
 
 // ---------------------------
 // Session-protected routes

@@ -30,21 +30,15 @@
             <div class="row">
                 <div class="seprate_crdhdr mb-4">
                     <div class="d-flex gap-2 align-items-center">
-                        <div class="dropdown">
-                            <a href="javascript:void(0);"
-                                class="dropdown-toggle border text-black btn btn-outline-secondary fs-13 me-2"
-                                data-bs-toggle="dropdown">
-                                Select Department
-                            </a>
-                            <ul class="dropdown-menu dropdown-menu-end p-3" id="departmentFilter">
-                                <li><a href="javascript:void(0);" class="dropdown-item rounded-1" data-dept="all">All
-                                        Departments</a></li>
-                            </ul>
+                        <div class="mb-0">
+                            <select id="department" class="form-select select2" style="width: 200px;">
+                                <option value="">-- Select Department --</option>
+                            </select>
                         </div>
                     </div>
                 </div>
 
-                <div class="col-xxl-12 col-xl-12">
+                <div class="col-12">
                     <div class="card flex-fill">
                         <div class="card-body p-0">
                             <div class="custom-datatable-filter table-responsive">
@@ -98,140 +92,149 @@
                     default: "/img/icons/fn1.png"
                 };
 
+                function initSelect2(selector, url, textKey) {
+                    $(selector).select2({
+                        placeholder: `-- Select ${textKey} --`,
+                        allowClear: true,
+                        ajax: {
+                            url,
+                            dataType: 'json',
+                            delay: 250,
+                            data: params => ({ search: params.term }),
+                            processResults: data => ({
+                                results: [
+                                    { id: '', text: `-- Select ${textKey} --` },
+                                    ...data.data.map(item => ({ id: item._id, text: item[textKey] }))
+                                ]
+                            })
+                        }
+                    });
+
+                    $(selector).on('select2:select', function (e) {
+                        if (!e.params.data.id) {
+                            $(this).val(null).trigger('change');
+                        }
+                    });
+                }
+
+                initSelect2('#department', `${baseUrl}/api/departments/search`, 'name');
+
                 const $table = $('#archived_documents_table');
+
+                const columnMap = [
+                    null,                  // actions
+                    'files.originalName',  // file name
+                    'createdAt',           // created
+                    'department.name',     // department
+                    'updatedAt',           // deleted on
+                    'tags',                // tags
+                    null                   // metadata
+                ];
 
                 const dataTable = $table.DataTable({
                     processing: true,
                     serverSide: true,
+                    searching: true,
+                    ordering: true,
                     ajax: {
                         url: `${baseUrl}/api/documents/archive`,
                         type: "GET",
                         data: function (d) {
-                            d.page = (d.start / d.length) + 1;
-                            d.limit = d.length;
+                            const dept = $('#department').val() || 'all';
+                            return {
+                                page: Math.floor(d.start / d.length) + 1,
+                                limit: d.length,
+                                search: d.search.value,
+                                orderColumn: columnMap[d.order[0].column] || 'updatedAt',
+                                orderDir: d.order[0].dir,
+                                department: dept
+                            };
                         },
                         dataSrc: function (res) {
-                            if (!res.success) return [];
                             return res.data.map(doc => {
-                                const filesInfo = doc.files?.[0]
-                                    ? (() => {
-                                        const file = doc.files[0];
-                                        const ext = file.originalName.split('.').pop().toLowerCase();
-                                        const fileSizeKB = (file.fileSize / 1024).toFixed(2) + ' KB';
-                                        return `
-                                    <div class="d-flex align-items-center">
-                                        <span class="avatar rounded bg-light me-2">
-                                            <img src="${fileIcons[ext] || fileIcons.default}" style="height:30px;">
-                                        </span>
-                                        <div>
-                                            <p class="mb-0 text-dark">${file.originalName}</p>
-                                            <small class="text-muted">${fileSizeKB}</small>
-                                        </div>
-                                    </div>
-                                `;
-                                    })()
+                                const file = doc.files?.[0];
+                                const ext = file?.originalName?.split('.').pop().toLowerCase();
+                                const fileSizeKB = file?.fileSize ? (file.fileSize / 1024).toFixed(2) + ' KB' : '-';
+
+                                const filesInfo = file
+                                    ? `<div class="d-flex align-items-center">
+                            <span class="avatar rounded bg-light me-2">
+                                <img src="${fileIcons[ext] || fileIcons.default}" style="height:30px;">
+                            </span>
+                            <div>
+                                <p class="mb-0 text-dark">${file.originalName}</p>
+                                <small class="text-muted">${fileSizeKB}</small>
+                            </div>
+                        </div>`
                                     : '-';
 
                                 return {
-                                    actions: `
-                                <div class="action-icon d-inline-flex">
-                                    <a href="#" class="restore-folder me-2" data-folder-id="${doc._id}" data-bs-toggle="modal" data-bs-target="#restore-modal">
-                                        <i class="ti ti-restore"></i>
-                                    </a>
-                                    <a href="#" class="trash-folder" data-folder-id="${doc._id}" data-bs-toggle="modal" data-bs-target="#trashdocfile-modal">
-                                        <i class="ti ti-trash"></i>
-                                    </a>
-                                </div>`,
+                                    actions: `<div class="action-icon d-inline-flex">
+                            <a href="#" class="restore-folder me-2" data-folder-id="${doc._id}" data-bs-toggle="modal" data-bs-target="#restore-modal">
+                                <i class="ti ti-restore"></i>
+                            </a>
+                            <a href="#" class="trash-folder" data-folder-id="${doc._id}" data-bs-toggle="modal" data-bs-target="#trashdoc-modal">
+                                <i class="ti ti-trash"></i>
+                            </a>
+                        </div>`,
                                     fileName: filesInfo,
                                     createdAt: new Date(doc.createdAt).toLocaleDateString(),
                                     department: doc.department?.name || "-",
                                     deletedOn: new Date(doc.updatedAt || doc.createdAt).toLocaleDateString(),
-                                    tags: doc.tags.join(", "),
-                                    metaData: `
-                                <strong>Description:</strong> ${doc.metadata.fileDescription}<br>
-                                <strong>Heading:</strong> ${doc.metadata.mainHeading}
-                            `,
+                                    tags: doc.tags?.join(", ") || "-",
+                                    metaData: `<strong>Description:</strong> ${doc.metadata?.fileDescription || "-"}<br>
+                                   <strong>Heading:</strong> ${doc.metadata?.mainHeading || "-"}`
                                 };
                             });
                         }
                     },
                     columns: [
                         { data: 'actions', orderable: false, searchable: false },
-                        { data: 'fileName' },
+                        { data: 'fileName', orderable: false },
                         { data: 'createdAt' },
                         { data: 'department' },
                         { data: 'deletedOn' },
                         { data: 'tags' },
-                        { data: 'metaData' }
+                        { data: 'metaData', orderable: false }
                     ],
-                    columnDefs: [
-                        {
-                            targets: 6, // files column
-                            render: function (data) {
-                                return data; // DataTables will render HTML
-                            }
-                        }
-                    ],
-                    order: [[1, 'desc']],
+                    order: [[2, 'desc']],
                     paging: true,
-                    searching: true,
-                    ordering: true,
                     info: true,
                     autoWidth: false
                 });
 
-                // Filter by Department
-                $(document).on('click', '#departmentFilter a', function () {
-                    const dept = $(this).data('dept');
-                    if (dept === 'all') {
-                        dataTable.column(3).search('').draw(); // department column index
-                    } else {
-                        dataTable.column(3).search(dept).draw();
-                    }
+                // Department filter
+                $('#department').on('change', function () {
+                    dataTable.ajax.reload();
                 });
 
-                // Trash Folder
+                // Debounced search
+                let searchTimer;
+                $('.dataTables_filter input').off().on('keyup', function () {
+                    clearTimeout(searchTimer);
+                    const value = this.value;
+                    searchTimer = setTimeout(() => {
+                        dataTable.search(value).draw();
+                    }, 400);
+                });
+
+                // Trash folder
                 $(document).on('click', '.trash-folder', function (e) {
                     e.preventDefault();
-                    const folderId = $(this).data('folder-id');
+                    const documentId = $(this).data('folder-id');
                     $('#confirm-trash-folder').off('click').on('click', function () {
                         $.ajax({
-                            url: `${baseUrl}/api/folders/${folderId}`,
+                            url: `${baseUrl}/api/documen/permanent`,
                             type: 'DELETE',
+                            contentType: 'application/json',
+                            data: JSON.stringify({ ids: [documentId] }),
                             success: function (res) {
                                 if (res.success) {
-                                    dataTable.ajax.reload();
-                                }
-                            }
-                        });
-                    });
-                });
-
-                // Restore File
-                // Restore File / Folder using existing #restore-modal
-                $(document).on('click', '.restore-folder', function (e) {
-                    e.preventDefault();
-
-                    const folderId = $(this).data('folder-id');
-                    const $row = $(this).closest('tr');
-
-                    // Get the full HTML of the filesInfo column
-                    const filesInfoHTML = $row.find('td:eq(1)').html() || '-';
-
-                    // Inject full filesInfo into modal body
-                    $('#restore-modal .modal-body').html(filesInfoHTML);
-
-                    // Handle restore action
-                    $('#restore-modal .btn-primary').off('click').on('click', function () {
-                        $.ajax({
-                            url: `${baseUrl}/api/folders/${folderId}/restore`,
-                            type: 'PATCH',
-                            success: function (res) {
-                                if (res.success) {
-                                    $('#restore-modal').modal('hide'); // Close modal
-                                    $('#archived_documents_table').DataTable().ajax.reload(); // Refresh table
+                                    showToast('Folder trashed successfully', 'success');
+                                    dataTable.ajax.reload(null, false);
+                                    $('#trashdoc-modal').modal('hide'); // close modal after deletion
                                 } else {
-                                    showToast('Failed to restore file.', 'success');
+                                    showToast(res.message || 'Failed to delete folder', 'error');
                                 }
                             },
                             error: function () {
@@ -239,6 +242,84 @@
                             }
                         });
                     });
+                });
+
+                // Restore folder
+                $(document).on('click', '.restore-folder', function (e) {
+                    e.preventDefault();
+                    const documentId = $(this).data('folder-id');
+                    const $row = $(this).closest('tr');
+                    const filesInfoHTML = $row.find('td:eq(1)').html() || '-';
+                    $('#restore-modal .modal-body').html(filesInfoHTML);
+
+                    $('#restore-modal .btn-primary').off('click').on('click', function () {
+                        $.ajax({
+                            url: `${baseUrl}/api/documents/${documentId}/archive?isArchived=false`,
+                            type: 'PATCH',
+                            success: function (res) {
+                                if (res.success) {
+                                    showToast('File restored successfully', 'success');
+                                    $('#restore-modal').modal('hide');
+                                    dataTable.ajax.reload(null, false);
+                                } else {
+                                    showToast('Failed to restore file', 'error');
+                                }
+                            },
+                            error: function () {
+                                showToast('Something went wrong!', 'error');
+                            }
+                        });
+                    });
+                    // Empty Archive - permanently delete all archived documents
+                    $('#emptybin-modal .btn-primary').on('click', function () {
+                        const $btn = $(this);
+                        $btn.prop('disabled', true).text('Deleting...');
+
+                        // Fetch all archived documents
+                        $.ajax({
+                            url: `${baseUrl}/api/documents/archive`,
+                            type: 'GET',
+                            data: { page: 1, limit: 10000 }, // fetch all documents
+                            success: function (res) {
+                                const allIds = res.data.map(doc => doc._id);
+
+                                if (!allIds.length) {
+                                    showToast('No documents to delete', 'info');
+                                    $btn.prop('disabled', false).text('Yes, Delete');
+                                    $('#emptybin-modal').modal('hide');
+                                    return;
+                                }
+
+                                // Delete all documents permanently
+                                $.ajax({
+                                    url: `${baseUrl}/api/documents/permanent`,
+                                    type: 'DELETE',
+                                    contentType: 'application/json',
+                                    data: JSON.stringify({ ids: allIds }),
+                                    success: function (res) {
+                                        if (res.success) {
+                                            showToast(`${res.message}`, 'success');
+                                            dataTable.ajax.reload(); // refresh DataTable
+                                            $('#emptybin-modal').modal('hide'); // close modal
+                                        } else {
+                                            showToast(res.message || 'Failed to empty archive', 'error');
+                                        }
+                                    },
+                                    error: function () {
+                                        showToast('Something went wrong!', 'error');
+                                    },
+                                    complete: function () {
+                                        $btn.prop('disabled', false).text('Yes, Delete');
+                                    }
+                                });
+                            },
+                            error: function () {
+                                showToast('Failed to fetch archived documents', 'error');
+                                $btn.prop('disabled', false).text('Yes, Delete');
+                            }
+                        });
+                    });
+
                 });
             });
         </script>

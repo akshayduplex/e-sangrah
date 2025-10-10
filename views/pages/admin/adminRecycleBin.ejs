@@ -79,6 +79,14 @@
 				function formatBytesToMB(kb) {
 					return (kb / 1024).toFixed(2) + ' MB';
 				}
+				// Debounce function
+				function debounce(fn, delay) {
+					let timer;
+					return function (...args) {
+						clearTimeout(timer);
+						timer = setTimeout(() => fn.apply(this, args), delay);
+					};
+				}
 				function initSelect2(selector, url, textKey) {
 					$(selector).select2({
 						placeholder: `-- Select ${textKey} --`,
@@ -109,10 +117,26 @@
 				const table = $('#recyclinbindocuments_table').DataTable({
 					serverSide: true,
 					processing: true,
+					searching: false, // we handle search manually
+					pageLength: 10,
+					lengthMenu: [10, 25, 50, 100],
+					order: [[2, 'desc']], // default sort by Created On
 					ajax: {
 						url: '/api/documents/recyclebin',
 						type: 'GET',
+						data: function (d) {
+							// Convert DataTable params to your API query
+							return {
+								page: Math.floor(d.start / d.length) + 1,
+								limit: d.length,
+								search: $('#search_input').val(),
+								department: $('#department').val()
+							};
+						},
 						dataSrc: function (json) {
+							// Update pagination info
+							json.recordsTotal = json.total;
+							json.recordsFiltered = json.total;
 							return (json.data || []).map(doc => renderRow(doc));
 						}
 					},
@@ -123,11 +147,7 @@
 						{ title: "Department" },
 						{ title: "Deleted On" },
 						{ title: "Actions", orderable: false }
-					],
-					searching: true,
-					pageLength: 10,
-					lengthMenu: [10, 25, 50, 100],
-					order: [[2, 'desc']]
+					]
 				});
 
 				// Render each row
@@ -165,9 +185,12 @@
 
 					return [checkbox, filesInfo, createdOn, departmentName, deletedOn, actions];
 				}
-				$('#department, #projectName').on('change', function () {
-					table.ajax.reload();
-				});
+				// Debounced reload for search and filters
+				const reloadTable = debounce(() => table.ajax.reload(), 500);
+
+				$('#department').on('change', reloadTable);
+				$('#search_input').on('keyup', reloadTable);
+				$('#recyclinbindocuments_table_length select').on('change', reloadTable);
 				// Restore document
 				$(document).on('click', '.restore-btn', function () {
 					const row = $(this).closest('tr');

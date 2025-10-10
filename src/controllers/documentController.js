@@ -501,7 +501,7 @@ export const getRecycleBinDocuments = async (req, res) => {
 
         const query = {
             isDeleted: false,
-            isArchived: true
+            // isArchived: false
         };
 
         if (search) {
@@ -589,35 +589,51 @@ export const archiveDocuments = async (req, res) => {
  */
 export const getArchivedDocuments = async (req, res) => {
     try {
+        const draw = parseInt(req.query.draw) || 1;
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 10;
         const skip = (page - 1) * limit;
 
+        const search = req.query.search || '';
+        const orderColumn = req.query.orderColumn || 'updatedAt';
+        const orderDir = req.query.orderDir === 'asc' ? 1 : -1;
+
+        // Start query
+        const query = { isArchived: true, isDeleted: false };
+
+        // Department filter
+        if (req.query.department && req.query.department !== 'all') {
+            query.department = req.query.department;
+        }
+
+        // Search filter (works with files array)
+        if (search) {
+            query['files'] = {
+                $elemMatch: { originalName: { $regex: search, $options: 'i' } }
+            };
+        }
+
         const [documents, total] = await Promise.all([
-            Document.find({ isArchived: true, isDeleted: false })
-                .select("files metadata tags createdAt department")
+            Document.find(query)
                 .populate("department", "name")
                 .populate("files", "originalName version isPrimary fileSize")
-                .sort({ updatedAt: -1 })
+                .sort({ [orderColumn]: orderDir })
                 .skip(skip)
                 .limit(limit),
-            Document.countDocuments({ isArchived: true, isDeleted: false })
+            Document.countDocuments(query)
         ]);
 
         return res.json({
-            success: true,
-            message: "Archive documents fetched successfully",
-            data: documents,
-            total,
-            page,
-            limit
+            draw,                    // required by DataTables
+            recordsTotal: total,     // total docs
+            recordsFiltered: total,  // filtered docs
+            data: documents          // array of documents
         });
     } catch (err) {
-        console.error("Get archived documents error:", err);
-        return res.status(500).json({ success: false, message: "Failed to fetch documents", error: err.message });
+        console.error(err);
+        return res.status(500).json({ success: false, message: err.message });
     }
 };
-
 
 // Restore a soft-deleted document
 export const restoreDocument = async (req, res) => {
