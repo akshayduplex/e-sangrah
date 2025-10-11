@@ -1,6 +1,57 @@
 <%- include('../../partials/header') %>
+
+	<style>
+		/* Folder container using flexbox for 5 folders per row */
+		#folder-container {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 15px;
+			/* spacing between folders */
+		}
+
+		.folderbox {
+			flex: 0 0 calc(20% - 15px);
+			/* 20% width for 5 per row minus gap */
+			box-sizing: border-box;
+		}
+
+		/* Responsive adjustments */
+		@media (max-width: 1200px) {
+			.folderbox {
+				flex: 0 0 calc(25% - 15px);
+			}
+
+			/* 4 per row */
+		}
+
+		@media (max-width: 992px) {
+			.folderbox {
+				flex: 0 0 calc(33.33% - 15px);
+			}
+
+			/* 3 per row */
+		}
+
+		@media (max-width: 768px) {
+			.folderbox {
+				flex: 0 0 calc(50% - 15px);
+			}
+
+			/* 2 per row */
+		}
+
+		@media (max-width: 576px) {
+			.folderbox {
+				flex: 0 0 100%;
+			}
+
+			/* 1 per row on mobile */
+		}
+	</style>
+
 	<div class="page-wrapper">
 		<div class="content">
+
 			<!-- Breadcrumb -->
 			<div class="d-flex align-items-center justify-content-between page-breadcrumb mb-3">
 				<div class="my-auto mb-2">
@@ -29,37 +80,47 @@
 			</div>
 
 			<!-- Folder Container -->
-			<div class="row g-3" id="folder-container"></div>
+			<div id="folder-container"></div>
 
-			<!-- Loading -->
+			<!-- Loading & Empty -->
 			<div id="folder-loading" class="text-center py-4" style="display:none;">
 				<div class="spinner-border text-primary"></div>
 				<p class="mt-2 text-muted">Loading folders...</p>
 			</div>
 
-			<!-- Empty -->
 			<div id="folder-empty" class="text-center py-4" style="display:none;">
 				<i class="ti ti-folder-off fs-1 text-muted"></i>
 				<p class="mt-2 text-muted">No subfolders found</p>
 			</div>
+
 		</div>
 
 		<!-- Footer -->
 		<div class="footer mt-4 d-sm-flex align-items-center justify-content-between border-top bg-white p-3">
 			<p class="mb-0">2025 &copy; HLFPPT.</p>
 			<p>Designed & Developed by <a href="javascript:void(0);" class="text-primary">Duplex services &
-					Technology</a>
-			</p>
+					Technology</a></p>
 		</div>
 	</div>
 
 	<!-- Folder Modal -->
 	<%- include('../../modals/addFolder') %>
-
-		<!-- Footer -->
 		<%- include('../../partials/footer') %>
 
 			<script>
+				const shareModal = document.getElementById("sharedoc-modal");
+				const userInviteSelect = document.getElementById("userInviteSelect");
+				const accessLevelSelect = document.getElementById("accessLevelSelect");
+				const inviteUserBtn = document.getElementById("inviteUserBtn");
+				const usersWithAccessContainer = document.getElementById("usersWithAccessContainer");
+				const shareLinkInput = document.getElementById("sharelink");
+				const copyLinkBtn = document.getElementById("copyLinkBtn");
+				const accessTypeSelect = document.getElementById("accessType");
+				const roleTypeSelect = document.getElementById("roleType");
+
+				let currentShareFolderId = null;
+				let allUsers = [];
+
 				const folderState = {
 					selectedFolders: [],
 					currentFolderId: null,
@@ -77,16 +138,15 @@
 				let pendingFolderId = null;
 				let editingFolderId = null;
 
-				// Loading and empty states
 				const setLoadingState = (loading) => {
 					elements.loading.style.display = loading ? 'block' : 'none';
-					elements.container.style.display = loading ? 'none' : 'block';
+					elements.container.style.display = loading ? 'none' : 'flex';
 					elements.empty.style.display = 'none';
 				};
 
 				const setEmptyState = (isEmpty) => {
 					elements.empty.style.display = isEmpty ? 'block' : 'none';
-					elements.container.style.display = isEmpty ? 'none' : 'block';
+					elements.container.style.display = isEmpty ? 'none' : 'flex';
 					elements.loading.style.display = 'none';
 				};
 
@@ -94,10 +154,10 @@
 					elements.noProject.style.display = show ? 'block' : 'none';
 				};
 
-				// Fetch folders from API
 				const fetchFolders = async (projectId) => {
 					const queryParams = new URLSearchParams();
 					if (projectId) queryParams.append('projectId', projectId);
+
 					const response = await fetch(`/api/folders/tree/structure?${queryParams}`, { credentials: 'include' });
 					if (!response.ok) throw new Error(`HTTP error! ${response.status}`);
 					const data = await response.json();
@@ -105,7 +165,6 @@
 					return data.tree || [];
 				};
 
-				// Get subfolders of a folder
 				const getSubfolders = (folders, targetFolderId) => {
 					if (!targetFolderId) return folders;
 					const findFolderAndGetChildren = (list, id) => {
@@ -121,7 +180,6 @@
 					return findFolderAndGetChildren(folders, targetFolderId);
 				};
 
-				// Load folders
 				const loadFolders = async (parentFolderId = null, parentPath = [], projectId = window.selectedProjectId) => {
 					try {
 						showNoProject(false);
@@ -152,23 +210,23 @@
 
 						subfolders.forEach(folder => {
 							const div = document.createElement("div");
-							div.className = "col-6 col-md-4 col-lg-2 folderbox";
+							div.className = "folderbox";
 							div.dataset.id = folder._id;
 							div.innerHTML = `
-                <div class="fldricon"><img src="/img/icons/folder.png" alt="Folder"></div>
-                <div class="fldrname"><p>${folder.name}</p></div>
-                <div class="folder_links">
-                  <button type="button" class="btn border-0" data-bs-toggle="dropdown" aria-expanded="false"><i class="ti ti-dots"></i></button>
-                  <ul class="dropdown-menu" data-bs-auto-close="outside">
-                    <li><a class="dropdown-item" href="/${folder._id}/list"><i class="ti ti-eye"></i> View</a></li>
-                    <li><a class="dropdown-item rename-folder" href="#"><i class="ti ti-pencil-minus"></i> Edit</a></li>
-                    <li><a class="dropdown-item delete-folder" href="#" data-bs-toggle="modal" data-bs-target="#trashdoc-modal"><i class="ti ti-trash"></i> Move to Trash</a></li>
-                    <li><a class="dropdown-item share-btn" href="#" data-doc-id="${folder._id}" data-bs-toggle="modal" data-bs-target="#sharedoc-modal"><i class="ti ti-share"></i> Share</a></li>
-                    <li><a class="dropdown-item archive-folder" href="#" data-bs-toggle="modal" data-bs-target="#archivedoc-modal"><i class="ti ti-archive"></i> Move to Archive</a></li>
-                    <li><a class="dropdown-item download-folder" href="#" data-bs-toggle="modal" data-bs-target="#downloaddoc-modal"><i class="ti ti-download"></i> Download</a></li>
-                  </ul>
-                </div>
-            `;
+          <div class="fldricon"><img src="/img/icons/folder.png" alt="Folder"></div>
+          <div class="fldrname"><p>${folder.name}</p></div>
+          <div class="folder_links">
+            <button type="button" class="btn border-0" data-bs-toggle="dropdown"><i class="ti ti-dots"></i></button>
+            <ul class="dropdown-menu" data-bs-auto-close="outside">
+              <li><a class="dropdown-item" href="/${folder._id}/list"><i class="ti ti-eye"></i> View</a></li>
+              <li><a class="dropdown-item rename-folder" href="#"><i class="ti ti-pencil-minus"></i> Edit</a></li>
+              <li><a class="dropdown-item delete-folder" href="#" data-bs-toggle="modal" data-bs-target="#trashdoc-modal"><i class="ti ti-trash"></i> Move to Trash</a></li>
+              <li><a class="dropdown-item share-btn" href="#" data-doc-id="${folder._id}" data-bs-toggle="modal" data-bs-target="#sharedoc-modal"><i class="ti ti-share"></i> Share</a></li>
+              <li><a class="dropdown-item archive-folder" href="#" data-bs-toggle="modal" data-bs-target="#archivedoc-modal"><i class="ti ti-archive"></i> Move to Archive</a></li>
+              <li><a class="dropdown-item download-folder" href="#" data-bs-toggle="modal" data-bs-target="#downloaddoc-modal"><i class="ti ti-download"></i> Download</a></li>
+            </ul>
+          </div>
+        `;
 
 							div.addEventListener("dblclick", () => {
 								loadFolders(folder._id, [...parentPath, { id: folder._id, name: folder.name }], projectId);
@@ -188,46 +246,25 @@
 					}
 				};
 
-				// breadcrumb
 				const updateDirectoryPath = () => {
 					const folders = folderState.selectedFolders;
 					const pathElements = [];
-
-					// Always show Root
 					pathElements.push(`<a href="javascript:void(0)" class="dir-link" data-id="">Root</a>`);
-
-					// Append selected folder path
-					folders.forEach(f => {
-						pathElements.push(`<a href="javascript:void(0)" class="dir-link" data-id="${f.id}">${f.name}</a>`);
-					});
-
+					folders.forEach(f => pathElements.push(`<a href="javascript:void(0)" class="dir-link" data-id="${f.id}">${f.name}</a>`));
 					elements.path.innerHTML = pathElements.join(" / ");
 
-					// Add click handlers
 					document.querySelectorAll(".dir-link").forEach(link => {
 						link.addEventListener("click", async function () {
 							const index = Array.from(this.parentNode.children).indexOf(this);
-							let newPath;
-							let folderId;
-
-							if (this.dataset.id === "") {
-								// Root clicked
-								newPath = [];
-								folderId = null;
-							} else {
-								newPath = folderState.selectedFolders.slice(0, index);
-								newPath.push(folderState.selectedFolders[index]);
-								folderId = this.dataset.id;
-							}
-
+							let newPath, folderId;
+							if (this.dataset.id === "") { newPath = []; folderId = null; }
+							else { newPath = folderState.selectedFolders.slice(0, index); newPath.push(folderState.selectedFolders[index]); folderId = this.dataset.id; }
 							folderState.selectedFolders = newPath;
 							await loadFolders(folderId, newPath, window.selectedProjectId);
 						});
 					});
 				};
 
-
-				// Folder actions
 				elements.container.addEventListener("click", (e) => {
 					const link = e.target.closest("a");
 					if (!link) return;
@@ -247,39 +284,23 @@
 					if (link.classList.contains("download-folder")) pendingFolderId = id;
 				});
 
-				// Folder form submit
 				document.getElementById("folderForm")?.addEventListener("submit", async (e) => {
 					e.preventDefault();
 					const name = document.getElementById("folderName").value.trim();
 					if (!name) return;
 
 					try {
-						const url = editingFolderId
-							? `/api/folders/${editingFolderId}/rename`
-							: `/api/folders`;
+						const url = editingFolderId ? `/api/folders/${editingFolderId}/rename` : `/api/folders`;
 						const method = editingFolderId ? "PATCH" : "POST";
+						const body = { name, projectId: window.selectedProjectId || null, parentId: folderState.currentFolderId || null };
 
-						// Send projectId always, parentId only if there is a parent folder
-						const body = {
-							name,
-							projectId: window.selectedProjectId || null,
-							parentId: folderState.currentFolderId || null
-						};
-
-						const res = await fetch(url, {
-							method,
-							headers: { "Content-Type": "application/json" },
-							body: JSON.stringify(body)
-						});
-
+						const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
 						const data = await res.json();
 						if (!data.success) throw new Error(data.message);
 
 						showToast(editingFolderId ? "Folder renamed" : "Folder created");
 						bootstrap.Modal.getInstance(document.getElementById("folder-modal")).hide();
 						editingFolderId = null;
-
-						// Reload current folder view
 						loadFolders(folderState.currentFolderId, folderState.selectedFolders, window.selectedProjectId);
 					} catch (err) {
 						console.error(err);
@@ -287,15 +308,12 @@
 					}
 				});
 
-
-				// Confirm delete
 				document.getElementById("confirm-trash-folder")?.addEventListener("click", async () => {
 					if (!pendingFolderId) return;
 					try {
 						const res = await fetch(`/api/folders/${pendingFolderId}`, { method: "DELETE" });
 						const data = await res.json();
 						if (!data.success) return showToast(data.message || "Failed to delete folder", "warning");
-
 						showToast(data.message || "Folder deleted successfully");
 						loadFolders(folderState.currentFolderId, folderState.selectedFolders);
 					} catch (err) {
@@ -306,7 +324,6 @@
 					}
 				});
 
-				// Initialize
 				document.addEventListener("DOMContentLoaded", () => {
 					document.querySelector(".btn-add-folder")?.addEventListener("click", () => {
 						editingFolderId = null;
@@ -318,4 +335,142 @@
 
 					loadFolders();
 				});
+
+				// --------------------
+				// Folder Share Modal
+				// --------------------
+				elements.container.addEventListener("click", (e) => {
+					const shareBtn = e.target.closest(".share-btn");
+					if (!shareBtn) return;
+
+					currentShareFolderId = shareBtn.dataset.docId;
+					loadFolderShares(currentShareFolderId);
+					new bootstrap.Modal(shareModal).show();
+				});
+
+				// Load shared users and link
+				const loadFolderShares = async (folderId) => {
+					try {
+						const res = await fetch(`/api/folders/${folderId}`);
+						const data = await res.json();
+
+						// Clear previous users
+						usersWithAccessContainer.innerHTML = "";
+
+						// Populate users with access
+						(data.usersWithAccess || []).forEach(user => {
+							const div = document.createElement("div");
+							div.className = "d-flex justify-content-between align-items-center mb-2 user-access-row";
+
+							div.innerHTML = `
+                <div>
+                    <div class="fw-bold">${user.name}</div>
+                    <small class="text-muted">${user.email}</small>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <select class="form-select form-select-sm access-level" style="width:100px;" data-user-id="${user.id}">
+                        <option value="view" ${user.access.includes('view') ? 'selected' : ''}>View</option>
+                        <option value="edit" ${user.access.includes('edit') ? 'selected' : ''}>Edit</option>
+                    </select>
+                    <button class="btn btn-sm btn-danger remove-access" data-user-id="${user.id}">&times;</button>
+                </div>
+            `;
+
+							usersWithAccessContainer.appendChild(div);
+						});
+
+						// Update or generate share link
+						if ((data.shareLinks || []).length > 0) {
+							shareLinkInput.value = data.shareLinks[0].token;
+						} else {
+							const tokenRes = await fetch(`/api/folders/${folderId}/link`, {
+								method: "POST",
+								headers: { "Content-Type": "application/json" },
+								body: JSON.stringify({ access: roleTypeSelect.value === "editor" ? "editor" : "viewer" })
+							});
+							const tokenData = await tokenRes.json();
+							shareLinkInput.value = tokenData.link;
+						}
+
+					} catch (err) {
+						console.error("Error loading share info:", err);
+						alert("Failed to load folder share info");
+					}
+				};
+
+				// Invite user
+				inviteUserBtn.addEventListener("click", async () => {
+					const userId = userInviteSelect.value;
+					const access = accessLevelSelect.value;
+
+					if (!currentShareFolderId || !userId) return alert("Select a user to invite");
+
+					try {
+						const res = await fetch(`/api/folders/${currentShareFolderId}/share`, {
+							method: "POST",
+							headers: { "Content-Type": "application/json" },
+							body: JSON.stringify({ userId, access })
+						});
+						const data = await res.json();
+						if (!res.ok) throw new Error(data.error || "Failed to share folder");
+
+						loadFolderShares(currentShareFolderId);
+						userInviteSelect.value = ""; // reset dropdown
+					} catch (err) {
+						console.error(err);
+						alert("Failed to invite user");
+					}
+				});
+
+				// Remove user access
+				usersWithAccessContainer.addEventListener("click", async (e) => {
+					if (!e.target.classList.contains("remove-access")) return;
+
+					const userId = e.target.dataset.userId;
+					if (!currentShareFolderId || !userId) return;
+
+					if (!confirm("Are you sure you want to remove this user's access?")) return;
+
+					try {
+						const res = await fetch(`/api/folders/${currentShareFolderId}/unshare`, {
+							method: "POST",
+							headers: { "Content-Type": "application/json" },
+							body: JSON.stringify({ userId })
+						});
+						const data = await res.json();
+						if (!res.ok) throw new Error(data.error || "Failed to remove access");
+
+						loadFolderShares(currentShareFolderId);
+					} catch (err) {
+						console.error(err);
+						alert("Failed to remove access");
+					}
+				});
+
+				// Copy share link
+				copyLinkBtn.addEventListener("click", () => {
+					shareLinkInput.select();
+					document.execCommand("copy");
+					alert("Link copied to clipboard");
+				});
+
+				// Regenerate share link on role type change
+				roleTypeSelect.addEventListener("change", () => {
+					if (currentShareFolderId) loadFolderShares(currentShareFolderId);
+				});
+
+				// Access type change text
+				accessTypeSelect.addEventListener("change", () => {
+					const infoText = document.getElementById("infoText");
+					const accessType = accessTypeSelect.value;
+
+					if (accessType === "anyone") {
+						infoText.textContent = roleTypeSelect.value === "viewer" ?
+							"Anyone on the internet with the link can view" :
+							"Anyone on the internet with the link can edit";
+					} else {
+						infoText.textContent = "Only people with access can view";
+					}
+				});
+
 			</script>

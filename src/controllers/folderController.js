@@ -1,6 +1,7 @@
 // controllers/folderController.js
 import Folder from '../models/Folder.js';
 import Document from '../models/Document.js';
+import crypto from 'crypto'
 import mongoose from 'mongoose';
 import { generateUniqueFileName } from '../helper/GenerateUniquename.js';
 import { putObject } from '../utils/s3Helpers.js';
@@ -651,5 +652,161 @@ export const restoreFolder = async (req, res) => {
     } catch (err) {
         logger.error(err);
         res.status(500).json({ success: false, message: "Server error while restoring folder" });
+    }
+};
+
+
+
+
+/**
+ * Get folder details for sharing
+ * - List of users with access
+ * - Shareable links
+ */
+export const getFolderShareInfo = async (req, res) => {
+    const { folderId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(folderId)) {
+        return res.status(400).json({ error: 'Invalid folder ID' });
+    }
+
+    try {
+        const folder = await Folder.findById(folderId)
+            .populate('permissions.principal', 'name email') // populate user info
+            .lean();
+
+        if (!folder) return res.status(404).json({ error: 'Folder not found' });
+
+        // Map permissions to include principal name/email
+        const usersWithAccess = (folder.permissions || [])
+            .filter(p => p.model === 'User')
+            .map(p => ({
+                id: p.principal?._id,
+                name: p.principal?.name || "Unknown",
+                email: p.principal?.email || "",
+                access: p.access
+            }));
+
+        const shareLinks = folder.metadata?.shareLinks || [];
+
+        res.json({
+            success: true,
+            folderId: folder._id,
+            folderName: folder.name,
+            usersWithAccess,
+            shareLinks
+        });
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Server error' });
+    }
+};
+
+
+/**
+ * Invite a user to a folder
+ */
+export const shareFolder = async (req, res) => {
+    const { folderId } = req.params;
+    const { userId, access } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(folderId) || !mongoose.Types.ObjectId.isValid(userId)) {
+        return res.status(400).json({ error: 'Invalid folder or user ID' });
+    }
+
+    try {
+        const folder = await Folder.findById(folderId);
+        if (!folder) return res.status(404).json({ error: 'Folder not found' });
+
+        const existing = folder.permissions.find(
+            p => String(p.principal) === userId && p.model === 'User'
+        );
+
+        if (existing) {
+            existing.access = Array.from(new Set([...existing.access, access]));
+        } else {
+            folder.permissions.push({
+                principal: userId,
+                model: 'User',
+                access: [access]
+            });
+        }
+
+        await folder.save();
+        res.json({ message: 'Folder shared successfully', folder });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Server error' });
+    }
+};
+
+/**
+ * Remove a user's access
+ */
+export const unshareFolder = async (req, res) => {
+    const { folderId } = req.params;
+    const { userId } = req.body;
+
+    try {
+        const folder = await Folder.findById(folderId);
+        if (!folder) return res.status(404).json({ error: 'Folder not found' });
+
+        folder.permissions = folder.permissions.filter(
+            p => !(String(p.principal) === userId && p.model === 'User')
+        );
+
+        await folder.save();
+        res.json({ message: 'Access revoked successfully', folder });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Server error' });
+    }
+};
+
+/**
+ * Generate shareable link
+ */
+export const generateShareLink = async (req, res) => {
+    const { folderId } = req.params;
+    const { access } = req.body;
+
+    try {
+        const folder = await Folder.findById(folderId);
+        if (!folder) return res.status(404).json({ error: 'Folder not found' });
+
+        const token = crypto.randomBytes(16).toString('hex');
+
+        folder.metadata = folder.metadata || {};
+        folder.metadata.shareLinks = folder.metadata.shareLinks || [];
+        folder.metadata.shareLinks.push({ token, access, createdAt: new Date() });
+
+        await folder.save();
+
+        const shareableUrl = `https://yourdomain.com/folders/${folderId}/access/${token}`;
+        res.json({ message: 'Shareable link generated', link: shareableUrl });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Server error' });
+    }
+};
+
+/**
+ * Access folder via shareable link
+ */
+export const accessViaLink = async (req, res) => {
+    const { folderId, token } = req.params;
+
+    try {
+        const folder = await Folder.findById(folderId);
+        if (!folder) return res.status(404).json({ error: 'Folder not found' });
+
+        const link = folder.metadata?.shareLinks?.find(l => l.token === token);
+        if (!link) return res.status(403).json({ error: 'Invalid or expired link' });
+
+        res.json({ folder, access: link.access });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Server error' });
     }
 };

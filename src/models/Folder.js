@@ -1,22 +1,6 @@
-
 import mongoose from 'mongoose';
 
 const { Schema } = mongoose;
-
-/**
- * Permission schema for ACL (Access Control List).
- * Supports User, Group, or Role principals.
- */
-const PermissionSchema = new Schema({
-    principal: { type: Schema.Types.ObjectId, required: true, refPath: 'permissions.principalModel' },
-    principalModel: { type: String, required: true, enum: ['User', 'Group', 'Role'] },
-    access: {
-        type: [String],
-        enum: ['read', 'write', 'delete', 'share', 'owner'],
-        default: ['read']
-    },
-    inherited: { type: Boolean, default: false }
-}, { _id: false });
 
 /**
  * Folder schema with materialized path hierarchy.
@@ -29,31 +13,24 @@ const folderSchema = new Schema({
     projectId: { type: mongoose.Schema.Types.ObjectId, ref: "Project", default: null },
     departmentId: { type: mongoose.Schema.Types.ObjectId, ref: "Department", default: null },
     parent: { type: Schema.Types.ObjectId, ref: 'Folder', default: null, index: true },
-    path: { type: String, index: true }, // materialized path, e.g., /root/documents/project1
+    path: { type: String, index: true }, // materialized path
     ancestors: [{ type: Schema.Types.ObjectId, ref: 'Folder', index: true }], // ancestor references
     depth: { type: Number, default: 0, index: true },
-    files: [
+    // Permissions (ACL)
+    permissions: [
         {
-            file: { type: String, required: true },      // s3 key or path
-            originalName: { type: String, required: true },
-            fileType: { type: String, required: true },
-            size: { type: Number, default: 0 },
-            uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-            uploadedAt: { type: Date, default: Date.now }
+            principal: { type: Schema.Types.ObjectId, required: true, refPath: 'permissions.model' },
+            model: { type: String, enum: ['User', 'Group', 'Role'], required: true },
+            access: [{ type: String, enum: ['view', 'edit', 'owner'] }]
         }
     ],
-
-    permissions: { type: [PermissionSchema], default: [] },
-    deletedAt: { type: Date, default: null },
+    deletedAt: { type: Date, default: null, index: true },
     status: {
         type: String,
         enum: ["active", "inactive"],
         default: "active"
     },
-    isArchived: {
-        type: Boolean,
-        default: false
-    },
+    isArchived: { type: Boolean, default: false },
     size: { type: Number, default: 0 }, // aggregate size (bytes) of contents
     metadata: { type: Schema.Types.Mixed, default: {} },
 
@@ -70,6 +47,7 @@ folderSchema.set('optimisticConcurrency', true);
 // Indexes
 folderSchema.index({ owner: 1, parent: 1, name: 1 }, { unique: true }); // prevent duplicate sibling names
 folderSchema.index({ name: 'text' }); // text search on folder name
+folderSchema.index({ owner: 1, path: 1 }); // fast path prefix queries
 
 /**
  * Pre-save middleware:
@@ -106,17 +84,6 @@ folderSchema.pre('save', async function (next) {
     }
 });
 
-/**
- * Post-save middleware:
- * Currently only a placeholder. For path updates during moves,
- * prefer using `moveFolder` static method which handles old/new path diffing.
- */
-folderSchema.post('save', async function () {
-    if (this.isModified && this.isModified('path')) {
-        // Future hook: handle descendant updates on path change
-    }
-});
-
 /* ---------- Static Methods ---------- */
 
 /**
@@ -139,8 +106,7 @@ folderSchema.statics.createFolder = async function (owner, parent, name, created
                 updatedBy: createdBy
             });
 
-            // ✅ path, ancestors, depth will be computed automatically in pre('save')
-            await folder.save();
+            await folder.save(); // path, ancestors, depth auto-computed
             return folder;
         } catch (err) {
             if (err.code === 11000) {
@@ -153,7 +119,6 @@ folderSchema.statics.createFolder = async function (owner, parent, name, created
     }
 };
 
-
 /**
  * Get all non-deleted descendants of a folder.
  */
@@ -161,7 +126,7 @@ folderSchema.statics.getDescendants = async function (folderId) {
     const Folder = this;
     const root = await Folder.findById(folderId).lean();
     if (!root) return [];
-    return Folder.find({ ancestors: root._id, isDeleted: false }).sort({ depth: 1 }).lean();
+    return Folder.find({ ancestors: root._id, deletedAt: null }).sort({ depth: 1 }).lean();
 };
 
 /**
@@ -207,20 +172,17 @@ folderSchema.statics.moveFolder = async function (folderId, newParentId, updated
 
         // Update descendants
         const descendants = await Folder.find({ ancestors: folder._id }).session(session);
-
         for (const desc of descendants) {
-            const oldPrefix = [...oldAncestors, folder._id].map(id => String(id));
-            const newPrefix = [...newAncestors, folder._id].map(id => String(id));
-            const currentAnc = (desc.ancestors || []).map(id => String(id));
+            const oldPrefix = [...oldAncestors, folder._id].map(String);
+            const newPrefix = [...newAncestors, folder._id].map(String);
+            const currentAnc = (desc.ancestors || []).map(String);
 
-            // Replace old ancestors prefix with new
             if (JSON.stringify(currentAnc.slice(0, oldPrefix.length)) === JSON.stringify(oldPrefix)) {
                 const rest = currentAnc.slice(oldPrefix.length);
                 desc.ancestors = [...newPrefix, ...rest];
                 desc.depth = desc.ancestors.length;
             }
 
-            // Update path prefix
             if (desc.path?.startsWith(oldPath)) {
                 desc.path = desc.path.replace(oldPath, newPath);
             }
@@ -251,7 +213,6 @@ folderSchema.statics.markDeleted = async function (folderId, cascade = true, del
         const root = await Folder.findById(folderId).session(session);
         if (!root) throw new Error('Folder not found');
 
-        root.isDeleted = true;
         root.deletedAt = new Date();
         root.updatedBy = deletedBy;
         await root.save({ session });
@@ -259,7 +220,7 @@ folderSchema.statics.markDeleted = async function (folderId, cascade = true, del
         if (cascade) {
             await Folder.updateMany(
                 { ancestors: root._id },
-                { $set: { isDeleted: true, deletedAt: new Date(), updatedBy: deletedBy } }
+                { $set: { deletedAt: new Date(), updatedBy: deletedBy } }
             ).session(session);
         }
 
@@ -277,22 +238,17 @@ folderSchema.statics.markDeleted = async function (folderId, cascade = true, del
 
 /**
  * Check if a principal (user, group, or role) has required access.
- * @param {Array} principals - Array of { id, model } representing user/groups/roles.
- * @param {String} required - Access type required (default: "read").
  */
 folderSchema.methods.checkAccess = async function (principals = [], required = 'read') {
     const matches = (ace, pid) => String(ace.principal) === String(pid) && ace.access.includes(required);
 
-    // Check direct permissions
     for (const p of principals) {
         if (this.permissions?.some(ace => matches(ace, p.id))) return true;
     }
 
-    // Check inherited permissions
     if (this.ancestors?.length) {
         const Folder = this.constructor;
         const ancestors = await Folder.find({ _id: { $in: this.ancestors } }).sort({ depth: -1 }).lean();
-
         for (const anc of ancestors) {
             for (const p of principals) {
                 if ((anc.permissions || []).some(ace => matches(ace, p.id))) return true;

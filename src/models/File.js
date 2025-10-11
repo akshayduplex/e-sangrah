@@ -8,6 +8,8 @@ const fileSchema = new mongoose.Schema({
     originalName: { type: String, required: true },
     version: { type: Number, required: true },
     uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    fileType: { type: String, required: true },
+    folder: { type: mongoose.Schema.Types.ObjectId, ref: "Folder", required: false },
     uploadedAt: { type: Date, default: Date.now },
     isPrimary: { type: Boolean, default: false },
     status: { type: String, enum: ["active", "archived"], default: "active" },
@@ -16,9 +18,8 @@ const fileSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 // Indexes
-fileSchema.index({ document: 1, version: -1 });
-fileSchema.index({ document: 1, isPrimary: 1 });
-fileSchema.index({ document: 1, status: 1 });
+fileSchema.index({ folder: 1, uploadedAt: -1 });
+fileSchema.index({ document: 1, version: -1, status: 1 });
 
 const File = mongoose.model("File", fileSchema);
 export default File;

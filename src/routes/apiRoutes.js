@@ -742,6 +742,21 @@ router.patch('/folders/:id/restore', FolderController.restoreFolder);
 
 
 
+// Fetch users with access and share links
+router.get('/folders/:folderId', FolderController.getFolderShareInfo);
+// Invite user to folder
+router.post('/folders/:folderId/share', FolderController.shareFolder);
+
+// Remove user access
+router.post('/folders/:folderId/unshare', FolderController.unshareFolder);
+
+// Generate shareable link
+router.post('/folders/:folderId/link', FolderController.generateShareLink);
+
+// Access folder via link
+router.get('/folders/:folderId/access/:token', FolderController.accessViaLink);
+
+
 // ---------------------------
 // Donors and Vendors routes
 // ---------------------------
