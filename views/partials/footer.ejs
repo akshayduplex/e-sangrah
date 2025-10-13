@@ -425,6 +425,9 @@
 
 <!-- Color Picker JS -->
 <script src="/plugins/%40simonwep/pickr/pickr.es5.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+
 
 <!-- <script src="/socket.io/socket.io.js"></script> -->
 
@@ -445,6 +448,7 @@
 <!-- <script src="/js/pages/permissions.js"></script> -->
 
 <!-- Share Document Modal -->
+<!-- Share Document Modal -->
 <div class="modal fade" id="sharedoc-modal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content custom-modal p-3">
@@ -455,80 +459,93 @@
                 </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
+
             <div class="modal-body">
                 <!-- Time Duration -->
                 <h6 class="fw-normal fs-20 mb-3">Time Duration</h6>
-                <div class="d-flex flex-wrap gap-3 mb-3">
-                    <div class="form-check"><input class="form-check-input" type="radio" name="time" id="oneday"><label
-                            class="form-check-label" for="oneday">One Day</label></div>
-                    <div class="form-check"><input class="form-check-input" type="radio" name="time"
-                            id="onemonth"><label class="form-check-label" for="onemonth">1 Month</label></div>
-                    <div class="form-check"><input class="form-check-input" type="radio" name="time" id="oneweek"><label
-                            class="form-check-label" for="oneweek">1 Week</label></div>
-                    <div class="form-check"><input class="form-check-input" type="radio" name="time"
-                            id="lifetime"><label class="form-check-label" for="lifetime">Lifetime</label></div>
-                    <div class="form-check"><input class="form-check-input" type="radio" name="time" id="onetime"><label
-                            class="form-check-label" for="onetime">One Time</label></div>
-                    <div class="form-check"><input class="form-check-input" type="radio" name="time" id="custom"><label
-                            class="form-check-label" for="custom">Custom</label></div>
-                </div>
-
-                <!-- Wrapper added ONLY for toggling, ID untouched -->
-                <div id="customDateWrapper" style="display:none;">
-                    <label for="flatpickr-range" class="form-label">Range Picker</label>
-                    <input type="text" class="form-control" placeholder="YYYY-MM-DD to YYYY-MM-DD"
-                        id="flatpickr-range" />
+                <div class="d-flex flex-wrap gap-3 mb-4">
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="time" id="oneday">
+                        <label class="form-check-label" for="oneday">One Day</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="time" id="onemonth">
+                        <label class="form-check-label" for="onemonth">1 Month</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="time" id="oneweek">
+                        <label class="form-check-label" for="oneweek">1 Week</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="time" id="lifetime">
+                        <label class="form-check-label" for="lifetime">Lifetime</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="time" id="onetime">
+                        <label class="form-check-label" for="onetime">One Time</label>
+                    </div>
+                    <div class="form-check position-relative">
+                        <input class="form-check-input" type="radio" name="time" id="custom">
+                        <label class="form-check-label rangelabel" for="custom">Custom <i
+                                class="ti ti-calendar"></i></label>
+                        <div id="customDateWrapper" style="display:none;">
+                            <input type="text" class="form-control" placeholder="YYYY-MM-DD to YYYY-MM-DD"
+                                id="flatpickr-range" />
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Search User -->
-                <div class="d-flex mb-3">
-                    <select id="userInviteSelect" class="form-select me-2" style="width: 200px;"></select>
-                    <select class="form-select me-2" id="accessLevelSelect" style="width: 140px;">
+                <div class="d-flex mb-4 gap-2">
+                    <select id="userInviteSelect" class="form-select" style="width: 200px;"></select>
+                    <select class="form-select" id="accessLevelSelect" style="width: 140px;">
                         <option value="view">View Only</option>
                         <option value="edit">Edit</option>
                     </select>
-                    <button id="inviteUserBtn" class="site-btnmd ">Invite</button>
-                </div>
-                <!-- People with access -->
-                <h6 class="fw-normal fs-20 mb-3">People With Access</h6>
-                <div id="usersWithAccessContainer">
-                    <!-- Dynamic rows will be injected here -->
+                    <button id="inviteUserBtn" class="site-btnmd">Invite</button>
                 </div>
 
+                <!-- People With Access -->
+                <h6 class="fw-normal fs-20 mb-3">People With Access</h6>
+                <div id="usersWithAccessContainer" class="mb-4"></div>
+
                 <!-- General Access -->
-                <h6 class="fw-normal fs-20 mt-3 mb-3">General Access</h6>
-                <div class="d-flex align-items-start justify-content-between mb-3">
-                    <div class="icon_anyoneslct">
-                        <div class="icn"><img src="/img/icons/link.png"></div>
+                <h6 class="fw-normal fs-20 mb-3">General Access</h6>
+                <div class="d-flex align-items-start justify-content-between mb-4">
+                    <div class="icon_anyoneslct d-flex align-items-center gap-2">
+                        <div class="icn">
+                            <img src="/img/icons/link.png" alt="link icon">
+                        </div>
                         <div class="anyone_txtwrp">
-                            <div class="fw-normal fs-16">
-                                <select id="accessType" class="form-select w-auto">
-                                    <option value="anyone">Anyone with the link</option>
-                                    <option value="restricted">Restricted</option>
-                                </select>
-                            </div>
+                            <select id="accessType" class="form-select w-auto mb-1">
+                                <option value="anyone" selected>Anyone with the link</option>
+                                <option value="restricted">Restricted</option>
+                            </select>
                             <small class="fs-12" id="infoText">Anyone on the internet with the link can view</small>
                         </div>
                     </div>
                     <select id="roleType" class="form-select form-select-sm" style="width:120px;">
-                        <option value="viewer">Can View</option>
+                        <option value="viewer" selected>Can View</option>
                         <option value="editor">Can Edit</option>
                     </select>
                 </div>
-                <div class="input-group share-link-box mb-3">
-                    <input type="text" id="sharelink" class="form-control border-0 bg-transparent" readonly
-                        placeholder="https://duplextech.com/">
-                    <button class="btn btn-link text-outline-secondary copy-btn" type="button" id="copyLinkBtn">
+
+                <!-- Share Link -->
+                <div class="input-group mb-3 copygroup">
+                    <input type="text" id="sharelink" class="form-control" value="https://duplextech.com/" readonly>
+                    <button class="btn btncopylink" id="copyLinkBtn">
                         <i class="ti ti-copy"></i> Copy link
                     </button>
                 </div>
             </div>
+
             <div class="modal-footer">
-                <button class="site-btnmd">Share</button>
+                <button class="site-btnmd" id="shareBtn">Share</button>
             </div>
         </div>
     </div>
 </div>
+
 
 
 <!-- Version modal -->
@@ -555,7 +572,8 @@
                                 <div class="flxtbltxt">
                                     <p class="fs-18 mb-1 fw-normal">Project Proposal v2.4</p>
                                     <span class="fs-16 fw-normal d-block mb-2">Modified by Arun Sharma </span>
-                                    <h5 class="fs-18 fw-light text-black mb-3">Added New feature in the Document</h5>
+                                    <h5 class="fs-18 fw-light text-black mb-3">Added New feature in the Document
+                                    </h5>
                                     <div class="version-actions">
                                         <button class="site-btnmd fw-light">View</button>
                                         <button class="btn btn-outline-light rounded-pill">Restore to v2.4
@@ -576,7 +594,8 @@
                                 <div class="flxtbltxt">
                                     <p class="fs-18 mb-1 fw-normal">Project Proposal v2.4</p>
                                     <span class="fs-16 fw-normal d-block mb-2">Modified by Arun Sharma </span>
-                                    <h5 class="fs-18 fw-light text-black mb-3">Added New feature in the Document</h5>
+                                    <h5 class="fs-18 fw-light text-black mb-3">Added New feature in the Document
+                                    </h5>
                                     <div class="version-actions">
                                         <button class="site-btnmd fw-light">View</button>
                                         <button class="btn btn-outline-light rounded-pill">Restore to v2.4
@@ -597,7 +616,8 @@
                                 <div class="flxtbltxt">
                                     <p class="fs-18 mb-1 fw-normal">Project Proposal v2.4</p>
                                     <span class="fs-16 fw-normal d-block mb-2">Modified by Arun Sharma </span>
-                                    <h5 class="fs-18 fw-light text-black mb-3">Added New feature in the Document</h5>
+                                    <h5 class="fs-18 fw-light text-black mb-3">Added New feature in the Document
+                                    </h5>
                                     <div class="version-actions">
                                         <button class="site-btnmd fw-light">View</button>
                                         <button class="btn btn-outline-light rounded-pill">Restore to v2.4
@@ -618,7 +638,8 @@
                                 <div class="flxtbltxt">
                                     <p class="fs-18 mb-1 fw-normal">Project Proposal v2.4</p>
                                     <span class="fs-16 fw-normal d-block mb-2">Modified by Arun Sharma </span>
-                                    <h5 class="fs-18 fw-light text-black mb-3">Added New feature in the Document</h5>
+                                    <h5 class="fs-18 fw-light text-black mb-3">Added New feature in the Document
+                                    </h5>
                                     <div class="version-actions">
                                         <button class="site-btnmd fw-light">View</button>
                                         <button class="btn btn-outline-light rounded-pill">Restore to v2.4
@@ -807,7 +828,8 @@
 
             <!-- Body -->
             <div class="modal-body text-muted">
-                Are you sure you want to permanently <span class="txtblue"> delete all files </span> in the recycle bin
+                Are you sure you want to permanently <span class="txtblue"> delete all files </span> in the recycle
+                bin
                 (111MB)? This action cannot be undone
             </div>
 
@@ -832,7 +854,7 @@
 
                     <div class="d-flex align-items-center">
                         <span class="avatar rounded bg-light me-2">
-                            <img src="assets/img/icons/fn1.png" alt="File Icon">
+                            <img src="/img/icons/fn1.png" alt="File Icon">
                         </span>
                         <div class="flxtbltxt">
                             <p class="fs-14 mb-1 fw-normal text-neutral">
@@ -878,7 +900,7 @@
 
                     <div class="d-flex align-items-center">
                         <span class="avatar rounded bg-light me-2">
-                            <img src="assets/img/icons/fn1.png" alt="File Icon">
+                            <img src="/img/icons/fn1.png" alt="File Icon">
                         </span>
                         <div class="flxtbltxt">
                             <p class="fs-14 mb-1 fw-normal text-neutral">
@@ -910,7 +932,22 @@
     </div>
 </div>
 
+<script>$(document).ready(function () {
+        $('#sharedoc-modal').on('shown.bs.modal', function () {
+            flatpickr('#flatpickr-range', {
+                mode: 'range',
+                dateFormat: 'd-m-Y',
+                appendTo: this, // attach to current modal
+            });
+        });
 
+        // Prevent Bootstrap from blocking Flatpickr focus
+        $('#shareDocumentModal').on('focusin', function (e) {
+            if ($(e.target).closest('.flatpickr-calendar').length) {
+                e.stopPropagation();
+            }
+        });
+    });</script>
 <script>
     $(document).ready(function () {
         const baseUrl = "http://localhost:5000";
@@ -1038,13 +1075,15 @@
     });
 </script>
 
-<!-- <script>
+<script>
     document.querySelectorAll('input[name="time"]').forEach(radio => {
         radio.addEventListener('change', function () {
             if (this.id === "custom") {
                 document.getElementById("customDateWrapper").style.display = "flex";
+                document.getElementsByClassName("rangelabel")[0].style.display = "none";
             } else {
                 document.getElementById("customDateWrapper").style.display = "none";
+                document.getElementsByClassName("rangelabel")[0].style.display = "block";
             }
         });
     });
@@ -1063,7 +1102,7 @@
     });
 
 
-</script> -->
+</script>
 
 </body>
 

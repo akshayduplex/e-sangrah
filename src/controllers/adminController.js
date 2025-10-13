@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import Document from "../models/Document.js";
 import logger from "../utils/logger.js";
 import Designation from "../models/Designation.js";
+import Folder from "../models/Folder.js";
 
 //Page controllers
 
@@ -58,6 +59,50 @@ export const showRecycleBinPage = async (req, res) => {
     }
 };
 
+export const showManageAccessPage = async (req, res) => {
+    try {
+        const { folderId } = req.params;
+        const owner = req.user;
+
+        if (!folderId || !owner) {
+            return res.status(400).send("Invalid request");
+        }
+
+        const folder = await Folder.findById(folderId)
+            .populate("owner", "name email")
+            .populate("permissions.principal", "name email"); // populate users with permissions
+
+        if (!folder) return res.status(404).send("Folder not found");
+
+        // Only owner can manage access
+        if (folder.owner._id.toString() !== owner._id.toString()) {
+            return res.status(403).send("Not authorized");
+        }
+
+        // Prepare a list of users with access
+        const accessList = folder.permissions.map(p => ({
+            userId: p.principal?._id,
+            name: p.principal?.name || 'Unknown',
+            email: p.principal?.email || 'Unknown',
+            access: p.access,
+            expiresAt: p.expiresAt,
+            duration: p.duration
+        }));
+
+        res.render("pages/admin/manage-access", {
+            folder,
+            accessList,
+            user: req.user
+        });
+
+    } catch (err) {
+        logger.error("Admin render error:", err);
+        res.status(500).render("pages/error", {
+            user: req.user,
+            message: "Unable to load manage access page"
+        });
+    }
+};
 //API Controllers
 
 /**

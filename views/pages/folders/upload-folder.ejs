@@ -155,35 +155,52 @@
 			// -------------------------
 			// Initialize Select2 with Clear Option
 			// -------------------------
-			function initSelect2(selector, url, textKey) {
+			function initSelect2(selector, url, textKey, placeholder) {
 				$(selector).select2({
-					placeholder: `-- Select ${textKey} --`,
+					placeholder: placeholder || `-- Select ${textKey} --`,
 					allowClear: true,
+					width: '100%',
 					ajax: {
-						url,
+						url: url,
 						dataType: 'json',
 						delay: 250,
-						data: params => ({ search: params.term }),
-						processResults: data => {
+						data: function (params) {
+							return {
+								search: params.term
+							};
+						},
+						processResults: function (data) {
 							const results = [
-								{ id: '', text: `-- Select ${textKey} --` }, // empty string for reset
-								...data.data.map(item => ({ id: item._id, text: item[textKey] }))
+								{ id: '', text: `-- Select ${textKey} --` },
+								...data.data.map(item => ({
+									id: item._id,
+									text: item[textKey]
+								}))
 							];
-							return { results };
-						}
+							return {
+								results: results
+							};
+						},
+						cache: true
 					}
 				});
 
+				// 🔥 FIX: Clear selection properly
 				$(selector).on('select2:select', function (e) {
-					if (!e.params.data.id) { // empty string selected
+					if (!e.params.data.id) {
 						$(this).val(null).trigger('change');
 					}
+				});
+
+				// 🔥 FIX: Handle clearing
+				$(selector).on('select2:unselect', function (e) {
+					$(this).val(null).trigger('change');
 				});
 			}
 
 
-			initSelect2('#department', `${baseUrl}/api/departments/search`, 'name');
-			initSelect2('#projectName', `${baseUrl}/api/projects`, 'projectName');
+			// initSelect2('#department', `${baseUrl}/api/departments/search`, 'name');
+			// initSelect2('#projectName', `${baseUrl}/api/projects`, 'projectName');
 
 
 			// ---------------- STORAGE INFO ----------------
@@ -413,7 +430,7 @@
 				if (!fileList) return null;
 
 				const div = document.createElement('div');
-				div.className = 'col-6 mb-3 pending-item'; // ✅ 2 per row
+				div.className = 'col-6 mb-3 pending-item';
 
 				const isFolder = !!item.relativePath;
 				const displayName = isFolder ? item.relativePath : item.file.name;
@@ -481,40 +498,90 @@
 
 			// ---------------- FILE UPLOAD TO SERVER ----------------
 			async function uploadFileToServer(fileItem, progressCallback) {
-				try {
+				return new Promise((resolve) => {
 					const formData = new FormData();
-					formData.append('file', fileItem.file);
-					const response = await fetch(`/api/files/upload/${fileItem.folderId}`, { method: 'POST', body: formData, credentials: 'include' });
-					const data = await response.json();
-					if (progressCallback) progressCallback(100);
-					return data.success;
-				} catch (err) {
-					if (progressCallback) progressCallback(0, true);
-					return false;
-				}
+					formData.append("file", fileItem.file);
+
+					const xhr = new XMLHttpRequest();
+					xhr.open("POST", `/api/files/upload/${fileItem.folderId}`, true);
+					xhr.withCredentials = true;
+
+					// ✅ Real-time progress event
+					xhr.upload.onprogress = function (event) {
+						if (event.lengthComputable) {
+							let percent = Math.round((event.loaded / event.total) * 100);
+							progressCallback(percent);
+						}
+					};
+
+					xhr.onload = function () {
+						if (xhr.status === 200) {
+							progressCallback(100);
+							resolve(true);
+						} else {
+							progressCallback(0, true);
+							resolve(false);
+						}
+					};
+
+					xhr.onerror = function () {
+						progressCallback(0, true);
+						resolve(false);
+					};
+
+					xhr.send(formData);
+				});
 			}
 
 			// ---------------- FOLDER UPLOAD ----------------
 			async function uploadFolderToServer(folderItems) {
-				if (!folderItems.length) return;
-				const folderId = folderItems[0].folderId; // All files have same folderId
+				for (const item of folderItems) {
+					const div = Array.from(document.querySelectorAll('.pending-item')).find(d =>
+						d.querySelector('.text-truncate').textContent === item.relativePath
+					);
+					const progressBar = div?.querySelector('.progress-bar');
 
-				const formData = new FormData();
-				for (let key of formData.keys()) {
-					console.log(key);
-				}
+					await new Promise((resolve) => {
+						const formData = new FormData();
+						formData.append("folder", item.file, item.relativePath);
 
-				folderItems.forEach(item => formData.append('folder', item.file, item.relativePath));
+						const xhr = new XMLHttpRequest();
+						xhr.open("POST", `/api/files/upload-folder/${item.folderId}`, true);
+						xhr.withCredentials = true;
 
-				try {
-					const response = await fetch(`/api/files/upload-folder/${folderId}`, { method: 'POST', body: formData, credentials: 'include' });
-					const data = await response.json();
-					return data.success;
-				} catch (err) {
-					console.error("Folder upload failed:", err);
-					return false;
+						xhr.upload.onprogress = function (event) {
+							if (event.lengthComputable && progressBar) {
+								const percent = Math.round((event.loaded / event.total) * 100);
+								progressBar.style.width = percent + '%';
+								progressBar.textContent = percent + '%';
+							}
+						};
+
+						xhr.onload = function () {
+							if (progressBar) {
+								progressBar.style.width = '100%';
+								progressBar.textContent = xhr.status === 200 ? 'Uploaded' : 'Failed';
+								progressBar.classList.toggle('bg-success', xhr.status === 200);
+								progressBar.classList.toggle('bg-danger', xhr.status !== 200);
+							}
+							resolve(xhr.status === 200);
+						};
+
+						xhr.onerror = function () {
+							if (progressBar) {
+								progressBar.style.width = '100%';
+								progressBar.textContent = 'Failed';
+								progressBar.classList.remove('bg-success');
+								progressBar.classList.add('bg-danger');
+							}
+							resolve(false);
+						};
+
+						xhr.send(formData);
+					});
 				}
 			}
+
 
 			async function uploadPendingFiles() {
 				if (!pendingUploads.length) return alert("No files to upload.");
@@ -531,7 +598,6 @@
 
 					let progressBar = div ? div.querySelector('.progress-bar') : null;
 					const updateProgress = (p, failed = false) => { if (progressBar) { progressBar.style.width = p + '%'; progressBar.textContent = failed ? 'Failed' : p + '%'; progressBar.classList.toggle('bg-success', !failed); progressBar.classList.toggle('bg-danger', failed); } };
-					for (let i = 0; i <= 90; i += 10) { updateProgress(i); await new Promise(r => setTimeout(r, 100)); }
 					const success = await uploadFileToServer(item, updateProgress);
 					updateProgress(100, !success);
 					item.uploadSuccess = success;
@@ -539,9 +605,22 @@
 
 				// Upload folder files in one call
 				if (folderFiles.length) {
-					const success = await uploadFolderToServer(folderFiles);
-					folderFiles.forEach(item => { item.uploadSuccess = success; const div = Array.from(document.querySelectorAll('.pending-item')).find(d => d.querySelector('.text-truncate').textContent === item.relativePath); if (div) { const progressBar = div.querySelector('.progress-bar'); progressBar.style.width = '100%'; progressBar.textContent = success ? 'Uploaded' : 'Failed'; progressBar.classList.toggle('bg-success', success); progressBar.classList.toggle('bg-danger', !success); } });
+					const updateEachProgress = (item, percent, failed = false) => {
+						const div = Array.from(document.querySelectorAll('.pending-item')).find(d =>
+							d.querySelector('.text-truncate').textContent === item.relativePath
+						);
+						if (div) {
+							const progressBar = div.querySelector('.progress-bar');
+							progressBar.style.width = percent + '%';
+							progressBar.textContent = failed ? 'Failed' : percent + '%';
+							progressBar.classList.toggle('bg-success', !failed);
+							progressBar.classList.toggle('bg-danger', failed);
+						}
+					};
+
+					await uploadFolderToServer(folderFiles, updateEachProgress);
 				}
+
 
 				// Refresh folder view
 				if (window.selectedProjectId) loadFolders(folderState.currentFolderId, folderState.selectedFolders, window.selectedProjectId);
@@ -551,25 +630,40 @@
 			document.addEventListener("DOMContentLoaded", function () {
 				updateStorageInfo();
 				initializeUploadBox();
+				// Initialize Select2 with proper configuration
+				initSelect2('#department', `${baseUrl}/api/departments/search`, 'name', '-- Select Department --');
+				initSelect2('#projectName', `${baseUrl}/api/projects`, 'projectName', '-- Select Project --');
 
 				$('#projectName').on('select2:select', function (e) {
 					const selectedId = e.params.data.id;
-					if (selectedId) { window.selectedProjectId = selectedId; loadFolders(null, [], selectedId); }
+					if (selectedId) {
+						window.selectedProjectId = selectedId;
+						loadFolders(null, [], selectedId);
+					}
 				});
 
-				$('#department').on('change', function () { if (window.selectedProjectId) loadFolders(null, [], window.selectedProjectId); });
-
+				$('#department').on('change', function () {
+					if (window.selectedProjectId) {
+						loadFolders(null, [], window.selectedProjectId);
+					}
+				});
 				const uploadFilesBtn = document.getElementById("uploadFilesBtn");
 				if (uploadFilesBtn) uploadFilesBtn.addEventListener("click", uploadPendingFiles);
 
 				setTimeout(() => {
 					if (!window.selectedProjectId) {
 						const firstOption = $('#projectName').find('option:eq(1)').val();
-						if (firstOption) { $('#projectName').val(firstOption).trigger('change'); window.selectedProjectId = firstOption; loadFolders(null, [], firstOption); }
+						if (firstOption) {
+							$('#projectName').val(firstOption).trigger('change');
+							window.selectedProjectId = firstOption;
+							loadFolders(null, [], firstOption);
+						}
 					}
 					if (!$('#department').val()) {
 						const firstDept = $('#department').find('option:eq(1)').val();
-						if (firstDept) $('#department').val(firstDept).trigger('change');
+						if (firstDept) {
+							$('#department').val(firstDept).trigger('change');
+						}
 					}
 				}, 600);
 			});

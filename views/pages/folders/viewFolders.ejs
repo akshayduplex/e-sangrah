@@ -1,7 +1,6 @@
 <%- include('../../partials/header') %>
 
     <style>
-        /* File container */
         #file-container {
             display: flex;
             flex-wrap: wrap;
@@ -10,7 +9,6 @@
 
         .filebox {
             flex: 0 0 calc(20% - 15px);
-            box-sizing: border-box;
             text-align: center;
             padding: 15px;
             border: 1px solid #ddd;
@@ -36,25 +34,25 @@
             word-break: break-all;
         }
 
-        @media (max-width: 1200px) {
+        @media (max-width:1200px) {
             .filebox {
-                flex: 0 0 calc(25% - 15px);
+                flex: 0 0 calc(25%-15px);
             }
         }
 
-        @media (max-width: 992px) {
+        @media (max-width:992px) {
             .filebox {
-                flex: 0 0 calc(33.33% - 15px);
+                flex: 0 0 calc(33.33%-15px);
             }
         }
 
-        @media (max-width: 768px) {
+        @media (max-width:768px) {
             .filebox {
-                flex: 0 0 calc(50% - 15px);
+                flex: 0 0 calc(50%-15px);
             }
         }
 
-        @media (max-width: 576px) {
+        @media (max-width:576px) {
             .filebox {
                 flex: 0 0 100%;
             }
@@ -66,7 +64,9 @@
 
             <div class="d-flex align-items-center justify-content-between page-breadcrumb mb-3">
                 <div class="my-auto mb-2">
-                    <h2 class="mb-1" id="folder-name">Files</h2>
+                    <h2 class="mb-1" id="folder-name">
+                        <%= folder.name %>
+                    </h2>
                     <nav>
                         <ol class="breadcrumb mb-0">
                             <li class="breadcrumb-item"><a href="#"><i class="ti ti-smart-home"></i></a></li>
@@ -77,23 +77,29 @@
                 </div>
             </div>
 
-            <!-- File Container -->
-            <div id="file-container"></div>
+            <!-- Request Access -->
+            <div id="request-access-container" class="text-center my-3"
+                style="display:<%= canRequestAccess ? 'block' : 'none' %>;">
+                <button id="request-access-btn" class="btn btn-primary">Request Access</button>
+                <p id="request-access-msg" class="mt-2 text-success" style="display:none;"></p>
+            </div>
 
-            <!-- Loading & Empty -->
+            <!-- Files -->
+            <div id="file-container" style="display:<%= canView && !folderExpired ? 'flex' : 'none' %>;"></div>
+
+            <!-- Expired / Empty -->
+            <div id="file-empty" class="text-center py-4" style="display:<%= folderExpired ? 'block' : 'none' %>;">
+                <i class="ti ti-file-off fs-1 text-muted"></i>
+                <p class="mt-2 text-muted">This folder has expired and files are no longer available.</p>
+            </div>
+
             <div id="file-loading" class="text-center py-4" style="display:none;">
                 <div class="spinner-border text-primary"></div>
                 <p class="mt-2 text-muted">Loading files...</p>
             </div>
 
-            <div id="file-empty" class="text-center py-4" style="display:none;">
-                <i class="ti ti-file-off fs-1 text-muted"></i>
-                <p class="mt-2 text-muted">No files found</p>
-            </div>
-
         </div>
 
-        <!-- Footer -->
         <div class="footer mt-4 d-sm-flex align-items-center justify-content-between border-top bg-white p-3">
             <p class="mb-0">2025 &copy; HLFPPT.</p>
             <p>Designed & Developed by <a href="javascript:void(0);" class="text-primary">Duplex Services &
@@ -108,8 +114,14 @@
             const fileLoading = document.getElementById('file-loading');
             const fileEmpty = document.getElementById('file-empty');
             const folderName = document.getElementById('folder-name');
+            const requestAccessContainer = document.getElementById('request-access-container');
+            const requestAccessBtn = document.getElementById('request-access-btn');
+            const requestAccessMsg = document.getElementById('request-access-msg');
 
-            // File type icons mapping
+            const CAN_REQUEST_ACCESS = <%= canRequestAccess ? 'true' : 'false' %>;
+            const FOLDER_EXPIRED = <%= folderExpired ? 'true' : 'false' %>;
+            const CAN_VIEW = <%= canView ? 'true' : 'false' %>;
+
             const fileIcons = {
                 ppt: "/img/icons/fn1.png",
                 pptx: "/img/icons/fn1.png",
@@ -145,42 +157,34 @@
             };
 
             const loadFiles = async () => {
-                const parts = window.location.pathname.split("/");
-                const folderId = parts[parts.indexOf("folders") + 2];
+                if (!CAN_VIEW || FOLDER_EXPIRED) return;
 
-                if (!folderId) {
-                    console.error("Folder ID not found in URL");
-                    setEmpty(true);
-                    return;
-                }
-
-                setLoading(true);
                 try {
+                    const parts = window.location.pathname.split("/");
+                    const folderId = parts[parts.indexOf("folders") + 2];
+
+                    setLoading(true);
+
                     const res = await fetch(`/api/folders/details/${folderId}`);
                     const data = await res.json();
 
                     if (!data.success || !data.folder) throw new Error("Folder not found");
 
-                    const folder = data.folder;
-                    const files = folder.files || [];
-
-                    folderName.textContent = folder.name;
+                    const files = data.folder.files || [];
+                    folderName.textContent = data.folder.name;
                     fileContainer.innerHTML = "";
+
                     setLoading(false);
 
-                    if (files.length === 0) {
-                        setEmpty(true);
-                        return;
-                    }
+                    if (files.length === 0) { setEmpty(true); return; }
 
-                    // Render files in list structure
                     files.forEach(file => {
                         const ext = getFileExtension(file.originalName);
                         const icon = fileIcons[ext] || fileIcons.default;
-                        const fileSizeKB = formatFileSize(file.size);
+                        const fileSize = formatFileSize(file.size);
 
                         const div = document.createElement("div");
-                        div.className = "filebox mb-2"; // optional margin-bottom for spacing
+                        div.className = "filebox mb-2";
                         div.innerHTML = `
                     <div class="d-flex align-items-center p-2 rounded cursor-pointer">
                         <span class="avatar rounded bg-light me-2">
@@ -188,24 +192,51 @@
                         </span>
                         <div>
                             <p class="mb-0 text-dark">${file.originalName}</p>
-                            <small class="text-muted">${fileSizeKB}</small>
+                            <small class="text-muted">${fileSize}</small>
                         </div>
                     </div>
                 `;
-
                         div.addEventListener("click", () => {
-                            window.open('/uploads/' + file.file, '_blank');
+                            if (file.file) window.open('/uploads/' + file.file, '_blank');
+                            else alert("File URL not found");
                         });
 
                         fileContainer.appendChild(div);
                     });
 
                 } catch (err) {
-                    console.error("Error loading files:", err);
+                    console.error(err);
                     setLoading(false);
                     setEmpty(true);
                 }
             };
+
+            requestAccessBtn?.addEventListener("click", async () => {
+                const parts = window.location.pathname.split("/");
+                const folderId = parts[parts.indexOf("folders") + 2];
+
+                requestAccessBtn.disabled = true;
+                requestAccessBtn.textContent = "Sending...";
+
+                try {
+                    const res = await fetch(`/api/folders/${folderId}/request-access`, { method: 'POST' });
+                    const data = await res.json();
+
+                    requestAccessMsg.style.display = 'block';
+                    requestAccessMsg.textContent = data.success ?
+                        "Access request sent to folder owner!" :
+                        data.message || "Error sending request.";
+
+                    if (data.success) requestAccessContainer.style.display = 'none';
+                } catch (err) {
+                    console.error(err);
+                    requestAccessMsg.style.display = 'block';
+                    requestAccessMsg.textContent = "Server error. Please try again.";
+                } finally {
+                    requestAccessBtn.disabled = false;
+                    requestAccessBtn.textContent = "Request Access";
+                }
+            });
 
             document.addEventListener("DOMContentLoaded", loadFiles);
         </script>

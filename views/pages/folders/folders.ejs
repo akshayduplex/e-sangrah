@@ -219,11 +219,11 @@
             <button type="button" class="btn border-0" data-bs-toggle="dropdown"><i class="ti ti-dots"></i></button>
             <ul class="dropdown-menu" data-bs-auto-close="outside">
               <li><a class="dropdown-item" href="/${folder._id}/list"><i class="ti ti-eye"></i> View</a></li>
-              <li><a class="dropdown-item rename-folder" href="#"><i class="ti ti-pencil-minus"></i> Edit</a></li>
-              <li><a class="dropdown-item delete-folder" href="#" data-bs-toggle="modal" data-bs-target="#trashdoc-modal"><i class="ti ti-trash"></i> Move to Trash</a></li>
+              <li><a class="dropdown-item rename-folder" href="#"><i class="ti ti-pencil-minus"></i> Rename</a></li>
               <li><a class="dropdown-item share-btn" href="#" data-doc-id="${folder._id}" data-bs-toggle="modal" data-bs-target="#sharedoc-modal"><i class="ti ti-share"></i> Share</a></li>
-              <li><a class="dropdown-item archive-folder" href="#" data-bs-toggle="modal" data-bs-target="#archivedoc-modal"><i class="ti ti-archive"></i> Move to Archive</a></li>
               <li><a class="dropdown-item download-folder" href="#" data-bs-toggle="modal" data-bs-target="#downloaddoc-modal"><i class="ti ti-download"></i> Download</a></li>
+              <li><a class="dropdown-item delete-folder" href="#" data-bs-toggle="modal" data-bs-target="#trashdoc-modal"><i class="ti ti-trash"></i> Move to Trash</a></li>
+              <li><a class="dropdown-item archive-folder" href="#" data-bs-toggle="modal" data-bs-target="#archivedoc-modal"><i class="ti ti-archive"></i> Move to Archive</a></li>
             </ul>
           </div>
         `;
@@ -242,7 +242,7 @@
 					} catch (err) {
 						setLoadingState(false);
 						console.error("Error loading folders:", err);
-						showToast("Failed to load folders", "danger");
+						showToast("Failed to load folders", "error");
 					}
 				};
 
@@ -298,13 +298,13 @@
 						const data = await res.json();
 						if (!data.success) throw new Error(data.message);
 
-						showToast(editingFolderId ? "Folder renamed" : "Folder created");
+						showToast(editingFolderId ? "Folder renamed" : "Folder created", 'success');
 						bootstrap.Modal.getInstance(document.getElementById("folder-modal")).hide();
 						editingFolderId = null;
 						loadFolders(folderState.currentFolderId, folderState.selectedFolders, window.selectedProjectId);
 					} catch (err) {
 						console.error(err);
-						showToast("Error saving folder", "danger");
+						showToast("Error saving folder", "error");
 					}
 				});
 
@@ -314,10 +314,10 @@
 						const res = await fetch(`/api/folders/${pendingFolderId}`, { method: "DELETE" });
 						const data = await res.json();
 						if (!data.success) return showToast(data.message || "Failed to delete folder", "warning");
-						showToast(data.message || "Folder deleted successfully");
+						showToast(data.message || "Folder deleted successfully", 'success');
 						loadFolders(folderState.currentFolderId, folderState.selectedFolders);
 					} catch (err) {
-						showToast("Failed to delete folder", "danger");
+						showToast("Failed to delete folder", "error");
 					} finally {
 						pendingFolderId = null;
 						bootstrap.Modal.getInstance(document.getElementById("trashdoc-modal")).hide();
@@ -335,21 +335,71 @@
 
 					loadFolders();
 				});
+				async function generateShareLink(folderId, accessType, role) {
+					if (!folderId || accessType !== "anyone") return;
+
+					try {
+						const res = await fetch(`/api/folders/${folderId}/link`, {
+							method: "POST",
+							headers: { "Content-Type": "application/json" },
+							body: JSON.stringify({ access: role === "editor" ? "editor" : "viewer" })
+						});
+
+						const data = await res.json();
+						if (!res.ok) throw new Error(data.error || "Failed to generate share link");
+
+						// Use the link returned by API directly
+						const shareLink = data.link;
+						window.currentShareLink = shareLink;
+						shareLinkInput.value = shareLink;
+
+					} catch (err) {
+						console.error(err);
+						shareLinkInput.value = "";
+						window.currentShareLink = null;
+					}
+				}
 
 				// --------------------
 				// Folder Share Modal
 				// --------------------
-				elements.container.addEventListener("click", (e) => {
+				elements.container.addEventListener("click", async (e) => {
 					const shareBtn = e.target.closest(".share-btn");
 					if (!shareBtn) return;
 
 					currentShareFolderId = shareBtn.dataset.docId;
-					loadFolderShares(currentShareFolderId);
+
+					// Load API data first
+					await loadFolderShares(currentShareFolderId);
+
+					// Update roleType display based on current accessType
+					updateAccessInfoText();
+
 					new bootstrap.Modal(shareModal).show();
 				});
 
+
+				function updateAccessInfoText() {
+					const infoText = document.getElementById("infoText");
+
+					if (accessTypeSelect.value === "anyone") {
+						infoText.textContent = roleTypeSelect.value === "viewer" ?
+							"Anyone on the internet with the link can view" :
+							"Anyone on the internet with the link can edit";
+
+						// Show roleType dropdown when 'anyone' is selected
+						roleTypeSelect.style.display = "inline-block";
+					} else {
+						infoText.textContent = "Only people with access can view";
+
+						// Hide roleType dropdown when 'restricted' is selected
+						roleTypeSelect.style.display = "none";
+					}
+				}
+
+
 				// Load shared users and link
-				const loadFolderShares = async (folderId) => {
+				async function loadFolderShares(folderId) {
 					try {
 						const res = await fetch(`/api/folders/${folderId}`);
 						const data = await res.json();
@@ -357,68 +407,144 @@
 						// Clear previous users
 						usersWithAccessContainer.innerHTML = "";
 
-						// Populate users with access
 						(data.usersWithAccess || []).forEach(user => {
 							const div = document.createElement("div");
-							div.className = "d-flex justify-content-between align-items-center mb-2 user-access-row";
-
+							div.className = "user-accssrow d-flex justify-content-between align-items-center mb-2";
 							div.innerHTML = `
-                <div>
-                    <div class="fw-bold">${user.name}</div>
-                    <small class="text-muted">${user.email}</small>
-                </div>
-                <div class="d-flex align-items-center gap-2">
-                    <select class="form-select form-select-sm access-level" style="width:100px;" data-user-id="${user.id}">
-                        <option value="view" ${user.access.includes('view') ? 'selected' : ''}>View</option>
-                        <option value="edit" ${user.access.includes('edit') ? 'selected' : ''}>Edit</option>
-                    </select>
-                    <button class="btn btn-sm btn-danger remove-access" data-user-id="${user.id}">&times;</button>
-                </div>
-            `;
-
+      <div class="empname_eml">
+        <div class="fw-normal fs-18">${user.name}</div>
+        <small class="fs-16">${user.email}</small>
+      </div>
+      <div class="d-flex align-items-center gap-4">
+        <div class="form-check form-switch">
+          <label>Download Access</label>
+          <input class="form-check-input download-access" type="checkbox" ${user.canDownload ? 'checked' : ''} data-user-id="${user.id}">
+        </div>
+        <select class="form-select form-select-sm border-0" style="width:100px;" data-user-id="${user.id}">
+          <option value="edit" ${user.access.includes('edit') ? 'selected' : ''}>Edit</option>
+          <option value="view" ${user.access.includes('view') ? 'selected' : ''}>View</option>
+        </select>
+        <button class="btn btn-sm remvaccessbtn remove-access" data-user-id="${user.id}">Remove</button>
+      </div>
+    `;
 							usersWithAccessContainer.appendChild(div);
 						});
 
-						// If a share link already exists, use it
+						// Set dropdowns and share link based on API data if exists
 						if ((data.shareLinks || []).length > 0) {
-							shareLinkInput.value = `${window.location.origin}/folders/${data.shareLinks[0].access}/${folderId}?token=${data.shareLinks[0].token}`;
+							const shareData = data.shareLinks[0];
+							roleTypeSelect.value = shareData.access === "editor" ? "editor" : "viewer";
+							accessTypeSelect.value = shareData.access === "restricted" ? "restricted" : "anyone";
+
+							updateAccessInfoText();
+
+							const shareLink = `${window.location.origin}/folders/${shareData.access}/${folderId}?=${shareData.token}`;
+							shareLinkInput.value = shareLink;
+							window.currentShareLink = shareLink;
 						} else {
-							// If no link exists, generate a new one
-							const tokenRes = await fetch(`/api/folders/${folderId}/link`, {
-								method: "POST",
-								headers: { "Content-Type": "application/json" },
-								body: JSON.stringify({ access: roleType === "editor" ? "editor" : "viewer" })
-							});
-							const tokenData = await tokenRes.json();
-							shareLinkInput.value = `${window.location.origin}/folders/${tokenData.access}/${folderId}?token=${tokenData.link}`;
+							// No existing share link → use defaults
+							accessTypeSelect.value = "anyone";
+							roleTypeSelect.value = "viewer";
+							updateAccessInfoText();
+							await generateShareLink(folderId, accessTypeSelect.value, roleTypeSelect.value);
 						}
+
 					} catch (err) {
-						console.error("Error loading share info:", err);
-						alert("Failed to load folder share info");
+						console.error("Error loading folder shares:", err);
+						showToast("Failed to load folder share info", 'error');
 					}
-				};
+				}
+
 
 				// Invite user
 				inviteUserBtn.addEventListener("click", async () => {
 					const userId = userInviteSelect.value;
 					const access = accessLevelSelect.value;
 
-					if (!currentShareFolderId || !userId) return alert("Select a user to invite");
+					if (!currentShareFolderId || !userId) return showToast("Select a user to invite", 'warning');
+
+					let customStart = null;
+					let customEnd = null;
+					// Determine selected duration
+					const durationRadio = document.querySelector('input[name="time"]:checked');
+					let duration = durationRadio ? durationRadio.id : "lifetime";
+					let expiresAt = null;
+
+					const now = new Date();
+
+					switch (duration) {
+						case "oneday":
+							expiresAt = new Date(now.getTime() + 1 * 24 * 60 * 60 * 1000);
+							break;
+
+						case "oneweek":
+							expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+							break;
+
+						case "onemonth":
+							expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+							break;
+
+						case "custom":
+							const customRange = document.getElementById("flatpickr-range").value.trim();
+
+							if (!customRange.includes(" to ")) {
+								return showToast("Please select a valid custom date range.", 'warning');
+							}
+
+							const [startRaw, endRaw] = customRange.split(" to ");
+
+							// 🔁 Convert DD-MM-YYYY → YYYY-MM-DD
+							const [d1, m1, y1] = startRaw.trim().split("-");
+							const [d2, m2, y2] = endRaw.trim().split("-");
+
+							const startISO = `${y1}-${m1}-${d1}T00:00:00.000Z`;
+							const endISO = `${y2}-${m2}-${d2}T23:59:59.999Z`;
+
+							const startDate = new Date(startISO);
+							const endDate = new Date(endISO);
+
+							if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+								return showToast("Invalid date selection. Please reselect range.", 'warning');
+							}
+
+							customStart = startDate.toISOString();
+							customEnd = endDate.toISOString(); // ✅ Safe now
+							expiresAt = customEnd;
+							break;
+
+						case "onetime":
+							expiresAt = new Date(now.getTime() + 1 * 60 * 60 * 1000);
+							break;
+
+						case "lifetime":
+						default:
+							expiresAt = null;
+					}
 
 					try {
 						const res = await fetch(`/api/folders/${currentShareFolderId}/share`, {
 							method: "POST",
 							headers: { "Content-Type": "application/json" },
-							body: JSON.stringify({ userId, access })
+							body: JSON.stringify({
+								userId,
+								access,
+								shareLink: window.currentShareLink,
+								duration,
+								expiresAt,
+								customStart,  // ✅ NOW SENT
+								customEnd     // ✅ NOW SENT
+							})
 						});
+
 						const data = await res.json();
 						if (!res.ok) throw new Error(data.error || "Failed to share folder");
 
 						loadFolderShares(currentShareFolderId);
-						userInviteSelect.value = ""; // reset dropdown
+						userInviteSelect.value = "";
 					} catch (err) {
 						console.error(err);
-						alert("Failed to invite user");
+						showToast("Failed to invite user", 'error');
 					}
 				});
 
@@ -429,7 +555,7 @@
 					const userId = e.target.dataset.userId;
 					if (!currentShareFolderId || !userId) return;
 
-					if (!confirm("Are you sure you want to remove this user's access?")) return;
+					if (!confirm("Are you sure you want to remove this user's access?")) return showToast("Removed User from share list", 'success');
 
 					try {
 						const res = await fetch(`/api/folders/${currentShareFolderId}/unshare`, {
@@ -443,33 +569,86 @@
 						loadFolderShares(currentShareFolderId);
 					} catch (err) {
 						console.error(err);
-						alert("Failed to remove access");
+						showToast("Failed to remove access", 'error');
 					}
 				});
+
+				usersWithAccessContainer.addEventListener("change", async (e) => {
+					if (!e.target.classList.contains("download-access")) return;
+
+					const userId = e.target.dataset.userId;
+					const canDownload = e.target.checked;
+
+					if (!currentShareFolderId || !userId) return;
+
+					try {
+						const res = await fetch(`/api/folders/${currentShareFolderId}/permissions`, {
+							method: "PATCH",
+							headers: { "Content-Type": "application/json" },
+							body: JSON.stringify({ principalId: userId, canDownload })
+						});
+
+						const data = await res.json();
+						if (!res.ok) throw new Error(data.error || "Failed to update download access");
+
+						showToast(`Download access ${canDownload ? "enabled" : "disabled"} for user`, 'success');
+					} catch (err) {
+						console.error(err);
+						showToast("Failed to update download access", 'error');
+						e.target.checked = !canDownload; // revert checkbox on failure
+					}
+				});
+				usersWithAccessContainer.addEventListener("change", async (e) => {
+					if (!e.target.classList.contains("access-level")) return;
+
+					const userId = e.target.dataset.userId;
+					const access = e.target.value; // "view" or "edit"
+
+					if (!currentShareFolderId || !userId) return;
+
+					try {
+						const res = await fetch(`/api/folders/${currentShareFolderId}/permissions`, {
+							method: "PATCH",
+							headers: { "Content-Type": "application/json" },
+							body: JSON.stringify({ principalId: userId, access })
+						});
+
+						const data = await res.json();
+						if (!res.ok) throw new Error(data.error || "Failed to update access level");
+
+						showToast(`Access level updated to ${access} for user`, 'success');
+					} catch (err) {
+						console.error(err);
+						showToast("Failed to update access level", 'error');
+					}
+				});
+
 
 				// Copy share link
 				copyLinkBtn.addEventListener("click", () => {
 					shareLinkInput.select();
 					document.execCommand("copy");
-					alert("Link copied to clipboard");
+					showToast("Link copied to clipboard", 'success');
 				});
 
-				// Regenerate share link on role type change
-				roleTypeSelect.addEventListener("change", () => {
-					if (currentShareFolderId) loadFolderShares(currentShareFolderId);
-				});
+				accessTypeSelect.addEventListener("change", async () => {
+					updateAccessInfoText();
 
-				// Access type change text
-				accessTypeSelect.addEventListener("change", () => {
-					const infoText = document.getElementById("infoText");
-					const accessType = accessTypeSelect.value;
-
-					if (accessType === "anyone") {
-						infoText.textContent = roleTypeSelect.value === "viewer" ?
-							"Anyone on the internet with the link can view" :
-							"Anyone on the internet with the link can edit";
+					if (currentShareFolderId && accessTypeSelect.value === "anyone") {
+						// Regenerate share link only when switching back to 'anyone'
+						await generateShareLink(currentShareFolderId, accessTypeSelect.value, roleTypeSelect.value);
 					} else {
-						infoText.textContent = "Only people with access can view";
+						// Clear share link input when restricted
+						shareLinkInput.value = "";
+						window.currentShareLink = null;
+					}
+				});
+
+
+				roleTypeSelect.addEventListener("change", () => {
+					updateAccessInfoText();
+					if (currentShareFolderId && accessTypeSelect.value === "anyone") {
+						generateShareLink(currentShareFolderId, accessTypeSelect.value, roleTypeSelect.value);
 					}
 				});
 

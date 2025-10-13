@@ -767,6 +767,75 @@
         max-width: 55px;
     }
 
+
+    .anlytc_linkbx {
+        margin-bottom: 16px;
+        border-radius: 20px;
+    }
+
+    .anlytc_linkbx a {
+        display: flex;
+        align-items: center;
+        height: 125px;
+        padding: 20px;
+    }
+
+    .bgcream {
+        background: rgba(230, 255, 140, 0.10);
+    }
+
+    .bgltgreen {
+        background: rgba(195, 234, 181, 0.10);
+    }
+
+    .bgltred {
+        background: rgba(255, 167, 143, 0.10);
+    }
+
+    .bgltblue {
+        background: rgba(154, 194, 243, 0.10);
+    }
+
+    span#customDateWrapper input {
+        border: 0;
+        padding-top: 0;
+        padding-bottom: 10px;
+        border-bottom: 1px solid #9d9e9f;
+        border-radius: 0;
+        height: 30px;
+        color: #5E5E5E;
+        padding-left: 4px;
+        font-weight: 500;
+        padding-right: 20px;
+        font-size: 12px;
+    }
+
+    span#customDateWrapper i {
+        position: absolute;
+        right: 0px;
+        top: 2px;
+    }
+
+    .copygroup input {
+        background: #f3f5f9;
+    }
+
+    .btncopylink {
+        position: absolute !important;
+        right: 0;
+        top: 2px;
+        color: #33a3d2;
+        z-index: 99 !important;
+        font-weight: 300;
+    }
+
+    .remvaccessbtn:hover {
+        border: 1px solid #E54F4F !important;
+        color: #E54F4F !important;
+    }
+
+
+
     /* AddedbyAkshay */
 
     #sharedoc-modal .select2-container {

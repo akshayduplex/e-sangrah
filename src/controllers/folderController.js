@@ -2,6 +2,7 @@
 import Folder from '../models/Folder.js';
 import Document from '../models/Document.js';
 import crypto from 'crypto'
+import jwt from "jsonwebtoken";
 import mongoose from 'mongoose';
 import { generateUniqueFileName } from '../helper/GenerateUniquename.js';
 import { putObject } from '../utils/s3Helpers.js';
@@ -9,6 +10,9 @@ import logger from '../utils/logger.js';
 import TempFile from '../models/TempFile.js';
 import User from '../models/User.js';
 import { API_CONFIG } from '../config/ApiEndpoints.js';
+import { sendEmail } from '../services/emailService.js';
+import { folderSharedTemplate } from '../emailTemplates/folderSharedTemplate.js';
+import { folderAccessRequestTemplate } from '../emailTemplates/folderAccessRequestTemplate.js';
 
 //Page controlers
 
@@ -68,29 +72,57 @@ export const showMainFoldersPage = (req, res) => {
         user: req.user
     });
 };
-
 export const showviewFoldersPage = async (req, res) => {
-
     const { folderId } = req.params;
     const { token } = req.query;
 
     try {
-        let folder = await Folder.findById(folderId).lean();
+        const folder = await Folder.findById(folderId).lean();
         if (!folder) return res.status(404).send('Folder not found');
 
-        // If token provided, verify it
+        const now = new Date();
+        let canView = false;
+
+        // Token-based access
         if (token) {
             const link = folder.metadata?.shareLinks?.find(l => l.token === token);
-            if (!link) return res.status(403).send('Invalid or expired link');
+            if (link && (!link.expiresAt || new Date(link.expiresAt) > now)) {
+                canView = true;
+            }
         }
 
-        // folder.files contains files
-        res.render('pages/folders/viewFolders', { folder, user: req.user });
+        // User-based permissions
+        if (!canView && req.user) {
+            const permission = folder.permissions?.find(p => String(p.principal) === String(req.user._id));
+            if (permission) {
+                const valid =
+                    (!permission.expiresAt || new Date(permission.expiresAt) > now) &&
+                    (!permission.customEnd || new Date(permission.customEnd) > now);
+                if (valid) canView = true;
+            }
+        }
+
+        // Folder expired check
+        const folderExpired = folder.expiresAt && new Date(folder.expiresAt) <= now;
+        if (folderExpired) canView = false;
+
+        // Determine if user can request access
+        const canRequestAccess = !canView && !folderExpired;
+
+        res.render('pages/folders/viewFolders', {
+            folder,
+            user: req.user,
+            canView,
+            canRequestAccess,
+            folderExpired
+        });
+
     } catch (err) {
         console.error(err);
         res.status(500).send('Server error');
     }
 };
+
 //API controllers
 
 // Create folder
@@ -699,13 +731,14 @@ export const getFolderShareInfo = async (req, res) => {
 
         if (!folder) return res.status(404).json({ error: 'Folder not found' });
 
-        // Map permissions to include principal name/email
+        // Map permissions to include principal info and canDownload from the permission object
         const usersWithAccess = (folder.permissions || [])
             .filter(p => p.model === 'User')
             .map(p => ({
                 id: p.principal?._id,
                 name: p.principal?.name || "Unknown",
                 email: p.principal?.email || "",
+                canDownload: p.canDownload || false, // <-- corrected
                 access: p.access
             }));
 
@@ -729,59 +762,147 @@ export const getFolderShareInfo = async (req, res) => {
 /**
  * Invite a user to a folder
  */
+// export const shareFolder = async (req, res) => {
+//     const { folderId } = req.params;
+//     const { userId, access, shareLink } = req.body;
+//     console.log(req.body)
+//     if (!mongoose.Types.ObjectId.isValid(folderId)) {
+//         return res.status(400).json({ error: 'Invalid folder ID' });
+//     }
+//     if (!userId || !access) {
+//         return res.status(400).json({ error: 'User email and access level are required' });
+//     }
+
+//     try {
+//         const user = await User.findOne({ email: userId }).select('_id name');
+//         if (!user) return res.status(404).json({ error: 'User not found' });
+
+//         const folder = await Folder.findById(folderId);
+//         if (!folder) return res.status(404).json({ error: 'Folder not found' });
+
+//         // Add/update permissions
+//         const existing = folder.permissions.find(
+//             p => String(p.principal) === String(user._id) && p.model === "User"
+//         );
+//         if (existing) {
+//             existing.access = Array.from(new Set([...existing.access, access]));
+//         } else {
+//             folder.permissions.push({ principal: user._id, model: "User", access: [access] });
+//         }
+
+//         // Manage share links
+//         folder.metadata = folder.metadata || {};
+//         folder.metadata.shareLinks = folder.metadata.shareLinks || [];
+//         const now = new Date();
+//         folder.metadata.shareLinks = folder.metadata.shareLinks.filter(
+//             l => !l.expiresAt || new Date(l.expiresAt) > now
+//         );
+
+//         folder.metadata.shareLinks.push({
+//             access,
+//             createdAt: now,
+//             expiresAt: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
+//         });
+
+//         await folder.save();
+
+//         // Send email
+//         const html = folderSharedTemplate({
+//             userName: user.name,
+//             senderName: req.user?.name,
+//             folderName: folder.name,
+//             access,
+//             folderLink: shareLink,
+//         });
+
+//         await sendEmail({
+//             to: userId,
+//             subject: `Folder Shared with You: ${folder.name}`,
+//             html,
+//             fromName: "E-sangrah",
+//         });
+
+//         res.json({
+//             message: "Folder shared and invitation email sent successfully",
+//             folder,
+//             link: shareLink,
+//         });
+
+//     } catch (err) {
+//         console.error("Error sharing folder:", err);
+//         res.status(500).json({ error: "Server error" });
+//     }
+// };
 export const shareFolder = async (req, res) => {
     const { folderId } = req.params;
-    const { userId, access } = req.body; // userId is actually an email string
-
+    const { userId, access, shareLink, duration, expiresAt, customStart, customEnd } = req.body;
     if (!mongoose.Types.ObjectId.isValid(folderId)) {
         return res.status(400).json({ error: 'Invalid folder ID' });
     }
-
     if (!userId || !access) {
         return res.status(400).json({ error: 'User email and access level are required' });
     }
 
     try {
-        // Find the user by email
-        const user = await User.findOne({ email: userId }).select('_id');
-        if (!user) {
-            return res.status(404).json({ error: 'User not found' });
-        }
+        const user = await User.findOne({ email: userId }).select('_id name');
+        if (!user) return res.status(404).json({ error: 'User not found' });
 
-        // Fetch the folder
         const folder = await Folder.findById(folderId);
-        if (!folder) {
-            return res.status(404).json({ error: 'Folder not found' });
-        }
+        if (!folder) return res.status(404).json({ error: 'Folder not found' });
 
-        // Find if this user already has permissions
+        // Add/update permissions
         const existing = folder.permissions.find(
-            p => String(p.principal) === String(user._id) && p.model === 'User'
+            p => String(p.principal) === String(user._id) && p.model === "User"
         );
-
         if (existing) {
-            // Merge access permissions
             existing.access = Array.from(new Set([...existing.access, access]));
+            existing.duration = duration;
+            existing.expiresAt = expiresAt ? new Date(expiresAt) : null;
+            existing.customStart = customStart ? new Date(customStart) : null;
+            existing.customEnd = customEnd ? new Date(customEnd) : null;
         } else {
-            // Add a new permission entry
             folder.permissions.push({
                 principal: user._id,
-                model: 'User',
+                model: "User",
                 access: [access],
+                duration,
+                expiresAt: expiresAt ? new Date(expiresAt) : null,
+                customStart: customStart ? new Date(customStart) : null,
+                customEnd: customEnd ? new Date(customEnd) : null
             });
         }
 
         await folder.save();
 
-        res.json({
-            message: 'Folder shared successfully',
-            folder,
+        // Send email
+        const html = folderSharedTemplate({
+            userName: user.name,
+            senderName: req.user?.name,
+            folderName: folder.name,
+            access,
+            folderLink: shareLink,
+            expiresAt
         });
+
+        await sendEmail({
+            to: userId,
+            subject: `Folder Shared with You: ${folder.name}`,
+            html,
+            fromName: "E-sangrah",
+        });
+
+        res.json({
+            message: "Folder shared and invitation email sent successfully",
+            folder,
+            link: shareLink,
+        });
+
     } catch (err) {
-        console.error('Error sharing folder:', err);
-        res.status(500).json({ error: 'Server error' });
+        console.error("Error sharing folder:", err);
+        res.status(500).json({ error: "Server error" });
     }
 };
+
 
 /**
  * Remove a user's access
@@ -815,20 +936,42 @@ export const generateShareLink = async (req, res) => {
     const { folderId } = req.params;
     const { access } = req.body;
 
+    if (!mongoose.Types.ObjectId.isValid(folderId)) {
+        return res.status(400).json({ error: "Invalid folder ID" });
+    }
+    if (!access) {
+        return res.status(400).json({ error: "Access level is required" });
+    }
+
     try {
         const folder = await Folder.findById(folderId);
-        if (!folder) return res.status(404).json({ error: 'Folder not found' });
+        if (!folder) return res.status(404).json({ error: "Folder not found" });
 
-        const token = crypto.randomBytes(16).toString('hex');
-
+        // Clean expired share links
         folder.metadata = folder.metadata || {};
         folder.metadata.shareLinks = folder.metadata.shareLinks || [];
-        folder.metadata.shareLinks.push({ token, access, createdAt: new Date() });
+        const now = new Date();
+        folder.metadata.shareLinks = folder.metadata.shareLinks.filter(
+            l => !l.expiresAt || new Date(l.expiresAt) > now
+        );
+
+        // Generate token
+        const token = crypto.randomBytes(20).toString('hex');
+
+        folder.metadata.shareLinks.push({
+            token,
+            access,
+            createdAt: now,
+            expiresAt: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000), // 7 days
+        });
 
         await folder.save();
 
-        const shareableUrl = `${API_CONFIG.baseUrl}/folders/view/${folderId}?token=${token}`;
+        // Include access in URL
+        const shareableUrl = `${API_CONFIG.baseUrl}/folders/${access}/${folder._id}?${token}`;
+
         res.json({ message: 'Shareable link generated', link: shareableUrl });
+
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Server error' });
@@ -837,21 +980,224 @@ export const generateShareLink = async (req, res) => {
 
 /**
  * Access folder via token
- * GET /api/folders/:folderId/access/:token
+ * GET /api/folders/:folderId/:access/:token
  */
 export const accessViaToken = async (req, res) => {
-    const { folderId, token } = req.params;
+    const { folderId, access } = req.params;
+    const { token } = req.query;
+    if (!mongoose.Types.ObjectId.isValid(folderId)) {
+        return res.status(400).json({ error: 'Invalid folder ID' });
+    }
 
     try {
         const folder = await Folder.findById(folderId).lean();
         if (!folder) return res.status(404).json({ error: 'Folder not found' });
 
-        const link = folder.metadata?.shareLinks?.find(l => l.token === token);
+        const now = new Date();
+
+        // Find matching token with the same access
+        const link = folder.metadata?.shareLinks?.find(
+            l => l.token === token && l.access === access && (!l.expiresAt || new Date(l.expiresAt) > now)
+        );
+
         if (!link) return res.status(403).json({ error: 'Invalid or expired link' });
 
-        res.json({ success: true, folder, access: link.access });
+        res.json({
+            success: true,
+            folder,
+            access: link.access,
+        });
+
     } catch (err) {
-        console.error(err);
+        console.error('Error accessing folder via token:', err);
         res.status(500).json({ error: 'Server error' });
     }
 };
+
+/**
+ * Toggle or update permission for a folder.
+ * @param req.params.id - Folder ID
+ * @param req.body.principalId - User ID
+ * @param req.body.canDownload - Boolean (optional)
+ * @param req.body.access - Array of access strings: ['view','edit','owner'] (optional)
+ */
+export const updateFolderPermission = async (req, res) => {
+    const { id } = req.params;
+    const { principalId, canDownload, access } = req.body;
+    const updatedBy = req.user?._id || null; // assuming auth middleware sets req.user
+
+    if (!principalId) {
+        return res.status(400).json({ message: 'principalId is required' });
+    }
+
+    try {
+        const folder = await Folder.findById(id);
+        if (!folder) return res.status(404).json({ message: 'Folder not found' });
+
+        // Find existing permission
+        let permission = folder.permissions.find(p => String(p.principal) === String(principalId));
+
+        if (permission) {
+            // Update fields
+            if (typeof canDownload === 'boolean') permission.canDownload = canDownload;
+            if (Array.isArray(access)) permission.access[0] = access;
+        } else {
+            // Create new permission using Mongoose subdocument constructor
+            permission = folder.permissions.create({
+                principal: principalId,
+                model: 'User',
+                canDownload: canDownload || false,
+                access: Array.isArray(access) ? access : []
+            });
+            folder.permissions.push(permission);
+        }
+
+        folder.updatedBy = updatedBy;
+        await folder.save();
+
+        // Retrieve the updated permission from saved document
+        const updatedPermission = folder.permissions.find(p => String(p.principal) === String(principalId));
+
+        return res.json({
+            message: 'Permission updated successfully',
+            permission: updatedPermission
+        });
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ message: 'Server error', error: err.message });
+    }
+};
+
+
+// Request access to a folder
+export const requestFolderAccess = async (req, res) => {
+    try {
+        const { folderId } = req.params;
+        const user = req.user;
+
+        if (!mongoose.Types.ObjectId.isValid(folderId))
+            return res.status(400).json({ success: false, message: "Invalid folder ID" });
+
+        const folder = await Folder.findById(folderId).populate("owner", "name email");
+        if (!folder) return res.status(404).json({ success: false, message: "Folder not found" });
+
+        const owner = folder.owner;
+        if (!owner?.email) return res.status(400).json({ success: false, message: "Owner email not found" });
+
+        // --- Send email to owner with management link ---
+        const baseUrl = API_CONFIG.baseUrl || "http://localhost:5000";
+        const manageLink = `${baseUrl}/admin/folders/${folderId}/manage-access`;
+
+        await sendEmail({
+            to: owner.email,
+            subject: `Access Request for Folder: ${folder.name}`,
+            html: `
+                <p>${user.name} (${user.email}) requested access to folder <strong>${folder.name}</strong>.</p>
+                <p><a href="${manageLink}" style="color:white;background:#007bff;padding:10px 20px;border-radius:5px;text-decoration:none;">
+                    Grant Access
+                </a></p>
+            `
+        });
+
+        res.json({ success: true, message: `Access request notification sent to ${owner.name || owner.email}.` });
+    } catch (err) {
+        console.error("requestFolderAccess error:", err);
+        res.status(500).json({ success: false, message: "Server error: " + err.message });
+    }
+};
+export const getFolderAccess = async (req, res) => {
+    try {
+        const { folderId } = req.params;
+
+        if (!mongoose.Types.ObjectId.isValid(folderId))
+            return res.status(400).json({ success: false, message: "Invalid folder ID" });
+
+        const folder = await Folder.findById(folderId)
+            .populate('permissions.principal', 'name email')
+            .lean();
+
+        if (!folder) return res.status(404).json({ success: false, message: "Folder not found" });
+
+        const accessList = folder.permissions.map(p => ({
+            userId: p.principal._id,
+            name: p.principal.name,
+            email: p.principal.email,
+            access: p.access,
+            expiresAt: p.expiresAt
+        }));
+
+        res.json({ success: true, accessList });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: "Server error" });
+    }
+};
+// Approve or deny access
+export const grantFolderAccess = async (req, res) => {
+    try {
+        const { folderId } = req.params;
+        const { userEmail, access, duration, customEnd } = req.body;
+        const owner = req.user;
+
+        if (!mongoose.Types.ObjectId.isValid(folderId))
+            return res.status(400).json({ success: false, message: "Invalid folder ID" });
+
+        const folder = await Folder.findById(folderId);
+        if (!folder) return res.status(404).json({ success: false, message: "Folder not found" });
+
+        if (folder.owner.toString() !== owner._id.toString())
+            return res.status(403).json({ success: false, message: "Not authorized" });
+
+        const user = await User.findOne({ email: userEmail });
+        if (!user) return res.status(404).json({ success: false, message: "User not found" });
+
+        // Calculate expiration
+        let expiresAt = null;
+        const now = new Date();
+        switch (duration) {
+            case "oneday": expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); break;
+            case "oneweek": expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); break;
+            case "onemonth": expiresAt = new Date(now.setMonth(now.getMonth() + 1)); break;
+            case "custom": if (customEnd) expiresAt = new Date(customEnd); break;
+            case "lifetime": default: expiresAt = null;
+        }
+
+        // Check if user already has access
+        const existing = folder.permissions.find(p => p.principal.toString() === user._id.toString());
+        if (existing) {
+            // Update existing permission
+            existing.access = [access];
+            existing.duration = duration;
+            existing.expiresAt = expiresAt;
+        } else {
+            // Add new permission
+            folder.permissions.push({
+                principal: user._id,
+                model: "User",
+                access: [access],
+                duration,
+                expiresAt
+            });
+        }
+
+        folder.updatedBy = owner._id;
+        await folder.save();
+
+        // Notify user
+        await sendEmail({
+            to: user.email,
+            subject: `Access Granted/Updated - Folder: ${folder.name}`,
+            html: `<p>Your access to folder <strong>${folder.name}</strong> has been granted/updated.</p>
+                   <p><a href="${API_CONFIG.baseUrl}/folders/${folderId}">Open Folder</a></p>
+                   ${expiresAt ? `<p>Expires: ${expiresAt.toLocaleString()}</p>` : ''}`
+        });
+
+        res.json({ success: true, message: "Access granted/updated successfully." });
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: "Server error" });
+    }
+};
+
+

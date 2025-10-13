@@ -740,11 +740,20 @@ router.get('/folders/archived', FolderController.getArchivedFolders);
 router.patch('/folders/:id/restore', FolderController.restoreFolder);
 
 
+router.patch('/folders/:id/permissions', FolderController.updateFolderPermission);
 
 // Fetch users with access and share links
 router.get('/folders/:folderId', FolderController.getFolderShareInfo);
 // Invite user to folder
 router.post('/folders/:folderId/share', FolderController.shareFolder);
+
+router.post('/folders/:folderId/request-access', FolderController.requestFolderAccess);
+router.post('/folders/:folderId/grant-access', FolderController.grantFolderAccess);
+/**
+ * Get folder access permissions (for prefilling form)
+ * GET /api/folders/:folderId/access
+ */
+router.get('/folders/:folderId/access', FolderController.getFolderAccess);
 
 // Remove user access
 router.post('/folders/:folderId/unshare', FolderController.unshareFolder);

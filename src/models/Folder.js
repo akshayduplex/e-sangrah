@@ -20,8 +20,14 @@ const folderSchema = new Schema({
     permissions: [
         {
             principal: { type: Schema.Types.ObjectId, required: true, refPath: 'permissions.model' },
-            model: { type: String, enum: ['User', 'Group', 'Role'], required: true },
-            access: [{ type: String, enum: ['view', 'edit', 'owner'] }]
+            model: { type: String, enum: ['User'], required: true },
+            access: [{ type: String, enum: ['view', 'edit', 'owner'] }],
+            canDownload: { type: Boolean, default: false },
+            expiresAt: { type: Date, default: null }, // for timed shares
+            customStart: { type: Date, default: null },
+            customEnd: { type: Date, default: null },
+            duration: { type: String, enum: ['oneday', 'oneweek', 'onemonth', 'custom', 'onetime', 'lifetime'], default: 'lifetime' },
+            used: { type: Boolean, default: false }, // for onetime shares
         }
     ],
     deletedAt: { type: Date, default: null, index: true },

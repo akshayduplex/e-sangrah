@@ -125,6 +125,7 @@ router.get("/departments/:id", authenticate, checkPermissions, DepartmentControl
 router.get("/admin/approval", authenticate, checkPermissions, AdminController.showAdminApprovalPage);
 router.get("/document/:id/admin/approval/track", authenticate, checkPermissions, AdminController.showApprovalTrackPage);
 router.get("/documents/admin/recyclebin", authenticate, checkPermissions, AdminController.showRecycleBinPage);
+router.get("/admin/folders/:folderId/manage-access", authenticate, AdminController.showManageAccessPage);
 
 /* =========================================
    EMPLOYEE ROUTE
@@ -325,7 +326,7 @@ router.get("/recyclebin", authenticate, checkPermissions, FolderController.showR
 
 // Main Folders page
 router.get("/folders", authenticate, checkPermissions, FolderController.showMainFoldersPage);
-router.get("/folders/:accesslevel/:folderId", authenticate, checkPermissions, FolderController.showviewFoldersPage);
+router.get("/folders/:accesslevel/:folderId", authenticate, FolderController.showviewFoldersPage);
 
 /* =========================================
    NOTIFICATIONS ROUTE
