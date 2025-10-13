@@ -379,19 +379,19 @@
 							usersWithAccessContainer.appendChild(div);
 						});
 
-						// Update or generate share link
+						// If a share link already exists, use it
 						if ((data.shareLinks || []).length > 0) {
-							shareLinkInput.value = data.shareLinks[0].token;
+							shareLinkInput.value = `${window.location.origin}/folders/${data.shareLinks[0].access}/${folderId}?token=${data.shareLinks[0].token}`;
 						} else {
+							// If no link exists, generate a new one
 							const tokenRes = await fetch(`/api/folders/${folderId}/link`, {
 								method: "POST",
 								headers: { "Content-Type": "application/json" },
-								body: JSON.stringify({ access: roleTypeSelect.value === "editor" ? "editor" : "viewer" })
+								body: JSON.stringify({ access: roleType === "editor" ? "editor" : "viewer" })
 							});
 							const tokenData = await tokenRes.json();
-							shareLinkInput.value = tokenData.link;
+							shareLinkInput.value = `${window.location.origin}/folders/${tokenData.access}/${folderId}?token=${tokenData.link}`;
 						}
-
 					} catch (err) {
 						console.error("Error loading share info:", err);
 						alert("Failed to load folder share info");

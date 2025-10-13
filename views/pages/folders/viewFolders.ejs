@@ -1,0 +1,211 @@
+<%- include('../../partials/header') %>
+
+    <style>
+        /* File container */
+        #file-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .filebox {
+            flex: 0 0 calc(20% - 15px);
+            box-sizing: border-box;
+            text-align: center;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background-color: #fff;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+        }
+
+        .filebox:hover {
+            box-shadow: 0px 3px 6px rgba(0, 0, 0, 0.1);
+            transform: translateY(-3px);
+        }
+
+        .filebox img {
+            width: 50px;
+            height: 50px;
+            margin-bottom: 10px;
+        }
+
+        .filebox p {
+            font-size: 14px;
+            word-break: break-all;
+        }
+
+        @media (max-width: 1200px) {
+            .filebox {
+                flex: 0 0 calc(25% - 15px);
+            }
+        }
+
+        @media (max-width: 992px) {
+            .filebox {
+                flex: 0 0 calc(33.33% - 15px);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .filebox {
+                flex: 0 0 calc(50% - 15px);
+            }
+        }
+
+        @media (max-width: 576px) {
+            .filebox {
+                flex: 0 0 100%;
+            }
+        }
+    </style>
+
+    <div class="page-wrapper">
+        <div class="content">
+
+            <div class="d-flex align-items-center justify-content-between page-breadcrumb mb-3">
+                <div class="my-auto mb-2">
+                    <h2 class="mb-1" id="folder-name">Files</h2>
+                    <nav>
+                        <ol class="breadcrumb mb-0">
+                            <li class="breadcrumb-item"><a href="#"><i class="ti ti-smart-home"></i></a></li>
+                            <li class="breadcrumb-item">Dashboard</li>
+                            <li class="breadcrumb-item active">Files</li>
+                        </ol>
+                    </nav>
+                </div>
+            </div>
+
+            <!-- File Container -->
+            <div id="file-container"></div>
+
+            <!-- Loading & Empty -->
+            <div id="file-loading" class="text-center py-4" style="display:none;">
+                <div class="spinner-border text-primary"></div>
+                <p class="mt-2 text-muted">Loading files...</p>
+            </div>
+
+            <div id="file-empty" class="text-center py-4" style="display:none;">
+                <i class="ti ti-file-off fs-1 text-muted"></i>
+                <p class="mt-2 text-muted">No files found</p>
+            </div>
+
+        </div>
+
+        <!-- Footer -->
+        <div class="footer mt-4 d-sm-flex align-items-center justify-content-between border-top bg-white p-3">
+            <p class="mb-0">2025 &copy; HLFPPT.</p>
+            <p>Designed & Developed by <a href="javascript:void(0);" class="text-primary">Duplex Services &
+                    Technology</a></p>
+        </div>
+    </div>
+
+    <%- include('../../partials/footer') %>
+
+        <script>
+            const fileContainer = document.getElementById('file-container');
+            const fileLoading = document.getElementById('file-loading');
+            const fileEmpty = document.getElementById('file-empty');
+            const folderName = document.getElementById('folder-name');
+
+            // File type icons mapping
+            const fileIcons = {
+                ppt: "/img/icons/fn1.png",
+                pptx: "/img/icons/fn1.png",
+                doc: "/img/icons/fn2.png",
+                docx: "/img/icons/fn2.png",
+                xls: "/img/icons/fn3.png",
+                xlsx: "/img/icons/fn3.png",
+                pdf: "/img/icons/fn4.png",
+                default: "/img/icons/fn1.png"
+            };
+
+            const setLoading = (loading) => {
+                fileLoading.style.display = loading ? 'block' : 'none';
+                fileContainer.style.display = loading ? 'none' : 'flex';
+                fileEmpty.style.display = 'none';
+            };
+
+            const setEmpty = (empty) => {
+                fileEmpty.style.display = empty ? 'block' : 'none';
+                fileContainer.style.display = empty ? 'none' : 'flex';
+                fileLoading.style.display = 'none';
+            };
+
+            const getFileExtension = (filename) => {
+                const parts = filename.split('.');
+                return parts.length > 1 ? parts.pop().toLowerCase() : '';
+            };
+
+            const formatFileSize = (bytes) => {
+                if (bytes < 1024) return bytes + " B";
+                if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+                return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+            };
+
+            const loadFiles = async () => {
+                const parts = window.location.pathname.split("/");
+                const folderId = parts[parts.indexOf("folders") + 2];
+
+                if (!folderId) {
+                    console.error("Folder ID not found in URL");
+                    setEmpty(true);
+                    return;
+                }
+
+                setLoading(true);
+                try {
+                    const res = await fetch(`/api/folders/details/${folderId}`);
+                    const data = await res.json();
+
+                    if (!data.success || !data.folder) throw new Error("Folder not found");
+
+                    const folder = data.folder;
+                    const files = folder.files || [];
+
+                    folderName.textContent = folder.name;
+                    fileContainer.innerHTML = "";
+                    setLoading(false);
+
+                    if (files.length === 0) {
+                        setEmpty(true);
+                        return;
+                    }
+
+                    // Render files in list structure
+                    files.forEach(file => {
+                        const ext = getFileExtension(file.originalName);
+                        const icon = fileIcons[ext] || fileIcons.default;
+                        const fileSizeKB = formatFileSize(file.size);
+
+                        const div = document.createElement("div");
+                        div.className = "filebox mb-2"; // optional margin-bottom for spacing
+                        div.innerHTML = `
+                    <div class="d-flex align-items-center p-2 rounded cursor-pointer">
+                        <span class="avatar rounded bg-light me-2">
+                            <img src="${icon}" style="height:30px;">
+                        </span>
+                        <div>
+                            <p class="mb-0 text-dark">${file.originalName}</p>
+                            <small class="text-muted">${fileSizeKB}</small>
+                        </div>
+                    </div>
+                `;
+
+                        div.addEventListener("click", () => {
+                            window.open('/uploads/' + file.file, '_blank');
+                        });
+
+                        fileContainer.appendChild(div);
+                    });
+
+                } catch (err) {
+                    console.error("Error loading files:", err);
+                    setLoading(false);
+                    setEmpty(true);
+                }
+            };
+
+            document.addEventListener("DOMContentLoaded", loadFiles);
+        </script>

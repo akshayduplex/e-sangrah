@@ -159,7 +159,6 @@ router.get("/documents/:documentId/invite/:userId/auto-accept", DocumentControll
 
 router.get('/documents/:documentId/:fileId/share-link', async (req, res) => {
     const { documentId, fileId } = req.params;
-    console.log("sharelink", documentId, fileId)
     try {
         const link = generateShareLink(documentId, fileId);
         res.json({ success: true, link });
@@ -754,7 +753,7 @@ router.post('/folders/:folderId/unshare', FolderController.unshareFolder);
 router.post('/folders/:folderId/link', FolderController.generateShareLink);
 
 // Access folder via link
-router.get('/folders/:folderId/access/:token', FolderController.accessViaLink);
+router.get('/folders/:folderId/access/:token', FolderController.accessViaToken);
 
 
 // ---------------------------

@@ -7,6 +7,8 @@ import { generateUniqueFileName } from '../helper/GenerateUniquename.js';
 import { putObject } from '../utils/s3Helpers.js';
 import logger from '../utils/logger.js';
 import TempFile from '../models/TempFile.js';
+import User from '../models/User.js';
+import { API_CONFIG } from '../config/ApiEndpoints.js';
 
 //Page controlers
 
@@ -67,6 +69,28 @@ export const showMainFoldersPage = (req, res) => {
     });
 };
 
+export const showviewFoldersPage = async (req, res) => {
+
+    const { folderId } = req.params;
+    const { token } = req.query;
+
+    try {
+        let folder = await Folder.findById(folderId).lean();
+        if (!folder) return res.status(404).send('Folder not found');
+
+        // If token provided, verify it
+        if (token) {
+            const link = folder.metadata?.shareLinks?.find(l => l.token === token);
+            if (!link) return res.status(403).send('Invalid or expired link');
+        }
+
+        // folder.files contains files
+        res.render('pages/folders/viewFolders', { folder, user: req.user });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Server error');
+    }
+};
 //API controllers
 
 // Create folder
@@ -238,13 +262,11 @@ export const getFolder = async (req, res) => {
     try {
         const { id } = req.params;
         const ownerId = req.user._id;
-
-        const folder = await Folder.findOne({ _id: id, owner: ownerId, isDeleted: false })
+        const folder = await Folder.findOne({ _id: id, "deletedAt": null })
             .populate('parent', 'name path')
             .populate('owner', 'name email')
             .populate('projectId', 'name')
             .populate('departmentId', 'name');
-
         if (!folder) {
             return res.status(404).json({
                 success: false,
@@ -709,34 +731,54 @@ export const getFolderShareInfo = async (req, res) => {
  */
 export const shareFolder = async (req, res) => {
     const { folderId } = req.params;
-    const { userId, access } = req.body;
+    const { userId, access } = req.body; // userId is actually an email string
 
-    if (!mongoose.Types.ObjectId.isValid(folderId) || !mongoose.Types.ObjectId.isValid(userId)) {
-        return res.status(400).json({ error: 'Invalid folder or user ID' });
+    if (!mongoose.Types.ObjectId.isValid(folderId)) {
+        return res.status(400).json({ error: 'Invalid folder ID' });
+    }
+
+    if (!userId || !access) {
+        return res.status(400).json({ error: 'User email and access level are required' });
     }
 
     try {
-        const folder = await Folder.findById(folderId);
-        if (!folder) return res.status(404).json({ error: 'Folder not found' });
+        // Find the user by email
+        const user = await User.findOne({ email: userId }).select('_id');
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
 
+        // Fetch the folder
+        const folder = await Folder.findById(folderId);
+        if (!folder) {
+            return res.status(404).json({ error: 'Folder not found' });
+        }
+
+        // Find if this user already has permissions
         const existing = folder.permissions.find(
-            p => String(p.principal) === userId && p.model === 'User'
+            p => String(p.principal) === String(user._id) && p.model === 'User'
         );
 
         if (existing) {
+            // Merge access permissions
             existing.access = Array.from(new Set([...existing.access, access]));
         } else {
+            // Add a new permission entry
             folder.permissions.push({
-                principal: userId,
+                principal: user._id,
                 model: 'User',
-                access: [access]
+                access: [access],
             });
         }
 
         await folder.save();
-        res.json({ message: 'Folder shared successfully', folder });
+
+        res.json({
+            message: 'Folder shared successfully',
+            folder,
+        });
     } catch (err) {
-        console.error(err);
+        console.error('Error sharing folder:', err);
         res.status(500).json({ error: 'Server error' });
     }
 };
@@ -765,7 +807,9 @@ export const unshareFolder = async (req, res) => {
 };
 
 /**
- * Generate shareable link
+ * Generate shareable link for a folder
+ * POST /api/folders/:folderId/share
+ * body: { access: 'viewer' | 'editor' }
  */
 export const generateShareLink = async (req, res) => {
     const { folderId } = req.params;
@@ -783,7 +827,7 @@ export const generateShareLink = async (req, res) => {
 
         await folder.save();
 
-        const shareableUrl = `https://yourdomain.com/folders/${folderId}/access/${token}`;
+        const shareableUrl = `${API_CONFIG.baseUrl}/folders/view/${folderId}?token=${token}`;
         res.json({ message: 'Shareable link generated', link: shareableUrl });
     } catch (err) {
         console.error(err);
@@ -792,19 +836,20 @@ export const generateShareLink = async (req, res) => {
 };
 
 /**
- * Access folder via shareable link
+ * Access folder via token
+ * GET /api/folders/:folderId/access/:token
  */
-export const accessViaLink = async (req, res) => {
+export const accessViaToken = async (req, res) => {
     const { folderId, token } = req.params;
 
     try {
-        const folder = await Folder.findById(folderId);
+        const folder = await Folder.findById(folderId).lean();
         if (!folder) return res.status(404).json({ error: 'Folder not found' });
 
         const link = folder.metadata?.shareLinks?.find(l => l.token === token);
         if (!link) return res.status(403).json({ error: 'Invalid or expired link' });
 
-        res.json({ folder, access: link.access });
+        res.json({ success: true, folder, access: link.access });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Server error' });

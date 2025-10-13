@@ -325,6 +325,7 @@ router.get("/recyclebin", authenticate, checkPermissions, FolderController.showR
 
 // Main Folders page
 router.get("/folders", authenticate, checkPermissions, FolderController.showMainFoldersPage);
+router.get("/folders/:accesslevel/:folderId", authenticate, checkPermissions, FolderController.showviewFoldersPage);
 
 /* =========================================
    NOTIFICATIONS ROUTE
