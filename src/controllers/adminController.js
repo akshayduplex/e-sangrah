@@ -62,8 +62,8 @@ export const showRecycleBinPage = async (req, res) => {
 export const showManageAccessPage = async (req, res) => {
     try {
         const { folderId } = req.params;
+        const { userEmail } = req.query;
         const owner = req.user;
-
         if (!folderId || !owner) {
             return res.status(400).send("Invalid request");
         }
@@ -79,20 +79,10 @@ export const showManageAccessPage = async (req, res) => {
             return res.status(403).send("Not authorized");
         }
 
-        // Prepare a list of users with access
-        const accessList = folder.permissions.map(p => ({
-            userId: p.principal?._id,
-            name: p.principal?.name || 'Unknown',
-            email: p.principal?.email || 'Unknown',
-            access: p.access,
-            expiresAt: p.expiresAt,
-            duration: p.duration
-        }));
-
         res.render("pages/admin/manage-access", {
             folder,
-            accessList,
-            user: req.user
+            user: req.user,
+            userEmail
         });
 
     } catch (err) {

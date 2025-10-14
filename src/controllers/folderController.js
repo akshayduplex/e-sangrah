@@ -14,6 +14,8 @@ import { sendEmail } from '../services/emailService.js';
 import { folderSharedTemplate } from '../emailTemplates/folderSharedTemplate.js';
 import { folderAccessRequestTemplate } from '../emailTemplates/folderAccessRequestTemplate.js';
 import File from '../models/File.js';
+import { GetObjectCommand } from '@aws-sdk/client-s3';
+import { s3Client } from '../config/S3Client.js';
 
 //Page controlers
 
@@ -128,6 +130,7 @@ export const viewFile = async (req, res) => {
     try {
         const { fileId } = req.params;
         console.log("Viewing file with ID:", fileId);
+
         const formatFileSize = (bytes) => {
             if (!bytes) return "0 Bytes";
             const k = 1024;
@@ -136,17 +139,22 @@ export const viewFile = async (req, res) => {
             return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
         };
 
-        const getFileType = (filename) => {
-            const ext = filename.split(".").pop().toLowerCase();
+        const getFileType = (filename, mimeType) => {
+            const ext = filename.split('.').pop().toLowerCase();
+            const mime = mimeType || '';
+
             return {
-                isPDF: ext === "pdf",
-                isWord: ["doc", "docx"].includes(ext),
-                isExcel: ["xls", "xlsx"].includes(ext),
-                isPowerPoint: ["ppt", "pptx"].includes(ext),
-                isText: ["txt", "md", "json", "xml", "html", "csv"].includes(ext),
-                extension: ext
+                isPDF: ext === 'pdf' || mime.includes('pdf'),
+                isWord: ['doc', 'docx'].includes(ext) || mime.includes('word'),
+                isExcel: ['xls', 'xlsx'].includes(ext) || mime.includes('excel'),
+                isPowerPoint: ['ppt', 'pptx'].includes(ext) || mime.includes('powerpoint'),
+                isImage: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'].includes(ext),
+                isText: ['txt', 'md', 'json', 'xml', 'html', 'csv'].includes(ext),
+                extension: ext,
+                mimeType: mime
             };
         };
+
         // Fetch file document from DB
         const file = await File.findById(fileId).lean();
         if (!file) {
@@ -157,15 +165,16 @@ export const viewFile = async (req, res) => {
             });
         }
 
-        // Generate signed URL from S3
-        const fileUrl = file.s3Url || await getObjectUrl(file.file, 3600); // 1 hour expiry
+        // Generate signed URL from S3 with proper headers
+        const fileUrl = file.s3Url || await getObjectUrl(file.file, 3600);
         console.log("Generated file URL:", fileUrl);
+
         res.render("pages/folders/viewFile", {
             file: {
                 ...file,
                 formattedSize: formatFileSize(file.fileSize),
                 fileUrl,
-                fileType: getFileType(file.originalName)
+                fileType: getFileType(file.originalName, file.mimeType)
             },
             documentTitle: file.originalName,
             user: req.user
@@ -351,11 +360,12 @@ export const getFolder = async (req, res) => {
     try {
         const { id } = req.params;
         const ownerId = req.user._id;
-        const folder = await Folder.findOne({ _id: id, "deletedAt": null })
+        const folder = await Folder.findOne({ _id: id, "deletedAt": null, status: "active" })
             .populate('parent', 'name path')
             .populate('owner', 'name email')
             .populate('projectId', 'name')
-            .populate('departmentId', 'name');
+            .populate('departmentId', 'name')
+            .populate('files');
         if (!folder) {
             return res.status(404).json({
                 success: false,
@@ -646,7 +656,7 @@ export const getFolderTree = async (req, res) => {
 
         const buildTree = async (parentId = null) => {
             // Build query dynamically
-            const query = { parent: parentId, status: "active", isArchived: false };
+            const query = { parent: parentId, isArchived: false };
 
             if (departmentId && departmentId !== 'all') query.departmentId = departmentId;
             if (projectId && projectId !== 'all') query.projectId = projectId;
@@ -654,6 +664,7 @@ export const getFolderTree = async (req, res) => {
             const folders = await Folder.find(query)
                 .populate('projectId', 'name')
                 .populate('departmentId', 'name')
+                .populate('files')
                 .sort({ name: 1 })
                 .lean();
 
@@ -666,12 +677,13 @@ export const getFolderTree = async (req, res) => {
                     file: f.file,
                     originalName: f.originalName,
                     fileType: f.fileType,
-                    size: f.size
+                    size: f.fileSize
                 }));
 
                 return {
                     _id: folder._id,
                     name: folder.name,
+                    status: folder.status,
                     slug: folder.slug,
                     path: folder.path,
                     projectId: folder.projectId,
@@ -815,84 +827,11 @@ export const getFolderShareInfo = async (req, res) => {
     }
 };
 
-
-/**
- * Invite a user to a folder
- */
-// export const shareFolder = async (req, res) => {
-//     const { folderId } = req.params;
-//     const { userId, access, shareLink } = req.body;
-//     console.log(req.body)
-//     if (!mongoose.Types.ObjectId.isValid(folderId)) {
-//         return res.status(400).json({ error: 'Invalid folder ID' });
-//     }
-//     if (!userId || !access) {
-//         return res.status(400).json({ error: 'User email and access level are required' });
-//     }
-
-//     try {
-//         const user = await User.findOne({ email: userId }).select('_id name');
-//         if (!user) return res.status(404).json({ error: 'User not found' });
-
-//         const folder = await Folder.findById(folderId);
-//         if (!folder) return res.status(404).json({ error: 'Folder not found' });
-
-//         // Add/update permissions
-//         const existing = folder.permissions.find(
-//             p => String(p.principal) === String(user._id) && p.model === "User"
-//         );
-//         if (existing) {
-//             existing.access = Array.from(new Set([...existing.access, access]));
-//         } else {
-//             folder.permissions.push({ principal: user._id, model: "User", access: [access] });
-//         }
-
-//         // Manage share links
-//         folder.metadata = folder.metadata || {};
-//         folder.metadata.shareLinks = folder.metadata.shareLinks || [];
-//         const now = new Date();
-//         folder.metadata.shareLinks = folder.metadata.shareLinks.filter(
-//             l => !l.expiresAt || new Date(l.expiresAt) > now
-//         );
-
-//         folder.metadata.shareLinks.push({
-//             access,
-//             createdAt: now,
-//             expiresAt: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
-//         });
-
-//         await folder.save();
-
-//         // Send email
-//         const html = folderSharedTemplate({
-//             userName: user.name,
-//             senderName: req.user?.name,
-//             folderName: folder.name,
-//             access,
-//             folderLink: shareLink,
-//         });
-
-//         await sendEmail({
-//             to: userId,
-//             subject: `Folder Shared with You: ${folder.name}`,
-//             html,
-//             fromName: "E-sangrah",
-//         });
-
-//         res.json({
-//             message: "Folder shared and invitation email sent successfully",
-//             folder,
-//             link: shareLink,
-//         });
-
-//     } catch (err) {
-//         console.error("Error sharing folder:", err);
-//         res.status(500).json({ error: "Server error" });
-//     }
-// };
 export const shareFolder = async (req, res) => {
     const { folderId } = req.params;
     const { userId, access, shareLink, duration, expiresAt, customStart, customEnd } = req.body;
+
+    console.log("access", access)
     if (!mongoose.Types.ObjectId.isValid(folderId)) {
         return res.status(400).json({ error: 'Invalid folder ID' });
     }
@@ -912,7 +851,7 @@ export const shareFolder = async (req, res) => {
             p => String(p.principal) === String(user._id) && p.model === "User"
         );
         if (existing) {
-            existing.access = Array.from(new Set([...existing.access, access]));
+            existing.access = access;
             existing.duration = duration;
             existing.expiresAt = expiresAt ? new Date(expiresAt) : null;
             existing.customStart = customStart ? new Date(customStart) : null;
@@ -921,7 +860,7 @@ export const shareFolder = async (req, res) => {
             folder.permissions.push({
                 principal: user._id,
                 model: "User",
-                access: [access],
+                access,
                 duration,
                 expiresAt: expiresAt ? new Date(expiresAt) : null,
                 customStart: customStart ? new Date(customStart) : null,
@@ -1103,16 +1042,16 @@ export const accessViaToken = async (req, res) => {
  */
 export const updateFolderPermission = async (req, res) => {
     const { id } = req.params;
-    const { principalId, canDownload, access } = req.body;
+    const { principalId, canDownload, access, status } = req.body;
     const updatedBy = req.user?._id || null; // assuming auth middleware sets req.user
-
-    if (!principalId) {
-        return res.status(400).json({ message: 'principalId is required' });
-    }
-
     try {
         const folder = await Folder.findById(id);
         if (!folder) return res.status(404).json({ message: 'Folder not found' });
+
+        // Update folder status if provided
+        if (status && ['active', 'inactive'].includes(status)) {
+            folder.status = status;
+        }
 
         // Find existing permission
         let permission = folder.permissions.find(p => String(p.principal) === String(principalId));
@@ -1120,14 +1059,14 @@ export const updateFolderPermission = async (req, res) => {
         if (permission) {
             // Update fields
             if (typeof canDownload === 'boolean') permission.canDownload = canDownload;
-            if (Array.isArray(access)) permission.access[0] = access;
+            if (access) permission.access = access;
         } else {
             // Create new permission using Mongoose subdocument constructor
             permission = folder.permissions.create({
                 principal: principalId,
                 model: 'User',
                 canDownload: canDownload || false,
-                access: Array.isArray(access) ? access : []
+                access: access || 'view'
             });
             folder.permissions.push(permission);
         }
@@ -1140,13 +1079,15 @@ export const updateFolderPermission = async (req, res) => {
 
         return res.json({
             message: 'Permission updated successfully',
-            permission: updatedPermission
+            permission: updatedPermission,
+            folderStatus: folder.status // include updated status in response
         });
     } catch (err) {
         console.error(err);
         return res.status(500).json({ message: 'Server error', error: err.message });
     }
 };
+
 
 
 // Request access to a folder
@@ -1166,7 +1107,7 @@ export const requestFolderAccess = async (req, res) => {
 
         // --- Send email to owner with management link ---
         const baseUrl = API_CONFIG.baseUrl || "http://localhost:5000";
-        const manageLink = `${baseUrl}/admin/folders/${folderId}/manage-access`;
+        const manageLink = `${baseUrl}/admin/folders/${folderId}/manage-access?userEmail=${user.email}`;
 
         await sendEmail({
             to: owner.email,
@@ -1234,27 +1175,41 @@ export const grantFolderAccess = async (req, res) => {
         // Calculate expiration
         let expiresAt = null;
         const now = new Date();
-        switch (duration) {
-            case "oneday": expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); break;
-            case "oneweek": expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); break;
-            case "onemonth": expiresAt = new Date(now.setMonth(now.getMonth() + 1)); break;
-            case "custom": if (customEnd) expiresAt = new Date(customEnd); break;
-            case "lifetime": default: expiresAt = null;
-        }
 
+        switch (duration) {
+            case "oneday":
+                expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+                break;
+            case "oneweek":
+                expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+                break;
+            case "onemonth":
+                expiresAt = new Date(now);
+                expiresAt.setMonth(expiresAt.getMonth() + 1);
+                break;
+            case "custom":
+                if (customEnd) expiresAt = new Date(customEnd);
+                break;
+            case "lifetime":
+                expiresAt = new Date(now);
+                expiresAt.setFullYear(expiresAt.getFullYear() + 50);
+                break;
+            default:
+                expiresAt = null;
+        }
         // Check if user already has access
-        const existing = folder.permissions.find(p => p.principal.toString() === user._id.toString());
+        const existing = folder.permissions.find(
+            p => p.principal.toString() === user._id.toString()
+        );
         if (existing) {
-            // Update existing permission
-            existing.access = [access];
+            existing.access = access;
             existing.duration = duration;
             existing.expiresAt = expiresAt;
         } else {
-            // Add new permission
             folder.permissions.push({
                 principal: user._id,
                 model: "User",
-                access: [access],
+                access,
                 duration,
                 expiresAt
             });

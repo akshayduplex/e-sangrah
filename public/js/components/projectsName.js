@@ -77,21 +77,24 @@
 
         $select.on('change', async function () {
             const val = $(this).val();
+            const selectedText = $(this).find('option:selected').text(); // ✅ Get project name
+
             window.selectedProjectId = val || null;
+            window.selectedProjectName = selectedText || null; // ✅ FIX: Set the name here
 
             const addBtn = document.getElementById("btnAddFolder");
 
             if (val) {
-                if (addBtn) addBtn.classList.remove("disabled"); // safely check
-                loadFolders(null, [], val); // load folders for the new project
+                if (addBtn) addBtn.classList.remove("disabled");
+                loadFolders(null, [], val);
             } else {
-                if (addBtn) addBtn.classList.add("disabled"); // safely check
+                if (addBtn) addBtn.classList.add("disabled");
                 if (elements?.container) elements.container.innerHTML = "";
                 setEmptyState(false);
-                showNoProject(true); // show "please select project"
+                showNoProject(true);
             }
 
-            // Save project in session
+            // Save project session
             try {
                 await fetch(`/api/session/project`, {
                     method: 'POST',
@@ -103,5 +106,6 @@
                 showToast("Failed to save project in session: " + err, "error");
             }
         });
+
     });
 })(jQuery);

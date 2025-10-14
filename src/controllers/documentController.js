@@ -365,7 +365,7 @@ export const getDocuments = async (req, res) => {
         const skip = (pageNum - 1) * limitNum;
 
         const documents = await Document.find(filter)
-            .select("files updatedAt createdAt signature isDeleted isArchived comment sharedWithUsers compliance metadata tags owner documentVendor documentDonor department project description")
+            .select("files updatedAt createdAt signature isDeleted isArchived comment sharedWithUsers compliance status metadata tags owner documentVendor documentDonor department project description")
             .populate("department", "name")
             .populate("project", "projectName")
             .populate("owner", "name email")
@@ -664,6 +664,7 @@ export const restoreDocument = async (req, res) => {
         return res.status(500).json({ message: "Server error while restoring document." });
     }
 };
+
 /**
  * Create new document
  */
@@ -701,9 +702,26 @@ export const createDocument = async (req, res) => {
         }
 
         // ------------------- Parse tags -------------------
-        const parsedTags = tags ? tags.split(",").map(t => t.trim()) : [];
+        const parsedTags = tags ? (typeof tags === "string" ? tags.split(",").map(t => t.trim()) : tags) : [];
 
-        // ------------------- Compliance -------------------
+        // ------------------- Parse fileIds -------------------
+        let parsedFileIds = [];
+        if (fileIds) {
+            if (typeof fileIds === "string") {
+                try {
+                    parsedFileIds = JSON.parse(fileIds);
+                    if (!Array.isArray(parsedFileIds)) parsedFileIds = [parsedFileIds];
+                } catch {
+                    parsedFileIds = [fileIds];
+                }
+            } else if (Array.isArray(fileIds)) {
+                parsedFileIds = fileIds;
+            }
+        }
+        parsedFileIds = [...new Set(parsedFileIds)]
+            .filter(id => mongoose.Types.ObjectId.isValid(id))
+            .map(id => new mongoose.Types.ObjectId(id));
+        // ------------------- Parse compliance -------------------
         const isCompliance = compliance === "yes";
         let parsedExpiryDate = null;
         if (isCompliance && expiryDate) {
@@ -718,7 +736,7 @@ export const createDocument = async (req, res) => {
             }
         }
 
-        // ------------------- Document date -------------------
+        // ------------------- Parse document date -------------------
         let parsedDocumentDate = new Date();
         if (documentDate) {
             if (documentDate.includes("-")) {
@@ -732,7 +750,7 @@ export const createDocument = async (req, res) => {
             }
         }
 
-        // ------------------- Create Document first -------------------
+        // ------------------- Create Document -------------------
         const document = new Document({
             project: project || null,
             department,
@@ -741,15 +759,13 @@ export const createDocument = async (req, res) => {
             documentVendor: documentVendor || null,
             folderId: validFolderId,
             owner: req.user._id,
-            documentManager: null,
             documentDate: parsedDocumentDate,
             status: "Draft",
             tags: parsedTags,
-            category: null,
             metadata: parsedMetadata,
             description,
             compliance: { isCompliance, expiryDate: parsedExpiryDate },
-            files: [], // empty for now
+            files: [],
             signature: {},
             link: link || null,
             comment: comment || null,
@@ -769,61 +785,56 @@ export const createDocument = async (req, res) => {
                 },
             ],
         });
+
         await document.save();
-
-        // ------------------- Process files -------------------
-        let parsedFileIds = [];
-        if (fileIds) {
-            if (typeof fileIds === "string") {
-                try {
-                    parsedFileIds = JSON.parse(fileIds);
-                    if (!Array.isArray(parsedFileIds)) parsedFileIds = [parsedFileIds];
-                } catch {
-                    parsedFileIds = [fileIds];
-                }
-            } else if (Array.isArray(fileIds)) {
-                parsedFileIds = fileIds;
-            }
-        }
-        parsedFileIds = parsedFileIds
-            .filter(id => mongoose.Types.ObjectId.isValid(id))
-            .map(id => new mongoose.Types.ObjectId(id));
-
+        // ------------------- Process TempFiles and create Files -------------------
         const fileDocs = [];
-        for (const fileId of parsedFileIds) {
+        for (const tempFileId of parsedFileIds) {
             try {
-                const tempFile = await TempFile.findById(fileId);
-                if (!tempFile || tempFile.status !== "temp") continue;
+                const tempFile = await TempFile.findById(tempFileId);
+                if (!tempFile || tempFile.status !== "temp") {
+                    continue;
+                }
 
-                tempFile.status = "permanent";
-                await tempFile.save();
-
+                // Create permanent File record
                 const newFile = await File.create({
-                    document: document._id, // now valid
+                    document: document._id,
                     file: tempFile.s3Filename,
                     s3Url: tempFile.s3Url,
                     originalName: tempFile.originalName,
+                    fileType: tempFile.fileType,
+                    folder: tempFile.folder || folderId || null,
+                    projectId: document.project || null,
+                    departmentId: document.department || null,
                     version: 1,
                     uploadedBy: req.user._id,
                     uploadedAt: new Date(),
                     fileSize: tempFile.size,
+                    hash: tempFile.hash || null,
                     isPrimary: fileDocs.length === 0,
-                    status: "active"
+                    status: "active",
                 });
+
+                // Update TempFile status
+                tempFile.status = "permanent";
+                await tempFile.save();
+
                 fileDocs.push(newFile._id);
+                console.log("Created File ID:", newFile._id);
+
             } catch (err) {
-                console.error(`Failed to create file for ${fileId}`, err);
-                logger.warn(`Skipping invalid file ID: ${fileId}`, err);
+                console.error(`Error processing temp file ${tempFileId}:`, err);
             }
         }
 
-        // Update Document with file references
         if (fileDocs.length > 0) {
             document.files = fileDocs;
             await document.save();
+        } else {
+            console.log("No files were added to document");
         }
 
-        // ------------------- Signature -------------------
+        // ------------------- Handle Signature -------------------
         if (req.files?.signatureFile?.[0]) {
             const file = req.files.signatureFile[0];
             if (!file.mimetype.startsWith("image/")) {
@@ -831,8 +842,9 @@ export const createDocument = async (req, res) => {
             }
             document.signature = {
                 fileName: file.originalname,
-                fileUrl: file.path || file.filename
+                fileUrl: file.path || file.filename,
             };
+            await document.save();
         } else if (req.body.signature) {
             const base64Data = req.body.signature;
             if (!base64Data.startsWith("data:image/")) {
@@ -847,31 +859,19 @@ export const createDocument = async (req, res) => {
                 fileName: uploaded.original_filename,
                 fileUrl: uploaded.secure_url
             };
+            await document.save();
         }
 
-        await document.save();
-
-        // ------------------- Notification -------------------
-        if (projectManager) {
-            await Notification.create({
-                recipient: projectManager,
-                sender: req.user._id,
-                type: "document_shared",
-                title: "New Document Assigned",
-                message: `A new document "${description || "Untitled"}" has been shared with you.`,
-                relatedDocument: document._id,
-                priority: "medium",
-                actionUrl: `/documents/${document._id}`
-            });
-        }
-
+        // ------------------- Populate and return -------------------
         await document.populate([
             { path: "department", select: "name" },
             { path: "project", select: "projectName" },
-            { path: "owner", select: "name email" }
+            { path: "owner", select: "name email" },
+            { path: "files", select: "originalName fileType s3Url" }
         ]);
 
         return successResponse(res, { document }, "Document created successfully", 201);
+
     } catch (error) {
         if (error.name === "ValidationError") {
             const errors = Object.values(error.errors).map(err => err.message);
@@ -1618,6 +1618,9 @@ export const shareDocument = async (req, res) => {
                 used = false;
                 break;
             case "lifetime":
+                expiresAt = new Date(now);
+                expiresAt.setFullYear(expiresAt.getFullYear() + 50);
+                break;
             default:
                 expiresAt = null;
         }
@@ -1810,6 +1813,7 @@ export const inviteUser = async (req, res) => {
             case "oneday": expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); break;
             case "oneweek": expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); break;
             case "onemonth": expiresAt = new Date(now.setMonth(now.getMonth() + 1)); break;
+            case "lifetime": expiresAt = new Date(now); expiresAt.setFullYear(expiresAt.getFullYear() + 50); break;
             case "custom": if (customEnd) expiresAt = new Date(customEnd); break;
         }
         // Create or update share entry
@@ -2065,9 +2069,9 @@ export const grantAccessViaToken = async (req, res) => {
         if (!doc) return res.status(404).send("Document not found.");
         if (doc.owner.toString() !== ownerId) return res.status(403).send("Not authorized.");
 
-        // --- Calculate expiry ---
-        const now = new Date();
+        // Calculate expiration
         let expiresAt = null;
+        const now = new Date();
 
         switch (duration) {
             case "oneday":
@@ -2077,16 +2081,20 @@ export const grantAccessViaToken = async (req, res) => {
                 expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
                 break;
             case "onemonth":
-                expiresAt = new Date(now.setMonth(now.getMonth() + 1));
+                expiresAt = new Date(now);
+                expiresAt.setMonth(expiresAt.getMonth() + 1);
                 break;
             case "custom":
                 if (customEnd) expiresAt = new Date(customEnd);
                 break;
             case "lifetime":
+                expiresAt = new Date(now);
+                expiresAt.setFullYear(expiresAt.getFullYear() + 50);
+                break;
             default:
                 expiresAt = null;
-                break;
         }
+
 
         // --- Create or update shared record ---
         const share = await SharedWith.findOneAndUpdate(

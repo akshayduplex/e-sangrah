@@ -73,12 +73,13 @@ export const deleteObject = async (key) => {
     return { status: 204 };
 };
 
-export const getObjectUrl = async (key, expiresIn = 3600) => { // Increased to 1 hour
+export const getObjectUrl = async (key, expiresIn = 3600) => {
     try {
         const command = new GetObjectCommand({
             Bucket: process.env.AWS_BUCKET,
             Key: key,
-            ResponseContentDisposition: 'inline', // <-- ensure PDF opens in-browser
+            ResponseContentDisposition: 'inline', // Display in browser
+            ResponseContentType: 'application/pdf', // Explicitly set content type
         });
 
         const url = await getSignedUrl(s3Client, command, { expiresIn });

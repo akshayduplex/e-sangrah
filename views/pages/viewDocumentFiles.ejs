@@ -62,7 +62,7 @@
             <% if (file && file.fileUrl) { %>
 
                 <% if (file.fileType.isPDF) { %>
-                    <iframe src="<%= file.fileUrl %>" class="preview-iframe"
+                    <iframe src="/api/file/pdf/<%= file._id %>" class="preview-iframe"
                         title="PDF Preview of <%= file.originalName %>">
                         <p>Your browser does not support PDFs.
                             <a href="<%= file.fileUrl %>" download>Download the PDF</a> instead.
@@ -81,7 +81,7 @@
                         </div>
 
                         <% } else if (file.fileType.isText) { %>
-                            <iframe src="<%= file.fileUrl %>" class="preview-iframe"
+                            <iframe src="/api/file/pdf/<%= file._id %>" class="preview-iframe"
                                 title="Text Preview of <%= file.originalName %>"></iframe>
 
                             <% } else if (file.originalName.match(/\.(jpg|jpeg|png|gif|webp)$/i)) { %>

@@ -19,9 +19,9 @@ const folderSchema = new Schema({
     // Permissions (ACL)
     permissions: [
         {
-            principal: { type: Schema.Types.ObjectId, required: true, refPath: 'permissions.model' },
-            model: { type: String, enum: ['User'], required: true },
-            access: [{ type: String, enum: ['view', 'edit', 'owner'] }],
+            principal: { type: Schema.Types.ObjectId, refPath: 'permissions.model' },
+            model: { type: String, enum: ['User'] },
+            access: { type: String },
             canDownload: { type: Boolean, default: false },
             expiresAt: { type: Date, default: null }, // for timed shares
             customStart: { type: Date, default: null },

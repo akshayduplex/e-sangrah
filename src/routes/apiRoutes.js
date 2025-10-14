@@ -20,6 +20,7 @@ import * as PermissionController from "../controllers/PermisssionsController.js"
 import * as FolderController from "../controllers/FolderController.js";
 import * as NotificationController from "../controllers/NotificationController.js";
 import * as TempController from "../controllers/TempFileController.js";
+import * as CommonController from "../controllers/CommonController.js"
 
 // ---------------------------
 // Middleware imports
@@ -106,6 +107,16 @@ router.get("/auth/profile", authenticate, AuthController.getProfile);
 router.patch("/auth/edit-profile", authenticate, upload.single("profile_image"), AuthController.updateProfile);
 router.post("/auth/logout", authenticate, AuthController.logout);
 
+
+// ---------------------------
+// Common routes
+// ---------------------------
+router.get('/file/pdf/:fileId', authenticate, CommonController.servePDF);
+// ✅ Route to Download Folder
+router.get("/download/:folderId", authenticate, CommonController.downloadFolderAsZip);
+
+
+
 // ---------------------------
 // Admin routes
 // ---------------------------
@@ -120,43 +131,81 @@ router.get("/approval-requests", EmployeeController.getApprovalRequests);
 
 
 // ---------------------------
-// Documents routes
+// Document Routes
 // ---------------------------
+
+/**
+ * Document Management
+ */
+// List all documents
 router.get("/documents", DocumentController.getDocuments);
-router.get("/documents/search", DocumentController.searchDocuments);
-router.get("/documents/recyclebin", DocumentController.getRecycleBinDocuments);
-router.patch("/documents/:id/archive", DocumentController.archiveDocuments);
-router.get("/documents/archive", DocumentController.getArchivedDocuments);
-router.delete("/documents/permanent", DocumentController.deleteDocument);
-router.patch("/documents/:id/restore", DocumentController.restoreDocument);
+
+// Get documents in a specific folder
 router.get("/documents/folder/:folderId", authenticate, DocumentController.getDocumentsByFolder);
-// Only accept signature file
-router.post("/documents", upload.fields([{ name: "signatureFile", maxCount: 1 }]), DocumentController.createDocument);
-// router.get("/documents/:id", DocumentController.getDocument);
-router.patch("/documents/:id", upload.fields([{ name: "signature", maxCount: 1 }]), DocumentController.updateDocument);
-// Soft delete (recycle bin)
+
+// Search documents
+router.get("/documents/search", DocumentController.searchDocuments);
+
+// Create a new document (only accepts signature file)
+router.post(
+    "/documents",
+    upload.fields([{ name: "signatureFile", maxCount: 1 }]),
+    DocumentController.createDocument
+);
+
+// Update a document (with optional signature update)
+router.patch(
+    "/documents/:id",
+    upload.fields([{ name: "signature", maxCount: 1 }]),
+    DocumentController.updateDocument
+);
+
+// Soft delete (move to recycle bin)
 router.delete("/documents/:id", DocumentController.softDeleteDocument);
 
 // Hard delete (permanent removal)
+router.delete("/documents/permanent", DocumentController.deleteDocument);
+
+// Update document status (hard delete or other status updates)
 router.patch("/documents/:id/status", DocumentController.updateDocumentStatus);
 
-// List all users document is shared with
+// Archive and restore documents
+router.patch("/documents/:id/archive", DocumentController.archiveDocuments);
+router.get("/documents/archive", DocumentController.getArchivedDocuments);
+router.patch("/documents/:id/restore", DocumentController.restoreDocument);
+
+// Recycle bin
+router.get("/documents/recyclebin", DocumentController.getRecycleBinDocuments);
+
+
+/**
+ * Document Sharing & Permissions
+ */
+// Share a document
+router.patch("/documents/:id/share", DocumentController.shareDocument);
+
+// List all users a document is shared with
 router.get("/documents/:documentId/shared-users", DocumentController.getSharedUsers);
-// Update user access level
+
+// Update user access level for a shared document
 router.put("/documents/share/:documentId", DocumentController.updateSharedUser);
 
 // Remove user from shared list
 router.delete("/documents/share/:documentId", DocumentController.removeSharedUser);
-router.patch("/documents/:id/share", DocumentController.shareDocument);
-router.get("/documents/:id/audit-logs", DocumentController.getDocumentAuditLogs);
-router.get("/documents/:id/access-logs", DocumentController.getDocumentAccessLogs);
+
 // Invite a user to a document (sends email)
 router.post("/documents/:documentId/invite", DocumentController.inviteUser);
-router.post("/documents/:documentId/request-access-again", DocumentController.requestAccessAgain);
-router.get("/documents/grant-access/:token", DocumentController.grantAccessViaToken);
-//accept or reject an invite
+
+// Accept or reject an invite automatically
 router.get("/documents/:documentId/invite/:userId/auto-accept", DocumentController.autoAcceptInvite);
 
+// Request access again
+router.post("/documents/:documentId/request-access-again", DocumentController.requestAccessAgain);
+
+// Grant access via token
+router.get("/documents/grant-access/:token", DocumentController.grantAccessViaToken);
+
+// Generate shareable link for a document file
 router.get('/documents/:documentId/:fileId/share-link', async (req, res) => {
     const { documentId, fileId } = req.params;
     try {
@@ -168,19 +217,43 @@ router.get('/documents/:documentId/:fileId/share-link', async (req, res) => {
     }
 });
 
-// versioning
+
+/**
+ * Audit & Logs
+ */
+// Get audit logs for a document
+router.get("/documents/:id/audit-logs", DocumentController.getDocumentAuditLogs);
+
+// Get access logs for a document
+router.get("/documents/:id/access-logs", DocumentController.getDocumentAccessLogs);
+
+
+/**
+ * Document Versioning
+ */
+// Get version history
 router.get('/documents/:id/versions/history', DocumentController.getVersionHistory);
+
+// View a specific version
 router.get('/documents/:id/versions/view', DocumentController.viewDocumentVersion);
 router.get('/documents/:id/versions/:version/view', DocumentController.viewVersion);
-// router.get('/documents/:id/versions/:version/download', DocumentController.download);
+
+// Restore a previous version
 router.patch('/documents/:id/versions/:version/restore', DocumentController.restoreVersion);
 
-//approval
-// router.get('/:documentId', getDocumentApprovals);
-router.patch('/documents/:documentId/approvals/:approver', DocumentController.updateApprovalStatus);
-// Process approval action
+
+/**
+ * Document Approval Workflow
+ */
+// Create an approval request
 router.post('/documents/:documentId/add', DocumentController.createApprovalRequest);
+
+// Track approvals
 router.get('/documents/:documentId/approval/track', DocumentController.getApprovals);
+
+// Update approval status for a document
+router.patch('/documents/:documentId/approvals/:approver', DocumentController.updateApprovalStatus);
+
 
 // ---------------------------
 // Departments routes
@@ -662,6 +735,25 @@ router.delete("/user/:id", UserController.deleteUser);
 // ---------------------------
 // TempFile routes
 // ---------------------------
+
+// ---------------------------
+router.post("/tempfiles/upload/:folderId", async (req, res, next) => {
+    try {
+        const { folderId } = req.params;
+        const folder = await Folder.findById(folderId);
+        if (!folder) return res.status(404).json({ success: false, message: "Folder not found" });
+
+        // Dynamically create uploader for the selected folder
+        const uploader = createS3Uploader(folder.name);
+        uploader.array("file")(req, res, (err) => {
+            if (err) return next(err);
+            TempController.tempUploadFile(req, res); // call your controller
+        });
+    } catch (err) {
+        next(err);
+    }
+});
+
 router.post("/files/upload/:folderId", async (req, res, next) => {
     try {
         const { folderId } = req.params;
@@ -709,68 +801,83 @@ router.get("/files/:fileId/status", TempController.getFileStatus);
 
 
 // ---------------------------
-// Folders routes
+// Folder Routes
 // ---------------------------
-// Create folder
+
+/**
+ * Folder Management
+ */
+// Create a new folder
 router.post('/folders', FolderController.createFolder);
 
-// List folders (optionally by parent)
+// List folders (optionally filter by parent)
 router.get('/folders', FolderController.listFolders);
 router.get('/folders/all', FolderController.getAllFolders);
 
-// Get folder details with contents
+// Get folder details along with its contents
 router.get('/folders/details/:id', FolderController.getFolder);
 
-// router.get('', getFoldersProjectDepartment)
-
-// Rename folder
+// Rename a folder
 router.patch('/folders/:id/rename', FolderController.renameFolder);
 
-// Move folder
+// Move a folder to another location
 router.patch('/folders/:id/move', FolderController.moveFolder);
 
-// Delete folder (soft delete)
+// Soft delete a folder
 router.delete('/folders/:id', FolderController.deleteFolder);
 
-// Upload files to folder
-router.post('/folders/:folderId/upload', upload.array("files"), FolderController.uploadToFolder);
+// Archive a folder
+router.patch('/folders/:id/archive', FolderController.archiveFolder);
+
+// Restore an archived folder
+router.patch('/folders/:id/restore', FolderController.restoreFolder);
+
+// Get all archived folders for the current user
+router.get('/folders/archived', FolderController.getArchivedFolders);
 
 // Get folder tree structure
 router.get('/folders/tree/structure', FolderController.getFolderTree);
 
-router.patch('/folders/:id/archive', FolderController.archiveFolder);
-// Get all archived folders for the current user
-router.get('/folders/archived', FolderController.getArchivedFolders);
 
-router.patch('/folders/:id/restore', FolderController.restoreFolder);
+/**
+ * File Management within Folders
+ */
+// Upload files to a specific folder
+router.post('/folders/:folderId/upload', upload.array("files"), FolderController.uploadToFolder);
+
+// Download a specific file
+router.get('/folders/download/:fileId', authenticate, FolderController.downloadFile);
 
 
+/**
+ * Folder Sharing & Permissions
+ */
+// Update folder permissions
 router.patch('/folders/:id/permissions', FolderController.updateFolderPermission);
 
-// Fetch users with access and share links
+// Fetch users with access and folder share info
 router.get('/folders/:folderId', FolderController.getFolderShareInfo);
+
 // Invite user to folder
 router.post('/folders/:folderId/share', FolderController.shareFolder);
 
+// Request access to folder
 router.post('/folders/:folderId/request-access', FolderController.requestFolderAccess);
+
+// Grant access to a user
 router.post('/folders/:folderId/grant-access', FolderController.grantFolderAccess);
-/**
- * Get folder access permissions (for prefilling form)
- * GET /api/folders/:folderId/access
- */
+
+// Get folder access permissions (for prefilling forms)
 router.get('/folders/:folderId/access', FolderController.getFolderAccess);
 
 // Remove user access
 router.post('/folders/:folderId/unshare', FolderController.unshareFolder);
 
-// Generate shareable link
+// Generate shareable link for a folder
 router.post('/folders/:folderId/link', FolderController.generateShareLink);
 
-// Access folder via link
+// Access folder via shareable link
 router.get('/folders/:folderId/access/:token', FolderController.accessViaToken);
-
-router.get('/folders/download/:fileId', authenticate, FolderController.downloadFile);
-
 
 
 // ---------------------------

@@ -1,69 +1,127 @@
 <%- include('../../partials/header') %>
 
     <style>
+        /* Container adjustments */
         #file-container {
+            margin-left: -7.5px;
+            margin-right: -7.5px;
             display: flex;
             flex-wrap: wrap;
-            gap: 15px;
         }
 
-        .filebox {
-            flex: 0 0 calc(20% - 15px);
+        /* Grid item: 10 per row on large screens */
+        .file-grid-item {
+            padding: 7.5px;
+            flex: 0 0 100%;
+            max-width: 100%;
+        }
+
+        @media (min-width: 1200px) {
+            .file-grid-item {
+                flex: 0 0 10%;
+                max-width: 10%;
+            }
+        }
+
+        @media (min-width: 992px) and (max-width: 1199px) {
+            .file-grid-item {
+                flex: 0 0 12.5%;
+                max-width: 12.5%;
+            }
+        }
+
+        @media (min-width: 768px) and (max-width: 991px) {
+            .file-grid-item {
+                flex: 0 0 16.66%;
+                max-width: 16.66%;
+            }
+        }
+
+        @media (min-width: 576px) and (max-width: 767px) {
+            .file-grid-item {
+                flex: 0 0 25%;
+                max-width: 25%;
+            }
+        }
+
+        /* Modern card styling */
+        .file-card {
+            border: 1px solid #e9ecef;
+            border-radius: 0.5rem;
+            padding: 15px 10px;
             text-align: center;
-            padding: 15px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
+            height: 100%;
             background-color: #fff;
-            cursor: pointer;
             transition: all 0.2s ease-in-out;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            position: relative;
         }
 
-        .filebox:hover {
-            box-shadow: 0px 3px 6px rgba(0, 0, 0, 0.1);
+        .file-card:hover {
+            box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.15);
             transform: translateY(-3px);
+            border-color: #ced4da;
         }
 
-        .filebox img {
-            width: 50px;
-            height: 50px;
-            margin-bottom: 10px;
+        /* Always show actions for first 3 cards */
+        .file-card.always-show-actions .file-actions {
+            opacity: 1 !important;
         }
 
-        .filebox p {
-            font-size: 14px;
-            word-break: break-all;
+        .file-icon-img {
+            width: 48px;
+            height: 48px;
+            object-fit: contain;
+            margin-bottom: 8px;
         }
 
-        @media (max-width:1200px) {
-            .filebox {
-                flex: 0 0 calc(25%-15px);
-            }
+        .file-name {
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: #343a40;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            width: 100%;
+            margin-bottom: 0;
         }
 
-        @media (max-width:992px) {
-            .filebox {
-                flex: 0 0 calc(33.33%-15px);
-            }
+        .file-size {
+            font-size: 0.7rem;
+            color: #6c757d;
+            margin-top: 2px;
         }
 
-        @media (max-width:768px) {
-            .filebox {
-                flex: 0 0 calc(50%-15px);
-            }
+        .file-actions {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            opacity: 0;
+            transition: opacity 0.2s;
         }
 
-        @media (max-width:576px) {
-            .filebox {
-                flex: 0 0 100%;
-            }
+        .file-card:hover .file-actions {
+            opacity: 1;
+        }
+
+        .file-actions .btn {
+            padding: 0;
+            font-size: 1rem;
+            color: #6c757d;
+            background-color: transparent !important;
+            border: none !important;
         }
     </style>
 
     <div class="page-wrapper">
         <div class="content">
 
-            <div class="d-flex align-items-center justify-content-between page-breadcrumb mb-3">
-                <div class="my-auto mb-2">
+            <div class="d-flex align-items-center justify-content-between page-breadcrumb mb-4">
+                <div class="my-auto">
                     <h2 class="mb-1" id="folder-name">
                         <%= folder.name %>
                     </h2>
@@ -78,22 +136,25 @@
             </div>
 
             <!-- Request Access -->
-            <div id="request-access-container" class="text-center my-3"
+            <div id="request-access-container" class="text-center my-4 p-4 rounded bg-light"
                 style="display:<%= canRequestAccess ? 'block' : 'none' %>;">
                 <button id="request-access-btn" class="btn btn-primary">Request Access</button>
                 <p id="request-access-msg" class="mt-2 text-success" style="display:none;"></p>
             </div>
 
-            <!-- Files -->
-            <div id="file-container" style="display:<%= canView && !folderExpired ? 'flex' : 'none' %>;"></div>
+            <!-- File Container -->
+            <div id="file-container" class="row gx-3"
+                style="display:<%= canView && !folderExpired ? 'flex' : 'none' %>;">
+            </div>
 
-            <!-- Expired / Empty -->
-            <div id="file-empty" class="text-center py-4" style="display:<%= folderExpired ? 'block' : 'none' %>;">
+            <!-- Empty State -->
+            <div id="file-empty" class="text-center py-5" style="display:<%= folderExpired ? 'block' : 'none' %>;">
                 <i class="ti ti-file-off fs-1 text-muted"></i>
                 <p class="mt-2 text-muted">This folder has expired and files are no longer available.</p>
             </div>
 
-            <div id="file-loading" class="text-center py-4" style="display:none;">
+            <!-- Loading State -->
+            <div id="file-loading" class="text-center py-5" style="display:none;">
                 <div class="spinner-border text-primary"></div>
                 <p class="mt-2 text-muted">Loading files...</p>
             </div>
@@ -135,13 +196,13 @@
 
             const setLoading = (loading) => {
                 fileLoading.style.display = loading ? 'block' : 'none';
-                fileContainer.style.display = loading ? 'none' : 'flex';
+                fileContainer.style.display = loading ? 'none' : (CAN_VIEW && !FOLDER_EXPIRED ? 'flex' : 'none');
                 fileEmpty.style.display = 'none';
             };
 
             const setEmpty = (empty) => {
                 fileEmpty.style.display = empty ? 'block' : 'none';
-                fileContainer.style.display = empty ? 'none' : 'flex';
+                fileContainer.style.display = empty ? 'none' : (CAN_VIEW && !FOLDER_EXPIRED ? 'flex' : 'none');
                 fileLoading.style.display = 'none';
             };
 
@@ -178,61 +239,49 @@
 
                     if (files.length === 0) { setEmpty(true); return; }
 
-                    files.forEach(file => {
+                    files.forEach((file, index) => {
                         const ext = getFileExtension(file.originalName);
                         const icon = fileIcons[ext] || fileIcons.default;
-                        const fileSize = formatFileSize(file.size);
+                        const fileSize = formatFileSize(file.fileSize);
 
-                        const div = document.createElement("div");
-                        div.className = "filebox mb-2";
-                        div.innerHTML = `
-        <div class="d-flex align-items-center justify-content-between p-2 rounded cursor-pointer">
-            <span class="avatar rounded bg-light me-2">
-                <img src="${icon}" style="height:30px;">
-            </span>
-            <div class="flex-grow-1 ms-2">
-                <p class="mb-0 text-dark">${file.originalName}</p>
-                <small class="text-muted">${fileSize}</small>
-            </div>
-            <div class="dropdown">
-                <button class="btn btn-sm btn-light dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                    &#x22EE;
-                </button>
-                <ul class="dropdown-menu dropdown-menu-end">
-                    <li><a class="dropdown-item view-file" href="#">View</a></li>
-                    <li><a class="dropdown-item download-file" href="#">Download</a></li>
-                </ul>
-            </div>
-        </div>
-    `;
+                        const colDiv = document.createElement("div");
+                        colDiv.className = "file-grid-item mb-3";
 
-                        // View action
-                        div.querySelector(".view-file").addEventListener("click", (e) => {
+                        colDiv.innerHTML = `
+                    <div class="file-card ${index < 3 ? 'always-show-actions' : ''}" data-file-id="${file._id}" title="${file.originalName}">
+                        <img src="${icon}" class="file-icon-img" alt="${ext} icon">
+                        <p class="file-name mb-0">${file.originalName}</p>
+                        <small class="file-size">${fileSize}</small>
+
+                        <div class="file-actions dropdown">
+                            <button class="btn btn-sm" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="ti ti-dots-vertical"></i>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li><a class="dropdown-item view-file" href="#" data-file-id="${file._id}">View</a></li>
+                                <li><a class="dropdown-item download-file" href="#" data-file-id="${file._id}">Download</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                `;
+
+                        const handleFileAction = (e, action) => {
                             e.stopPropagation();
-                            if (file._id) {
-                                // Open your view page for this file
-                                window.location.href = `/folders/view/${file._id}`;
+                            const fileId = e.currentTarget.getAttribute('data-file-id') || e.currentTarget.closest('.file-card').getAttribute('data-file-id');
+                            if (fileId) {
+                                if (action === 'view') window.location.href = `/folders/view/${fileId}`;
+                                if (action === 'download') window.location.href = `/api/folders/download/${fileId}`;
                             } else {
                                 alert("File not found");
                             }
-                        });
+                        };
 
-                        // Download action
-                        // Download action
-                        div.querySelector(".download-file").addEventListener("click", (e) => {
-                            e.stopPropagation();
+                        colDiv.querySelector(".view-file").addEventListener("click", (e) => handleFileAction(e, 'view'));
+                        colDiv.querySelector(".download-file").addEventListener("click", (e) => handleFileAction(e, 'download'));
+                        colDiv.querySelector(".file-card").addEventListener("dblclick", (e) => handleFileAction(e, 'view'));
 
-                            if (file._id) {
-                                // Hit backend download API
-                                window.location.href = `/api/folders/download/${file._id}`;
-                            } else {
-                                alert("File not found");
-                            }
-                        });
-
-                        fileContainer.appendChild(div);
+                        fileContainer.appendChild(colDiv);
                     });
-
                 } catch (err) {
                     console.error(err);
                     setLoading(false);
@@ -240,15 +289,13 @@
                 }
             };
 
+            // Request access
             requestAccessBtn?.addEventListener("click", async () => {
                 const parts = window.location.pathname.split("/");
                 const folderId = parts[parts.indexOf("folders") + 2];
 
-                // Keep "Sending..." on button
                 requestAccessBtn.disabled = true;
                 requestAccessBtn.textContent = "Sending...";
-
-                // Show message area
                 requestAccessMsg.style.display = 'block';
                 requestAccessMsg.textContent = "Sending request...";
 
@@ -256,26 +303,22 @@
                     const res = await fetch(`/api/folders/${folderId}/request-access`, { method: 'POST' });
                     const data = await res.json();
 
-                    // Update message below button instead of changing button text
                     requestAccessMsg.textContent = data.success
                         ? "Access request sent to folder owner!"
                         : data.message || "Error sending request.";
 
-                    // Optionally hide the button if request succeeded
                     if (data.success) requestAccessBtn.style.display = 'none';
 
                 } catch (err) {
                     console.error(err);
                     requestAccessMsg.textContent = "Server error. Please try again.";
                 } finally {
-                    // Keep button enabled and text as "Request Access" if request failed
                     if (requestAccessBtn.style.display !== 'none') {
                         requestAccessBtn.disabled = false;
                         requestAccessBtn.textContent = "Request Access";
                     }
                 }
             });
-
 
             document.addEventListener("DOMContentLoaded", loadFiles);
         </script>

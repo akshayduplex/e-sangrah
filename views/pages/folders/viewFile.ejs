@@ -1,45 +1,70 @@
-<%- include('../../partials/header') %>
+<!DOCTYPE html>
+<html lang="en">
 
-    <div class="page-wrapper">
-        <div class="content container-fluid">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Details</title>
+</head>
 
-            <div class="d-md-flex d-block align-items-center justify-content-between page-breadcrumb mb-4">
+<body style="margin:0; font-family: Arial, sans-serif; background-color:#f4f4f4;">
+
+    <div class="page-wrapper" style="padding:20px;">
+        <div class="content container-fluid"
+            style="background:white; max-width:1200px; margin:auto; padding:20px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+
+            <div class="d-md-flex d-block align-items-center justify-content-between page-breadcrumb mb-4"
+                style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
                 <div class="mb-2 mb-md-0">
-                    <h2 class="mb-1 fw-bold">File Details</h2>
+                    <h2 class="mb-1 fw-bold" style="margin:0; font-size:24px; font-weight:700;">File Details</h2>
                 </div>
             </div>
 
-            <div class="card shadow-sm mb-4">
-                <div class="card-body">
+            <div class="card shadow-sm mb-4"
+                style="border:1px solid #ddd; border-radius:6px; overflow:hidden; margin-bottom:20px;">
+                <div class="card-body" style="padding:20px;">
                     <% if (!file) { %>
-                        <div class="alert alert-warning">File not found.</div>
+                        <div class="alert alert-warning"
+                            style="padding:12px; background:#fff3cd; border:1px solid #ffeeba; color:#856404; border-radius:4px;">
+                            File not found.
+                        </div>
                         <% } else { %>
-                            <h4>
+                            <h4 style="margin-top:0; font-size:20px; font-weight:600;">
                                 <%= file.originalName %>
                             </h4>
-                            <p>Type: <%= file.fileType.extension %>
-                            </p>
-                            <p>Size: <%= file.formattedSize %>
-                            </p>
+                            <p style="margin:5px 0;">Type: <strong>
+                                    <%= file.fileType.extension %>
+                                </strong></p>
+                            <p style="margin:5px 0;">Size: <strong>
+                                    <%= file.formattedSize %>
+                                </strong></p>
 
                             <!-- File Preview -->
                             <% if (file.fileType.isPDF) { %>
                                 <!-- PDF Viewer -->
-                                <iframe src="<%= file.fileUrl %>" width="100%" height="600px"></iframe>
+                                <iframe src="/api/file/pdf/<%= file._id %>" width="100%" height="600px"
+                                    style="border:1px solid #ccc; border-radius:6px;"></iframe>
+
                                 <% } else if (['png','jpg','jpeg','gif'].includes(file.fileType.extension)) { %>
                                     <!-- Image Preview -->
-                                    <img src="<%= file.fileUrl %>" alt="<%= file.originalName %>" class="img-fluid" />
+                                    <img src="<%= file.fileUrl %>" alt="<%= file.originalName %>"
+                                        style="max-width:100%; border-radius:6px; display:block; margin-top:10px;" />
+
                                     <% } else if (file.fileType.isWord || file.fileType.isExcel ||
                                         file.fileType.isPowerPoint) { %>
                                         <!-- Microsoft Office Online Preview -->
                                         <iframe
                                             src="https://view.officeapps.live.com/op/embed.aspx?src=<%= encodeURIComponent(file.fileUrl) %>"
-                                            width="100%" height="600px" frameborder="0">
-                                        </iframe>
+                                            width="100%" height="600px" frameborder="0"
+                                            style="border:1px solid #ccc; border-radius:6px;"></iframe>
+
                                         <% } else { %>
                                             <!-- Other file types -->
-                                            <p>Download file: <a href="<%= file.fileUrl %>" target="_blank">Click
-                                                    here</a></p>
+                                            <p style="margin-top:10px;">Download file:
+                                                <a href="<%= file.fileUrl %>" target="_blank"
+                                                    style="color:#007bff; text-decoration:none;">Click here</a>
+                                            </p>
                                             <% } %>
                                                 <% } %>
                 </div>
@@ -48,4 +73,6 @@
         </div>
     </div>
 
-    <%- include('../../partials/footer') %>
+</body>
+
+</html>

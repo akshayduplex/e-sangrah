@@ -17,38 +17,34 @@
             </div>
 
             <div class="content container my-5">
-                <div class="card shadow-sm">
-                    <div class="card-body">
-                        <h5 class="card-title mb-4">Grant Folder Access</h5>
-                        <form id="grantAccessForm" class="row g-3">
-                            <div class="col-md-6">
-                                <label for="userEmail" class="form-label">User Email</label>
-                                <input type="email" class="form-control" id="userEmail" placeholder="Enter user email"
-                                    required>
-                            </div>
-                            <div class="col-md-3">
-                                <label for="access" class="form-label">Access Level</label>
-                                <select id="access" class="form-select">
-                                    <option value="view">View</option>
-                                    <option value="edit">Edit</option>
-                                    <option value="owner">Owner</option>
-                                </select>
-                            </div>
-                            <div class="col-md-3">
-                                <label for="duration" class="form-label">Duration</label>
-                                <select id="duration" class="form-select">
-                                    <option value="oneday">1 Day</option>
-                                    <option value="oneweek">1 Week</option>
-                                    <option value="onemonth">1 Month</option>
-                                    <option value="lifetime" selected>Lifetime</option>
-                                </select>
-                            </div>
-                            <div class="col-12">
-                                <button type="button" id="grantBtn" class="btn btn-primary">Grant Access</button>
-                            </div>
-                        </form>
+                <!-- Removed card wrapper -->
+                <h5 class="mb-4">Grant Folder Access</h5>
+                <form id="grantAccessForm" class="row g-3">
+                    <div class="col-md-6">
+                        <label for="userEmail" class="form-label">User Email</label>
+                        <input type="email" class="form-control" id="userEmail" placeholder="Enter user email"
+                            value="<%= userEmail || '' %>" required readonly>
                     </div>
-                </div>
+                    <div class="col-md-3">
+                        <label for="access" class="form-label">Access Level</label>
+                        <select id="access" class="form-select">
+                            <option value="view">View</option>
+                            <option value="edit">Edit</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="duration" class="form-label">Duration</label>
+                        <select id="duration" class="form-select">
+                            <option value="oneday">1 Day</option>
+                            <option value="oneweek">1 Week</option>
+                            <option value="onemonth">1 Month</option>
+                            <option value="lifetime" selected>Lifetime</option>
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <button type="button" id="grantBtn" class="btn btn-primary">Grant Access</button>
+                    </div>
+                </form>
             </div>
         </div>
 

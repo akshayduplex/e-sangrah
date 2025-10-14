@@ -70,6 +70,75 @@ export const uploadFile = async (req, res, folder) => {
     }
 };
 
+// Upload temporary file
+export const tempUploadFile = async (req, res) => {
+    try {
+        const { folderId } = req.params;
+        const ownerId = req.user._id;
+
+        // Validate folderId
+        if (!mongoose.Types.ObjectId.isValid(folderId)) {
+            return res.status(400).json({ success: false, message: "Invalid folder ID" });
+        }
+
+        const folder = await Folder.findById(folderId);
+        if (!folder) return res.status(404).json({ success: false, message: "Folder not found" });
+
+        if (!req.files || req.files.length === 0) {
+            return res.status(400).json({ success: false, message: "No files uploaded" });
+        }
+
+        let totalSize = 0;
+        const uploadedFiles = [];
+
+        for (const file of req.files) {
+            const { originalname, mimetype, size, key, location } = file;
+
+            // Create TempFile document
+            const tempFile = await TempFile.create({
+                fileName: key,
+                originalName: originalname,
+                s3Filename: key,
+                s3Url: location,
+                fileType: mimetype,
+                status: "temp",
+                size: size || 0,
+                folder: folder._id, // associate with folder
+            });
+
+            // Push only ObjectId to folder.files
+            if (!folder.files) folder.files = [];
+            folder.files.push(tempFile._id);
+
+            totalSize += size || 0;
+
+            uploadedFiles.push({
+                fileId: tempFile._id,
+                originalName: originalname,
+                s3Filename: key,
+                s3Url: location,
+            });
+        }
+
+        // Update folder size
+        folder.size += totalSize;
+        await folder.save();
+
+        // Populate files for response
+        const populatedFolder = await Folder.findById(folder._id).populate("files");
+
+        return res.status(201).json({
+            success: true,
+            message: "Files uploaded successfully",
+            folderId: folder._id,
+            files: uploadedFiles,
+            folderFiles: populatedFolder.files, // optional: full file details
+        });
+    } catch (err) {
+        console.error("Upload to folder error:", err);
+        return res.status(500).json({ success: false, message: "File upload failed" });
+    }
+};
 export const handleFolderUpload = async (req, res, parentFolder) => {
     try {
         const ownerId = req.user._id;
