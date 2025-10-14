@@ -1,0 +1,51 @@
+<%- include('../../partials/header') %>
+
+    <div class="page-wrapper">
+        <div class="content container-fluid">
+
+            <div class="d-md-flex d-block align-items-center justify-content-between page-breadcrumb mb-4">
+                <div class="mb-2 mb-md-0">
+                    <h2 class="mb-1 fw-bold">File Details</h2>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <% if (!file) { %>
+                        <div class="alert alert-warning">File not found.</div>
+                        <% } else { %>
+                            <h4>
+                                <%= file.originalName %>
+                            </h4>
+                            <p>Type: <%= file.fileType.extension %>
+                            </p>
+                            <p>Size: <%= file.formattedSize %>
+                            </p>
+
+                            <!-- File Preview -->
+                            <% if (file.fileType.isPDF) { %>
+                                <!-- PDF Viewer -->
+                                <iframe src="<%= file.fileUrl %>" width="100%" height="600px"></iframe>
+                                <% } else if (['png','jpg','jpeg','gif'].includes(file.fileType.extension)) { %>
+                                    <!-- Image Preview -->
+                                    <img src="<%= file.fileUrl %>" alt="<%= file.originalName %>" class="img-fluid" />
+                                    <% } else if (file.fileType.isWord || file.fileType.isExcel ||
+                                        file.fileType.isPowerPoint) { %>
+                                        <!-- Microsoft Office Online Preview -->
+                                        <iframe
+                                            src="https://view.officeapps.live.com/op/embed.aspx?src=<%= encodeURIComponent(file.fileUrl) %>"
+                                            width="100%" height="600px" frameborder="0">
+                                        </iframe>
+                                        <% } else { %>
+                                            <!-- Other file types -->
+                                            <p>Download file: <a href="<%= file.fileUrl %>" target="_blank">Click
+                                                    here</a></p>
+                                            <% } %>
+                                                <% } %>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <%- include('../../partials/footer') %>

@@ -672,7 +672,7 @@ router.post("/files/upload/:folderId", async (req, res, next) => {
         const uploader = createS3Uploader(folder.name);
         uploader.array("file")(req, res, (err) => {
             if (err) return next(err);
-            TempController.uploadFile(req, res); // call your controller
+            TempController.uploadFile(req, res, folder); // call your controller
         });
     } catch (err) {
         next(err);
@@ -682,19 +682,24 @@ router.post("/files/upload/:folderId", async (req, res, next) => {
 router.post("/files/upload-folder/:folderId", async (req, res, next) => {
     try {
         const { folderId } = req.params;
-        const folder = await Folder.findById(folderId); // f2
-        if (!folder) return res.status(404).json({ success: false, message: "Folder not found" });
+        const parentFolder = await Folder.findById(folderId);
+        if (!parentFolder)
+            return res.status(404).json({ success: false, message: "Folder not found" });
+        // console.log("Parent folder:", req.body.folderName);
+        // Create uploader using folderName from body
+        const uploader = createS3FolderUploader();
 
-        const uploader = createS3FolderUploader(folder.name);
-
-        uploader.array("folder")(req, res, (err) => {
+        uploader.array("file")(req, res, async (err) => {
             if (err) return next(err);
-            TempController.uploadFile(req, res);
+
+            // Handle nested folder uploads
+            await TempController.handleFolderUpload(req, res, parentFolder);
         });
     } catch (err) {
         next(err);
     }
 });
+
 
 router.get("/files/download/:fileName", TempController.download);
 router.post("/files/submit-form", TempController.submitForm);
@@ -763,6 +768,9 @@ router.post('/folders/:folderId/link', FolderController.generateShareLink);
 
 // Access folder via link
 router.get('/folders/:folderId/access/:token', FolderController.accessViaToken);
+
+router.get('/folders/download/:fileId', authenticate, FolderController.downloadFile);
+
 
 
 // ---------------------------

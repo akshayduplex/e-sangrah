@@ -5,7 +5,7 @@ import crypto from 'crypto'
 import jwt from "jsonwebtoken";
 import mongoose from 'mongoose';
 import { generateUniqueFileName } from '../helper/GenerateUniquename.js';
-import { putObject } from '../utils/s3Helpers.js';
+import { getObjectUrl, putObject } from '../utils/s3Helpers.js';
 import logger from '../utils/logger.js';
 import TempFile from '../models/TempFile.js';
 import User from '../models/User.js';
@@ -13,6 +13,7 @@ import { API_CONFIG } from '../config/ApiEndpoints.js';
 import { sendEmail } from '../services/emailService.js';
 import { folderSharedTemplate } from '../emailTemplates/folderSharedTemplate.js';
 import { folderAccessRequestTemplate } from '../emailTemplates/folderAccessRequestTemplate.js';
+import File from '../models/File.js';
 
 //Page controlers
 
@@ -123,6 +124,62 @@ export const showviewFoldersPage = async (req, res) => {
     }
 };
 
+export const viewFile = async (req, res) => {
+    try {
+        const { fileId } = req.params;
+        console.log("Viewing file with ID:", fileId);
+        const formatFileSize = (bytes) => {
+            if (!bytes) return "0 Bytes";
+            const k = 1024;
+            const sizes = ["Bytes", "KB", "MB", "GB"];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+        };
+
+        const getFileType = (filename) => {
+            const ext = filename.split(".").pop().toLowerCase();
+            return {
+                isPDF: ext === "pdf",
+                isWord: ["doc", "docx"].includes(ext),
+                isExcel: ["xls", "xlsx"].includes(ext),
+                isPowerPoint: ["ppt", "pptx"].includes(ext),
+                isText: ["txt", "md", "json", "xml", "html", "csv"].includes(ext),
+                extension: ext
+            };
+        };
+        // Fetch file document from DB
+        const file = await File.findById(fileId).lean();
+        if (!file) {
+            return res.render("pages/folders/viewFile", {
+                file: null,
+                documentTitle: "Document",
+                user: req.user
+            });
+        }
+
+        // Generate signed URL from S3
+        const fileUrl = file.s3Url || await getObjectUrl(file.file, 3600); // 1 hour expiry
+        console.log("Generated file URL:", fileUrl);
+        res.render("pages/folders/viewFile", {
+            file: {
+                ...file,
+                formattedSize: formatFileSize(file.fileSize),
+                fileUrl,
+                fileType: getFileType(file.originalName)
+            },
+            documentTitle: file.originalName,
+            user: req.user
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.render("pages/folders/viewFile", {
+            file: null,
+            documentTitle: "Document",
+            user: req.user
+        });
+    }
+};
 //API controllers
 
 // Create folder
@@ -924,6 +981,29 @@ export const unshareFolder = async (req, res) => {
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Server error' });
+    }
+};
+
+
+export const downloadFile = async (req, res) => {
+    try {
+        const { fileId } = req.params;
+        const file = await File.findById(fileId).lean();
+        if (!file) return res.status(404).send("File not found");
+
+        const command = new GetObjectCommand({
+            Bucket: process.env.AWS_BUCKET,
+            Key: file.file,
+            ResponseContentDisposition: `attachment; filename="${file.originalName}"`,
+        });
+
+        const url = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
+
+        // Redirect browser to the signed download URL
+        res.redirect(url);
+    } catch (err) {
+        console.error(err);
+        res.status(500).send("Error generating download link");
     }
 };
 

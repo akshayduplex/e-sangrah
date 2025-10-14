@@ -543,8 +543,15 @@
 
 					await new Promise((resolve) => {
 						const formData = new FormData();
-						formData.append("folder", item.file, item.relativePath);
 
+						// ✅ Append the file itself
+						formData.append("file", item.file, item.relativePath);
+
+						// ✅ Extract top-level folder from relativePath
+						const topLevelFolder = item.relativePath.split('/')[0];
+						console.log("Top level folder:", topLevelFolder);
+						// ✅ Append folderName and relativePath
+						formData.append("folderName", topLevelFolder);
 						const xhr = new XMLHttpRequest();
 						xhr.open("POST", `/api/files/upload-folder/${item.folderId}`, true);
 						xhr.withCredentials = true;

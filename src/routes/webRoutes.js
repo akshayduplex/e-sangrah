@@ -174,7 +174,7 @@ router.get("/documents/add", authenticate, checkPermissions, DocumentController.
 
 // Edit Document page
 router.get("/documents/edit/:id", authenticate, checkPermissions, DocumentController.showEditDocumentPage);
-router.get('/documents/view/:token', authenticate, DocumentController.viewDocumentFiles)
+router.get('/documents/view/:token', authenticate, DocumentController.viewDocumentFiles);
 
 /* =========================================
    PROJECTS ROUTES
@@ -326,8 +326,8 @@ router.get("/recyclebin", authenticate, checkPermissions, FolderController.showR
 
 // Main Folders page
 router.get("/folders", authenticate, checkPermissions, FolderController.showMainFoldersPage);
+router.get('/folders/view/:fileId', authenticate, FolderController.viewFile)
 router.get("/folders/:accesslevel/:folderId", authenticate, FolderController.showviewFoldersPage);
-
 /* =========================================
    NOTIFICATIONS ROUTE
    ========================================= */

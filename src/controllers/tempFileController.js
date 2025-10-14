@@ -4,60 +4,54 @@ import TempFile from "../models/TempFile.js";
 import crypto from "crypto";
 import path from "path";
 import Folder from "../models/Folder.js";
+import File from "../models/File.js";
 import { generateUniqueFileName } from "../helper/GenerateUniquename.js";
 import mongoose from "mongoose";
 import logger from "../utils/logger.js";
+import { ensureFolderHierarchy } from "../helper/FolderHierarchy.js";
 // Unique filename generator
 
 // Upload temporary file
-export const uploadFile = async (req, res) => {
+export const uploadFile = async (req, res, folder) => {
     try {
-        const { folderId } = req.params;
         const ownerId = req.user._id;
 
-        if (!mongoose.Types.ObjectId.isValid(folderId)) {
-            return res.status(400).json({ success: false, message: "Invalid folder ID" });
-        }
+        if (!req.files || req.files.length === 0)
+            return res.status(400).json({ success: false, message: "No files uploaded" });
 
-        const folder = await Folder.findById(folderId);
-        if (!folder) return res.status(404).json({ success: false, message: "Folder not found" });
-        if (!req.files || req.files.length === 0) return res.status(400).json({ success: false, message: "No files uploaded" });
-
-        let totalSize = 0;
         const uploadedFiles = [];
+        let totalSize = 0;
 
         for (const file of req.files) {
             const { originalname, mimetype, size, key, location } = file;
 
-            const tempFile = await TempFile.create({
-                fileName: key,
-                originalName: originalname,
-                s3Filename: key,
-                s3Url: location,
-                fileType: mimetype,
-                status: "temp",
-                size: size || 0,
-            });
-
-            if (!folder.files) folder.files = [];
-            folder.files.push({
+            // ✅ Create file record
+            const newFile = await File.create({
                 file: key,
+                s3Url: location,
                 originalName: originalname,
                 fileType: mimetype,
-                size: size || 0,
                 uploadedBy: ownerId,
+                folder: folder._id,
+                projectId: folder.projectId,
+                departmentId: folder.departmentId,
+                fileSize: size,
             });
 
-            totalSize += size || 0;
+            // ✅ Push file reference to folder
+            folder.files.push(newFile._id);
+            totalSize += size;
 
             uploadedFiles.push({
-                fileId: tempFile._id,
+                _id: newFile._id,
                 originalName: originalname,
-                s3Filename: key,
                 s3Url: location,
+                fileType: mimetype,
+                size,
             });
         }
 
+        // ✅ Update folder metadata
         folder.size += totalSize;
         await folder.save();
 
@@ -68,8 +62,74 @@ export const uploadFile = async (req, res) => {
             files: uploadedFiles,
         });
     } catch (err) {
-        logger.error("Upload to folder error:", err);
-        return res.status(500).json({ success: false, message: "File upload failed" });
+        console.error("Upload to folder error:", err);
+        return res.status(500).json({
+            success: false,
+            message: err.message || "File upload failed",
+        });
+    }
+};
+
+export const handleFolderUpload = async (req, res, parentFolder) => {
+    try {
+        const ownerId = req.user._id;
+        const { projectId, departmentId } = parentFolder;
+        const folderName = req.body.folderName;
+        console.log("foldername", folderName);
+        const uploadedFiles = [];
+        let totalSize = 0;
+
+        const folderMap = new Map();
+        folderMap.set("", parentFolder._id); // root folder
+
+        for (const file of req.files) {
+            const { originalname, mimetype, size, key, location } = file;
+
+            const folderPath = path.dirname(file.originalname); // nested path
+            const fileName = path.basename(file.originalname);
+
+            const folderId = await ensureFolderHierarchy(folderPath, parentFolder, folderMap, ownerId);
+
+            // Save file
+            const newFile = await file.create({
+                file: key,
+                s3Url: location,
+                originalName: fileName,
+                fileType: mimetype,
+                uploadedBy: ownerId,
+                folder: folderId,
+                projectId,
+                departmentId,
+                fileSize: size,
+            });
+
+            // Update folder size & files
+            await folder.findByIdAndUpdate(folderId, { $inc: { size }, $push: { files: newFile._id } });
+
+            totalSize += size;
+
+            uploadedFiles.push({
+                fileId: newFile._id,
+                folderId,
+                path: folderPath,
+                fileName,
+                s3Url: location,
+            });
+        }
+
+        // Update parent folder size
+        await folder.findByIdAndUpdate(parentFolder._id, { $inc: { size: totalSize } });
+
+        return res.status(201).json({
+            success: true,
+            message: "Folder (with subfolders) uploaded successfully",
+            rootFolder: parentFolder._id,
+            uploadedFiles,
+        });
+
+    } catch (err) {
+        console.error("Whole folder upload error:", err);
+        return res.status(500).json({ success: false, message: "Folder upload failed" });
     }
 };
 

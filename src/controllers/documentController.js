@@ -139,7 +139,7 @@ export const viewDocumentFiles = async (req, res) => {
     try {
         const { token } = req.params;
         if (!token) throw new Error('Invalid link');
-
+        const fileviewlink = generateShareLink()
         let decrypted;
         try {
             decrypted = JSON.parse(decrypt(token));
@@ -267,9 +267,6 @@ export const viewDocumentFiles = async (req, res) => {
         });
     }
 };
-
-
-
 
 //API Controllers
 

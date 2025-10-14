@@ -36,6 +36,7 @@ const folderSchema = new Schema({
         enum: ["active", "inactive"],
         default: "active"
     },
+    files: [{ type: mongoose.Schema.Types.ObjectId, ref: "File" }],
     isArchived: { type: Boolean, default: false },
     size: { type: Number, default: 0 }, // aggregate size (bytes) of contents
     metadata: { type: Schema.Types.Mixed, default: {} },

@@ -40,20 +40,28 @@ export const createS3Uploader = (folderName) => {
 };
 
 
-export function createS3FolderUploader(selectedFolderName) {
+export function createS3FolderUploader(baseFolderName) {
     return multer({
         storage: multerS3({
-            s3: s3Client, // Reuse existing S3 client
+            s3: s3Client,
             bucket: process.env.AWS_BUCKET,
-            contentType: multerS3.AUTO_CONTENT_TYPE,
+            acl: "private",
             key: (req, file, cb) => {
-                const relativePath = file.originalname; // Includes folder structure
-                const finalPath = `${selectedFolderName}/${relativePath}`;
-                console.log("Uploading to:", finalPath);
-                cb(null, finalPath);
-            }
-        })
+                // Use folderName from body
+                const folderName = req.body?.folderName || "unnamed_folder";
+                console.log("Base folder name:", folderName);
+                // Replace spaces with underscores
+                const safePath = file.originalname.replace(/\s+/g, "_");
+
+                // Use folderName as root + timestamp
+                cb(null, `${baseFolderName}/${Date.now()}-${safePath}`);
+            },
+        }),
+        limits: { fileSize: MAX_FILE_SIZE },
+        fileFilter: (req, file, cb) => {
+            if (ALLOWED_DOC_MIME_TYPES.includes(file.mimetype)) cb(null, true);
+            else cb(new Error(`Invalid file type: ${file.originalname}`), false);
+        },
     });
-}
 
-
+};
