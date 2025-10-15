@@ -114,7 +114,8 @@ router.post("/auth/logout", authenticate, AuthController.logout);
 router.get('/file/pdf/:fileId', authenticate, CommonController.servePDF);
 // ✅ Route to Download Folder
 router.get("/download/:folderId", authenticate, CommonController.downloadFolderAsZip);
-
+router.post('/export', authenticate, CommonController.exportDocuments);
+router.get('/export/formats', authenticate, CommonController.getExportFormats);
 
 
 // ---------------------------

@@ -1,4 +1,16 @@
 <%- include('../../partials/header') %>
+	<style>
+		.sbtxt a {
+			color: #007bff;
+			text-decoration: none;
+			font-weight: 500;
+			cursor: pointer;
+		}
+
+		.sbtxt a:hover {
+			text-decoration: underline;
+		}
+	</style>
 	<!-- Page Wrapper -->
 	<div class="page-wrapper">
 		<div class="content">
@@ -86,10 +98,16 @@
 
 
 					<div class="w-100 text-end pt-3">
-						<button class="btn btn-primary btn-lg rounded-pill">
+						<button id="exportBtn" class="btn btn-primary btn-lg rounded-pill">
 							<i class="ti ti-download"></i> Export Report
 						</button>
-						<p class="sbtxt gap-1 pt-2">XLSX / ODS / CSV / PDF</p>
+
+						<p class="sbtxt gap-1 pt-2">
+							<a href="#" class="export-link" data-format="xlsx">XLSX</a> /
+							<a href="#" class="export-link" data-format="ods">ODS</a> /
+							<a href="#" class="export-link" data-format="csv">CSV</a> /
+							<a href="#" class="export-link" data-format="pdf">PDF</a>
+						</p>
 					</div>
 				</div>
 
@@ -351,6 +369,56 @@
 						{ data: 'status' }
 					],
 					order: [[6, 'desc']] // default sort by Last Modified
+				});
+				// Handle export clicks (XLSX / CSV / PDF / ODS)
+				$('.export-link').on('click', async function (e) {
+					e.preventDefault();
+					const format = $(this).data('format');
+
+					// Collect filters from UI
+					const filters = {
+						role: $('#roleSelect').val(),
+						department: $('#department').val(),
+						docType: $('#docTypeSelect').val(),
+						designation: $('#designation_select').val(),
+						search: $('input[name="q"]').val(),
+						date: $('.datetimepicker').val()
+					};
+
+					try {
+						const response = await fetch(`${baseUrl}/api/export`, {
+							method: 'POST',
+							headers: {
+								'Content-Type': 'application/json',
+								'Authorization': `Bearer ${localStorage.getItem('token') || ''}` // adjust auth
+							},
+							body: JSON.stringify({
+								format,
+								filters,
+								exportAll: true // export all filtered documents
+							})
+						});
+
+						if (!response.ok) {
+							const error = await response.json();
+							alert(`Export failed: ${error.message}`);
+							return;
+						}
+
+						// Convert response to blob and trigger download
+						const blob = await response.blob();
+						const fileURL = window.URL.createObjectURL(blob);
+						const a = document.createElement('a');
+						a.href = fileURL;
+						a.download = `documents-${Date.now()}.${format}`;
+						document.body.appendChild(a);
+						a.click();
+						a.remove();
+
+					} catch (err) {
+						console.error('Export error:', err);
+						alert('Something went wrong while exporting.');
+					}
 				});
 			});
 		</script>
