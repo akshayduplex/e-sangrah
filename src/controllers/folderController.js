@@ -39,9 +39,14 @@ export const showFolderListById = async (req, res) => {
 
 // Upload Folder page
 export const showUploadFolderPage = (req, res) => {
+    const selectedProjectId = req.session.selectedProject || null;
+    const selectedProjectName = req.session.selectedProjectName || ''
     res.render("pages/folders/upload-folder", {
         title: "E-Sangrah - Upload-Folder",
-        user: req.user
+        user: req.user,
+        selectedProjectId: selectedProjectId,
+        selectedProjectName: selectedProjectName
+
     });
 };
 

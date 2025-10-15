@@ -6,156 +6,84 @@
     <title>File Preview - <%= file ? file.originalName : 'No File' %>
     </title>
     <style>
+        html,
         body {
-            font-family: Arial, sans-serif;
             margin: 0;
-            padding: 20px;
-            background-color: #f5f5f5;
+            padding: 0;
+            height: 100%;
+            background-color: #000;
         }
 
-        .file-container {
-            max-width: 900px;
-            margin: 0 auto;
-            background: #fff;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-        }
-
-        .preview-iframe {
+        iframe,
+        img {
+            display: block;
             width: 100%;
-            height: 600px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
-
-        .download-btn {
-            display: inline-block;
-            margin-top: 10px;
-            padding: 8px 16px;
-            background-color: #007bff;
-            color: #fff;
-            text-decoration: none;
-            border-radius: 4px;
-        }
-
-        .download-btn:hover {
-            background-color: #0056b3;
+            height: 100%;
+            border: none;
         }
 
         img {
-            max-width: 100%;
-            max-height: 600px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
+            object-fit: contain;
+            background-color: #000;
         }
 
-        h4 {
-            margin-bottom: 10px;
+        /* Optional: center "file not found" text */
+        .fallback {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #fff;
+            font-family: Arial, sans-serif;
+            text-align: center;
         }
     </style>
 </head>
 
 <body>
-    <div class="file-container">
-        <div class="file-preview">
-            <% if (file && file.fileUrl) { %>
-
-                <% if (file.fileType.isPDF) { %>
-                    <iframe src="/api/file/pdf/<%= file._id %>" class="preview-iframe"
-                        title="PDF Preview of <%= file.originalName %>">
-                        <p>Your browser does not support PDFs.
-                            <a href="<%= file.fileUrl %>" download>Download the PDF</a> instead.
-                        </p>
-                    </iframe>
-
-                    <% } else if (file.fileType.isWord || file.fileType.isExcel || file.fileType.isPowerPoint) { %>
-                        <div style="position: relative; height: 600px;">
-                            <iframe
-                                src="https://view.officeapps.live.com/op/embed.aspx?src=<%= encodeURIComponent(file.fileUrl) %>"
-                                class="preview-iframe" style="width: 100%; height: 100%; border: none;"
-                                title="Office Preview of <%= file.originalName %>"></iframe>
-                        </div>
-                        <div style="margin-top: 10px; font-size: 12px; color: #666;">
-                            <em>Powered by Microsoft Office Online Viewer</em>
-                        </div>
-
-                        <% } else if (file.fileType.isText) { %>
-                            <iframe src="/api/file/pdf/<%= file._id %>" class="preview-iframe"
-                                title="Text Preview of <%= file.originalName %>"></iframe>
-
-                            <% } else if (file.originalName.match(/\.(jpg|jpeg|png|gif|webp)$/i)) { %>
-                                <div style="text-align: center;">
-                                    <img src="<%= file.fileUrl %>" alt="<%= file.originalName %>">
-                                </div>
-
-                                <% } else { %>
-                                    <div style="text-align: center; padding: 40px;">
-                                        <h4>Preview not available</h4>
-                                        <p>This file type (.<%= file.fileType.extension %>) cannot be previewed in the
-                                                browser.</p>
-                                        <a href="<%= file.fileUrl %>" class="download-btn"
-                                            download="<%= file.originalName %>">Download File</a>
-                                    </div>
-                                    <% } %>
-
-                                        <% } else { %>
-                                            <div style="text-align:center; padding: 40px;">
-                                                <h4>File not available</h4>
-                                                <% if (expiredMessage) { %>
-                                                    <p>
-                                                        <%= expiredMessage %>
-                                                    </p>
-                                                    <% } else { %>
-                                                        <p>The file could not be loaded.</p>
-                                                        <% } %>
-
-                                                            <% if (canRenew && documentId) { %>
-                                                                <div style="margin-top: 20px;">
-                                                                    <button id="request-access-btn" style="background-color:#007bff;color:#fff;border:none;padding:10px 20px;
-                           border-radius:5px;cursor:pointer;font-size:15px;">
-                                                                        Request Access Again
-                                                                    </button>
-                                                                    <p id="access-status"
-                                                                        style="margin-top:10px;color:#666;font-size:14px;">
-                                                                    </p>
-                                                                </div>
-
-                                                                <script>
-                                                                    document.getElementById('request-access-btn').addEventListener('click', async () => {
-                                                                        const btn = document.getElementById('request-access-btn');
-                                                                        const status = document.getElementById('access-status');
-                                                                        btn.disabled = true;
-                                                                        btn.textContent = 'Requesting...';
-
-                                                                        try {
-                                                                            const res = await fetch(`/api/documents/<%= documentId %>/request-access-again`, {
-                                                                                method: 'POST',
-                                                                                headers: { 'Content-Type': 'application/json' }
-                                                                            });
-                                                                            const data = await res.json();
-                                                                            if (data.success) {
-                                                                                status.textContent = '✅ Access request sent to the owner!';
-                                                                                btn.style.display = 'none';
-                                                                            } else {
-                                                                                status.textContent = '❌ ' + (data.message || 'Failed to send request.');
-                                                                                btn.disabled = false;
-                                                                                btn.textContent = 'Request Access Again';
-                                                                            }
-                                                                        } catch (err) {
-                                                                            status.textContent = '❌ Network error. Please try again.';
-                                                                            btn.disabled = false;
-                                                                            btn.textContent = 'Request Access Again';
-                                                                        }
-                                                                    });
-                                                                </script>
-                                                                <% } %>
-
-                                            </div>
-                                            <% } %>
-
+    <% if (!file || !file.fileUrl) { %>
+        <div class="fallback">
+            <div>
+                <h2>File not available</h2>
+                <% if (expiredMessage) { %>
+                    <p>
+                        <%= expiredMessage %>
+                    </p>
+                    <% } else { %>
+                        <p>The file could not be loaded.</p>
+                        <% } %>
+            </div>
         </div>
-    </div>
+        <% } else { %>
+
+            <% if (file.fileType.isPDF) { %>
+                <!-- PDF Preview -->
+                <iframe src="/api/file/pdf/<%= file._id %>" title="PDF Preview of <%= file.originalName %>"></iframe>
+
+                <% } else if (file.fileType.isWord || file.fileType.isExcel || file.fileType.isPowerPoint) { %>
+                    <!-- Office Preview -->
+                    <iframe
+                        src="https://view.officeapps.live.com/op/embed.aspx?src=<%= encodeURIComponent(file.fileUrl) %>"
+                        title="Office Preview of <%= file.originalName %>"></iframe>
+
+                    <% } else if (file.originalName.match(/\.(jpg|jpeg|png|gif|webp)$/i)) { %>
+                        <!-- Image Preview -->
+                        <img src="<%= file.fileUrl %>" alt="<%= file.originalName %>">
+
+                        <% } else { %>
+                            <!-- Other file types -->
+                            <div class="fallback">
+                                <div>
+                                    <h2>Preview not available</h2>
+                                    <p>This file type (.<%= file.fileType.extension %>) cannot be previewed in the
+                                            browser.</p>
+                                    <p><a href="<%= file.fileUrl %>" style="color:#0af;" target="_blank">Download
+                                            File</a></p>
+                                </div>
+                            </div>
+                            <% } %>
+
+                                <% } %>
 </body>
 
 </html>

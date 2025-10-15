@@ -20,6 +20,7 @@ export const API_CONFIG = {
     baseUrl: process.env.BASE_URL || 'http://localhost:5000/api',
     MONGO_URI: process.env.MONGO_URI,
     DB_NAME: process.env.DB_NAME,
+    Bucket: process.env.AWS_BUCKET,
     ACCESS_GRANT_SECRET: process.env.ACCESS_GRANT_SECRET,
     encryptedKey: process.env.URL_ENCRYPTION_KEY || '12345678901234567890123456789012',
     timeout: Number(process.env.API_TIMEOUT) || 5000,

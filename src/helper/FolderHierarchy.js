@@ -29,21 +29,15 @@ export const ensureFolderHierarchy = async (folderPath, parentFolder, folderMap,
         // Check if folder exists under current parent
         let folder = await Folder.findOne({
             name: part,
-            parentId: currentParentId,
+            parent: currentParentId,
             projectId: parentFolder.projectId,
             departmentId: parentFolder.departmentId,
+            isDeleted: false
         });
 
         if (!folder) {
-            folder = await Folder.create({
-                name: part,
-                parentId: currentParentId,
-                projectId: parentFolder.projectId,
-                departmentId: parentFolder.departmentId,
-                uploadedBy: ownerId,
-                files: [],
-                size: 0
-            });
+            // Use the static createFolder method to ensure slug uniqueness
+            folder = await Folder.createFolder(ownerId, currentParentId, part, ownerId);
         }
 
         folderMap.set(currentPath, folder._id);

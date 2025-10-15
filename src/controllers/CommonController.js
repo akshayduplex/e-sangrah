@@ -8,6 +8,8 @@ import ExcelJS from 'exceljs';
 import PDFDocument from 'pdfkit';
 import { createObjectCsvStringifier } from 'csv-writer';
 import { Parser } from 'json2csv';
+import { getObjectUrl } from "../utils/s3Helpers.js";
+import { API_CONFIG } from "../config/ApiEndpoints.js";
 
 // Add this route to serve PDF files with correct headers
 export const servePDF = async (req, res) => {
@@ -109,6 +111,32 @@ export const downloadFolderAsZip = async (req, res) => {
     } catch (error) {
         console.error("Download ZIP error:", error);
         return res.status(500).json({ message: "Failed to download folder" });
+    }
+};
+
+// Download file
+export const downloadFile = async (req, res) => {
+    try {
+        const file = await File.findById(req.params.fileId);
+        if (!file) return res.status(404).json({ message: "File not found" });
+
+        const command = new GetObjectCommand({
+            Bucket: API_CONFIG.Bucket,
+            Key: file.file
+        });
+
+        const s3Object = await s3Client.send(command);
+
+        // Set headers so browser downloads file
+        res.setHeader("Content-Disposition", `attachment; filename="${file.originalName}"`);
+        res.setHeader("Content-Type", file.fileType || "application/octet-stream");
+
+        // Stream file from S3 to response
+        s3Object.Body.pipe(res);
+
+    } catch (error) {
+        console.error("Download error:", error);
+        res.status(500).json({ message: "Failed to download file", error: error.message });
     }
 };
 

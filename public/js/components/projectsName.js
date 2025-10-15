@@ -77,10 +77,10 @@
 
         $select.on('change', async function () {
             const val = $(this).val();
-            const selectedText = $(this).find('option:selected').text(); // ✅ Get project name
+            const selectedText = $(this).find('option:selected').text();
 
             window.selectedProjectId = val || null;
-            window.selectedProjectName = selectedText || null; // ✅ FIX: Set the name here
+            window.selectedProjectName = selectedText || null;
 
             const addBtn = document.getElementById("btnAddFolder");
 

@@ -270,7 +270,7 @@
                             const fileId = e.currentTarget.getAttribute('data-file-id') || e.currentTarget.closest('.file-card').getAttribute('data-file-id');
                             if (fileId) {
                                 if (action === 'view') window.location.href = `/folders/view/${fileId}`;
-                                if (action === 'download') window.location.href = `/api/folders/download/${fileId}`;
+                                if (action === 'download') window.location.href = `/api/download/file/${fileId}`;
                             } else {
                                 alert("File not found");
                             }

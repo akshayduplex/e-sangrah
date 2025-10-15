@@ -49,10 +49,12 @@ import Menu from "../models/Menu.js";
 import DesignationMenu from "../models/menuAssignment.js";
 import UserPermission from "../models/UserPermission.js";
 import logger from "../utils/logger.js";
-import { createS3FolderUploader, createS3Uploader } from "../middlewares/multer-s3.js";
+import { createS3Uploader, s3uploadfolder } from "../middlewares/multer-s3.js";
 import Folder from "../models/Folder.js";
 import mongoose from "mongoose";
 import { generateShareLink } from "../helper/GenerateUniquename.js";
+import Project from "../models/Project.js";
+import { ParentFolderName } from "../middlewares/parentFolderName.js";
 
 
 const router = express.Router();
@@ -112,8 +114,9 @@ router.post("/auth/logout", authenticate, AuthController.logout);
 // Common routes
 // ---------------------------
 router.get('/file/pdf/:fileId', authenticate, CommonController.servePDF);
-// ✅ Route to Download Folder
+// Route to Download Folder
 router.get("/download/:folderId", authenticate, CommonController.downloadFolderAsZip);
+router.get("/download/file/:fileId", authenticate, CommonController.downloadFile);
 router.post('/export', authenticate, CommonController.exportDocuments);
 router.get('/export/formats', authenticate, CommonController.getExportFormats);
 
@@ -295,22 +298,34 @@ router.delete('/designations/:id', authenticate, authorize('admin'), Designation
 // ---------------------------
 
 // Save selected project to session
-router.post("/session/project", (req, res) => {
+// Save selected project to session
+router.post("/session/project", async (req, res) => {
     const { projectId } = req.body;
 
     if (!projectId) return res.status(400).json({ error: "Project ID is required" });
 
-    req.session.selectedProject = projectId;
+    try {
+        // Fetch project name from DB
+        const project = await Project.findById(projectId).select("projectName");
+        if (!project) return res.status(404).json({ error: "Project not found" });
 
-    req.session.save(err => {
-        if (err) return res.status(500).json({ error: "Failed to save session" });
-        res.json({ success: true, selectedProject: projectId });
-    });
+        // Save both ID and name in session
+        req.session.selectedProject = projectId,
+            req.session.selectedProjectName = project.projectName
+
+        req.session.save(err => {
+            if (err) return res.status(500).json({ error: "Failed to save session" });
+            res.json({ success: true, selectedProject: req.session.selectedProject });
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Server error" });
+    }
 });
 
 // Get selected project from session
 router.get("/session/project", (req, res) => {
-    res.json({ selectedProject: req.session.selectedProject || null });
+    res.json({ selectedProject: req.session.selectedProject || null, selectedProjectName: req.session.selectedProjectName });
 });
 
 
@@ -772,26 +787,22 @@ router.post("/files/upload/:folderId", async (req, res, next) => {
     }
 });
 
-router.post("/files/upload-folder/:folderId", async (req, res, next) => {
+// Fix uploader to read folderName from body
+router.post("/files/upload-folder/:folderId", ParentFolderName, s3uploadfolder.array('file'), async (req, res, next) => {
     try {
         const { folderId } = req.params;
-        const parentFolder = await Folder.findById(folderId);
-        if (!parentFolder)
+        const parentfolder = await Folder.findById(folderId).select("name departmentId projectId ");
+
+        if (!parentfolder)
             return res.status(404).json({ success: false, message: "Folder not found" });
-        // console.log("Parent folder:", req.body.folderName);
-        // Create uploader using folderName from body
-        const uploader = createS3FolderUploader();
+        await TempController.handleFolderUpload(req, res, parentfolder);
 
-        uploader.array("file")(req, res, async (err) => {
-            if (err) return next(err);
-
-            // Handle nested folder uploads
-            await TempController.handleFolderUpload(req, res, parentFolder);
-        });
     } catch (err) {
         next(err);
     }
 });
+
+
 
 
 router.get("/files/download/:fileName", TempController.download);

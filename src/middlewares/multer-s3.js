@@ -40,28 +40,24 @@ export const createS3Uploader = (folderName) => {
 };
 
 
-export function createS3FolderUploader(baseFolderName) {
-    return multer({
-        storage: multerS3({
-            s3: s3Client,
-            bucket: process.env.AWS_BUCKET,
-            acl: "private",
-            key: (req, file, cb) => {
-                // Use folderName from body
-                const folderName = req.body?.folderName || "unnamed_folder";
-                console.log("Base folder name:", folderName);
-                // Replace spaces with underscores
-                const safePath = file.originalname.replace(/\s+/g, "_");
+// Multer S3 uploader
+export const s3uploadfolder = multer({
+    storage: multerS3({
+        s3: s3Client,
+        bucket: process.env.AWS_BUCKET,
+        acl: "private",
+        key: (req, file, cb) => {
+            const parentFolderName = req.parentFolderName;
+            console.log("s3", parentFolderName);
 
-                // Use folderName as root + timestamp
-                cb(null, `${baseFolderName}/${Date.now()}-${safePath}`);
-            },
-        }),
-        limits: { fileSize: MAX_FILE_SIZE },
-        fileFilter: (req, file, cb) => {
-            if (ALLOWED_DOC_MIME_TYPES.includes(file.mimetype)) cb(null, true);
-            else cb(new Error(`Invalid file type: ${file.originalname}`), false);
+            const safeFileName = file.originalname.replace(/\s+/g, "_");
+            const s3Key = `${parentFolderName}/${req.query.folderName}/${Date.now()}_${safeFileName}`;
+            cb(null, s3Key);
         },
-    });
-
-};
+    }),
+    limits: { fileSize: MAX_FILE_SIZE },
+    fileFilter: (req, file, cb) => {
+        if (ALLOWED_DOC_MIME_TYPES.includes(file.mimetype)) cb(null, true);
+        else cb(new Error(`Invalid file type: ${file.originalname}`), false);
+    },
+});

@@ -143,61 +143,71 @@ export const handleFolderUpload = async (req, res, parentFolder) => {
     try {
         const ownerId = req.user._id;
         const { projectId, departmentId } = parentFolder;
-        const folderName = req.body.folderName;
-        console.log("foldername", folderName);
+        const folderName = req.query.folderName || "New Folder";
+
+        // Create the new subfolder
+        const subfolder = await Folder.create({
+            name: folderName,
+            parent: parentFolder._id,
+            owner: ownerId,
+            projectId,
+            departmentId,
+            files: []
+        });
+
+        console.log("Created subfolder:", subfolder.name, subfolder._id);
+
         const uploadedFiles = [];
         let totalSize = 0;
 
-        const folderMap = new Map();
-        folderMap.set("", parentFolder._id); // root folder
-
+        // Upload each file into the new subfolder
         for (const file of req.files) {
             const { originalname, mimetype, size, key, location } = file;
+            const fileName = path.basename(originalname);
 
-            const folderPath = path.dirname(file.originalname); // nested path
-            const fileName = path.basename(file.originalname);
-
-            const folderId = await ensureFolderHierarchy(folderPath, parentFolder, folderMap, ownerId);
-
-            // Save file
-            const newFile = await file.create({
+            const newFile = await File.create({
                 file: key,
                 s3Url: location,
                 originalName: fileName,
                 fileType: mimetype,
                 uploadedBy: ownerId,
-                folder: folderId,
+                folder: subfolder._id,
                 projectId,
                 departmentId,
                 fileSize: size,
             });
 
-            // Update folder size & files
-            await folder.findByIdAndUpdate(folderId, { $inc: { size }, $push: { files: newFile._id } });
+            // Add file to subfolder and update size
+            await Folder.findByIdAndUpdate(subfolder._id, {
+                $inc: { size },
+                $push: { files: newFile._id }
+            });
 
             totalSize += size;
 
             uploadedFiles.push({
                 fileId: newFile._id,
-                folderId,
-                path: folderPath,
+                folderId: subfolder._id,
                 fileName,
                 s3Url: location,
             });
+
+            console.log(`File "${fileName}" saved in subfolder "${subfolder.name}"`);
         }
 
         // Update parent folder size
-        await folder.findByIdAndUpdate(parentFolder._id, { $inc: { size: totalSize } });
+        await Folder.findByIdAndUpdate(parentFolder._id, { $inc: { size: totalSize } });
 
         return res.status(201).json({
             success: true,
-            message: "Folder (with subfolders) uploaded successfully",
-            rootFolder: parentFolder._id,
+            message: "Files uploaded successfully to subfolder",
+            parentFolderId: parentFolder._id,
+            subfolderId: subfolder._id,
             uploadedFiles,
         });
 
     } catch (err) {
-        console.error("Whole folder upload error:", err);
+        console.error("Folder upload error:", err);
         return res.status(500).json({ success: false, message: "Folder upload failed" });
     }
 };
