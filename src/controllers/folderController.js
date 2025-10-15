@@ -748,18 +748,51 @@ export const archiveFolder = async (req, res) => {
 export const getArchivedFolders = async (req, res) => {
     try {
         const ownerId = req.user._id;
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const search = req.query.search || "";
+        const sortBy = req.query.sortBy || "updatedAt";
+        const sortOrder = req.query.sortOrder === "asc" ? 1 : -1;
+        const departmentFilter = req.query.department || "all";
 
-        // Find all folders that are archived and not deleted
-        const folders = await Folder.find({ owner: ownerId, isArchived: true, deletedAt: null })
-            .sort({ updatedAt: -1 }).select('name owner departmentId parent status createdBy updatedBy slug').populate('departmentId', 'name').populate('parent', 'name').populate('createdBy', 'name').populate('updatedBy', 'name').populate('owner', 'name email').populate('projectId', 'projectName')
+        // Build filter
+        const filter = {
+            owner: ownerId,
+            isArchived: true,
+            deletedAt: null,
+            ...(departmentFilter !== "all" ? { departmentId: departmentFilter } : {})
+        };
+
+        // Search
+        if (search) {
+            filter.$or = [
+                { name: { $regex: search, $options: "i" } },
+                { status: { $regex: search, $options: "i" } }
+            ];
+        }
+
+        const total = await Folder.countDocuments(filter);
+
+        const folders = await Folder.find(filter)
+            .sort({ [sortBy]: sortOrder })
+            .skip((page - 1) * limit)
+            .limit(limit)
+            .populate('departmentId', 'name')
+            .populate('owner', 'name email')
+            .populate('projectId', 'projectName')
+            .populate('createdBy', 'name')
+            .populate('updatedBy', 'name')
             .lean();
 
         res.json({
             success: true,
-            folders
+            folders,
+            total,
+            page,
+            totalPages: Math.ceil(total / limit)
         });
     } catch (err) {
-        logger.error("Error fetching archived folders:", err);
+        console.error("Error fetching archived folders:", err);
         res.status(500).json({ success: false, message: "Server error while fetching archived folders" });
     }
 };

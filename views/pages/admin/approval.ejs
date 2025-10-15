@@ -37,8 +37,7 @@
                                 </select>
                             </div>
                             <div class="input-icon-end position-relative">
-                                <input type="text" class="form-control datetimepicker" placeholder="dd/mm/yyyy"
-                                    value="02-05-2024">
+                                <input type="text" class="form-control datetimepicker" placeholder="Date">
                                 <span class="input-icon-addon">
                                     <i class="ti ti-calendar text-gray-7"></i>
                                 </span>
@@ -223,18 +222,49 @@
                 let table = $('#approvalsTable').DataTable({
                     processing: true,
                     serverSide: true,
-                    ajax: {
-                        url: "http://localhost:5000/api/my-approvals",
-                        type: "GET",
-                        data: function (d) {
-                            // Add filter parameters
-                            d.status = $('.filterbtn.active').text() === "All" ? "" : $('.filterbtn.active').text();
-                            d.department = $('#department').val() || "";
-                            d.date = formatDate($('.datetimepicker').val());
-                        },
-                        dataSrc: function (json) {
-                            return json.data;
+                    ajax: function (data, callback) {
+                        const page = Math.floor(data.start / data.length) + 1;
+                        const limit = data.length;
+
+                        // Handle sorting
+                        let sortField = 'createdAt'; // default
+                        let sortOrder = 'desc';
+                        if (data.order && data.order.length > 0) {
+                            const columnIdx = data.order[0].column;
+                            sortOrder = data.order[0].dir;
+
+                            // Map column index to field name
+                            const columnMap = {
+                                1: 'metadata.fileName',
+                                2: 'createdAt',
+                                3: 'documentDonor.name',
+                                4: 'department.name',
+                                5: 'status',
+                                8: 'comment'
+                            };
+                            sortField = columnMap[columnIdx] || 'createdAt';
                         }
+
+                        $.ajax({
+                            url: "http://localhost:5000/api/my-approvals",
+                            type: "GET",
+                            data: {
+                                page,
+                                limit,
+                                status: $('.filterbtn.active').text() === "All" ? "" : $('.filterbtn.active').text(),
+                                department: $('#department').val() || "",
+                                createdAt: formatDate($('.datetimepicker').val()),
+                                sortField,
+                                sortOrder
+                            },
+                            success: function (response) {
+                                callback({
+                                    data: response.data || [],
+                                    recordsTotal: response.pagination?.total || 0,
+                                    recordsFiltered: response.pagination?.total || 0
+                                });
+                            }
+                        });
                     },
                     columns: [
                         {

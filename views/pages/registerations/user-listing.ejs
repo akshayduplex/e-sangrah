@@ -71,34 +71,75 @@
             <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
             <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
 
-            <script>$(document).ready(function () {
+            <script>
+                $(document).ready(function () {
+                    // Map frontend columns to backend fields
+                    const columnMap = {
+                        srNo: "_id",
+                        name: "name",
+                        email: "email",
+                        phone: "phone_number",
+                        profile_type: "profile_type",
+                        status: "status",
+                        department: "userDetails.department",
+                        designation: "userDetails.designation",
+                        lastLogin: "lastLogin",
+                        createdAt: "createdAt"
+                    };
+
                     const table = $('#userTable').DataTable({
-                        serverSide: true, // server-side processing
-                        processing: true, // show loader
-                        ajax: {
-                            url: `${baseUrl}/api/user`,
-                            type: 'GET',
-                            dataSrc: function (json) {
-                                // Check if API success
-                                if (!json.success) return [];
-                                // Map users to DataTables format
-                                return json.users.map((user, index) => ({
-                                    srNo: index + 1,
-                                    name: user.name,
-                                    email: user.email,
-                                    phone: user.phone_number || '-',
-                                    profile_type: user.profile_type,
-                                    status: user.status,
-                                    department: user.userDetails?.department?.name || '-',
-                                    designation: user.userDetails?.designation?.name || '-',
-                                    lastLogin: user.lastLogin ? new Date(user.lastLogin).toLocaleString() : '-',
-                                    createdAt: new Date(user.createdAt).toLocaleString(),
-                                    actions: `
-                        <a href="/users/edit/${user._id}" class="text-primary me-2"><i class="ti ti-edit"></i></a>
-                        <a href="#" class="text-danger btn-delete" data-id="${user._id}"><i class="ti ti-trash"></i></a>
-                    `
-                                }));
-                            }
+                        serverSide: true,
+                        processing: true,
+                        ajax: function (data, callback) {
+                            const page = Math.ceil(data.start / data.length) + 1;
+                            const limit = data.length;
+                            const sortBy = columnMap[data.columns[data.order[0].column].data] || "createdAt";
+                            const sortOrder = data.order[0].dir;
+
+                            $.ajax({
+                                url: '/api/user',
+                                method: "GET",
+                                data: {
+                                    page,
+                                    limit,
+                                    search: data.search.value,
+                                    sortBy,
+                                    sortOrder
+                                },
+                                success: function (res) {
+                                    if (!res.success) {
+                                        callback({ draw: data.draw, data: [] });
+                                        return;
+                                    }
+
+                                    const users = res.users.map((user, index) => ({
+                                        srNo: (page - 1) * limit + index + 1,
+                                        name: user.name,
+                                        email: user.email,
+                                        phone: user.phone_number || "-",
+                                        profile_type: user.profile_type,
+                                        status: user.status,
+                                        department: user.userDetails?.department?.name || "-",
+                                        designation: user.userDetails?.designation?.name || "-",
+                                        lastLogin: user.lastLogin ? new Date(user.lastLogin).toLocaleString() : "-",
+                                        createdAt: new Date(user.createdAt).toLocaleString(),
+                                        actions: `
+                            <a href="/users/edit/${user._id}" class="text-primary me-2"><i class="ti ti-edit"></i></a>
+                            <a href="#" class="text-danger btn-delete" data-id="${user._id}"><i class="ti ti-trash"></i></a>
+                        `
+                                    }));
+
+                                    callback({
+                                        draw: data.draw,
+                                        recordsTotal: res.total,
+                                        recordsFiltered: res.total,
+                                        data: users
+                                    });
+                                },
+                                error: function () {
+                                    callback({ draw: data.draw, data: [] });
+                                }
+                            });
                         },
                         columns: [
                             { data: 'srNo' },
@@ -114,15 +155,10 @@
                             { data: 'actions', orderable: false, searchable: false }
                         ],
                         order: [[9, 'desc']],
-                        lengthMenu: [10, 25, 50],
+                        lengthMenu: [10, 25, 50]
                     });
 
-                    // Debounced search
-                    $('#userTable_filter input').off('keyup').on('keyup', debounce(function () {
-                        table.search(this.value).draw();
-                    }, 500));
-
-                    // Delete user logic
+                    // Delete user
                     $(document).on('click', '.btn-delete', function (e) {
                         e.preventDefault();
                         const deleteUserId = $(this).data('id');
@@ -130,134 +166,23 @@
 
                         $('#confirmDeleteBtn').off('click').on('click', function () {
                             $.ajax({
-                                url: `${baseUrl}/api/user/${deleteUserId}`,
+                                url: `/api/user/${deleteUserId}`,
                                 method: 'DELETE',
                                 success: function (res) {
                                     $('#confirmDeleteModal').modal('hide');
                                     if (res.success) {
-                                        showToast('User deleted successfully!', 'success');
                                         table.ajax.reload(null, false);
+                                        alert('User deleted successfully');
                                     } else {
-                                        showToast(res.message || 'Failed to delete user', 'error');
+                                        alert(res.message || 'Failed to delete user');
                                     }
                                 },
                                 error: function () {
                                     $('#confirmDeleteModal').modal('hide');
-                                    showToast('Error deleting user', 'error');
+                                    alert('Error deleting user');
                                 }
                             });
-                        });
-                    });
-
-                    function debounce(func, wait) {
-                        let timeout;
-                        return function (...args) {
-                            clearTimeout(timeout);
-                            timeout = setTimeout(() => func.apply(this, args), wait);
-                        };
-                    }
-                });
-            </script>
-
-            <!-- <script>
-let deleteUserId = null;
-
-                $(document).ready(function () {
-                    let table;
-
-                    // Fetch users from API
-                    $.ajax({
-                        url: '/api/user',
-                        method: 'GET',
-                        success: function (res) {
-                            if (!res.success) {
-                                alert('Failed to fetch users!');
-                                return;
-                            }
-
-                            let users = res.users;
-                            let tbody = '';
-                            users.forEach((user, index) => {
-                                let department = user.userDetails?.department?.name || '-';
-                                let designation = user.userDetails?.designation?.name || '-';
-                                let phone = user.phone_number || '-';
-                                let lastLogin = user.lastLogin ? new Date(user.lastLogin).toLocaleString() : '-';
-                                let createdAt = new Date(user.createdAt).toLocaleString();
-
-                                tbody += `
-                        <tr>
-                            <td>${index + 1}</td>
-                            <td>${user.name}</td>
-                            <td>${user.email}</td>
-                            <td>${phone}</td>
-                            <td>${user.profile_type}</td>
-                            <td>${user.status}</td>
-                            <td>${department}</td>
-                            <td>${designation}</td>
-                            <td>${lastLogin}</td>
-                            <td>${createdAt}</td>
-                            <td>
-                                <a href="/users/edit/${user._id}" class="text-primary me-2" title="Edit">
-                                    <i class="ti ti-edit"></i>
-                                </a>
-                                <a href="#" class="text-danger btn-delete" data-id="${user._id}" title="Delete">
-                                    <i class="ti ti-trash"></i>
-                                </a>
-                            </td>
-                        </tr>
-                    `;
-                            });
-
-                            $('#userTableBody').html(tbody);
-
-                            // Initialize DataTable
-                            table = $('#userTable').DataTable({
-                                "columnDefs": [
-                                    { "orderable": false, "targets": [0, 1, 4, 5, 10] },
-                                    { "orderable": true, "targets": [2, 3, 6, 7, 8, 9] }
-                                ],
-                                "order": []
-                            });
-                        },
-                        error: function (err) {
-                            showToast('Error fetching users', 'error');
-                        }
-                    });
-
-                    // Delete user - open confirmation modal
-                    $(document).on('click', '.btn-delete', function (e) {
-                        e.preventDefault();
-                        deleteUserId = $(this).data('id');
-                        $('#confirmDeleteModal').modal('show');
-                    });
-
-                    // Handle confirmation delete
-                    $('#confirmDeleteBtn').click(function () {
-                        if (!deleteUserId) return;
-
-                        $.ajax({
-                            url: `/api/user/${deleteUserId}`,
-                            method: 'DELETE',
-                            success: function (res) {
-                                $('#confirmDeleteModal').modal('hide');
-
-                                if (res.success) {
-                                    showToast('User deleted successfully!', 'success');
-
-                                    // Remove the deleted row from DataTable
-                                    const row = $(`.btn-delete[data-id="${deleteUserId}"]`).closest('tr');
-                                    table.row(row).remove().draw(false); // redraw table without full reload
-
-                                    deleteUserId = null;
-                                } else {
-                                    showToast(res.message || 'Failed to delete user', 'error');
-                                }
-                            },
-                            error: function (err) {
-                                $('#confirmDeleteModal').modal('hide');
-                                showToast('Error deleting user', 'error');
-                            }
                         });
                     });
                 });
-            </script> -->
+            </script>

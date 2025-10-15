@@ -153,15 +153,38 @@ export const registerUser = async (req, res) => {
 // Get all users with profile type 'user'
 export const getAllUsers = async (req, res) => {
     try {
-        let profile_type = req.query.profile_type || "user"; // Role filter from front-end
+        let profile_type = req.query.profile_type || "user";
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const search = req.query.search || "";
+        const sortBy = req.query.sortBy || "createdAt";
+        const sortOrder = req.query.sortOrder === "asc" ? 1 : -1;
 
-        const users = await User.find({ profile_type })
+        // Build filter
+        const filter = {
+            profile_type,
+            $or: [
+                { name: { $regex: search, $options: "i" } },
+                { email: { $regex: search, $options: "i" } },
+                ...(search
+                    ? [{ $expr: { $regexMatch: { input: { $toString: "$phone_number" }, regex: search, options: "i" } } }]
+                    : [])
+            ]
+        };
+
+        // Total count
+        const total = await User.countDocuments(filter);
+
+        // Fetch users with pagination and sorting
+        const users = await User.find(filter)
             .populate("userDetails.department", "name")
             .populate("userDetails.designation", "name")
             .select("-password -raw_password")
+            .sort({ [sortBy]: sortOrder })
+            .skip((page - 1) * limit)
+            .limit(limit)
             .lean();
 
-        // Map users to match DataTable expected format
         const mappedUsers = users.map(user => ({
             _id: user._id,
             name: user.name || "-",
@@ -177,7 +200,13 @@ export const getAllUsers = async (req, res) => {
             createdAt: user.createdAt
         }));
 
-        res.json({ success: true, users: mappedUsers });
+        res.json({
+            success: true,
+            users: mappedUsers,
+            total,
+            page,
+            totalPages: Math.ceil(total / limit)
+        });
     } catch (error) {
         console.error("DataTable error:", error);
         res.status(500).json({ success: false, message: "Internal server error" });

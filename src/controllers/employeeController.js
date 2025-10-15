@@ -39,40 +39,59 @@ export const showEmployeeRecycleBinPage = async (req, res) => {
  */
 export const getApprovalRequests = async (req, res) => {
     try {
-        const { status, department, createdAt } = req.query;
+        let { status, department, createdAt, page = 1, limit = 10, sortField = 'createdAt', sortOrder = 'desc' } = req.query;
+
+        page = parseInt(page);
+        limit = parseInt(limit);
 
         const filter = {};
 
         if (status && status !== "All") filter.status = status;
 
-        if (department && mongoose.Types.ObjectId.isValid(department))
+        if (department && mongoose.Types.ObjectId.isValid(department)) {
             filter.department = department;
+        }
 
         if (createdAt) {
-            // Parse DD-MM-YYYY (from your datepicker)
             const [day, month, year] = createdAt.split("-").map(Number);
-
             if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
-                const selectedDate = new Date(year, month - 1, day);
-
-                // Match only documents where the DATE part of createdAt == selected date
-                // (since Mongo stores with time, this ensures same date)
-                const start = new Date(selectedDate.setHours(0, 0, 0, 0));
-                const end = new Date(selectedDate.setHours(23, 59, 59, 999));
+                const start = new Date(year, month - 1, day, 0, 0, 0, 0);
+                const end = new Date(year, month - 1, day, 23, 59, 59, 999);
                 filter.createdAt = { $gte: start, $lte: end };
             }
         }
 
-        const documents = await Document.find(filter)
-            .populate("department", "name")
-            .populate("owner", "name")
-            .populate("projectManager", "name")
-            .populate("files")
-            .sort({ createdAt: -1 });
+        const allowedFields = ['metadata.fileName', 'createdAt', 'department.name', 'projectManager.name', 'status', 'comment'];
+        const sortObj = {};
+        sortObj[allowedFields.includes(sortField) ? sortField : 'createdAt'] = sortOrder === 'asc' ? 1 : -1;
 
-        res.status(200).json({ success: true, data: documents });
+        const skip = (page - 1) * limit;
+
+        const [documents, total] = await Promise.all([
+            Document.find(filter)
+                .populate("department", "name")
+                .populate("owner", "name")
+                .populate("projectManager", "name")
+                .populate("files")
+                .sort(sortObj)
+                .skip(skip)
+                .limit(limit),
+            Document.countDocuments(filter)
+        ]);
+
+        res.status(200).json({
+            success: true,
+            data: documents,
+            pagination: {
+                total,
+                page,
+                pages: Math.ceil(total / limit),
+                limit
+            }
+        });
+
     } catch (error) {
-        console.error(error);
+        console.error("Error in getApprovalRequests:", error);
         res.status(500).json({ success: false, message: "Server Error" });
     }
 };

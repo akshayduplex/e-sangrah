@@ -102,7 +102,15 @@ export const showManageAccessPage = async (req, res) => {
 export const getMyApprovals = async (req, res) => {
     try {
         const userId = req.user._id;
-        const { status, department, createdAt } = req.query;
+        const {
+            status,
+            department,
+            createdAt,
+            page = 1,
+            limit = 10,
+            sortField = "createdAt", // default sort field
+            sortOrder = "desc"       // default sort order
+        } = req.query;
 
         const filter = { owner: userId };
 
@@ -123,15 +131,52 @@ export const getMyApprovals = async (req, res) => {
             }
         }
 
-        const documents = await Document.find(filter)
-            .populate("department", "name")
-            .populate("documentDonor", "name")
-            .populate("files")
-            .sort({ createdAt: -1 });
+        // Pagination
+        const skip = (parseInt(page) - 1) * parseInt(limit);
 
-        res.status(200).json({ success: true, data: documents });
+        // Sorting
+        const sortObj = {};
+        const order = sortOrder === "asc" ? 1 : -1;
+
+        // Validate sortField to avoid injection
+        const allowedFields = [
+            "metadata.fileName",
+            "createdAt",
+            "documentDonor.name",
+            "department.name",
+            "status",
+            "comment"
+        ];
+        if (allowedFields.includes(sortField)) {
+            sortObj[sortField] = order;
+        } else {
+            sortObj["createdAt"] = -1; // fallback default
+        }
+
+        const [documents, total] = await Promise.all([
+            Document.find(filter)
+                .populate("department", "name")
+                .populate("documentDonor", "name")
+                .populate("files")
+                .sort(sortObj)
+                .skip(skip)
+                .limit(parseInt(limit)),
+            Document.countDocuments(filter)
+        ]);
+
+        res.status(200).json({
+            success: true,
+            data: documents,
+            pagination: {
+                total,
+                page: parseInt(page),
+                pages: Math.ceil(total / parseInt(limit)),
+                limit: parseInt(limit)
+            }
+        });
     } catch (error) {
         console.error("Error in getMyApprovals:", error);
         res.status(500).json({ success: false, message: "Server Error" });
     }
 };
+

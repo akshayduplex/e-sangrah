@@ -91,46 +91,52 @@
             $(document).ready(function () {
                 const $table = $('#archived_folders_table');
 
-                // Initialize DataTable
                 const dataTable = $table.DataTable({
                     processing: true,
-                    serverSide: true,
-                    ajax: {
-                        url: `${baseUrl}/api/folders/archived`,
-                        type: "GET",
-                        dataSrc: function (res) {
-                            if (!res.success) return [];
-                            // Populate department dropdown dynamically
-                            const departments = new Set();
-                            res.folders.forEach(f => {
-                                if (f.departmentId?.name) departments.add(f.departmentId.name);
-                            });
-                            $('#departmentFilter').append([...departments].map(d => `<li><a href="javascript:void(0);" class="dropdown-item rounded-1" data-dept="${d}">${d}</a></li>`));
+                    serverSide: false, // we handle sorting/search manually
+                    paging: true,
+                    searching: false,
+                    ordering: false,
+                    ajax: function (data, callback) {
+                        const page = 1; // default page, implement your own paging if needed
+                        const limit = 50; // or fetch from table length
+                        const search = $('#archived_folders_table_filter input').val() || "";
+                        const department = $('#departmentFilter a.active').data('dept') || "all";
 
-                            return res.folders.map(folder => ({
-                                id: folder._id,
-                                actions: `
-						<div class="action-icon d-inline-flex">
-							<a href="#" class="restore-folder me-2" data-folder-id="${folder._id}" data-bs-toggle="modal" data-bs-target="#restore-folder-modal">
-								<i class="ti ti-restore"></i>
-							</a>
-							<a href="#" class="trash-folder" data-folder-id="${folder._id}" data-bs-toggle="modal" data-bs-target="#trashdocfile-modal">
-								<i class="ti ti-trash"></i>
-							</a>
-						</div>`,
-                                name: folder.name || "-",
-                                ownerName: folder.owner?.name || "-",
-                                ownerEmail: folder.owner?.email || "-",
-                                department: folder.departmentId?.name || "-",
-                                project: folder.projectId?.projectName || "-",
-                                status: folder.status || "-",
-                                createdBy: folder.createdBy?.name || "-",
-                                updatedBy: folder.updatedBy?.name || "-"
-                            }));
-                        }
+                        $.ajax({
+                            url: `${baseUrl}/api/folders/archived`,
+                            type: "GET",
+                            data: { page, limit, search, department },
+                            success: function (res) {
+                                if (!res.success) return callback({ data: [] });
+
+                                const folders = res.folders.map(folder => ({
+                                    actions: `
+                            <div class="action-icon d-inline-flex">
+                                <a href="#" class="restore-folder me-2" data-folder-id="${folder._id}" data-bs-toggle="modal" data-bs-target="#restore-folder-modal">
+                                    <i class="ti ti-restore"></i>
+                                </a>
+                                <a href="#" class="trash-folder" data-folder-id="${folder._id}" data-bs-toggle="modal" data-bs-target="#trashdocfile-modal">
+                                    <i class="ti ti-trash"></i>
+                                </a>
+                            </div>
+                        `,
+                                    name: folder.name || "-",
+                                    ownerName: folder.owner?.name || "-",
+                                    ownerEmail: folder.owner?.email || "-",
+                                    department: folder.departmentId?.name || "-",
+                                    project: folder.projectId?.projectName || "-",
+                                    status: folder.status || "-",
+                                    createdBy: folder.createdBy?.name || "-",
+                                    updatedBy: folder.updatedBy?.name || "-"
+                                }));
+
+                                callback({ data: folders });
+                            }
+                        });
                     },
                     columns: [
-                        { data: 'actions', orderable: false, searchable: false },
+                        { data: 'actions' },
                         { data: 'name' },
                         { data: 'ownerName' },
                         { data: 'ownerEmail' },
@@ -140,25 +146,17 @@
                         { data: 'createdBy' },
                         { data: 'updatedBy' }
                     ],
-                    order: [[1, 'asc']],
-                    paging: true,
-                    searching: true,
-                    ordering: true,
-                    info: true,
-                    autoWidth: false
+                    order: [[1, 'asc']]
                 });
 
-                // Filter by Department
+                // Department filter
                 $(document).on('click', '#departmentFilter a', function () {
-                    const dept = $(this).data('dept');
-                    if (dept === 'all') {
-                        dataTable.column(4).search('').draw();
-                    } else {
-                        dataTable.column(4).search(dept).draw();
-                    }
+                    $('#departmentFilter a').removeClass('active');
+                    $(this).addClass('active');
+                    dataTable.ajax.reload();
                 });
 
-                // Trash Folder
+                // Trash folder
                 $(document).on('click', '.trash-folder', function (e) {
                     e.preventDefault();
                     const folderId = $(this).data('folder-id');
@@ -167,15 +165,13 @@
                             url: `${baseUrl}/api/folders/${folderId}`,
                             type: 'DELETE',
                             success: function (res) {
-                                if (res.success) {
-                                    dataTable.ajax.reload();
-                                }
+                                if (res.success) dataTable.ajax.reload();
                             }
                         });
                     });
                 });
 
-                // Restore File
+                // Restore folder
                 $(document).on('click', '.restore-folder', function (e) {
                     e.preventDefault();
                     const folderId = $(this).data('folder-id');
@@ -184,9 +180,7 @@
                             url: `${baseUrl}/api/documents/${folderId}/restore`,
                             type: 'PATCH',
                             success: function (res) {
-                                if (res.success) {
-                                    dataTable.ajax.reload();
-                                }
+                                if (res.success) dataTable.ajax.reload();
                             }
                         });
                     });
