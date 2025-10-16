@@ -1002,3 +1002,10 @@
             max-width: 80px;
         }
     }
+
+    /* sidebar */
+    .recent-child li {
+        /* padding-left: 20px; */
+        margin-left: 12px;
+        padding-top: 0px;
+    }

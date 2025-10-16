@@ -150,7 +150,7 @@
             <!-- Empty State -->
             <div id="file-empty" class="text-center py-5" style="display:<%= folderExpired ? 'block' : 'none' %>;">
                 <i class="ti ti-file-off fs-1 text-muted"></i>
-                <p class="mt-2 text-muted">This folder has expired and files are no longer available.</p>
+                <p class="mt-2 text-muted">This folder has no files</p>
             </div>
 
             <!-- Loading State -->
@@ -182,17 +182,6 @@
             const CAN_REQUEST_ACCESS = <%= canRequestAccess ? 'true' : 'false' %>;
             const FOLDER_EXPIRED = <%= folderExpired ? 'true' : 'false' %>;
             const CAN_VIEW = <%= canView ? 'true' : 'false' %>;
-
-            const fileIcons = {
-                ppt: "/img/icons/fn1.png",
-                pptx: "/img/icons/fn1.png",
-                doc: "/img/icons/fn2.png",
-                docx: "/img/icons/fn2.png",
-                xls: "/img/icons/fn3.png",
-                xlsx: "/img/icons/fn3.png",
-                pdf: "/img/icons/fn4.png",
-                default: "/img/icons/fn1.png"
-            };
 
             const setLoading = (loading) => {
                 fileLoading.style.display = loading ? 'block' : 'none';
@@ -239,35 +228,44 @@
 
                     if (files.length === 0) { setEmpty(true); return; }
 
-                    files.forEach((file, index) => {
+                    files.forEach((file) => {
                         const ext = getFileExtension(file.originalName);
                         const icon = fileIcons[ext] || fileIcons.default;
                         const fileSize = formatFileSize(file.fileSize);
 
                         const colDiv = document.createElement("div");
-                        colDiv.className = "file-grid-item mb-3";
+                        colDiv.className = "col-auto mb-3"; // horizontal cards
 
                         colDiv.innerHTML = `
-                    <div class="file-card ${index < 3 ? 'always-show-actions' : ''}" data-file-id="${file._id}" title="${file.originalName}">
-                        <img src="${icon}" class="file-icon-img" alt="${ext} icon">
-                        <p class="file-name mb-0">${file.originalName}</p>
-                        <small class="file-size">${fileSize}</small>
+        <div class="folderbox filebox d-flex align-items-center border rounded" style="min-width: 150px;">
+            <!-- Icon -->
+            <div class="fldricon me-2 d-flex align-items-center">
+                <img src="${icon}" alt="File" style="width:40px; height:40px;">
+            </div>
 
-                        <div class="file-actions dropdown">
-                            <button class="btn btn-sm" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="ti ti-dots-vertical"></i>
-                            </button>
-                            <ul class="dropdown-menu dropdown-menu-end">
-                                <li><a class="dropdown-item view-file" href="#" data-file-id="${file._id}">View</a></li>
-                                <li><a class="dropdown-item download-file" href="#" data-file-id="${file._id}">Download</a></li>
-                            </ul>
-                        </div>
-                    </div>
-                `;
+            <!-- Filename + Size stacked vertically -->
+            <div class="file-info d-flex flex-column justify-content-center gap-0">
+                <p class="mb-1" style="font-size:0.85rem; margin:0;" title="${file.originalName}">${file.originalName}</p>
+                <p class="mb-1" style="font-size:0.75rem; color:#666;">${fileSize}</p>
+            </div>
 
+            <!-- Dropdown -->
+            <div class="folder_links ms-2 dropdown">
+                <button type="button" class="btn btn-sm border-0" data-bs-toggle="dropdown">
+                    <i class="ti ti-dots"></i>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li><a class="dropdown-item download-file" href="#" data-file-id="${file._id}"><i class="ti ti-download"></i> Download</a></li>
+                    <li><a class="dropdown-item view-file" href="#" data-file-id="${file._id}"><i class="ti ti-eye"></i> View</a></li>
+                </ul>
+            </div>
+        </div>
+    `;
+
+                        // Event handlers
                         const handleFileAction = (e, action) => {
                             e.stopPropagation();
-                            const fileId = e.currentTarget.getAttribute('data-file-id') || e.currentTarget.closest('.file-card').getAttribute('data-file-id');
+                            const fileId = e.currentTarget.getAttribute('data-file-id') || e.currentTarget.closest('.folderbox').getAttribute('data-id');
                             if (fileId) {
                                 if (action === 'view') window.location.href = `/folders/view/${fileId}`;
                                 if (action === 'download') window.location.href = `/api/download/file/${fileId}`;
@@ -278,10 +276,11 @@
 
                         colDiv.querySelector(".view-file").addEventListener("click", (e) => handleFileAction(e, 'view'));
                         colDiv.querySelector(".download-file").addEventListener("click", (e) => handleFileAction(e, 'download'));
-                        colDiv.querySelector(".file-card").addEventListener("dblclick", (e) => handleFileAction(e, 'view'));
+                        colDiv.querySelector(".folderbox").addEventListener("dblclick", (e) => handleFileAction(e, 'view'));
 
                         fileContainer.appendChild(colDiv);
                     });
+
                 } catch (err) {
                     console.error(err);
                     setLoading(false);

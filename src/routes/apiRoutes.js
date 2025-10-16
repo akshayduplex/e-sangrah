@@ -55,6 +55,7 @@ import mongoose from "mongoose";
 import { generateShareLink } from "../helper/GenerateUniquename.js";
 import Project from "../models/Project.js";
 import { ParentFolderName } from "../middlewares/parentFolderName.js";
+import UserFolderHistory from "../models/UserFolderHistory.js";
 
 
 const router = express.Router();
@@ -809,6 +810,199 @@ router.get("/files/download/:fileName", TempController.download);
 router.post("/files/submit-form", TempController.submitForm);
 router.delete("/files/:fileId", TempController.deleteFile);
 router.get("/files/:fileId/status", TempController.getFileStatus);
+
+
+// ---------------------------
+// Folder/Files Visted History
+// ---------------------------
+
+
+// Track folder visit
+const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
+
+router.post('/session/track-folder-visit', async (req, res) => {
+    try {
+        let { folderId, projectId, departmentId } = req.body;
+
+        if (!folderId || !isValidObjectId(folderId)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Valid folder ID is required'
+            });
+        }
+
+        // Convert IDs to ObjectId if valid
+        folderId = new mongoose.Types.ObjectId(folderId);
+        projectId = projectId && isValidObjectId(projectId) ? new mongoose.Types.ObjectId(projectId) : null;
+        departmentId = departmentId && isValidObjectId(departmentId) ? new mongoose.Types.ObjectId(departmentId) : null;
+
+        // Get folder details
+        const folder = await Folder.findById(folderId);
+        if (!folder) {
+            return res.status(404).json({
+                success: false,
+                message: 'Folder not found'
+            });
+        }
+
+        // Use folder's projectId/departmentId if not provided
+        projectId = projectId || (folder.projectId && isValidObjectId(folder.projectId) ? new mongoose.Types.ObjectId(folder.projectId) : null);
+        departmentId = departmentId || (folder.departmentId && isValidObjectId(folder.departmentId) ? new mongoose.Types.ObjectId(folder.departmentId) : null);
+
+        // Find or create session
+        let session = await Session.findOne({ userId: req.user._id });
+        if (!session) {
+            session = new Session({
+                userId: req.user._id,
+                projectId,
+                departmentId,
+                recentFolders: []
+            });
+        }
+
+        // Build folder path
+        let path = folder.name;
+        if (folder.ancestors && folder.ancestors.length > 0) {
+            const ancestors = await Folder.find({
+                _id: { $in: folder.ancestors.filter(isValidObjectId) }
+            }).select('name');
+
+            const ancestorNames = ancestors.map(a => a.name).join(' / ');
+            path = `${ancestorNames} / ${folder.name}`;
+        }
+
+        // Add to recent folders safely
+        await session.addRecentFolder({
+            folderId,
+            folderName: folder.name,
+            projectId,
+            departmentId,
+            path
+        });
+
+        res.json({
+            success: true,
+            message: 'Folder visit tracked successfully'
+        });
+
+    } catch (error) {
+        console.error('Error tracking folder visit:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error'
+        });
+    }
+});
+
+// Get recent folders
+router.get('/session/recent-folders', async (req, res) => {
+    try {
+        const userFolderHistory = await UserFolderHistory.findOne({ userId: req.user._id })
+            .populate('recentFolders.projectId', 'projectName')
+            .populate('recentFolders.departmentId', 'name');
+
+        if (!userFolderHistory || !userFolderHistory.recentFolders.length) {
+            return res.json({ success: true, recentFolders: [], lastVisitedFolder: null });
+        }
+
+        // Sort recent folders by visitedAt descending
+        const folders = userFolderHistory.recentFolders
+            .filter(f => f.folderId)
+            .sort((a, b) => b.visitedAt - a.visitedAt)
+            .slice(0, 5);
+
+        const projectMap = {};
+
+        folders.forEach(f => {
+            const projectId = f.projectId?._id.toString() || 'no_project';
+            if (!projectMap[projectId]) {
+                projectMap[projectId] = {
+                    projectId: f.projectId?._id,
+                    projectName: f.projectId?.projectName || 'No Project',
+                    folders: []
+                };
+            }
+
+            // Build nested folder tree using path
+            const pathParts = f.path ? f.path.split('/').map(p => p.trim()) : [f.folderName];
+            let currentLevel = projectMap[projectId].folders;
+
+            pathParts.forEach((name, index) => {
+                let existing = currentLevel.find(c => c.folderName === name);
+                if (!existing) {
+                    existing = {
+                        folderId: index === pathParts.length - 1 ? f.folderId : null,
+                        folderName: name,
+                        path: pathParts.slice(0, index + 1).join(' / '),
+                        department: index === pathParts.length - 1 && f.departmentId ? {
+                            departmentId: f.departmentId._id,
+                            name: f.departmentId.name
+                        } : null,
+                        visitedAt: index === pathParts.length - 1 ? f.visitedAt : null,
+                        children: []
+                    };
+                    currentLevel.push(existing);
+                }
+                currentLevel = existing.children;
+            });
+        });
+
+        // Last visited folder
+        const lastVisitedFolder = userFolderHistory.lastVisitedFolder?.folderId ? {
+            folderId: userFolderHistory.lastVisitedFolder.folderId._id,
+            folderName: userFolderHistory.lastVisitedFolder.folderName,
+            path: userFolderHistory.lastVisitedFolder.path,
+            project: userFolderHistory.lastVisitedFolder.projectId ? {
+                projectId: userFolderHistory.lastVisitedFolder.projectId._id,
+                projectName: userFolderHistory.lastVisitedFolder.projectId.projectName
+            } : null,
+            department: userFolderHistory.lastVisitedFolder.departmentId ? {
+                departmentId: userFolderHistory.lastVisitedFolder.departmentId._id,
+                name: userFolderHistory.lastVisitedFolder.departmentId.name
+            } : null,
+            visitedAt: userFolderHistory.lastVisitedFolder.visitedAt
+        } : null;
+
+        res.json({
+            success: true,
+            recentFolders: Object.values(projectMap),
+            lastVisitedFolder
+        });
+
+    } catch (error) {
+        console.error('Error fetching recent folders:', error);
+        res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+});
+
+
+
+// Clear recent folders
+router.delete('/session/clear-recent-folders', async (req, res) => {
+    try {
+        await Session.findOneAndUpdate(
+            { userId: req.user._id },
+            {
+                $set: {
+                    recentFolders: [],
+                    lastVisitedFolder: null
+                }
+            }
+        );
+
+        res.json({
+            success: true,
+            message: 'Recent folders cleared successfully'
+        });
+
+    } catch (error) {
+        console.error('Error clearing recent folders:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error'
+        });
+    }
+});
 
 
 

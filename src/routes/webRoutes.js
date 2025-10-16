@@ -316,7 +316,7 @@ router.get("/dashboard", authenticate, checkPermissions, DashboardController.sho
 router.get("/:folderId/list", authenticate, checkPermissions, FolderController.showFolderListById);
 
 // Upload Folder page
-router.get("/upload-folder", authenticate, checkPermissions, FolderController.showUploadFolderPage);
+router.get("/upload-folder", authenticate, FolderController.showUploadFolderPage);
 
 // Archived Folders page
 router.get("/archived", authenticate, checkPermissions, FolderController.showArchivedFoldersPage);
@@ -325,7 +325,7 @@ router.get("/archived", authenticate, checkPermissions, FolderController.showArc
 router.get("/recyclebin", authenticate, checkPermissions, FolderController.showRecycleBinPage);
 
 // Main Folders page
-router.get("/folders", authenticate, checkPermissions, FolderController.showMainFoldersPage);
+router.get("/folders", authenticate, FolderController.showMainFoldersPage);
 router.get('/folders/view/:fileId', authenticate, FolderController.viewFile)
 router.get("/folders/:accesslevel/:folderId", authenticate, FolderController.showviewFoldersPage);
 /* =========================================

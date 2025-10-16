@@ -131,17 +131,6 @@
 				return uploadChoiceModal;
 			}
 
-			const fileIcons = {
-				ppt: "/img/icons/fn1.png",
-				pptx: "/img/icons/fn1.png",
-				doc: "/img/icons/fn2.png",
-				docx: "/img/icons/fn2.png",
-				xls: "/img/icons/fn3.png",
-				xlsx: "/img/icons/fn3.png",
-				pdf: "/img/icons/fn4.png",
-				default: "/img/icons/fn1.png"
-			};
-
 			function getFileIcon(fileName) {
 				const ext = fileName.split('.').pop().toLowerCase();
 				return fileIcons[ext] || fileIcons.default;
@@ -290,12 +279,12 @@
 				setLoadingState(true);
 
 				try {
+					// Fetch folder tree from server
 					const res = await fetch(`/api/folders/tree/structure?projectId=${projectId}&departmentId=${$('#department').val() || 'all'}`, { credentials: 'include' });
 					const data = await res.json();
 					if (!data.success) return setEmptyState(true);
 
 					let allFolders = normalizeFolders(data.tree || []);
-
 					const subfolders = getSubfolders(allFolders, parentId);
 					const currentFolder = parentId ? findFolderById(allFolders, parentId) : null;
 					const files = currentFolder?.files || [];
@@ -316,6 +305,12 @@
 
 					folderState.selectedFolders = parentPath;
 					folderState.currentFolderId = parentId;
+
+					// Track folder visit if this is an actual folder
+					if (parentId) {
+						trackFolderVisit(parentId);
+					}
+
 					renderBreadcrumb(parentPath);
 
 				} catch (err) {
@@ -323,6 +318,29 @@
 					setLoadingState(false);
 				}
 			}
+
+			// Helper function to track folder visit via API
+			async function trackFolderVisit(folderId) {
+				if (!folderId) return;
+
+				const projectId = window.selectedProjectId || '';
+				const departmentId = $('#department').val() || '';
+
+				try {
+					const res = await fetch('/api/session/track-folder-visit', {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						credentials: 'include',
+						body: JSON.stringify({ folderId, projectId, departmentId })
+					});
+
+					const data = await res.json();
+					if (!data.success) console.warn('Failed to track folder visit:', data.message);
+				} catch (err) {
+					console.error('Error tracking folder visit:', err);
+				}
+			}
+
 
 			// Helper to find folder anywhere in tree
 			function findFolderById(folders, id) {

@@ -16,6 +16,7 @@ import { folderAccessRequestTemplate } from '../emailTemplates/folderAccessReque
 import File from '../models/File.js';
 import { GetObjectCommand } from '@aws-sdk/client-s3';
 import { s3Client } from '../config/S3Client.js';
+import checkFolderAccess from '../utils/checkFolderAccess.js';
 
 //Page controlers
 
@@ -88,41 +89,12 @@ export const showviewFoldersPage = async (req, res) => {
         const folder = await Folder.findById(folderId).lean();
         if (!folder) return res.status(404).send('Folder not found');
 
-        const now = new Date();
-        let canView = false;
-
-        // Token-based access
-        if (token) {
-            const link = folder.metadata?.shareLinks?.find(l => l.token === token);
-            if (link && (!link.expiresAt || new Date(link.expiresAt) > now)) {
-                canView = true;
-            }
-        }
-
-        // User-based permissions
-        if (!canView && req.user) {
-            const permission = folder.permissions?.find(p => String(p.principal) === String(req.user._id));
-            if (permission) {
-                const valid =
-                    (!permission.expiresAt || new Date(permission.expiresAt) > now) &&
-                    (!permission.customEnd || new Date(permission.customEnd) > now);
-                if (valid) canView = true;
-            }
-        }
-
-        // Folder expired check
-        const folderExpired = folder.expiresAt && new Date(folder.expiresAt) <= now;
-        if (folderExpired) canView = false;
-
-        // Determine if user can request access
-        const canRequestAccess = !canView && !folderExpired;
+        const access = checkFolderAccess(folder, req);
 
         res.render('pages/folders/viewFolders', {
             folder,
             user: req.user,
-            canView,
-            canRequestAccess,
-            folderExpired
+            ...access // auto spreads: canView, canRequestAccess, folderExpired, reason
         });
 
     } catch (err) {
@@ -134,8 +106,6 @@ export const showviewFoldersPage = async (req, res) => {
 export const viewFile = async (req, res) => {
     try {
         const { fileId } = req.params;
-        console.log("Viewing file with ID:", fileId);
-
         const formatFileSize = (bytes) => {
             if (!bytes) return "0 Bytes";
             const k = 1024;
@@ -1237,7 +1207,7 @@ export const grantFolderAccess = async (req, res) => {
         }
         // Check if user already has access
         const existing = folder.permissions.find(
-            p => p.principal.toString() === user._id.toString()
+            p => p.principal === user._id
         );
         if (existing) {
             existing.access = access;
