@@ -1,15 +1,13 @@
-import fs from "fs"
-import { putObject, deleteObject, getObjectUrl } from "../utils/s3Helpers.js";
+
+import { deleteObject, getObjectUrl } from "../utils/s3Helpers.js";
 import TempFile from "../models/TempFile.js";
-import crypto from "crypto";
+
 import path from "path";
 import Folder from "../models/Folder.js";
 import File from "../models/File.js";
-import { generateUniqueFileName } from "../helper/GenerateUniquename.js";
 import mongoose from "mongoose";
 import logger from "../utils/logger.js";
-import { ensureFolderHierarchy } from "../helper/FolderHierarchy.js";
-// Unique filename generator
+
 
 // Upload temporary file
 export const uploadFile = async (req, res, folder) => {
@@ -25,7 +23,7 @@ export const uploadFile = async (req, res, folder) => {
         for (const file of req.files) {
             const { originalname, mimetype, size, key, location } = file;
 
-            // ✅ Create file record
+            //Create file record
             const newFile = await File.create({
                 file: key,
                 s3Url: location,
@@ -38,7 +36,7 @@ export const uploadFile = async (req, res, folder) => {
                 fileSize: size,
             });
 
-            // ✅ Push file reference to folder
+            // Push file reference to folder
             folder.files.push(newFile._id);
             totalSize += size;
 
@@ -51,7 +49,7 @@ export const uploadFile = async (req, res, folder) => {
             });
         }
 
-        // ✅ Update folder metadata
+        // Update folder metadata
         folder.size += totalSize;
         await folder.save();
 
@@ -103,10 +101,9 @@ export const tempUploadFile = async (req, res) => {
                 fileType: mimetype,
                 status: "temp",
                 size: size || 0,
-                folder: folder._id, // associate with folder
+                folder: folder._id,
             });
 
-            // Push only ObjectId to folder.files
             if (!folder.files) folder.files = [];
             folder.files.push(tempFile._id);
 
@@ -132,7 +129,7 @@ export const tempUploadFile = async (req, res) => {
             message: "Files uploaded successfully",
             folderId: folder._id,
             files: uploadedFiles,
-            folderFiles: populatedFolder.files, // optional: full file details
+            folderFiles: populatedFolder.files,
         });
     } catch (err) {
         console.error("Upload to folder error:", err);
@@ -154,8 +151,6 @@ export const handleFolderUpload = async (req, res, parentFolder) => {
             departmentId,
             files: []
         });
-
-        console.log("Created subfolder:", subfolder.name, subfolder._id);
 
         const uploadedFiles = [];
         let totalSize = 0;

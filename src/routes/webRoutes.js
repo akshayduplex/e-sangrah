@@ -44,13 +44,11 @@ import User from "../models/User.js";
 import Department from "../models/Departments.js";
 import Designation from "../models/Designation.js";
 import UserPermission from "../models/UserPermission.js";
-import Document from "../models/Document.js";
 import Menu from "../models/Menu.js";
 
 // ===== Utils & Constants =====
 import { profile_type } from "../constant/Constant.js";
 import { buildMenuTree } from "../utils/buildMenuTree.js";
-import { renderProjectDetails } from "../utils/renderProjectDetails.js";
 import logger from "../utils/logger.js";
 
 // ===== Router Initialization =====
@@ -73,7 +71,6 @@ router.get("/forgot-password", AuthController.getForgotPasswordPage);
 router.get("/reset-password", authenticate, AuthController.getResetPasswordPage);
 
 
-// router.use(checkPermissions); // Apply RBAC middleware to all routes below
 /* --- User Management --- */
 
 // User list page

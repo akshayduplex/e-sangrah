@@ -70,7 +70,7 @@ export const showManageAccessPage = async (req, res) => {
 
         const folder = await Folder.findById(folderId)
             .populate("owner", "name email")
-            .populate("permissions.principal", "name email"); // populate users with permissions
+            .populate("permissions.principal", "name email");
 
         if (!folder) return res.status(404).send("Folder not found");
 
@@ -108,8 +108,8 @@ export const getMyApprovals = async (req, res) => {
             createdAt,
             page = 1,
             limit = 10,
-            sortField = "createdAt", // default sort field
-            sortOrder = "desc"       // default sort order
+            sortField = "createdAt",
+            sortOrder = "desc"
         } = req.query;
 
         const filter = { owner: userId };
@@ -150,7 +150,7 @@ export const getMyApprovals = async (req, res) => {
         if (allowedFields.includes(sortField)) {
             sortObj[sortField] = order;
         } else {
-            sortObj["createdAt"] = -1; // fallback default
+            sortObj["createdAt"] = -1;
         }
 
         const [documents, total] = await Promise.all([

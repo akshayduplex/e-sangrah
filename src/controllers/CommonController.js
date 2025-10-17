@@ -11,7 +11,6 @@ import { Parser } from 'json2csv';
 import { getObjectUrl } from "../utils/s3Helpers.js";
 import { API_CONFIG } from "../config/ApiEndpoints.js";
 
-// Add this route to serve PDF files with correct headers
 export const servePDF = async (req, res) => {
     try {
         const { fileId } = req.params;
@@ -21,7 +20,6 @@ export const servePDF = async (req, res) => {
             return res.status(404).send('File not found');
         }
 
-        // Get the file from S3
         const command = new GetObjectCommand({
             Bucket: process.env.AWS_BUCKET,
             Key: file.file,
@@ -29,7 +27,6 @@ export const servePDF = async (req, res) => {
 
         const response = await s3Client.send(command);
 
-        // Set proper headers for PDF display
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `inline; filename="${file.originalName}"`);
         res.setHeader('Content-Length', response.ContentLength);
@@ -47,13 +44,12 @@ export const downloadFolderAsZip = async (req, res) => {
     try {
         const { folderId } = req.params;
 
-        // 1. Find folder in DB
         const folder = await Folder.findById(folderId);
         if (!folder) return res.status(404).json({ message: "Folder not found" });
 
         const folderName = folder.slug;
 
-        // 2. List all files in S3 folder
+
         const listParams = {
             Bucket: process.env.AWS_BUCKET,
             Prefix: `folders/${folderName}/`,
@@ -65,7 +61,6 @@ export const downloadFolderAsZip = async (req, res) => {
             return res.status(404).json({ message: "No files in folder" });
         }
 
-        // 3. Set up ZIP response
         res.setHeader("Content-Type", "application/zip");
         res.setHeader("Content-Disposition", `attachment; filename=${folderName}.zip`);
 
@@ -76,35 +71,28 @@ export const downloadFolderAsZip = async (req, res) => {
         });
         archive.pipe(res);
 
-        // 4. Concurrency queue for downloading files
-        const concurrency = 5; // adjust based on server capacity
+        const concurrency = 5; y
         const queue = new PQueue({ concurrency });
 
-        // 5. Add tasks for each file
         listedObjects.Contents.forEach((file) => {
             queue.add(async () => {
-                // Generate pre-signed URL
                 const command = new GetObjectCommand({
                     Bucket: process.env.AWS_BUCKET,
                     Key: file.Key,
                 });
                 const signedUrl = await getSignedUrl(s3Client, command, { expiresIn: 300 });
-
-                // Fetch file stream via Axios
                 const response = await axios({
                     method: "GET",
                     url: signedUrl,
                     responseType: "stream",
                 });
 
-                // Append file to ZIP
                 archive.append(response.data, {
                     name: file.Key.replace(`folders/${folderName}/`, ""),
                 });
             });
         });
 
-        // 6. Wait for all downloads to finish
         await queue.onIdle();
         await archive.finalize();
 
@@ -127,11 +115,9 @@ export const downloadFile = async (req, res) => {
 
         const s3Object = await s3Client.send(command);
 
-        // Set headers so browser downloads file
         res.setHeader("Content-Disposition", `attachment; filename="${file.originalName}"`);
         res.setHeader("Content-Type", file.fileType || "application/octet-stream");
 
-        // Stream file from S3 to response
         s3Object.Body.pipe(res);
 
     } catch (error) {
@@ -144,7 +130,7 @@ export const exportDocuments = async (req, res) => {
     try {
         const { format, filters, columns, exportAll = false } = req.body;
 
-        // Validate format
+
         const validFormats = ['xlsx', 'csv', 'pdf', 'ods'];
         if (!validFormats.includes(format)) {
             return res.status(400).json({
@@ -153,13 +139,10 @@ export const exportDocuments = async (req, res) => {
             });
         }
 
-        // Build query based on filters
         const query = buildQuery(filters);
 
-        // Get documents based on filters
         let documents;
         if (exportAll) {
-            // Export all filtered documents (without pagination)
             documents = await Document.find(query)
                 .populate('owner', 'name designation')
                 .populate('department', 'name')
@@ -167,20 +150,18 @@ export const exportDocuments = async (req, res) => {
                 .populate('signature')
                 .sort({ updatedAt: -1 });
         } else {
-            // Export current page only (you might want to adjust this)
             documents = await Document.find(query)
                 .populate('owner', 'name designation')
                 .populate('department', 'name')
                 .populate('sharedWithUsers', 'name')
                 .populate('signature')
                 .sort({ updatedAt: -1 })
-                .limit(1000); // Limit for safety
+                .limit(1000);
         }
 
-        // Format data for export
+
         const exportData = formatExportData(documents, columns);
 
-        // Generate file based on format
         switch (format) {
             case 'xlsx':
                 await generateExcel(exportData, res);
@@ -211,7 +192,7 @@ export const exportDocuments = async (req, res) => {
     }
 };
 
-// Build query from filters
+
 function buildQuery(filters) {
     const query = {};
 
@@ -275,7 +256,6 @@ function formatExportData(documents, selectedColumns) {
             fileType: doc.files[0]?.fileType || ''
         };
 
-        // If specific columns are selected, filter the row data
         if (selectedColumns && selectedColumns.length > 0) {
             const filteredRow = {};
             selectedColumns.forEach(col => {
@@ -291,7 +271,6 @@ function formatExportData(documents, selectedColumns) {
     });
 }
 
-// Map display column names to data keys
 function mapColumnNameToKey(columnName) {
     const columnMap = {
         'File Name': 'fileName',
@@ -363,11 +342,9 @@ async function generateExcel(data, res) {
             });
         }
 
-        // Set response headers
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         res.setHeader('Content-Disposition', `attachment; filename=documents-${Date.now()}.xlsx`);
 
-        // Write to response
         await workbook.xlsx.write(res);
         res.end();
 
@@ -405,7 +382,6 @@ async function generatePDF(data, res) {
         try {
             const doc = new PDFDocument({ margin: 50 });
 
-            // Set response headers
             res.setHeader('Content-Type', 'application/pdf');
             res.setHeader('Content-Disposition', `attachment; filename=documents-${Date.now()}.pdf`);
 
@@ -423,7 +399,7 @@ async function generatePDF(data, res) {
 
             // Add data
             data.forEach((item, index) => {
-                if (yPosition > 700) { // New page check
+                if (yPosition > 700) {
                     doc.addPage();
                     yPosition = 50;
                 }
@@ -445,7 +421,7 @@ async function generatePDF(data, res) {
                     yPosition += 15;
                 });
 
-                yPosition += 10; // Space between documents
+                yPosition += 10;
             });
 
             doc.end();
@@ -460,7 +436,7 @@ async function generatePDF(data, res) {
 // Generate ODS file
 async function generateODS(data, res) {
     try {
-        // For ODS, we'll use ExcelJS with ODS format
+
         const workbook = new ExcelJS.Workbook();
         const worksheet = workbook.addWorksheet('Documents Report');
 

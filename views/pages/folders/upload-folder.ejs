@@ -118,8 +118,6 @@
 			const sessionSelectedProjectId = "<%= typeof selectedProjectId !== 'undefined' ? selectedProjectId : '' %>";
 			const selectedProjectName = "<%= selectedProjectName %>";
 
-			console.log("Session selected project ID:", sessionSelectedProjectId, selectedProjectName);
-
 			// Initialize modal only when needed
 			function getUploadChoiceModal() {
 				if (!uploadChoiceModal) {
@@ -514,7 +512,6 @@
 				if (!folderState.currentFolderId) return showToast("Please select a folder first.", "warning");
 
 				Array.from(files).forEach(file => {
-					console.log("Folder structure:", file.webkitRelativePath);
 
 					const item = {
 						file,
@@ -663,7 +660,6 @@
 					const optionExists = Array.from(projectSelect.options).some(opt => opt.value === sessionSelectedProjectId);
 
 					if (!optionExists) {
-						console.log("session", sessionSelectedProjectId, selectedProjectName)
 						const newOption = new Option(selectedProjectName, sessionSelectedProjectId, true, true);
 						projectSelect.add(newOption);
 					}

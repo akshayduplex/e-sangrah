@@ -336,7 +336,6 @@
 							setEmptyState(false);
 							elements.container.innerHTML = "";
 
-							// ✅ Render SUBFOLDERS
 							subfolders.forEach(folder => {
 								const div = document.createElement("div");
 								div.className = "folderbox";
@@ -364,9 +363,6 @@
 
 								elements.container.appendChild(div);
 							});
-
-							// ✅ Render FILES in CURRENT FOLDER
-							// ✅ Render FILES in CURRENT FOLDER (Horizontal: icon left, name top, size below)
 							if (currentFolderData.files && currentFolderData.files.length) {
 								currentFolderData.files.forEach(file => {
 									const ext = file.originalName.split('.').pop().toLowerCase();
@@ -413,7 +409,6 @@
 					const updateDirectoryPath = () => {
 						const folders = folderState.selectedFolders;
 						const pathElements = [];
-						console.log("folders project", window.selectedProjectName)
 						if (window.selectedProjectName) {
 							pathElements.push(`<a href="javascript:void(0)" class="dir-link project-root" data-id="">${window.selectedProjectName}</a>`);
 						}
@@ -471,7 +466,6 @@
 								didOpen: () => Swal.showLoading()
 							});
 
-							// ✅ Proper API request for download using a real <a> trigger
 							const link = document.createElement("a");
 							link.href = `/api/folders/download/${folderId}`;
 							link.setAttribute("download", "");

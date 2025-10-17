@@ -5,12 +5,12 @@ export default function checkFolderAccess(folder, req) {
     let folderExpired = false;
     let canRequestAccess = false;
 
-    // ✅ Owner bypass
+    // Owner bypass
     if (req.user && String(folder.owner) === String(req.user._id)) {
         return { canView: true, canRequestAccess: false, folderExpired: false, reason: 'owner' };
     }
 
-    // 🔐 Token-based access
+    // Token-based access
     const token = req.query?.token || req.body?.token;
     if (token) {
         const link = folder.metadata?.shareLinks?.find(l => l.token === token);
@@ -19,7 +19,7 @@ export default function checkFolderAccess(folder, req) {
         }
     }
 
-    // 👤 User-based direct permission
+    // User-based direct permission
     if (req.user) {
         const permission = folder.permissions?.find(p => String(p.principal) === String(req.user._id));
         if (permission) {
@@ -33,13 +33,13 @@ export default function checkFolderAccess(folder, req) {
         }
     }
 
-    // ⏳ Folder expired check (ONLY for non-owners)
+    // Folder expired check (ONLY for non-owners)
     folderExpired = folder.expiresAt && new Date(folder.expiresAt) <= now;
     if (folderExpired) {
         return { canView: false, canRequestAccess: false, folderExpired: true, reason: 'expired' };
     }
 
-    // 🚪 Can request access (not expired, but no access yet)
+    // Can request access (not expired, but no access yet)
     canRequestAccess = true;
 
     return { canView, canRequestAccess, folderExpired, reason: 'request_access' };

@@ -15,7 +15,7 @@ import errorHandler from "./middlewares/errorHandler.js";
 import { formatDateDDMMYYYY } from "./utils/formatDate.js";
 import { startCleanupJob } from "./helper/NodeCron.js";
 import { connectDB } from "./database/db.js";
-import checkPermissions, { loadMenuMap } from './middlewares/checkPermission.js';
+import { loadMenuMap } from './middlewares/checkPermission.js';
 import fs from "fs";
 
 const app = express();
@@ -92,12 +92,6 @@ const app = express();
         next();
     });
 
-    // ------------------- Test Route -------------------
-    app.get("/test-session", (req, res) => {
-        req.session.test = "hello";
-        res.json(req.session);
-    });
-
     // ------------------- Routes -------------------
     app.use("/api", ApiRoutes);
     app.use("/", pageRoutes);
@@ -108,12 +102,8 @@ const app = express();
     // ------------------- Error Handling -------------------
     app.use(errorHandler);
 
-    // ------------------- Start Server -------------------
-    const PORT = process.env.PORT || 3000;
-    const server = app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-
     // ------------------- Load Menu Map in Background -------------------
-    loadMenuMap().then(() => console.log("Menu map loaded in memory"));
+    loadMenuMap();
 })();
 
 export default app;

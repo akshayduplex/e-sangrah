@@ -88,8 +88,8 @@ $(document).ready(function () {
                 successModal.show();
 
                 this.reset();
-                preview.empty();      // ✅ clear uploaded image preview
-                uploadIcon.show();    // ✅ show upload icon again
+                preview.empty();
+                uploadIcon.show();
                 $('.is-valid, .is-invalid').removeClass('is-valid is-invalid');
             } else {
                 showToast(result.error || 'Something went wrong!', 'error');

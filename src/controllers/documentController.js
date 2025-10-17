@@ -4,7 +4,6 @@ import jwt from "jsonwebtoken";
 import Document from "../models/Document.js";
 import { errorResponse, successResponse, failResponse } from "../utils/responseHandler.js";
 import TempFile from "../models/TempFile.js";
-import Notification from "../models/Notification.js";
 import { cloudinary } from "../middlewares/fileUploads.js";
 import logger from "../utils/logger.js";
 import { sendEmail } from "../services/emailService.js";
@@ -289,11 +288,10 @@ export const getDocuments = async (req, res) => {
         } = req.query;
 
         const filter = { isDeleted: false, isArchived: false };
-        // Helper to convert query param to array safely
         const toArray = val => {
             if (!val) return [];
             if (Array.isArray(val)) return val;
-            return val.split(',').map(v => v.trim()).filter(Boolean); // remove empty strings
+            return val.split(',').map(v => v.trim()).filter(Boolean);
         };
         // --- Search ---
         if (search?.trim()) {
@@ -513,7 +511,6 @@ export const getRecycleBinDocuments = async (req, res) => {
             query.department = department;
         }
 
-        // Fetch documents and total count in parallel
         const [documents, total] = await Promise.all([
             Document.find(query)
                 .select(" files tags createdAt isDeleted deletedAt department metadata")
@@ -553,7 +550,6 @@ export const archiveDocuments = async (req, res) => {
             return failResponse(res, "Missing query parameter: isArchived", 400);
         }
 
-        // Convert isArchived to boolean
         const archiveStatus = isArchived === "true";
 
         // Find and update document
@@ -603,7 +599,7 @@ export const getArchivedDocuments = async (req, res) => {
             query.department = req.query.department;
         }
 
-        // Search filter (works with files array)
+        // Search filter
         if (search) {
             query['files'] = {
                 $elemMatch: { originalName: { $regex: search, $options: 'i' } }
@@ -621,10 +617,10 @@ export const getArchivedDocuments = async (req, res) => {
         ]);
 
         return res.json({
-            draw,                    // required by DataTables
-            recordsTotal: total,     // total docs
-            recordsFiltered: total,  // filtered docs
-            data: documents          // array of documents
+            draw,
+            recordsTotal: total,
+            recordsFiltered: total,
+            data: documents
         });
     } catch (err) {
         console.error(err);
@@ -636,20 +632,17 @@ export const getArchivedDocuments = async (req, res) => {
 export const restoreDocument = async (req, res) => {
     const { id } = req.params;
 
-    // Validate ObjectId
     if (!mongoose.Types.ObjectId.isValid(id)) {
         return res.status(400).json({ message: "Invalid document ID." });
     }
 
     try {
-        // Find the document that is soft-deleted
         const document = await Document.findOne({ _id: id, isDeleted: true });
 
         if (!document) {
             return res.status(404).json({ message: "Document not found or not deleted." });
         }
 
-        // Restore the document
         document.isDeleted = false;
         document.deletedAt = null;
 
@@ -820,7 +813,6 @@ export const createDocument = async (req, res) => {
                 await tempFile.save();
 
                 fileDocs.push(newFile._id);
-                console.log("Created File ID:", newFile._id);
 
             } catch (err) {
                 console.error(`Error processing temp file ${tempFileId}:`, err);
@@ -883,7 +875,7 @@ export const createDocument = async (req, res) => {
 };
 
 /**
- * PATCH /api/documents/:id - Update document with versioning
+ Update document with versioning
  */
 export const updateDocument = async (req, res) => {
     try {
@@ -913,7 +905,6 @@ export const updateDocument = async (req, res) => {
             }
         }
 
-        // Process all fields from request
         for (const [key, value] of Object.entries(req.body)) {
             if (value === undefined || value === null || key === 'folderId') continue;
 
@@ -996,7 +987,6 @@ export const updateDocument = async (req, res) => {
                 case "link":
 
                 case "signature":
-                    // handled separately
                     break;
 
                 default:
@@ -1072,7 +1062,7 @@ const processFileUpdates = async (document, fileIds, user, changedFields) => {
             file: tempFile.s3Filename,
             s3Url: tempFile.s3Url,
             originalName: tempFile.originalName,
-            version: document.versioning.currentVersion, // version will be bumped outside
+            version: document.versioning.currentVersion,
             uploadedBy: user._id,
             uploadedAt: new Date(),
             isPrimary: true,
@@ -1117,7 +1107,6 @@ const handleSignatureUpdate = async (document, req) => {
                 throw new Error("Invalid signature format");
             }
 
-            // If using Cloudinary
             if (typeof cloudinary !== 'undefined') {
                 const uploaded = await cloudinary.uploader.upload(base64Data, {
                     folder: "signatures",
@@ -1132,10 +1121,10 @@ const handleSignatureUpdate = async (document, req) => {
                     cloudinaryId: uploaded.public_id
                 };
             } else {
-                // Local storage fallback
+
                 document.signature = {
                     fileName: `signature-${Date.now()}.png`,
-                    fileUrl: base64Data, // store as base64 or process accordingly
+                    fileUrl: base64Data,
                     uploadedAt: new Date()
                 };
             }
@@ -1209,7 +1198,7 @@ export const restoreVersion = async (req, res) => {
         // Update versioning
         document.versioning.previousVersion = document.versioning.currentVersion;
         document.versioning.currentVersion = mongoose.Types.Decimal128.fromString(version.toString());
-        document.versioning.nextVersion = null; // optional
+        document.versioning.nextVersion = null;
 
         // Save document
         await document.save();
@@ -1238,7 +1227,6 @@ export const viewVersion = async (req, res) => {
             return failResponse(res, "Document not found", 404);
         }
 
-        // Find the specific version in history
         const versionData = document.versioning.versionHistory.find(
             v => v.version === parseFloat(version)
         );
@@ -1252,7 +1240,6 @@ export const viewVersion = async (req, res) => {
             _id: { $in: versionData.snapshot.files || [] }
         }).select('originalName s3Url version uploadedAt');
 
-        // Reconstruct the document as it was at that version
         const versionDocument = {
             _id: document._id,
             ...versionData.snapshot,
@@ -1266,7 +1253,6 @@ export const viewVersion = async (req, res) => {
             files: versionFiles
         };
 
-        // Populate referenced fields
         await Document.populate(versionDocument, [
             { path: 'department', select: 'name' },
             { path: 'project', select: 'projectName' },
@@ -1304,7 +1290,6 @@ export const getVersionHistory = async (req, res) => {
             return failResponse(res, "Document not found", 404);
         }
 
-        // Enhance version history with previous/next version info
         const enhancedHistory = document.versionHistory.map((version, index, arr) => {
             const previousVersion = index > 0 ? arr[index - 1].version?.toString() : null;
             const nextVersion = index < arr.length - 1 ? arr[index + 1].version?.toString() : null;
@@ -1316,7 +1301,7 @@ export const getVersionHistory = async (req, res) => {
                 timestamp: version.timestamp,
                 changedBy: version.changedBy,
                 changes: version.changes,
-                files: version.file ? [{ _id: version.file }] : [], // Optionally populate File model if needed
+                files: version.file ? [{ _id: version.file }] : [],
                 isCurrent: version.version?.toString() === document.versioning.currentVersion?.toString(),
                 snapshotPreview: {
                     description: version.snapshot?.description,
@@ -1340,7 +1325,7 @@ export const getVersionHistory = async (req, res) => {
     }
 };
 
-// GET document by ID, optionally with a specific version
+
 export const viewDocumentVersion = async (req, res) => {
     try {
         const { id } = req.params;
@@ -1383,12 +1368,10 @@ export const viewDocumentVersion = async (req, res) => {
             return res.status(404).json({ message: `Version ${version} not found` });
         }
 
-        // Merge snapshot with current document
         const snapshot = versionItem.snapshot || {};
-        const documentAtVersion = _.cloneDeep(document); // clone to avoid mutation
-        _.merge(documentAtVersion, snapshot); // merge snapshot into document
+        const documentAtVersion = _.cloneDeep(document);
+        _.merge(documentAtVersion, snapshot);
 
-        // Return merged document with version info
         const response = {
             version: versionItem.version.toString(),
             timestamp: versionItem.timestamp,
@@ -1479,14 +1462,13 @@ export const deleteDocument = async (req, res) => {
         const fileIds = docs.flatMap(d => [...(d.files || []), ...(d.versionFiles || [])]);
         const approvalIds = docs.flatMap(d => d.approvalHistory || []);
 
-        // Create an array of deletion operations **sequentially**
+
         const deletions = [];
 
         if (fileIds.length) deletions.push(File.deleteMany({ _id: { $in: fileIds } }).session(session));
         if (approvalIds.length) deletions.push(Approval.deleteMany({ _id: { $in: approvalIds } }).session(session));
         deletions.push(Document.deleteMany({ _id: { $in: objectIds } }).session(session));
 
-        // Execute sequentially to respect MongoDB transaction rules
         for (const op of deletions) {
             await op;
         }
@@ -1625,15 +1607,14 @@ export const shareDocument = async (req, res) => {
                 expiresAt = null;
         }
 
-        // --- Determine access levels from frontend ---
-        const finalAccessLevel = accessLevel; // view/edit from frontend
+
+        const finalAccessLevel = accessLevel;
         const generalRole = (accessLevel === "edit") ? "editor" : "viewer";
 
-        // --- Prepare share data (stores both duration and expiresAt) ---
         const shareData = {
             accessLevel: finalAccessLevel,
-            duration,      // e.g., "oneday", "lifetime"
-            expiresAt,     // actual computed expiration date or null
+            duration,
+            expiresAt,
             generalAccess,
             generalRole
         };
@@ -1641,7 +1622,7 @@ export const shareDocument = async (req, res) => {
 
         let updatedShares = [];
 
-        // --- Handle general access ---
+
         if (generalAccess) {
             const generalShare = await SharedWith.findOneAndUpdate(
                 { document: id, generalAccess: true },
@@ -1677,7 +1658,7 @@ export const shareDocument = async (req, res) => {
 
         return res.json({ success: true, message: "Share data updated successfully", data: updatedShares });
     } catch (err) {
-        console.error("🔥 Update document share error:", err);
+        console.error("Update document share error:", err);
         return res.status(500).json({ success: false, message: "Server error" });
     }
 };
@@ -1847,64 +1828,6 @@ export const inviteUser = async (req, res) => {
 };
 
 export const autoAcceptInvite = async (req, res) => {
-    // try {
-    //     const { documentId, userId } = req.params;
-
-    //     if (!mongoose.Types.ObjectId.isValid(documentId) || !mongoose.Types.ObjectId.isValid(userId)) {
-    //         return res.status(400).send("<script>alert('Invalid link.');window.location.href='/documents/list';</script>");
-    //     }
-
-    //     const share = await SharedWith.findOne({ document: documentId, user: userId }).populate("document");
-    //     if (!share) return res.status(404).send("<script>alert('Invitation not found.');window.location.href='/documents/list';</script>");
-
-    //     // Expired
-    //     if (share.expiresAt && new Date() > share.expiresAt) {
-    //         return res.send(`
-    //             <html>
-    //             <head>
-    //                 <title>Access Expired</title>
-    //                 <style>
-    //                     body { font-family: Arial; text-align: center; background:#f8f9fa; padding:60px; }
-    //                     .modal { background:#fff; border-radius:10px; padding:30px; display:inline-block; box-shadow:0 2px 8px rgba(0,0,0,0.1); }
-    //                     button { background:#007bff; color:#fff; padding:10px 20px; border:none; border-radius:5px; cursor:pointer; margin-top:20px; }
-    //                 </style>
-    //             </head>
-    //             <body>
-    //                 <div class="modal">
-    //                     <h2>Access Expired</h2>
-    //                     <p>This invitation has expired. Please request access again from the document owner.</p>
-    //                     <button onclick="window.location.href='/documents/request-access/${documentId}'">Request Access</button>
-    //                 </div>
-    //             </body>
-    //             </html>
-    //         `);
-    //     }
-
-    //     // Reject handling
-    //     if (share.inviteStatus === "rejected") {
-    //         return res.status(403).send("<script>alert('This invitation was rejected.');window.location.href='/documents/list';</script>");
-    //     }
-
-    //     // Auto accept
-    //     if (share.inviteStatus !== "accepted") {
-    //         share.inviteStatus = "accepted";
-    //         share.acceptedAt = new Date();
-    //         await share.save();
-    //     }
-
-    //     await Document.findByIdAndUpdate(documentId, { $addToSet: { sharedWithUsers: userId } });
-
-    //     // Save user session
-    //     req.session.user = await User.findById(userId);
-
-    //     const fileId = share.document?.files?.[0]?._id || "default";
-    //     const viewDocLink = generateShareLink(documentId, fileId)
-    //     return res.redirect(viewDocLink);
-
-    // } catch (err) {
-    //     console.error("autoAcceptInvite error:", err);
-    //     return res.status(500).send("<script>alert('Something went wrong.');window.location.href='/documents/list';</script>");
-    // }
     try {
         const { documentId, userId } = req.params;
 
@@ -1969,7 +1892,6 @@ export const requestAccessAgain = async (req, res) => {
         if (!owner?.email)
             return res.status(400).json({ success: false, message: "Owner email not found" });
 
-        // --- Generate secure JWT token (owner can approve without login) ---
         const token = jwt.sign(
             {
                 docId: documentId,
@@ -1984,7 +1906,6 @@ export const requestAccessAgain = async (req, res) => {
 
         const baseUrl = process.env.APP_BASE_URL || "http://localhost:5000";
 
-        // --- Duration options (for clickable email buttons) ---
         const durations = [
             { label: "1 Day", value: "oneday" },
             { label: "1 Week", value: "oneweek" },
@@ -2043,7 +1964,6 @@ export const grantAccessViaToken = async (req, res) => {
             return res.status(400).send("Invalid or incomplete request.");
         }
 
-        // --- Verify secure token (owner validation without login) ---
         let decoded;
         try {
             decoded = jwt.verify(token, process.env.JWT_SECRET || "supersecretkey");
@@ -2059,7 +1979,6 @@ export const grantAccessViaToken = async (req, res) => {
         }
 
         const { docId, userId, ownerId, fileId } = decoded;
-        console.log("grandaccs", docId, userId, ownerId)
         // --- Validate ---
         if (!mongoose.Types.ObjectId.isValid(docId) || !mongoose.Types.ObjectId.isValid(userId)) {
             return res.status(400).send("Invalid document or user ID.");
@@ -2129,7 +2048,7 @@ export const grantAccessViaToken = async (req, res) => {
         res.send(`
             <html>
                 <body style="font-family:Arial;text-align:center;padding:50px;">
-                    <h2>✅ Access Granted Successfully</h2>
+                    <h2> Access Granted Successfully</h2>
                     <p>${requester.name || requester.email} has been notified and now has access.</p>
                     <p><strong>Duration:</strong> ${duration}</p>
                     ${expiresAt ? `<p><strong>Expires:</strong> ${expiresAt.toLocaleString()}</p>` : ""}
@@ -2306,7 +2225,7 @@ export const getDocumentVersions = async (req, res) => {
 export const getDocumentApprovalsPage = async (req, res) => {
     try {
         const { id } = req.params;
-        const user = req.user; // Assuming you have authentication middleware
+        const user = req.user;
 
         // Get document with populated data
         const document = await Document.findById(id)
@@ -2327,12 +2246,9 @@ export const getDocumentApprovalsPage = async (req, res) => {
             });
         }
 
-        // Get approval workflow for this document
         const approvals = await Approval.find({ document: id })
             .populate('approver', 'name designation email')
             .sort({ level: 1 });
-
-        // If no approvals exist, create default approval workflow
         if (approvals.length === 0) {
             const defaultApprovers = await createDefaultApprovalWorkflow(id, document);
             approvals.push(...defaultApprovers);
@@ -2383,7 +2299,7 @@ export const getDocumentApprovalsPage = async (req, res) => {
                 total: totalApprovals
             },
             user: user,
-            currentUser: user // for EJS template
+            currentUser: user
         });
 
     } catch (error) {
@@ -2394,10 +2310,9 @@ export const getDocumentApprovalsPage = async (req, res) => {
     }
 };
 
-// Helper function to create default approval workflow
+
 const createDefaultApprovalWorkflow = async (documentId, document) => {
     try {
-        // Find users with specific designations for approval workflow
         const teamLeaders = await User.find({ designation: 'Team Leader' }).limit(1);
         const projectLeaders = await User.find({ designation: 'Project Leader' }).limit(1);
         const managers = await User.find({ designation: 'Manager' }).limit(1);
@@ -2417,7 +2332,6 @@ const createDefaultApprovalWorkflow = async (documentId, document) => {
             });
         }
 
-        // Project Leader approval
         if (projectLeaders.length > 0) {
             approvalWorkflow.push({
                 document: documentId,
@@ -2428,7 +2342,6 @@ const createDefaultApprovalWorkflow = async (documentId, document) => {
             });
         }
 
-        // Manager approval
         if (managers.length > 0) {
             approvalWorkflow.push({
                 document: documentId,
@@ -2439,7 +2352,6 @@ const createDefaultApprovalWorkflow = async (documentId, document) => {
             });
         }
 
-        // CEO approval
         if (ceos.length > 0) {
             approvalWorkflow.push({
                 document: documentId,
@@ -2450,10 +2362,9 @@ const createDefaultApprovalWorkflow = async (documentId, document) => {
             });
         }
 
-        // Create approvals in database
+
         const createdApprovals = await Approval.insertMany(approvalWorkflow);
 
-        // Populate approver information for immediate use
         return await Approval.find({ document: documentId })
             .populate('approver', 'name designation email')
             .sort({ level: 1 });

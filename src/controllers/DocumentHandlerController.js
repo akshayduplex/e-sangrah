@@ -6,7 +6,7 @@ import SharedWith from "../models/SharedWith.js";
 export const renewAccess = async (req, res) => {
     try {
         const { sharedId } = req.params;
-        const { duration } = req.body; // new duration from client
+        const { duration } = req.body;
 
         if (!mongoose.Types.ObjectId.isValid(sharedId)) {
             return res.status(400).json({ message: "Invalid shared document ID." });
@@ -19,7 +19,6 @@ export const renewAccess = async (req, res) => {
             return res.status(403).json({ message: "You are not authorized to renew this share." });
         }
 
-        // Determine duration to use: new one from client or fallback to existing
         const newDuration = duration || shared.duration;
         let newExpiryDate;
 
@@ -39,7 +38,7 @@ export const renewAccess = async (req, res) => {
                 break;
             case "onetime":
                 newExpiryDate = new Date(Date.now() + 24 * 60 * 60 * 1000); // default 1 day
-                shared.used = false; // reset used flag
+                shared.used = false;
                 break;
             case "custom":
                 return res.status(400).json({ message: "Custom duration requires a separate date input." });

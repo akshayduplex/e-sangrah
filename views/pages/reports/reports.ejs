@@ -299,7 +299,6 @@
 				$('#clear').on('select2:select', function (e) {
 					if ($(this).val() === "") {   // placeholder selected
 						$(this).val(null).trigger('change.select2'); // reset selection
-						console.log("Selection cleared via placeholder");
 					}
 				});
 

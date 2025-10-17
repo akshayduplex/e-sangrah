@@ -300,11 +300,7 @@
         try {
             window.isEdit = true;
             window.documentId = "<%= document._id %>";
-            window.documentData = <% - JSON.stringify(document) %>;
-            console.log('✅ EJS Variables Set Successfully:', {
-                documentId: window.documentId,
-                hasDocumentData: !!window.documentData
-            });
+            window.documentData = <% - JSON.stringify(document) %>
         } catch (e) {
             console.error('❌ EJS Variables Failed:', e);
 
@@ -313,10 +309,6 @@
             const hiddenData = document.getElementById('hiddenDocumentData').getAttribute('data-document');
             window.documentData = JSON.parse(decodeURIComponent(hiddenData));
             window.isEdit = true;
-            console.log('✅ Fallback DOM Variables Set:', {
-                documentId: window.documentId,
-                hasDocumentData: !!window.documentData
-            });
         }
 
         // Final verification

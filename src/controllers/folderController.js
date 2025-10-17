@@ -2,7 +2,6 @@
 import Folder from '../models/Folder.js';
 import Document from '../models/Document.js';
 import crypto from 'crypto'
-import jwt from "jsonwebtoken";
 import mongoose from 'mongoose';
 import { generateUniqueFileName } from '../helper/GenerateUniquename.js';
 import { getObjectUrl, putObject } from '../utils/s3Helpers.js';
@@ -12,7 +11,6 @@ import User from '../models/User.js';
 import { API_CONFIG } from '../config/ApiEndpoints.js';
 import { sendEmail } from '../services/emailService.js';
 import { folderSharedTemplate } from '../emailTemplates/folderSharedTemplate.js';
-import { folderAccessRequestTemplate } from '../emailTemplates/folderAccessRequestTemplate.js';
 import File from '../models/File.js';
 import { GetObjectCommand } from '@aws-sdk/client-s3';
 import { s3Client } from '../config/S3Client.js';
@@ -94,7 +92,7 @@ export const showviewFoldersPage = async (req, res) => {
         res.render('pages/folders/viewFolders', {
             folder,
             user: req.user,
-            ...access // auto spreads: canView, canRequestAccess, folderExpired, reason
+            ...access
         });
 
     } catch (err) {
@@ -142,7 +140,6 @@ export const viewFile = async (req, res) => {
 
         // Generate signed URL from S3 with proper headers
         const fileUrl = file.s3Url || await getObjectUrl(file.file, 3600);
-        console.log("Generated file URL:", fileUrl);
 
         res.render("pages/folders/viewFile", {
             file: {
@@ -172,7 +169,6 @@ export const createFolder = async (req, res) => {
         const { name, parentId, projectId, departmentId } = req.body;
         const ownerId = req.user._id;
 
-        // Check if folder with same name already exists in the same location
         const existingFolder = await Folder.findOne({
             name,
             parent: parentId || null,
@@ -187,7 +183,6 @@ export const createFolder = async (req, res) => {
             });
         }
 
-        // Use the static method to create folder with unique slug
         const folder = new Folder({
             owner: ownerId,
             parent: parentId || null,
@@ -239,8 +234,8 @@ export const getAllFolders = async (req, res) => {
 
         const folders = await Folder.find(filter)
             .select("_id name slug size path createdAt updatedAt departmentId projectId")
-            .populate("departmentId", "name") // department name
-            .populate("projectId", "projectName") // project name
+            .populate("departmentId", "name")
+            .populate("projectId", "projectName")
             .sort({ name: 1 })
             .lean();
 
@@ -277,7 +272,7 @@ export const listFolders = async (req, res) => {
 
         let content = [];
 
-        // If includeContent is requested, fetch documents/files in this folder
+
         if (includeContent === 'true') {
             content = await Document.find({
                 folder: parentId,
@@ -319,8 +314,8 @@ export const getFoldersProjectDepartment = async (req, res) => {
         }
 
         const folders = await Folder.find(filter)
-            .select("_id name") // only id and name
-            .sort({ name: 1 })  // optional: alphabetical
+            .select("_id name")
+            .sort({ name: 1 })
             .lean();
 
         return successResponse(res, { folders }, "Folders retrieved successfully");
@@ -355,7 +350,7 @@ export const getFolder = async (req, res) => {
             isDeleted: false
         }).select('name slug path createdAt updatedAt size projectId departmentId').populate('projectId', 'name').populate('departmentId', 'name').sort({ name: 1 });
 
-        // Get documents/files in this folder
+
         const documents = await Document.find({
             folder: id,
             owner: ownerId,
@@ -387,7 +382,6 @@ export const renameFolder = async (req, res) => {
         const { name } = req.body;
         const ownerId = req.user._id;
 
-        // Find the folder that is not deleted
         const folder = await Folder.findOne({ _id: id, owner: ownerId, deletedAt: null });
         if (!folder) {
             return res.status(404).json({
@@ -396,7 +390,6 @@ export const renameFolder = async (req, res) => {
             });
         }
 
-        // Check for duplicate name in the same parent
         const existingFolder = await Folder.findOne({
             name,
             parent: folder.parent,
@@ -415,7 +408,7 @@ export const renameFolder = async (req, res) => {
         // Rename
         folder.name = name;
         folder.updatedBy = ownerId;
-        await folder.save(); // updatedAt auto-updated
+        await folder.save();
 
         res.json({
             success: true,
@@ -454,7 +447,6 @@ export const moveFolder = async (req, res) => {
         const isCircular = await Folder.isDescendant(newParentId, folder._id);
         if (isCircular) throw new Error("Cannot move folder into its own subfolder");
 
-        // Use the static method to move folder (handles path updates recursively)
         const updatedFolder = await Folder.moveFolder(id, newParentId, ownerId);
 
         res.json({
@@ -480,8 +472,7 @@ export const moveFolder = async (req, res) => {
 export const deleteFolder = async (req, res) => {
     try {
         const { id } = req.params;
-        const ownerId = req.user._id; // assuming req.user is populated
-
+        const ownerId = req.user._id;
         // Find the folder
         const folder = await Folder.findOne({ _id: id, owner: ownerId });
         if (!folder) {
@@ -544,7 +535,7 @@ export const uploadToFolder = async (req, res) => {
                 s3Filename: key,
                 s3Url: url,
                 fileType: mimetype,
-                folder: folder._id, // still link to folder in DB
+                folder: folder._id,
                 status: "permanent",
                 size: buffer.length
             });
@@ -575,54 +566,6 @@ export const uploadToFolder = async (req, res) => {
     }
 };
 
-// Get folder tree structure
-// export const getFolderTree = async (req, res) => {
-//     try {
-//         const { rootId, departmentId, projectId } = req.query;
-
-//         const buildTree = async (parentId = null) => {
-//             // Build query dynamically
-//             const query = { parent: parentId, status: "active", isArchived: false };
-
-//             if (departmentId && departmentId !== 'all') query.departmentId = departmentId;
-//             if (projectId && projectId !== 'all') query.projectId = projectId;
-
-//             const folders = await Folder.find(query)
-//                 // .select('name slug path createdAt updatedAt projectId departmentId files')
-//                 .populate('projectId', 'name')
-//                 .populate('departmentId', 'name')
-//                 .sort({ name: 1 });
-
-//             const tree = await Promise.all(folders.map(async (folder) => {
-//                 const children = await buildTree(folder._id);
-//                 return {
-//                     _id: folder._id,
-//                     name: folder.name,
-//                     slug: folder.slug,
-//                     path: folder.path,
-//                     projectId: folder.projectId,
-//                     departmentId: folder.departmentId,
-//                     children: children.length > 0 ? children : null
-//                 };
-//             }));
-
-//             return tree;
-//         };
-
-//         const tree = rootId ? await buildTree(rootId) : await buildTree();
-
-//         res.json({
-//             success: true,
-//             tree
-//         });
-//     } catch (err) {
-//         logger.error('Get folder tree error:', err);
-//         res.status(500).json({
-//             success: false,
-//             message: 'Server error while fetching folder tree'
-//         });
-//     }
-// };
 
 // Get folder tree structure including files with selected fields
 export const getFolderTree = async (req, res) => {
@@ -696,7 +639,7 @@ export const archiveFolder = async (req, res) => {
             return res.status(404).json({ success: false, message: "Folder not found" });
         }
 
-        folder.isArchived = true; // or folder.status = "archived"
+        folder.isArchived = true;
         folder.updatedBy = ownerId;
         await folder.save();
 
@@ -775,7 +718,7 @@ export const restoreFolder = async (req, res) => {
         const folder = await Folder.findOne({ _id: id, owner: ownerId });
         if (!folder) return res.status(404).json({ success: false, message: "Folder not found" });
 
-        folder.isArchived = false; // restore
+        folder.isArchived = false;
         folder.updatedBy = ownerId;
         await folder.save();
 
@@ -808,14 +751,13 @@ export const getFolderShareInfo = async (req, res) => {
 
         if (!folder) return res.status(404).json({ error: 'Folder not found' });
 
-        // Map permissions to include principal info and canDownload from the permission object
         const usersWithAccess = (folder.permissions || [])
             .filter(p => p.model === 'User')
             .map(p => ({
                 id: p.principal?._id,
                 name: p.principal?.name || "Unknown",
                 email: p.principal?.email || "",
-                canDownload: p.canDownload || false, // <-- corrected
+                canDownload: p.canDownload || false,
                 access: p.access
             }));
 
@@ -839,7 +781,6 @@ export const shareFolder = async (req, res) => {
     const { folderId } = req.params;
     const { userId, access, shareLink, duration, expiresAt, customStart, customEnd } = req.body;
 
-    console.log("access", access)
     if (!mongoose.Types.ObjectId.isValid(folderId)) {
         return res.status(400).json({ error: 'Invalid folder ID' });
     }
@@ -946,7 +887,6 @@ export const downloadFile = async (req, res) => {
 
         const url = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
 
-        // Redirect browser to the signed download URL
         res.redirect(url);
     } catch (err) {
         console.error(err);
@@ -1022,7 +962,6 @@ export const accessViaToken = async (req, res) => {
 
         const now = new Date();
 
-        // Find matching token with the same access
         const link = folder.metadata?.shareLinks?.find(
             l => l.token === token && l.access === access && (!l.expiresAt || new Date(l.expiresAt) > now)
         );
@@ -1051,7 +990,7 @@ export const accessViaToken = async (req, res) => {
 export const updateFolderPermission = async (req, res) => {
     const { id } = req.params;
     const { principalId, canDownload, access, status } = req.body;
-    const updatedBy = req.user?._id || null; // assuming auth middleware sets req.user
+    const updatedBy = req.user?._id || null;
     try {
         const folder = await Folder.findById(id);
         if (!folder) return res.status(404).json({ message: 'Folder not found' });
@@ -1069,7 +1008,6 @@ export const updateFolderPermission = async (req, res) => {
             if (typeof canDownload === 'boolean') permission.canDownload = canDownload;
             if (access) permission.access = access;
         } else {
-            // Create new permission using Mongoose subdocument constructor
             permission = folder.permissions.create({
                 principal: principalId,
                 model: 'User',
@@ -1088,7 +1026,7 @@ export const updateFolderPermission = async (req, res) => {
         return res.json({
             message: 'Permission updated successfully',
             permission: updatedPermission,
-            folderStatus: folder.status // include updated status in response
+            folderStatus: folder.status
         });
     } catch (err) {
         console.error(err);
@@ -1113,7 +1051,6 @@ export const requestFolderAccess = async (req, res) => {
         const owner = folder.owner;
         if (!owner?.email) return res.status(400).json({ success: false, message: "Owner email not found" });
 
-        // --- Send email to owner with management link ---
         const baseUrl = API_CONFIG.baseUrl || "http://localhost:5000";
         const manageLink = `${baseUrl}/admin/folders/${folderId}/manage-access?userEmail=${user.email}`;
 
@@ -1168,19 +1105,21 @@ export const grantFolderAccess = async (req, res) => {
         const { userEmail, access, duration, customEnd } = req.body;
         const owner = req.user;
 
+        // Validate folder ID
         if (!mongoose.Types.ObjectId.isValid(folderId))
             return res.status(400).json({ success: false, message: "Invalid folder ID" });
 
         const folder = await Folder.findById(folderId);
         if (!folder) return res.status(404).json({ success: false, message: "Folder not found" });
 
+        // Check ownership
         if (folder.owner.toString() !== owner._id.toString())
             return res.status(403).json({ success: false, message: "Not authorized" });
 
         const user = await User.findOne({ email: userEmail });
         if (!user) return res.status(404).json({ success: false, message: "User not found" });
 
-        // Calculate expiration
+        // Calculate expiration date
         let expiresAt = null;
         const now = new Date();
 
@@ -1202,24 +1141,33 @@ export const grantFolderAccess = async (req, res) => {
                 expiresAt = new Date(now);
                 expiresAt.setFullYear(expiresAt.getFullYear() + 50);
                 break;
+            case "onetime":
+                expiresAt = null;
+                break;
             default:
                 expiresAt = null;
         }
-        // Check if user already has access
+
+        // Check for existing permission
         const existing = folder.permissions.find(
-            p => p.principal === user._id
+            p => p.principal.toString() === user._id.toString()
         );
+
         if (existing) {
+            // Update existing permission
             existing.access = access;
             existing.duration = duration;
             existing.expiresAt = expiresAt;
+            if (duration === "onetime") existing.used = false;
         } else {
+            // Add new permission
             folder.permissions.push({
                 principal: user._id,
                 model: "User",
                 access,
                 duration,
-                expiresAt
+                expiresAt,
+                used: duration === "onetime" ? false : undefined
             });
         }
 
@@ -1231,8 +1179,8 @@ export const grantFolderAccess = async (req, res) => {
             to: user.email,
             subject: `Access Granted/Updated - Folder: ${folder.name}`,
             html: `<p>Your access to folder <strong>${folder.name}</strong> has been granted/updated.</p>
-                   <p><a href="${API_CONFIG.baseUrl}/folders/${folderId}">Open Folder</a></p>
-                   ${expiresAt ? `<p>Expires: ${expiresAt.toLocaleString()}</p>` : ''}`
+               <p><a href="${API_CONFIG.baseUrl}/folders/${folderId}">Open Folder</a></p>
+               ${expiresAt ? `<p>Expires: ${expiresAt.toLocaleString()}</p>` : ''}`
         });
 
         res.json({ success: true, message: "Access granted/updated successfully." });

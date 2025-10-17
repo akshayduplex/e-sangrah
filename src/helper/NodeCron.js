@@ -1,5 +1,5 @@
 import cron from "node-cron";
-import TempFile from "../models/tempFile.js";
+import TempFile from "../models/TempFile.js";
 import { deleteObject } from "../utils/s3Helpers.js";
 import logger from "../utils/logger.js";
 
@@ -38,10 +38,8 @@ export const cleanupOldTempFiles = async () => {
 
 // Schedule cron job to run every 2 hours
 export const startCleanupJob = () => {
-    // runs at minute 0, every 2nd hour
     cron.schedule("0 */2 * * *", async () => {
         console.log(" Running cleanup job...");
         await cleanupOldTempFiles();
     });
-    console.log(" Cleanup cron job scheduled (runs every 2 hours)");
 };

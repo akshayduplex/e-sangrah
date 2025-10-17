@@ -82,11 +82,9 @@ export const listVendors = async (req, res) => {
 
 export const registerDonorVendor = async (req, res, next) => {
     try {
-        // Get form data from req.body (already parsed by multer)
-        const profile_image = req.file ? req.file.filename : undefined; // Get profile image path if uploaded
-
+        const profile_image = req.file ? req.file.filename : undefined;
         const {
-            id, // if present -> update flow
+            id,
             user_name,
             email_id,
             user_mobile,
@@ -97,13 +95,11 @@ export const registerDonorVendor = async (req, res, next) => {
             pan_tax_id
         } = req.body || {};
 
-        // Default to donor if not provided (since this endpoint is for donors/vendors)
         const role = profile_type || "donor";
         if (!["donor", "vendor"].includes(role)) {
             return res.status(400).json({ success: false, message: "Invalid profile type" });
         }
 
-        // (moved to bottom)
 
         // UPDATE FLOW
         if (id) {
@@ -135,7 +131,6 @@ export const registerDonorVendor = async (req, res, next) => {
                     organization_name: (typeof user_organization !== 'undefined') ? user_organization : (existing.donorDetails?.organization_name),
                     id_proof: (typeof pan_tax_id !== 'undefined') ? pan_tax_id : (existing.donorDetails?.id_proof),
                 } : existing.donorDetails,
-                // vendorDetails left as-is; extend if you add vendor edit form
             };
             if (profile_image) updateDoc.profile_image = profile_image;
 
@@ -158,7 +153,7 @@ export const registerDonorVendor = async (req, res, next) => {
             name: user_name,
             email: email_id,
             phone_number: user_mobile,
-            raw_password: randomPassword, // will be hashed by pre-save middleware
+            raw_password: randomPassword,
             address,
             profile_type: role,
             profile_image,

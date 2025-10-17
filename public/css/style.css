@@ -17263,7 +17263,7 @@ button.swal2-cancel {
 
 .sidebar .slimScrollDiv {
   top: 90px;
-  padding: 10px 16px;
+  padding: 10px 5px;
 }
 
 @media (max-width: 575.98px) {
@@ -17525,7 +17525,7 @@ span.submenuname {
 }
 
 .sidebar .sidebar-menu>ul li .submenu>ul li a {
-  padding-left: 10px;
+  padding-left: 20px;
   font-size: 14px;
   position: relative;
   color: #6B7280;
@@ -17539,7 +17539,7 @@ span.submenuname {
 
 .dropdown_wrap li a i {
   position: absolute;
-  left: -12px;
+  left: 0px;
 }
 
 .dropdown_wrap li a i.ti.ti-folder-filled {

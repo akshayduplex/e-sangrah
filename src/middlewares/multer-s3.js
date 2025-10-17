@@ -48,7 +48,6 @@ export const s3uploadfolder = multer({
         acl: "private",
         key: (req, file, cb) => {
             const parentFolderName = req.parentFolderName;
-            console.log("s3", parentFolderName);
 
             const safeFileName = file.originalname.replace(/\s+/g, "_");
             const s3Key = `${parentFolderName}/${req.query.folderName}/${Date.now()}_${safeFileName}`;

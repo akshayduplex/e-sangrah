@@ -60,7 +60,7 @@ export const searchDesignations = async (req, res) => {
 
         const query = { status: "Active" };
         if (search) {
-            query.name = { $regex: search, $options: 'i' }; // case-insensitive search
+            query.name = { $regex: search, $options: 'i' };
         }
 
         const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -74,7 +74,7 @@ export const searchDesignations = async (req, res) => {
             success: true,
             data,
             pagination: {
-                more: skip + data.length < total // tells Select2 if more pages exist
+                more: skip + data.length < total
             }
         });
     } catch (err) {
@@ -101,7 +101,6 @@ export const createDesignation = async (req, res) => {
     try {
         if (!req.user) return failResponse(res, 'Unauthorized', 401);
 
-        // Explicitly take values from req.body
         const designationData = {
             name: req.body.name,
             priority: req.body.priority || 0,

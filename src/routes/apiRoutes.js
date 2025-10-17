@@ -2,7 +2,7 @@
 // Core dependencies
 // ---------------------------
 import express from "express";
-
+import mongoose from "mongoose";
 // ---------------------------
 // Controller imports
 // ---------------------------
@@ -38,7 +38,7 @@ import {
     verifyOtpValidator,
     resetPasswordValidator
 } from "../middlewares/validation/authValidators.js";
-import { createProjectValidator, donorValidator, projectIdValidator, searchProjectsValidator, updateProjectValidator, vendorValidator } from '../middlewares/validation/projectValidator.js';
+import { createProjectValidator, donorValidator, projectIdValidator, searchProjectsValidator, vendorValidator } from '../middlewares/validation/projectValidator.js';
 import { registerVendor, registerVendorOrDonor } from "../middlewares/validation/venderDonorValidation.js";
 import { assignMenusValidator, getAssignedMenusValidator, unAssignMenusValidator } from "../middlewares/validation/permissionValidator.js";
 
@@ -46,17 +46,20 @@ import { assignMenusValidator, getAssignedMenusValidator, unAssignMenusValidator
 // Model imports
 // ---------------------------
 import Menu from "../models/Menu.js";
-import DesignationMenu from "../models/menuAssignment.js";
 import UserPermission from "../models/UserPermission.js";
-import logger from "../utils/logger.js";
-import { createS3Uploader, s3uploadfolder } from "../middlewares/multer-s3.js";
+import MenuAssignment from "../models/MenuAssignment.js";
 import Folder from "../models/Folder.js";
-import mongoose from "mongoose";
-import { generateShareLink } from "../helper/GenerateUniquename.js";
+import logger from "../utils/logger.js";
 import Project from "../models/Project.js";
-import { ParentFolderName } from "../middlewares/parentFolderName.js";
 import UserFolderHistory from "../models/UserFolderHistory.js";
 
+// ---------------------------
+// Utils & middlewares imports
+// ---------------------------
+
+import { createS3Uploader, s3uploadfolder } from "../middlewares/multer-s3.js";
+import { generateShareLink } from "../helper/GenerateUniquename.js";
+import { ParentFolderName } from "../middlewares/parentFolderName.js";
 
 const router = express.Router();
 
@@ -590,7 +593,7 @@ router.delete("/menu/:id", authenticate, async (req, res) => {
         const menu = await Menu.findByIdAndDelete(req.params.id);
         if (!menu) return res.status(404).json({ success: false, message: "Menu not found" });
 
-        await DesignationMenu.deleteMany({ menu_id: req.params.id });
+        await MenuAssignment.deleteMany({ menu_id: req.params.id });
         res.json({ success: true, message: "Menu deleted successfully" });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -672,11 +675,11 @@ router.post("/menu/assign", authenticate, async (req, res) => {
         }
 
         // Remove existing assignments
-        await DesignationMenu.deleteMany({ designation_id });
+        await MenuAssignment.deleteMany({ designation_id });
 
         // Insert new assignments
         const assignments = menu_ids.map(menu_id => ({ designation_id, menu_id }));
-        const savedAssignments = await DesignationMenu.insertMany(assignments);
+        const savedAssignments = await MenuAssignment.insertMany(assignments);
 
         res.status(201).json({ success: true, data: savedAssignments });
     } catch (error) {
@@ -850,9 +853,9 @@ router.post('/session/track-folder-visit', async (req, res) => {
         departmentId = departmentId || (folder.departmentId && isValidObjectId(folder.departmentId) ? new mongoose.Types.ObjectId(folder.departmentId) : null);
 
         // Find or create session
-        let session = await Session.findOne({ userId: req.user._id });
+        let session = await UserFolderHistory.findOne({ userId: req.user._id });
         if (!session) {
-            session = new Session({
+            session = new UserFolderHistory({
                 userId: req.user._id,
                 projectId,
                 departmentId,

@@ -7,10 +7,11 @@ import {
     errorResponse,
 } from "../utils/responseHandler.js";
 import { getOtpEmailHtml } from "../emailTemplates/OtpEmailTemplate.js";
-// Configure multer for file uploads
+
 import crypto from "crypto"
 import { sendEmail } from "../services/emailService.js";
 import logger from "../utils/logger.js";
+import { API_CONFIG } from "../config/ApiEndpoints.js";
 
 const otpStore = {};
 
@@ -89,7 +90,6 @@ export const getLoginPage = (req, res) => {
 export const login = async (req, res) => {
     try {
         const { email, password } = req.body;
-        console.log("login", email, password)
         const user = await User.findOne({ email }).select("+password");
         if (!user) {
             return failResponse(res, "User Not Found", 401);
@@ -309,7 +309,7 @@ export const sendResetLink = async (req, res) => {
         });
 
         // Send reset link
-        const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:5000'}/api/auth/verify-reset/${token}?email=${encodeURIComponent(email)}`;
+        const resetLink = `${API_CONFIG.baseUrl || 'http://localhost:5000'}/api/auth/verify-reset/${token}?email=${encodeURIComponent(email)}`;
 
         // Email HTML content
         const htmlContent = `
@@ -319,7 +319,7 @@ export const sendResetLink = async (req, res) => {
             <p>If you didn't request this change, please ignore this email.</p>
         `;
 
-        // Send email using global helper
+
         await sendEmail({
             to: email,
             subject: "Verify Password Change",
@@ -352,7 +352,7 @@ export const verifyResetLink = async (req, res) => {
         const user = await User.findOne({ email });
         if (!user) return failResponse(res, "User not found", 404);
 
-        user.raw_password = otpEntry.newPassword; // Ideally hash this!
+        user.raw_password = otpEntry.newPassword;
         user.passwordVerification = "verified";
         await user.save();
 
@@ -405,8 +405,8 @@ export const getProfile = async (req, res) => {
     try {
         const userId = req.user._id;
         const user = await User.findById(userId)
-            .populate("userDetails.designation", "name") // populate only name
-            .populate("userDetails.department", "name")  // populate only name
+            .populate("userDetails.designation", "name")
+            .populate("userDetails.department", "name")
             .lean();
 
         if (!user) {
@@ -426,13 +426,12 @@ export const updateProfile = async (req, res) => {
         const userId = req.user._id;
         const { name, email, phone_number, department, designation, address } = req.body;
 
-        // Include address in updateFields
+
         const updateFields = { name, email, phone_number, address };
 
-        // Set department and designation if provided
         if (department) updateFields["userDetails.department"] = department;
         if (designation) updateFields["userDetails.designation"] = designation;
-        if (req.file) updateFields.profile_image = req.file.path; // store file path
+        if (req.file) updateFields.profile_image = req.file.path;
 
         const updatedUser = await User.findByIdAndUpdate(
             userId,

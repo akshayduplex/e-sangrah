@@ -126,7 +126,6 @@ export const createProject = async (req, res) => {
             projectName: body.projectName.trim(),
             projectCode: body.projectCode.trim().toUpperCase(),
             projectType: new mongoose.Types.ObjectId(body.projectType),
-            // projectType: body.projectType,
             projectDescription: body.projectDescription?.trim() || "",
             projectManager: body.projectManager,
             projectCollaborationTeam: body.projectCollaborationTeam || [],
@@ -136,16 +135,15 @@ export const createProject = async (req, res) => {
             projectEndDate: endDate,
             projectDuration: Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)),
             projectStatus: body.projectStatus || "Active",
-            // priority: body.priority || "Medium",
             tags: body.tags?.map(tag => tag.trim().toLowerCase()) || [],
             isActive: body.isActive !== undefined ? body.isActive : true,
             createdBy: user._id
         }
         // Handle project logo if uploaded
         if (req.file && req.file.path) {
-            projectData.projectLogo = req.file.path; // only assign if file uploaded
+            projectData.projectLogo = req.file.path;
         } else {
-            delete body.projectLogo; // do not overwrite existing logo
+            delete body.projectLogo;
         }
 
         const project = new Project(projectData);
@@ -174,8 +172,8 @@ export const getAllProjects = async (req, res) => {
         const limit = search ? 0 : 10;
 
         const projects = await Project.find(query, { _id: 1, projectName: 1 })
-            .limit(limit) // 0 means no limit in Mongo
-            .sort({ projectName: 1 }) // optional: alphabetical sorting
+            .limit(limit)
+            .sort({ projectName: 1 })
             .lean();
 
         return successResponse(res, projects, "Projects fetched successfully");
@@ -188,18 +186,6 @@ export const getAllProjects = async (req, res) => {
 
 // Get a single project by ID
 export const getProject = async (req, res) => {
-    // try {
-    //     const { id } = req.params;
-    //     const project = await Project.findById(id).lean();
-
-    //     if (!project) {
-    //         return failResponse(res, "Project not found", 404);
-    //     }
-
-    //     return successResponse(res, project, "Project fetched successfully");
-    // } catch (err) {
-    //     return errorResponse(res, err, "Failed to fetch project");
-    // }
     try {
         const { id } = req.params;
         const project = await Project.findById(id)
@@ -207,7 +193,7 @@ export const getProject = async (req, res) => {
             .populate("projectCollaborationTeam", "name")
             .populate("donor", "name")
             .populate("vendor", "name")
-            .populate("projectType", "name") // 🔥 Added
+            .populate("projectType", "name")
             .lean();
 
         if (!project) {
@@ -229,7 +215,7 @@ export const updateProject = async (req, res) => {
         const project = await Project.findById(id);
         if (!project) return failResponse(res, "Project not found", 404);
 
-        // authorization: only admin/superadmin or projectManager can update
+        //only admin/superadmin or projectManager can update
         if (
             ["user"].includes(req.user.profile_type) &&
             !project.canManage(req.user._id)
@@ -237,7 +223,6 @@ export const updateProject = async (req, res) => {
             return failResponse(res, "Unauthorized to update this project", 403);
         }
 
-        // Convert and validate dates (DD/MM/YYYY or DD-MM-YYYY)
         if (body.projectStartDate) {
             const start = parseDateDDMMYYYY(body.projectStartDate);
             if (!start) return failResponse(res, "Invalid start date format", 400);
@@ -250,7 +235,6 @@ export const updateProject = async (req, res) => {
             body.projectEndDate = end;
         }
 
-        // Recompute duration if dates present
         if (body.projectStartDate && body.projectEndDate) {
             if (body.projectEndDate <= body.projectStartDate) {
                 return failResponse(res, "End date must be after start date", 400);
@@ -282,31 +266,13 @@ export const updateProject = async (req, res) => {
             }
             body[field] = body[field].map((val) => new mongoose.Types.ObjectId(val));
         }
-        // Optional logo
         if (req.file && req.file.path) {
             body.projectLogo = req.file.path || body.projectLogo;
         } else {
-            delete body.projectLogo; // do not overwrite existing logo
+            delete body.projectLogo;
         }
 
-
-        // Apply updates
         Object.assign(project, body);
-
-        // Recompute projectDuration if dates present
-        // if (project.projectStartDate && project.projectEndDate) {
-        //     const start = new Date(project.projectStartDate);
-        //     const end = new Date(project.projectEndDate);
-        //     if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-        //         return failResponse(res, "Invalid date format", 400);
-        //     }
-        //     if (end <= start) {
-        //         return failResponse(res, "End date must be after start date", 400);
-        //     }
-        //     project.projectDuration = Math.ceil(
-        //         (end - start) / (1000 * 60 * 60 * 24)
-        //     );
-        // }
 
         await project.save();
         return successResponse(res, project, "Project updated successfully");
@@ -642,7 +608,6 @@ export const exportProjects = async (req, res) => {
     try {
         const { format = 'json', filters = {} } = req.query;
 
-        // Build filter based on query params
         const filter = { isActive: true };
 
         if (filters.status) filter.projectStatus = filters.status;
@@ -680,8 +645,6 @@ export const exportProjects = async (req, res) => {
             const csvString = json2csv.parse(csvData);
             return res.status(200).send(csvString);
         }
-
-        // Default to JSON format
         res.status(200).json({
             success: true,
             count: projects.length,
@@ -749,7 +712,7 @@ export const cloneProject = async (req, res) => {
     }
 };
 
-// Archive project (soft delete)
+// Archive project
 export const archiveProject = async (req, res) => {
     try {
         const { id } = req.params;
@@ -1021,7 +984,7 @@ export const removeDonorFromProject = async (req, res) => {
     }
 };
 
-// Add vendor to project (similar to donor methods)
+// Add vendor to project
 export const addVendorToProject = async (req, res) => {
     try {
         const { id } = req.params;

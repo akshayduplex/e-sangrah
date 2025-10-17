@@ -106,12 +106,12 @@
 
 import UserPermission from '../models/UserPermission.js';
 import Menu from '../models/Menu.js';
-import MenuAssignment from '../models/menuAssignment.js';
+import MenuAssignment from '../models/MenuAssignment.js';
 
 // In-memory caches
 let urlMenuMap = {};
 let userPermissionsCache = {};
-let designationUserMap = {}; // ✅ Added to track users under each designation
+let designationUserMap = {};
 
 // Global permissions version
 let globalPermissionsVersion = 1;
@@ -190,7 +190,7 @@ const checkPermissions = async (req, res, next) => {
         const userId = user._id.toString();
         const designationId = user.userDetails.designation?.toString();
 
-        // ✅ Maintain designation-user map
+        //Maintain designation-user map
         if (designationId) {
             designationUserMap[designationId] = designationUserMap[designationId] || new Set();
             designationUserMap[designationId].add(userId);
@@ -219,7 +219,7 @@ const checkPermissions = async (req, res, next) => {
 
         const perms = userPermissionsCache[userId][menuId];
 
-        // ✅ Allow if either designation OR user override has permission
+        //Allow if either designation OR user override has permission
         const hasPermission = !!(perms.designation[requiredPermission] || perms.user[requiredPermission]);
 
         if (hasPermission) {

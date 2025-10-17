@@ -464,7 +464,7 @@
                             type: 'PATCH',
                             success: function (response) {
                                 $('#archivedoc-modal').modal('hide');
-                                table.ajax.reload(null, false); // ✅ keeps pagination intact
+                                table.ajax.reload(null, false);
                                 showToast(response.message || 'Document moved to archive successfully!', 'success');
                             },
                             error: function (xhr) {
@@ -540,7 +540,7 @@
                                 <option value="edit" ${user.accessLevel === 'edit' ? 'selected' : ''}>Edit</option>
                                 <option value="view" ${user.accessLevel === 'view' ? 'selected' : ''}>View</option>
                             </select>
-                            <button class="btn btn-sm btn-outline-danger remove-user" data-user-id="${user.userId}">Remove</button>
+                            <button class="btn btn-sm remvaccessbtn remove-user" data-user-id="${user.userId}">Remove</button>
                         </div>
                     </div>
                 `;

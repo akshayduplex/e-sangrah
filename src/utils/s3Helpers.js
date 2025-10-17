@@ -17,15 +17,12 @@ export const putObject = async (fileBuffer, fileName, contentType, folderName) =
     if (data.$metadata.httpStatusCode !== 200) {
         throw new Error("S3 upload failed");
     }
-
-    // URL should also reflect the folder name
     const url = `${process.env.AWS_URL}${s3Key}`;
     return { url, key: s3Key };
 };
 
 export const folderUpload = async (fileBuffer, fileName, contentType, folderName) => {
     try {
-        // Sanitize folder name and file name
         const sanitizedFolderName = folderName.replace(/[^a-zA-Z0-9-_]/g, '_');
         const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9-_.]/g, '_');
 
@@ -36,7 +33,6 @@ export const folderUpload = async (fileBuffer, fileName, contentType, folderName
             Key: s3Key,
             Body: fileBuffer,
             ContentType: contentType,
-            // Add metadata for better organization
             Metadata: {
                 'uploaded-at': new Date().toISOString(),
                 'original-filename': fileName
@@ -78,8 +74,8 @@ export const getObjectUrl = async (key, expiresIn = 3600) => {
         const command = new GetObjectCommand({
             Bucket: process.env.AWS_BUCKET,
             Key: key,
-            ResponseContentDisposition: 'inline', // Display in browser
-            ResponseContentType: 'application/pdf', // Explicitly set content type
+            ResponseContentDisposition: 'inline',
+            ResponseContentType: 'application/pdf',
         });
 
         const url = await getSignedUrl(s3Client, command, { expiresIn });

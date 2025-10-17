@@ -1,6 +1,5 @@
 import User from "../models/User.js";
 import { validationResult } from "express-validator";
-import { generateEmployeeId } from "../helper/GenerateEmployeeId.js";
 import { generateRandomPassword } from "../helper/GenerateRandomPassword.js";
 import { sendEmail } from "../services/emailService.js";
 import logger from "../utils/logger.js";
@@ -97,7 +96,7 @@ export const registerUser = async (req, res) => {
             name,
             email,
             phone_number,
-            raw_password: randomPassword, // will be hashed by pre-save middleware
+            raw_password: randomPassword,
             profile_type: "user",
             profile_image,
             userDetails: {
@@ -108,10 +107,8 @@ export const registerUser = async (req, res) => {
             address
         });
 
-        // Save user to database
         await newUser.save();
 
-        // Prepare HTML email content
         const htmlContent = `
             <p>Hello ${name},</p>
             <p>Your account has been created successfully.</p>
@@ -124,7 +121,6 @@ export const registerUser = async (req, res) => {
             <p>Thank you.</p>
         `;
 
-        // Send email using global helper
         await sendEmail({
             to: email,
             subject: "Your Account Has Been Created",
@@ -132,7 +128,6 @@ export const registerUser = async (req, res) => {
             fromName: "Support Team",
         });
 
-        // Return success response
         res.status(201).json({
             success: true,
             message: "User registered successfully. Login details sent to email.",
@@ -373,7 +368,6 @@ export const deleteUser = async (req, res) => {
         // Use deleteOne() on the document
         await user.deleteOne();
 
-        // Alternatively, you could do:
         // await User.findByIdAndDelete(req.params.id);
 
         res.status(200).json({

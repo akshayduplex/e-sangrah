@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import Designation from "../models/Designation.js"
 import Menu from "../models/Menu.js";
-import MenuAssignment from "../models/menuAssignment.js";
+import MenuAssignment from "../models/MenuAssignment.js";
 
 import { buildMenuTree } from "../utils/buildMenuTree.js";
 import logger from "../utils/logger.js";
@@ -12,6 +12,7 @@ import UserPermission from "../models/UserPermission.js";
 import { incrementGlobalPermissionsVersion } from "../middlewares/checkPermission.js";
 
 //Page Controllers
+
 // Assign Permissions page
 export const showAssignPermissionsPage = async (req, res) => {
     try {
@@ -22,7 +23,7 @@ export const showAssignPermissionsPage = async (req, res) => {
 
         res.render("pages/permissions/assign-permissions", {
             user: req.user,
-            Roles: profile_type,   // ⚠️ double-check where profile_type is coming from
+            Roles: profile_type,
             designations,
             departments,
             profile_type
@@ -156,22 +157,22 @@ export const saveUserPermissions = async (req, res) => {
 // Render assign menu page
 export const getAssignMenuPage = async (req, res) => {
     try {
-        // 1️⃣ Fetch active designations
+        // Fetch active designations
         const designations = await Designation.find({ status: "Active" })
             .select("name status")
             .sort({ name: 1 })
             .lean();
 
-        // 2️⃣ Fetch all menus
+        // Fetch all menus
         const menus = await Menu.find()
             .sort({ priority: 1, add_date: -1 })
             .populate("added_by updated_by", "name email")
             .lean();
 
-        // 3️⃣ Build menu tree
+        // Build menu tree
         const masterMenus = buildMenuTree(menus);
 
-        // 4️⃣ Render page
+        //Render page
         res.render("pages/permissions/assign-menu", {
             masterMenus,
             designations,
@@ -189,28 +190,12 @@ export const getAssignMenuPage = async (req, res) => {
 
 // Get assigned menus for a designation
 export const getAssignedMenus = async (req, res) => {
-    // try {
-    //     const { designation_id } = req.params;
-
-    //     const assignedMenus = await MenuAssignment.find({ designation_id })
-    //         .populate("menu_id", "name")
-    //         .select("menu_id");
-
-    //     const menuIds = assignedMenus.map(a => a.menu_id?._id?.toString());
-
-    //     res.json({ success: true, data: menuIds });
-    // } catch (error) {
-    //     logger.error("Error fetching assigned menus:", error);
-    //     res.status(500).json({ success: false, message: "Error fetching assigned menus" });
-    // }
     try {
         const { designation_id } = req.params;
 
         const assignedMenus = await MenuAssignment.find({ designation_id })
             .populate("menu_id", "name")
-            .select("menu_id permissions");  // include permissions
-
-        // Return array of objects instead of just _id
+            .select("menu_id permissions");
         const menuData = assignedMenus.map(a => ({
             menu_id: a.menu_id?._id?.toString(),
             permissions: a.permissions || { read: false, write: false, create: false, delete: false }
@@ -238,9 +223,7 @@ export const assignMenusToDesignation = async (req, res) => {
         // Remove existing assignments
         await MenuAssignment.deleteMany({ designation_id });
 
-        // Only insert new assignments if there are menus to assign
         if (menus.length > 0) {
-            // Insert new assignments with permissions
             const assignments = menus.map(m => ({
                 designation_id,
                 menu_id: m.menu_id,
@@ -249,8 +232,7 @@ export const assignMenusToDesignation = async (req, res) => {
 
             await MenuAssignment.insertMany(assignments);
         }
-        // Increment global permissions version to auto-refresh sessions
-        // Increment version for affected designation only
+
         incrementGlobalPermissionsVersion(designation_id);
         res.json({
             success: true,
@@ -313,7 +295,6 @@ export const getSidebarForUser = async (req, res) => {
         let assignedMenus = [];
 
         if (profileType === "admin" || profileType === "superadmin") {
-            // Admin: fetch all menus directly (one lean query)
             assignedMenus = await Menu.find(
                 { is_show: true },
                 { name: 1, url: 1, icon_code: 1, type: 1, master_id: 1, priority: 1 }
@@ -328,7 +309,6 @@ export const getSidebarForUser = async (req, res) => {
                     message: "No designation assigned to user",
                 });
             }
-            // Single aggregation pipeline to fetch assigned + parent menus
             const assignments = await MenuAssignment.aggregate([
                 { $match: { designation_id: new mongoose.Types.ObjectId(designationId) } },
                 {
@@ -352,7 +332,6 @@ export const getSidebarForUser = async (req, res) => {
                         permissions: "$permissions.read"
                     }
                 },
-                // ✅ bring in parent menus in the same pipeline
                 {
                     $graphLookup: {
                         from: "menus",
@@ -386,7 +365,6 @@ export const getSidebarForUser = async (req, res) => {
                 }
             ]);
 
-            // Flatten child + parent menus
             const allMenus = [];
             for (const a of assignments) {
                 allMenus.push({
@@ -411,8 +389,6 @@ export const getSidebarForUser = async (req, res) => {
             }
             assignedMenus = Array.from(menuMap.values());
         }
-
-        // Build hierarchy in-memory (fast recursion)
         const buildHierarchy = (menus, parentId = null) =>
             menus
                 .filter(m => String(m.master_id || null) === String(parentId))
@@ -428,15 +404,6 @@ export const getSidebarForUser = async (req, res) => {
                 }));
 
         const sidebar = buildHierarchy(assignedMenus);
-
-        // Disable caching
-        res.set({
-            "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
-            "Pragma": "no-cache",
-            "Expires": "0",
-            "Surrogate-Control": "no-store"
-        });
-
         return res.json({ success: true, data: sidebar });
     } catch (error) {
         logger.error("Error in getSidebarForUser:", error);
@@ -453,7 +420,7 @@ export const getSidebarForUser = async (req, res) => {
 export const getMenuList = async (req, res) => {
     try {
         const page = Math.max(parseInt(req.query.page) || 1, 1);
-        const limit = Math.min(parseInt(req.query.limit) || 10, 100); // avoid too large queries
+        const limit = Math.min(parseInt(req.query.limit) || 10, 100);
         const skip = (page - 1) * limit;
 
         const [menus, total] = await Promise.all([
@@ -461,7 +428,7 @@ export const getMenuList = async (req, res) => {
                 .sort({ priority: 1, add_date: -1 })
                 .skip(skip)
                 .limit(limit)
-                .lean(), // lean for performance
+                .lean(),
             Menu.countDocuments()
         ]);
 
@@ -483,11 +450,8 @@ export const getMenuList = async (req, res) => {
 // Render add menu form
 export const getAddMenu = async (req, res) => {
     try {
-        // Only Masters can be parents
         const masters = await Menu.find({ type: "Menu", is_show: true }).sort({ name: 1 });
 
-
-        // Render the unified form, menu is null for Add
         res.render("pages/permissions/add", { masters, menu: null, user: req.user });
     } catch (error) {
         res.status(500).render("error", { message: error.message });
@@ -504,9 +468,6 @@ export const getEditMenu = async (req, res) => {
         }
 
         const masters = await Menu.find({ type: "Menu", is_show: true }).sort({ name: 1 });
-
-
-        // Render the unified form, passing the existing menu
         res.render("pages/permissions/add", { masters, menu, user: req.user });
     } catch (error) {
         res.status(500).render("error", { message: error.message });

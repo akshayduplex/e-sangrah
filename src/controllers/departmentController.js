@@ -74,7 +74,7 @@ export const searchDepartments = async (req, res) => {
             success: true,
             data,
             pagination: {
-                more: skip + data.length < total // tells Select2 if more pages exist
+                more: skip + data.length < total
             }
         });
     } catch (err) {
@@ -115,7 +115,7 @@ export const createDepartment = async (req, res) => {
         await department.save();
         res.redirect('/departments/list?message=' + encodeURIComponent('Department added!') + '&type=success');
     } catch (err) {
-        logger.error(err); // Log for production
+        logger.error(err);
         res.redirect('/departments/list?message=' + encodeURIComponent('Failed to add department') + '&type=error');
     }
 };

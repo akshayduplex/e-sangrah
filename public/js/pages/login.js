@@ -69,7 +69,6 @@ async function handleLogin({ emailInput, passwordInput, loginBtn }) {
     // Disable button while processing
     loginBtn.disabled = true;
     loginBtn.textContent = "Logging in...";
-    console.log("login", email, password)
     try {
         const response = await fetch(`${baseUrl}/api/auth/login`, {
             method: "POST",
