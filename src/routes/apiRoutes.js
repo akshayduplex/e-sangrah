@@ -11,6 +11,7 @@ import * as AdminController from "../controllers/AdminController.js";
 import * as EmployeeController from "../controllers/EmployeeController.js";
 import * as UserController from "../controllers/UserController.js";
 import * as DonerVenderController from "../controllers/DonerVenderController.js";
+import * as AdminDashboard from "../controllers/DashboardController.js"
 import * as DepartmentController from "../controllers/DepartmentController.js";
 import * as DesignationController from "../controllers/DesignationController.js";
 import * as DocumentController from "../controllers/DocumentController.js";
@@ -129,7 +130,11 @@ router.get('/export/formats', authenticate, CommonController.getExportFormats);
 // Admin routes
 // ---------------------------
 router.get("/my-approvals", AdminController.getMyApprovals);
-
+router.get("/dashboard/stats", AdminDashboard.getDashboardStats);
+router.get("/file-status", AdminDashboard.getFileStatusRecentActivity);
+router.get("/recent-activity", AdminDashboard.getRecentActivities);
+router.get("/dashboard/uploads", AdminDashboard.getDocumentTypeUploads);
+router.get("/dashboard/summary", AdminDashboard.getDocumentsSummary);
 
 // ---------------------------
 // Employee routes

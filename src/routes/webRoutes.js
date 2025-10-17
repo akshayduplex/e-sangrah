@@ -119,6 +119,7 @@ router.get("/departments/:id", authenticate, checkPermissions, DepartmentControl
 /* =========================================
    ADMIN ROUTE
    ========================================= */
+router.get("/admin/dashboard", authenticate, checkPermissions, AdminController.showAdminDashboardPage);
 router.get("/admin/approval", authenticate, checkPermissions, AdminController.showAdminApprovalPage);
 router.get("/document/:id/admin/approval/track", authenticate, checkPermissions, AdminController.showApprovalTrackPage);
 router.get("/documents/admin/recyclebin", authenticate, checkPermissions, AdminController.showRecycleBinPage);

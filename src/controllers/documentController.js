@@ -1836,7 +1836,7 @@ export const autoAcceptInvite = async (req, res) => {
         }
 
         const share = await SharedWith.findOne({ document: documentId, user: userId }).populate("document");
-        if (!share) return res.status(404).send(alertRedirectTemplate('Invitation not found.', '/documents/list'));
+        if (!share) return res.status(404).send(alertRedirectTemplate('You are removed from invitation list.', '/documents/list'));
 
         if (share.expiresAt && new Date() > share.expiresAt) {
             return res.send(accessExpiredTemplate(documentId));
