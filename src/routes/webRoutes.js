@@ -129,6 +129,7 @@ router.get("/admin/folders/:folderId/manage-access", authenticate, AdminControll
    EMPLOYEE ROUTE
    ========================================= */
 router.get("/employee/approval", authenticate, checkPermissions, EmployeeController.showEmployeeApprovalPage);
+router.get("/employee/dashboard", authenticate, checkPermissions, EmployeeController.showEmployeeDashboardPage);
 // router.get("/employee/track", authenticate, checkPermissions, EmployeeController.showEmployeeApprovalPage);
 router.get("/documents/employee/recyclebin", authenticate, checkPermissions, EmployeeController.showEmployeeRecycleBinPage);
 //Approvals
@@ -301,11 +302,6 @@ router.post("/permissions/user/save", authenticate, checkPermissions, async (req
         res.status(500).json({ success: false, message: "Error saving user permissions" });
     }
 });
-
-/* =========================================
-   DASHBOARD ROUTE
-   ========================================= */
-router.get("/dashboard", authenticate, checkPermissions, DashboardController.showDashboard);
 
 /* =========================================
    FOLDERS AND DOCUMENTS ROUTES

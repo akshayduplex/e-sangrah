@@ -16,7 +16,6 @@ document.addEventListener('DOMContentLoaded', function () {
         if (typeof showToast === 'function') {
             try { showToast(message, 'error'); return; } catch (e) { }
         }
-        console.error('ERROR:', message);
     }
 
     // Build header dynamically so EJS doesn't need static columns
@@ -83,7 +82,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 return (json && Array.isArray(json.data)) ? json.data : [];
             },
             error: function (xhr, error, thrown) {
-                console.error('Error loading data:', error);
                 // if ($loadingSpinner && $loadingSpinner.length) $loadingSpinner.hide();
                 $table.show();
                 // Do NOT call draw() here in server-side mode to avoid infinite retry loops

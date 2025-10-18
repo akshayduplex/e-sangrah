@@ -1,5 +1,6 @@
 import User from "../models/User.js";
 import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
 import nodemailer from "nodemailer";
 import {
     successResponse,
@@ -12,6 +13,8 @@ import crypto from "crypto"
 import { sendEmail } from "../services/emailService.js";
 import logger from "../utils/logger.js";
 import { API_CONFIG } from "../config/ApiEndpoints.js";
+import UserToken from "../models/UserToken.js";
+import { loginOtpTemplate } from "../emailTemplates/loginOtpTemplate.js";
 
 const otpStore = {};
 
@@ -90,11 +93,12 @@ export const getLoginPage = (req, res) => {
 export const login = async (req, res) => {
     try {
         const { email, password } = req.body;
+
+        // Find user
         const user = await User.findOne({ email }).select("+password");
-        if (!user) {
-            return failResponse(res, "User Not Found", 401);
-        }
-        // If password change is pending, block login
+        if (!user) return failResponse(res, "User not found", 401);
+
+        //Password change verification check
         if (user.passwordVerification === "pending") {
             return failResponse(
                 res,
@@ -103,14 +107,102 @@ export const login = async (req, res) => {
             );
         }
 
+        // Verify password
         const isPasswordValid = await bcrypt.compare(password, user.password);
-        if (!isPasswordValid) {
-            return failResponse(res, "Password incorrect", 401);
+        if (!isPasswordValid) return failResponse(res, "Password incorrect", 401);
+
+        const now = new Date();
+
+        // Check for existing token
+        let userToken = await UserToken.findOne({ user: user._id });
+
+        if (userToken && userToken.expiresAt > now) {
+            try {
+                const decoded = jwt.verify(userToken.token, process.env.JWT_SECRET);
+
+                if (decoded.email !== user.email) {
+                    return failResponse(res, "Token invalid for this user", 401);
+                }
+
+                if (user.status !== "Active") {
+                    return failResponse(res, "User is not active", 403);
+                }
+
+                req.session.user = {
+                    _id: user._id,
+                    designation_id: user.userDetails?.designation || null,
+                    department: user.userDetails?.department || null,
+                    email: user.email,
+                    profile_type: user.profile_type,
+                    name: user.name,
+                };
+
+                //Return login success WITHOUT OTP
+                return successResponse(res, {
+                    message: "Login successful",
+                    requireOTP: false,
+                    user
+                });
+            } catch (err) {
+                logger.error("Token verification failed:", err.message);
+                // fall back to OTP flow
+            }
         }
 
-        user.lastLogin = new Date();
+
+        // 6️⃣ No valid token -> generate OTP
+        const otp = Math.floor(1000 + Math.random() * 9000).toString(); // 4-digit OTP
+
+        // Save OTP and expiry to user
+        user.otp = otp;
+        user.otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+        await user.save();
+        // Send OTP email
+        await sendEmail({
+            to: email,
+            subject: "Your Login OTP",
+            html: loginOtpTemplate(user.name, otp, 10),
+            fromName: "DMS Support Team"
+        });
+        return successResponse(res, {
+            message: "OTP sent to your registered email/phone",
+        });
+
+    } catch (err) {
+        console.error("Login error:", err);
+        return errorResponse(res, "Internal server error");
+    }
+};
+
+
+export const verifyTokenOtp = async (req, res) => {
+    try {
+        const { email, otp } = req.body;
+        const user = await User.findOne({ email }).select("+otp +otpExpiresAt");;
+        if (!user) return failResponse(res, "User not found", 404);
+        // Check OTP
+        if (!user.otp || user.otpExpiresAt < new Date()) {
+            return failResponse(res, "OTP expired, please login again", 400);
+        }
+        if (user.otp !== otp) return failResponse(res, "Invalid OTP", 400);
+
+        // OTP valid -> generate token
+        const tokenValue = user.generateAuthToken();
+        const tokenExpiry = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000); // 15 days
+
+        // Save token in DB
+        await UserToken.findOneAndUpdate(
+            { user: user._id },
+            { token: tokenValue, expiresAt: tokenExpiry },
+            { upsert: true }
+        );
+
+        // Clear OTP
+        user.otp = null;
+        user.otpExpiresAt = null;
         await user.save();
 
+        // Set session
         req.session.user = {
             _id: user._id,
             designation_id: user.userDetails?.designation,
@@ -120,13 +212,16 @@ export const login = async (req, res) => {
             name: user.name,
         };
 
-        const userResponse = user.toJSON();
-        return successResponse(res, userResponse, "Login successful");
+        return successResponse(res, { token: tokenValue, user: user.toJSON() }, "OTP verified, login successful");
+
     } catch (err) {
-        logger.error("Login error:", err);
+        console.error("OTP verification error:", err);
         return errorResponse(res, "Internal server error");
     }
+
 };
+
+
 
 // ---------------------------
 // Get Logged-in User

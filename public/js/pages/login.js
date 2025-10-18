@@ -49,7 +49,84 @@ function initPasswordToggles() {
 }
 
 // -------- Auth Handlers --------
+function showOtpSection(email) {
+    const otpSection = document.querySelector(".otp-section");
+    if (!otpSection) return;
 
+    otpSection.style.display = "block";
+
+    // Hide original login inputs
+    document.getElementById("emailInput").disabled = true;
+    document.getElementById("passwordInput").disabled = true;
+
+    const otpInputs = document.querySelectorAll(".otp-input");
+
+    // Attach event to check OTP when all 4 digits are entered
+    otpInputs.forEach((input, index) => {
+        input.addEventListener("input", async () => {
+            if (Array.from(otpInputs).every(inp => inp.value.length === 1)) {
+                const otp = Array.from(otpInputs).map(inp => inp.value).join("");
+                await verifyOtp(email, otp);
+            }
+        });
+    });
+
+    // Resend OTP button
+    const resendBtn = document.querySelector(".resend-btn");
+    if (resendBtn) {
+        resendBtn.addEventListener("click", async () => {
+            await resendOtp(email);
+        });
+    }
+}
+
+async function verifyOtp(email, otp) {
+    try {
+        const response = await fetch(`${baseUrl}/api/auth/verify/token`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, otp })
+        });
+        const data = await response.json().catch(() => ({}));
+
+        if (response.ok && data.success) {
+            document.querySelector(".otp-section .text-success").style.display = "block";
+            setTimeout(() => {
+                const profileType = data?.data?.user?.profile_type;
+                if (profileType === "admin") {
+                    window.location.href = "/admin/dashboard";
+                } else {
+                    window.location.href = "/employee/dashboard";
+                }
+            }, 2000);
+        } else {
+            showError(data.message || "Invalid OTP. Try again.");
+        }
+    } catch (err) {
+        showError("Network error while verifying OTP: " + err);
+    }
+}
+
+// Optional: resend OTP
+async function resendOtp(email) {
+    try {
+        const response = await fetch(`${baseUrl}/api/auth/resend-otp`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email })
+        });
+        const data = await response.json().catch(() => ({}));
+        if (data.success) {
+            showSuccess("OTP resent successfully.");
+        } else {
+            showError(data.message || "Failed to resend OTP.");
+        }
+    } catch (err) {
+        showError("Network error while resending OTP: " + err);
+    }
+}
+
+// Handle login submission
 // Handle login submission
 async function handleLogin({ emailInput, passwordInput, loginBtn }) {
     const email = emailInput.value.trim();
@@ -69,6 +146,7 @@ async function handleLogin({ emailInput, passwordInput, loginBtn }) {
     // Disable button while processing
     loginBtn.disabled = true;
     loginBtn.textContent = "Logging in...";
+
     try {
         const response = await fetch(`${baseUrl}/api/auth/login`, {
             method: "POST",
@@ -79,20 +157,32 @@ async function handleLogin({ emailInput, passwordInput, loginBtn }) {
         const data = await response.json().catch(() => ({}));
 
         if (response.ok && data.success) {
-            showSuccess("Login successful! Redirecting...");
-            setTimeout(() => {
-                window.location.href = "/dashboard";
-            }, 1000);
+            // Check if OTP is required
+            if (data?.data?.message?.includes("OTP sent")) {
+                showSuccess("OTP sent to your registered email/phone");
+                showOtpSection(email); // Show OTP fields
+            } else {
+                showSuccess("Login successful! Redirecting...");
+                setTimeout(() => {
+                    const profileType = data?.data?.user?.profile_type;
+                    if (profileType === "admin") {
+                        window.location.href = "/admin/dashboard";
+                    } else {
+                        window.location.href = "/employee/dashboard";
+                    }
+                }, 1000);
+            }
         } else {
             showError(data.message || "Login failed. Please try again.");
         }
     } catch (error) {
-        showError("Network error. Please try again later." + error, "error");
+        showError("Network error. Please try again later. " + error);
     } finally {
         loginBtn.disabled = false;
         loginBtn.textContent = "Submit";
     }
 }
+
 
 // Handle logout link
 async function handleLogoutLink(logoutLink) {

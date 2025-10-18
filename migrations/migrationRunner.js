@@ -7,6 +7,7 @@ import Designation from "../src/models/Designation.js";
 import Folder from "../src/models/Folder.js";
 import File from "../src/models/File.js";
 import Document from "../src/models/Document.js";
+import logger from "../src/utils/logger.js";
 
 // ------------------ Migration Log Schema ------------------
 const migrationLogSchema = new mongoose.Schema({
@@ -149,6 +150,6 @@ async function runMigrations() {
 
 // ------------------ Execute ------------------
 runMigrations().catch(err => {
-    console.error("Migration failed:", err);
+    logger.error("Migration failed:", err);
     mongoose.disconnect();
 });

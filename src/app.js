@@ -3,6 +3,7 @@ import express from "express";
 import path from "path";
 import morgan from "morgan";
 import helmet from "helmet";
+import cors from "cors";
 import compression from "compression";
 import session from "express-session";
 import MongoStore from "connect-mongo";
@@ -17,6 +18,7 @@ import { startCleanupJob } from "./helper/NodeCron.js";
 import { connectDB } from "./database/db.js";
 import { loadMenuMap } from './middlewares/checkPermission.js';
 import fs from "fs";
+import { API_CONFIG } from "./config/ApiEndpoints.js";
 
 const app = express();
 
@@ -26,7 +28,11 @@ const app = express();
     console.time("MongoDB Connect");
     await connectDB();
     console.timeEnd("MongoDB Connect");
-
+    app.use(cors({
+        origin: [API_CONFIG.FrontendUrl, 'http://localhost:5000'],
+        methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+        credentials: true
+    }));
     // Security middleware
     app.use(helmet({ contentSecurityPolicy: false }));
 
@@ -63,8 +69,8 @@ const app = express();
             }),
             cookie: {
                 maxAge: 1000 * 60 * 60,
-                httpOnly: true,
-                secure: process.env.NODE_ENV === "production",
+                // httpOnly: true,
+                // secure: process.env.NODE_ENV === "production",
                 sameSite: "lax",
             },
         })
@@ -95,6 +101,9 @@ const app = express();
     // ------------------- Routes -------------------
     app.use("/api", ApiRoutes);
     app.use("/", pageRoutes);
+    app.get('/', async (req, res) => {
+        res.redirect('/login');
+    });
 
     // ------------------- Background Tasks -------------------
     startCleanupJob();

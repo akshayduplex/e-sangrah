@@ -527,7 +527,9 @@
 							new bootstrap.Modal("#folder-modal").show();
 						});
 
-						loadFolders();
+						if (window.selectedProjectId) {
+							loadFolders(null, [], window.selectedProjectId);
+						}
 					});
 					async function generateShareLink(folderId, accessType, role) {
 						if (!folderId || accessType !== "anyone") return;

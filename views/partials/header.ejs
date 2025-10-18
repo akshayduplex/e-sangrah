@@ -271,9 +271,8 @@
                                 <a href="javascript:void(0);" class="dropdown-toggle d-flex align-items-center"
                                     data-bs-toggle="dropdown">
                                     <span class="avatar avatar-sm online">
-                                        <img src="<%= user.profile_image || '/img/profiles/avatar-12.jpg' %>"
-                                            alt="<%= name || 'User' %>" width="50" height="50"
-                                            style="object-fit: cover; border-radius: 50%;">
+                                        <img src="<%= user.profile_image || '' %>" alt="<%= name || 'User' %>"
+                                            width="50" height="50" style="object-fit: cover; border-radius: 50%;">
 
                                     </span>
                                     <span>
@@ -290,7 +289,7 @@
                                         <div class="card-header">
                                             <div class="d-flex align-items-center">
                                                 <span class="avatar avatar-lg me-2 avatar-rounded">
-                                                    <img src="<%= user.profile_image || '/img/profiles/avatar-12.jpg' %>"
+                                                    <img src="<%= user.profile_image || ''%>"
                                                         alt="<%= name || 'User' %>" width="50" height="50"
                                                         style="object-fit: cover; border-radius: 50%;">
 
@@ -358,13 +357,13 @@
         <!-- Sidebar -->
         <div class="sidebar" id="sidebar">
             <div class="sidebar-logo">
-                <a href="index.html" class="logo logo-normal">
+                <a href="#" class="logo logo-normal">
                     <img src="/img/logo.png" alt="Logo">
                 </a>
-                <a href="index.html" class="logo-small">
+                <a href="#" class="logo-small">
                     <img src="/img/logo-small.svg" alt="Logo">
                 </a>
-                <a href="index.html" class="dark-logo">
+                <a href="#" class="dark-logo">
                     <img src="/img/logo-white.svg" alt="Logo">
                 </a>
             </div>

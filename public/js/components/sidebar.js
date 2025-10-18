@@ -13,39 +13,41 @@ async function loadSidebar() {
             return 'ti ti-folder-filled';
         };
 
-const buildMenu = (items) => {
-    return items.map(item => {
-        const title = item.name || item.folderName || 'Untitled';
-        const children = item.children || [];
-        const hasChildren = children.length > 0;
-        const iconClass = getIcon(item);
+        const buildMenu = (items) => {
+            return items.map(item => {
+                const title = item.name || item.folderName || 'Untitled';
+                const children = item.children || [];
+                const hasChildren = children.length > 0;
+                const iconClass = getIcon(item);
+                const titleAttr = title.length > 20 ? `data-bs-toggle="tooltip" title="${title}"` : '';
 
-        if (hasChildren) {
-            return `
-                <li class="submenu">
-                    <a href="javascript:void(0);" class="menu-link">
-                        <i class="ti ti-chevron-down arrow-icon"></i>
-                        <i class="${iconClass}"></i>
-                        <span class="menuname">${title}</span>
-                    </a>
-                    <ul class="dropdown_wrap" style="display:none;">
-                        ${buildMenu(children)}
-                    </ul>
-                </li>`;
-        } else {
-            // Fix: ensure href is absolute
-            let href = item.url || (item.folderId ? `/folders/viewer/${item.folderId}` : '#');
-            if (!href.startsWith('http') && !href.startsWith('/')) {
-                href = '/' + href; // prepend slash to make it absolute
-            }
-            return `<li>
-                <a href="${href}">
-                    <i class="${iconClass}"></i> <span class="menuname">${title}</span>
-                </a>
-            </li>`;
-        }
-    }).join('');
-};
+                if (hasChildren) {
+                    return `
+        <li class="submenu">
+            <a href="javascript:void(0);" class="menu-link" ${titleAttr}>
+                <i class="ti ti-chevron-down arrow-icon"></i>
+                <i class="${iconClass}"></i>
+                <span class="menuname">${title}</span>
+            </a>
+            <ul class="dropdown_wrap" style="display:none;">
+                ${buildMenu(children)}
+            </ul>
+        </li>`;
+                } else {
+                    // Fix: ensure href is absolute
+                    let href = item.url || (item.folderId ? `/folders/viewer/${item.folderId}` : '#');
+                    if (!href.startsWith('http') && !href.startsWith('/')) {
+                        href = '/' + href; // prepend slash to make it absolute
+                    }
+                    return `<li>
+        <a href="${href}" ${titleAttr}>
+            <i class="${iconClass}"></i> <span class="menuname">${title}</span>
+        </a>
+    </li>`;
+                }
+            }).join('');
+        };
+
 
 
         const buildRecentMenu = (items) => {

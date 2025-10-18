@@ -48,6 +48,23 @@
                             <a href="forgot-password">Forgot Password?</a>
                         </div>
                     </div>
+                    <!-- OTP Input Section -->
+                    <div class="otp-section mt-3" style="display:none;">
+                        <h5 class="mb-3">Enter OTP</h5>
+                        <div class="d-flex mb-3 otp-inputs gap-2">
+                            <input type="text" maxlength="1" class="form-control otp-input">
+                            <input type="text" maxlength="1" class="form-control otp-input">
+                            <input type="text" maxlength="1" class="form-control otp-input">
+                            <input type="text" maxlength="1" class="form-control otp-input">
+                        </div>
+                        <!-- OTP Send / Resend Section -->
+                        <span>Didn’t get it?
+                            <button type="button" class="btn btn-link resend-btn">Resend</button>
+                        </span>
+                        <p class="text-success fw-bold" style="display:none;">✔ OTP Verified</p>
+                        <p id="otp-timer"></p>
+                    </div>
+
                     <div class="submitrow">
                         <button type="button" id="loginBtn" class="btn submitbtn">Submit</button>
                         <div id="loginMessage" class="mt-2"></div>

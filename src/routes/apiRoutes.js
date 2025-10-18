@@ -61,16 +61,16 @@ import UserFolderHistory from "../models/UserFolderHistory.js";
 import { createS3Uploader, s3uploadfolder } from "../middlewares/multer-s3.js";
 import { generateShareLink } from "../helper/GenerateUniquename.js";
 import { ParentFolderName } from "../middlewares/parentFolderName.js";
+import accessLogger from "../middlewares/accessLogger.js";
 
 const router = express.Router();
-
-
 // ---------------------------
 // Auth routes
 // ---------------------------
 router.post("/auth/register", registerValidator, AuthController.register);
 
 router.post("/auth/login", AuthController.login);
+router.post("/auth/verify/token", AuthController.verifyTokenOtp);
 
 router.post("/auth/send-otp", sendOtpValidator, validate, AuthController.sendOtp);
 
@@ -307,8 +307,7 @@ router.delete('/designations/:id', authenticate, authorize('admin'), Designation
 // ---------------------------
 
 // Save selected project to session
-// Save selected project to session
-router.post("/session/project", async (req, res) => {
+router.post("/session/project", authenticate, async (req, res) => {
     const { projectId } = req.body;
 
     if (!projectId) return res.status(400).json({ error: "Project ID is required" });
@@ -333,8 +332,29 @@ router.post("/session/project", async (req, res) => {
 });
 
 // Get selected project from session
-router.get("/session/project", (req, res) => {
-    res.json({ selectedProject: req.session.selectedProject || null, selectedProjectName: req.session.selectedProjectName });
+router.get("/session/project", authenticate, async (req, res) => {
+    try {
+        if (!req.session.user) {
+            return res.status(401).json({
+                error: "Not logged in",
+                selectedProject: null,
+                selectedProjectName: null
+            });
+        }
+
+        // Respond with session project data
+        res.json({
+            selectedProject: req.session.selectedProject || null,
+            selectedProjectName: req.session.selectedProjectName || null
+        });
+    } catch (err) {
+        console.error("Error in /session/project:", err);
+        res.status(500).json({
+            error: "Server error",
+            selectedProject: null,
+            selectedProjectName: null
+        });
+    }
 });
 
 
