@@ -28,11 +28,11 @@ const logger = createLogger({
     ),
     transports: [
         new transports.Console(), // logs to console
-        new transports.File({ filename: path.join(logDir, "error.log"), level: "error" }),
-        new transports.File({ filename: path.join(logDir, "warn.log"), level: "warn" }),
+        new transports.File({ filename: path.join(logDir, "Error.log"), level: "error" }),
+        new transports.File({ filename: path.join(logDir, "Warn.log"), level: "warn" }),
         new transports.File({ filename: path.join(logDir, "combined.log") }),
-        new transports.File({ filename: path.join(logDir, "debug.log"), level: "debug" }),
-        new transports.File({ filename: path.join(logDir, "access.log"), level: "info" }),
+        // new transports.File({ filename: path.join(logDir, "debug.log"), level: "debug" }),
+        new transports.File({ filename: path.join(logDir, "Access.log"), level: "info" }),
     ],
     exitOnError: false,
 });

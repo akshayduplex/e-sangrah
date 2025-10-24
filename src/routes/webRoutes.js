@@ -119,6 +119,7 @@ router.get("/departments/:id", authenticate, checkPermissions, DepartmentControl
 /* =========================================
    ADMIN ROUTE
    ========================================= */
+router.get("/admin/dashboard", authenticate, checkPermissions, AdminController.showAdminDashboardPage);
 router.get("/admin/approval", authenticate, checkPermissions, AdminController.showAdminApprovalPage);
 router.get("/document/:id/admin/approval/track", authenticate, checkPermissions, AdminController.showApprovalTrackPage);
 router.get("/documents/admin/recyclebin", authenticate, checkPermissions, AdminController.showRecycleBinPage);
@@ -128,6 +129,7 @@ router.get("/admin/folders/:folderId/manage-access", authenticate, AdminControll
    EMPLOYEE ROUTE
    ========================================= */
 router.get("/employee/approval", authenticate, checkPermissions, EmployeeController.showEmployeeApprovalPage);
+router.get("/employee/dashboard", authenticate, checkPermissions, EmployeeController.showEmployeeDashboardPage);
 // router.get("/employee/track", authenticate, checkPermissions, EmployeeController.showEmployeeApprovalPage);
 router.get("/documents/employee/recyclebin", authenticate, checkPermissions, EmployeeController.showEmployeeRecycleBinPage);
 //Approvals
@@ -172,6 +174,7 @@ router.get("/documents/add", authenticate, checkPermissions, DocumentController.
 // Edit Document page
 router.get("/documents/edit/:id", authenticate, checkPermissions, DocumentController.showEditDocumentPage);
 router.get('/documents/view/:token', authenticate, DocumentController.viewDocumentFiles);
+router.get('/documents/approve-access/:token', authenticate, DocumentController.viewGrantAccessPage);
 
 /* =========================================
    PROJECTS ROUTES
@@ -300,11 +303,6 @@ router.post("/permissions/user/save", authenticate, checkPermissions, async (req
         res.status(500).json({ success: false, message: "Error saving user permissions" });
     }
 });
-
-/* =========================================
-   DASHBOARD ROUTE
-   ========================================= */
-router.get("/dashboard", authenticate, checkPermissions, DashboardController.showDashboard);
 
 /* =========================================
    FOLDERS AND DOCUMENTS ROUTES

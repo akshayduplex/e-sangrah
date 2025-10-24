@@ -435,7 +435,6 @@
 <script> window.baseUrl = "<%= BASE_URL %>";</script>
 <script src="/js/todo.js"></script>
 <script src="/js/toast.js"></script>
-<script src="/js/components/projectsName.js"></script>
 <script src="/js/components/formatDate.js"></script>
 <script src="/js/theme-colorpicker.js"></script>
 <script src="/js/script.js"></script>
@@ -539,7 +538,7 @@
             </div>
 
             <div class="modal-footer">
-                <button class="site-btnmd" id="shareBtn">Share</button>
+                <button class="site-btnmd" id="shareBtn">Done</button>
             </div>
         </div>
     </div>
@@ -931,6 +930,158 @@
     </div>
 </div>
 
+<script>
+    $(document).ready(function () {
+        const $headerProjectSelect = $('#selectHeaderProject');
+
+        if ($headerProjectSelect.length) {
+            $headerProjectSelect.select2({
+                placeholder: 'Select project',
+                allowClear: true,
+                width: '200px',
+                ajax: {
+                    url: `${baseUrl}/api/projects`,
+                    dataType: 'json',
+                    delay: 250,
+                    data: function (params) {
+                        return {
+                            search: params.term || '',
+                            page: params.page || 1,
+                            limit: 10
+                        };
+                    },
+                    processResults: function (data) {
+                        return {
+                            results: (data.data || []).map(p => ({
+                                id: p._id,
+                                text: p.projectName || p.name
+                            }))
+                        };
+                    },
+                    cache: true
+                }
+            });
+
+            $headerProjectSelect.on('select2:select select2:unselect', async function () {
+                const projectId = $(this).val();
+                const projectName = $(this).find('option:selected').text();
+
+                try {
+                    const res = await fetch(`${baseUrl}/api/session/project`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({
+                            projectId: projectId || null,
+                            projectName: projectName || ''
+                        })
+                    });
+
+                    if (!res.ok) throw new Error('Failed to save project selection');
+
+                    if (projectId) {
+                        $('#currentProjectName').text(projectName);
+
+                        // ADD THESE LINES
+                        window.selectedProjectId = projectId;
+                        window.selectedProjectName = projectName;
+                        loadFolders(null, [], projectId); // Load folders immediately
+                        // location.reload(); // Optional — remove if AJAX load is enough
+                    } else {
+                        $('#currentProjectName').text('No project selected');
+                    }
+
+
+                    // Reload page after session is updated
+                    location.reload();
+
+                } catch (err) {
+                    console.error('Error saving project selection:', err);
+                }
+            });
+
+            // Load saved project on page load
+            (async function loadSavedProject() {
+                try {
+                    const res = await fetch(`${baseUrl}/api/session/project`, { credentials: 'include' });
+                    const data = await res.json();
+
+                    if (data.selectedProject) {
+                        // Set globals so your folder UI recognizes the selected project
+                        window.selectedProjectId = data.selectedProject;
+                        window.selectedProjectName = data.selectedProjectName;
+
+                        // Ensure the option exists in the dropdown
+                        if (!$headerProjectSelect.find(`option[value="${data.selectedProject}"]`).length) {
+                            const option = new Option(data.selectedProjectName, data.selectedProject, true, true);
+                            $headerProjectSelect.append(option).trigger('change');
+                        }
+
+                        // Auto load folders on page load!
+                        loadFolders(null, [], data.selectedProject);
+                    }
+                } catch (err) {
+                    console.error('Error loading saved project:', err);
+                }
+            })();
+        }
+    });
+
+    // ...existing code...
+    // (async function loadSavedProject() {
+    //     try {
+    //         // Use relative path to avoid protocol/domain mismatch (prevents HTML redirect responses)
+    //         const res = await fetch('/api/session/project', { credentials: 'include' });
+
+    //         // If server redirected to an HTML page (login), content-type will not be JSON
+    //         const contentType = res.headers.get('content-type') || '';
+    //         if (!res.ok) {
+    //             // If unauthorized, reset UI and stop
+    //             if (res.status === 401) {
+    //                 console.warn('Not authenticated when loading saved project');
+    //                 $('#currentProjectName').text('No project selected');
+    //                 return;
+    //             }
+    //             // For other errors try to log server response for debugging
+    //             const text = await res.text();
+    //             console.error('Failed loading saved project:', res.status, text);
+    //             return;
+    //         }
+
+    //         if (!contentType.includes('application/json')) {
+    //             // Server returned HTML (likely a redirect to login or an error page)
+    //             const text = await res.text();
+    //             console.error('Expected JSON but got:', text.slice(0, 200));
+    //             return;
+    //         }
+
+    //         const data = await res.json();
+
+    //         if (data && data.selectedProject) {
+    //             window.selectedProjectId = data.selectedProject;
+    //             window.selectedProjectName = data.selectedProjectName;
+
+    //             if (!$headerProjectSelect.find(`option[value="${data.selectedProject}"]`).length) {
+    //                 const option = new Option(data.selectedProjectName, data.selectedProject, true, true);
+    //                 $headerProjectSelect.append(option).trigger('change');
+    //             }
+
+    //             // Auto load folders on page load using the project id
+    //             if (typeof loadFolders === 'function') {
+    //                 try {
+    //                     loadFolders(null, [], data.selectedProject);
+    //                 } catch (err) {
+    //                     console.error('loadFolders failed:', err);
+    //                 }
+    //             }
+    //         }
+    //     } catch (err) {
+    //         // If fetch throws, log entire error (network/CORS/etc.)
+    //         console.error('Error loading saved project:', err);
+    //     }
+    // })();
+</script>
+
 <script>$(document).ready(function () {
         $('#sharedoc-modal').on('shown.bs.modal', function () {
             flatpickr('#flatpickr-range', {
@@ -949,7 +1100,7 @@
     });</script>
 <script>
     $(document).ready(function () {
-        const baseUrl = "http://localhost:5000";
+        const baseUrl = window.baseUrl;
         let currentDocId = null;
 
         // Initialize Select2

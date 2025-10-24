@@ -19,7 +19,6 @@ async function apiFetch(url, options = {}) {
         const data = await response.json();
         return data;
     } catch (error) {
-        console.error("API Fetch Error:", error);
         throw error;
     }
 }
@@ -48,8 +47,6 @@ function showError(message) {
         backgroundColor: "linear-gradient(to right, #ff5f6d, #ffc371)",
         stopOnFocus: true
     }).showToast();
-
-    console.error(`[ERROR]: ${message}`);
 }
 
 function debounce(func, wait) {

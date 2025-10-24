@@ -21,6 +21,7 @@ import { accessGrantedTemplate } from "../emailTemplates/accessGrantedTemplate.j
 import { accessRequestTemplate } from "../emailTemplates/accessRequestTemplate.js";
 import { accessExpiredTemplate, alertRedirectTemplate } from "../emailTemplates/accessExpiredTemplate.js";
 import { inviteUserTemplate } from "../emailTemplates/inviteUserTemplate.js";
+import { API_CONFIG } from "../config/ApiEndpoints.js";
 
 //Page Controllers
 
@@ -137,87 +138,69 @@ export const showArchivedDocumentPage = async (req, res) => {
 export const viewDocumentFiles = async (req, res) => {
     try {
         const { token } = req.params;
-        if (!token) throw new Error('Invalid link');
-        const fileviewlink = generateShareLink()
+        if (!token) throw new Error("Invalid link");
+
         let decrypted;
         try {
             decrypted = JSON.parse(decrypt(token));
         } catch (err) {
-            return res.render('pages/viewDocumentFiles', {
-                expiredMessage: 'Invalid or corrupted link.',
+            return res.render("pages/viewDocumentFiles", {
+                expiredMessage: "Invalid or corrupted link.",
                 canRenew: false,
-                documentTitle: 'Document',
+                documentTitle: "Document",
                 user: req.user,
+                sharedAccess: null,
                 file: null,
                 sharedId: null,
                 documentId: null
             });
         }
 
-        const { id, fileId } = decrypted;
+        const { id: documentId, fileId } = decrypted;
         const userId = req.user?._id;
 
-        const sharedAccess = await SharedWith.findOne({
-            document: id,
+        // --- Check if user has valid shared access ---
+        let sharedAccess = await SharedWith.findOne({
+            document: documentId,
             user: userId,
             generalAccess: true
         }).populate("document");
 
+        const now = new Date();
+        let expiredMessage = null;
+
         if (!sharedAccess) {
-            return res.render("pages/viewDocumentFiles", {
-                expiredMessage: "Access denied.",
-                canRenew: false,
-                documentTitle: "Document",
-                user: req.user,
-                file: null,
-                sharedId: null,
-                documentId: id
-            });
+            expiredMessage = "You don't have access to this document.";
+        } else {
+            // Check expiration
+            const isExpired = sharedAccess.expiresAt && now > sharedAccess.expiresAt;
+            const isUsed = sharedAccess.duration === "onetime" && sharedAccess.used;
+
+            if (isExpired) expiredMessage = "This link has expired.";
+            if (isUsed) expiredMessage = "This one-time link has already been used.";
+
+            // Mark one-time link as used
+            if (sharedAccess.duration === "onetime" && !sharedAccess.used) {
+                sharedAccess.used = true;
+                await sharedAccess.save();
+            }
         }
 
-        const isExpired = sharedAccess.expiresAt && new Date() > sharedAccess.expiresAt;
-        const isUsed = sharedAccess.duration === "onetime" && sharedAccess.used;
-
-        if (isExpired || isUsed) {
-            const expiredMessage = isUsed
-                ? "This one-time link has already been used."
-                : "This link has expired.";
-
-            return res.render("pages/viewDocumentFiles", {
-                expiredMessage,
-                canRenew: true,
-                documentTitle: sharedAccess.document?.title || "Document",
-                user: req.user,
-                file: null,
-                sharedId: sharedAccess._id,
-                documentId: id
-            });
+        // --- Fetch file if access exists ---
+        let file = null;
+        if (sharedAccess && !expiredMessage) {
+            file = await File.findById(fileId)
+                .populate("document")
+                .populate("uploadedBy", "name email")
+                .exec();
         }
 
-        if (sharedAccess.duration === "onetime" && !sharedAccess.used) {
-            sharedAccess.used = true;
-            await sharedAccess.save();
+        let fileUrl = null;
+        if (file) {
+            fileUrl = file.s3Url || (file.file ? await getObjectUrl(file.file, 3600) : null);
         }
 
-        const file = await File.findById(fileId)
-            .populate("document")
-            .populate("uploadedBy", "name email")
-            .exec();
-
-        if (!file) {
-            return res.render("pages/viewDocumentFiles", {
-                expiredMessage: "File not found.",
-                canRenew: false,
-                documentTitle: sharedAccess.document?.title || "Document",
-                user: req.user,
-                file: null,
-                sharedId: sharedAccess._id,
-                documentId: id
-            });
-        }
-
-        const fileUrl = file.s3Url || (file.file ? await getObjectUrl(file.file, 3600) : null);
-
+        // --- Helpers ---
         const formatFileSize = (bytes) => {
             if (!bytes) return "0 Bytes";
             const k = 1024;
@@ -239,20 +222,22 @@ export const viewDocumentFiles = async (req, res) => {
         };
 
         res.render("pages/viewDocumentFiles", {
-            expiredMessage: null,
-            canRenew: false,
-            documentTitle: file.document?.title || "Document",
+            expiredMessage,
+            canRenew: expiredMessage ? true : false,
+            documentTitle: sharedAccess?.document?.title || "Document",
             user: req.user,
-            sharedId: sharedAccess._id,
-            documentId: id,
-            file: {
-                ...file.toObject(),
-                formattedSize: formatFileSize(file.fileSize),
-                fileUrl,
-                fileType: getFileType(file.originalName)
-            }
+            sharedAccess,       // Pass sharedAccess to EJS
+            sharedId: sharedAccess?._id || null,
+            documentId,
+            file: file
+                ? {
+                    ...file.toObject(),
+                    formattedSize: formatFileSize(file.fileSize),
+                    fileUrl,
+                    fileType: getFileType(file.originalName)
+                }
+                : null
         });
-
     } catch (error) {
         console.error(error);
         res.render("pages/viewDocumentFiles", {
@@ -260,6 +245,7 @@ export const viewDocumentFiles = async (req, res) => {
             canRenew: false,
             documentTitle: "Document",
             user: req.user,
+            sharedAccess: null,
             file: null,
             sharedId: null,
             documentId: null
@@ -267,6 +253,30 @@ export const viewDocumentFiles = async (req, res) => {
     }
 };
 
+
+export const viewGrantAccessPage = async (req, res) => {
+    try {
+        const { token } = req.params;
+        const decoded = jwt.verify(token, API_CONFIG.JWT_SECRET || "supersecretkey");
+
+        const { docId, userId, action } = decoded;
+        if (action !== "approveAccess") throw new Error("Invalid token");
+
+        const doc = await Document.findById(docId);
+        const user = await User.findById(userId);
+        if (!doc || !user) throw new Error("Invalid document or user");
+
+        res.render("pages/admin/grantAccess", {
+            document: doc,
+            requester: user,
+            user: req.user,
+            token
+        });
+
+    } catch (err) {
+        res.send(`<h2>Invalid or expired link</h2><p>${err.message}</p>`);
+    }
+};
 //API Controllers
 
 
@@ -1664,7 +1674,64 @@ export const shareDocument = async (req, res) => {
 };
 
 
+/**
+ * Update user access level permission
+ * PUT /api/documents/:documentId/permissions
+ */
+export const bulkPermissionUpdate = async (req, res) => {
+    try {
+        const { documentId } = req.params;
+        const { users } = req.body; // [{ userId, accessLevel, canDownload }]
 
+        if (!mongoose.Types.ObjectId.isValid(documentId)) {
+            return res.status(400).json({ success: false, message: "Invalid document ID" });
+        }
+
+        if (!Array.isArray(users) || users.length === 0) {
+            return res.status(400).json({ success: false, message: "No users provided" });
+        }
+
+        const operations = [];
+        const invalidIds = [];
+
+        users.forEach(user => {
+            const { userId, accessLevel, canDownload } = user;
+
+            if (!mongoose.Types.ObjectId.isValid(userId)) {
+                invalidIds.push(userId);
+                return;
+            }
+
+            const updateFields = {};
+            if (accessLevel) updateFields.accessLevel = accessLevel;
+            if (canDownload !== undefined) updateFields.canDownload = canDownload;
+
+            operations.push({
+                updateOne: {
+                    filter: { document: documentId, user: userId },
+                    update: { $set: updateFields }
+                }
+            });
+        });
+
+        if (operations.length === 0) {
+            return res.status(400).json({ success: false, message: "No valid users to update", invalidIds });
+        }
+
+        const bulkResult = await SharedWith.bulkWrite(operations);
+
+        res.json({
+            success: true,
+            message: "Bulk permission update completed",
+            bulkResult,
+            invalidIds
+        });
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: "Server error" });
+    }
+};
 
 
 /**
@@ -1735,11 +1802,15 @@ export const getSharedUsers = async (req, res) => {
             return res.status(400).json({ success: false, message: "Invalid document ID" });
         }
 
+        // Fetch the document and populate the owner
+        const document = await Document.findById(documentId).populate("owner", "name email");
+        if (!document) return res.status(404).json({ success: false, message: "Document not found" });
+
+        // Fetch shared users
         const shares = await SharedWith.find({ document: documentId, inviteStatus: 'accepted' })
             .populate("user", "name email");
-        if (!shares) return res.status(404).json({ success: false, message: "Shares not found" });
 
-        const data = shares.map(sw => ({
+        const sharedUsers = shares.map(sw => ({
             userId: sw.user._id,
             name: sw.user.name,
             email: sw.user.email,
@@ -1747,13 +1818,23 @@ export const getSharedUsers = async (req, res) => {
             canDownload: sw.canDownload,
         }));
 
+        // Include owner
+        const ownerData = {
+            userId: document.owner._id,
+            name: document.owner.name,
+            email: document.owner.email,
+            accessLevel: "owner",
+            canDownload: true
+        };
+
+        const data = [ownerData, ...sharedUsers];
+
         return res.json({ success: true, data });
     } catch (err) {
         console.error(err);
         return res.status(500).json({ success: false, message: "Server error" });
     }
 };
-
 
 export const inviteUser = async (req, res) => {
     try {
@@ -1807,7 +1888,7 @@ export const inviteUser = async (req, res) => {
         await Document.findByIdAndUpdate(documentId, { $addToSet: { sharedWithUsers: user._id } });
 
         // Link using session-based route
-        const inviteLink = `http://localhost:5000/api/documents/${documentId}/invite/${user._id}/auto-accept`;
+        const inviteLink = `${baseUrl}/api/documents/${documentId}/invite/${user._id}/auto-accept`;
 
         await sendEmail({
             to: userEmail,
@@ -1836,7 +1917,7 @@ export const autoAcceptInvite = async (req, res) => {
         }
 
         const share = await SharedWith.findOne({ document: documentId, user: userId }).populate("document");
-        if (!share) return res.status(404).send(alertRedirectTemplate('Invitation not found.', '/documents/list'));
+        if (!share) return res.status(404).send(alertRedirectTemplate('You are removed from invitation list.', '/documents/list'));
 
         if (share.expiresAt && new Date() > share.expiresAt) {
             return res.send(accessExpiredTemplate(documentId));
@@ -1871,203 +1952,101 @@ export const autoAcceptInvite = async (req, res) => {
  */
 export const requestAccessAgain = async (req, res) => {
     try {
-        const { documentId, fileId } = req.params;
+        const { documentId } = req.params;
         const userId = req.session.user?._id;
+        if (!userId) return res.status(401).json({ success: false, message: "Not logged in" });
 
-        // --- Auth check ---
-        if (!userId)
-            return res.status(401).json({ success: false, message: "Not logged in" });
-
-        if (!mongoose.Types.ObjectId.isValid(documentId))
-            return res.status(400).json({ success: false, message: "Invalid document ID" });
-
-        // --- Get user + document ---
-        const user = await User.findById(userId);
         const doc = await Document.findById(documentId).populate("owner", "email name");
-
-        if (!doc)
-            return res.status(404).json({ success: false, message: "Document not found" });
+        if (!doc) return res.status(404).json({ success: false, message: "Document not found" });
 
         const owner = doc.owner;
-        if (!owner?.email)
-            return res.status(400).json({ success: false, message: "Owner email not found" });
+        if (!owner?.email) return res.status(400).json({ success: false, message: "Owner email not found" });
 
-        const token = jwt.sign(
-            {
-                docId: documentId,
-                userId,
-                fileId: doc.files[0]._id,
-                ownerId: owner._id,
-                action: "grantAccess"
-            },
-            process.env.JWT_SECRET || "supersecretkey",
-            { expiresIn: "3d" } // token expires in 3 days
-        );
+        // Create a JWT token for owner approval
+        const token = jwt.sign({
+            docId: documentId,
+            userId,
+            action: "approveAccess"
+        }, process.env.JWT_SECRET || "supersecretkey", { expiresIn: "3d" });
 
         const baseUrl = process.env.APP_BASE_URL || "http://localhost:5000";
+        const approvalLink = `${baseUrl}/documents/approve-access/${token}`;
 
-        const durations = [
-            { label: "1 Day", value: "oneday" },
-            { label: "1 Week", value: "oneweek" },
-            { label: "1 Month", value: "onemonth" },
-            { label: "Lifetime", value: "lifetime" },
-        ];
-
-        const grantLinks = durations.map(d => {
-            const url = `${baseUrl}/api/documents/grant-access/${token}?duration=${d.value}`;
-            return `
-                <li style="margin-bottom:10px;">
-                    <a href="${url}"
-                        style="background:#007bff;color:#fff;padding:10px 20px;border-radius:5px;
-                        text-decoration:none;font-size:15px;">
-                        Grant ${d.label} Access
-                    </a>
-                </li>
-            `;
-        }).join("");
-
-        // --- Email template for owner ---
-        const htmlContent = accessRequestTemplate({
-            requesterName: user.name,
-            requesterEmail: user.email,
-            fileName: doc.metadata?.fileName,
-            grantLinksHtml: grantLinks
-        });
-
-        // --- Send email ---
+        // Send email to owner
         await sendEmail({
             to: owner.email,
-            subject: `Access Request for Document: ${doc.metadata?.fileName || "Untitled"}`,
-            html: htmlContent,
+            subject: `Access Request for Document: ${doc.metadata?.fileName || 'Untitled'}`,
+            html: `
+                <p>${req.session.user.name} (${req.session.user.email}) requested access to <strong>${doc.metadata?.fileName || 'your document'}</strong>.</p>
+                <p>Click below to approve and set access duration:</p>
+                <a href="${approvalLink}" style="padding:10px 20px;background:#007bff;color:#fff;text-decoration:none;border-radius:5px;">Approve Access</a>
+            `
         });
 
-        // --- Response to requester ---
-        res.json({
-            success: true,
-            message: `Access request sent to ${owner.name || owner.email} successfully.`,
-        });
+        res.json({ success: true, message: `Request sent to ${owner.name || owner.email}` });
 
     } catch (err) {
-        console.error("requestAccessAgain error:", err);
-        res.status(500).json({
-            success: false,
-            message: "Server error: " + err.message,
-        });
+        console.error(err);
+        res.status(500).json({ success: false, message: "Server error: " + err.message });
     }
 };
+
+
 export const grantAccessViaToken = async (req, res) => {
     try {
         const { token } = req.params;
-        const { duration, customEnd } = req.query;
+        const { duration } = req.body;
 
-        if (!token || !duration) {
-            return res.status(400).send("Invalid or incomplete request.");
-        }
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || "supersecretkey");
+        const { docId, userId, action } = decoded;
+        if (action !== "approveAccess") return res.status(403).send("Invalid action");
 
-        let decoded;
-        try {
-            decoded = jwt.verify(token, process.env.JWT_SECRET || "supersecretkey");
-        } catch (e) {
-            return res.status(403).send(`
-                <html>
-                    <body style="font-family:Arial;text-align:center;padding:40px;">
-                        <h2>Invalid or Expired Link</h2>
-                        <p>This grant access link is no longer valid. Please ask the requester to send a new request.</p>
-                    </body>
-                </html>
-            `);
-        }
-
-        const { docId, userId, ownerId, fileId } = decoded;
-        // --- Validate ---
-        if (!mongoose.Types.ObjectId.isValid(docId) || !mongoose.Types.ObjectId.isValid(userId)) {
-            return res.status(400).send("Invalid document or user ID.");
-        }
-
-        const doc = await Document.findById(docId);
-        if (!doc) return res.status(404).send("Document not found.");
-        if (doc.owner.toString() !== ownerId) return res.status(403).send("Not authorized.");
+        const doc = await Document.findById(docId).populate("owner");
+        if (!doc) return res.status(404).send("Document not found");
 
         // Calculate expiration
-        let expiresAt = null;
         const now = new Date();
-
+        let expiresAt;
         switch (duration) {
-            case "oneday":
-                expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-                break;
-            case "oneweek":
-                expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-                break;
-            case "onemonth":
-                expiresAt = new Date(now);
-                expiresAt.setMonth(expiresAt.getMonth() + 1);
-                break;
-            case "custom":
-                if (customEnd) expiresAt = new Date(customEnd);
-                break;
-            case "lifetime":
-                expiresAt = new Date(now);
-                expiresAt.setFullYear(expiresAt.getFullYear() + 50);
-                break;
-            default:
-                expiresAt = null;
+            case "oneday": expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); break;
+            case "oneweek": expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); break;
+            case "onemonth": expiresAt = new Date(now); expiresAt.setMonth(expiresAt.getMonth() + 1); break;
+            case "lifetime": expiresAt = new Date(now); expiresAt.setFullYear(expiresAt.getFullYear() + 50); break;
+            default: expiresAt = null;
         }
 
-
-        // --- Create or update shared record ---
-        const share = await SharedWith.findOneAndUpdate(
+        // Update or create SharedWith
+        await SharedWith.findOneAndUpdate(
             { document: docId, user: userId },
-            {
-                accessLevel: "view",
-                duration,
-                expiresAt,
-                generalAccess: true,
-            },
+            { accessLevel: "view", duration, expiresAt, generalAccess: true },
             { new: true, upsert: true }
         );
 
-        // --- Add to document's shared list ---
-        await Document.findByIdAndUpdate(docId, { $addToSet: { sharedWithUsers: userId } });
-
-        const requester = await User.findById(userId);
-        const viewDocLink = generateShareLink(docId, fileId)
-        // --- Notify requester via email ---
+        // Notify user
+        const user = await User.findById(userId);
         await sendEmail({
-            to: requester.email,
-            subject: "Access Granted - E-Sangrah",
-            html: accessGrantedTemplate({
-                fileName: doc.metadata?.fileName,
-                duration,
-                expiresAt,
-                viewDocLink
-            })
+            to: user.email,
+            subject: "Access Granted",
+            html: `<p>Your access to "${doc.metadata?.fileName}" has been granted for ${duration}.</p>`
         });
 
-        // --- Send friendly confirmation to the owner ---
-        res.send(`
-            <html>
-                <body style="font-family:Arial;text-align:center;padding:50px;">
-                    <h2> Access Granted Successfully</h2>
-                    <p>${requester.name || requester.email} has been notified and now has access.</p>
-                    <p><strong>Duration:</strong> ${duration}</p>
-                    ${expiresAt ? `<p><strong>Expires:</strong> ${expiresAt.toLocaleString()}</p>` : ""}
-                </body>
-            </html>
-        `);
+        res.send(`<h2>Access granted to ${user.name}</h2><p>Email notification sent.</p>`);
 
     } catch (err) {
-        console.error("grantAccessViaToken error:", err);
-        res.status(500).send(`
-            <html><body style="font-family:Arial;text-align:center;padding:40px;">
-                <h2>Server Error</h2>
-                <p>${err.message}</p>
-            </body></html>
-        `);
+        res.send(`<h2>Error</h2><p>${err.message}</p>`);
     }
 };
 
-
+export const generateShareableLink = async (req, res) => {
+    const { documentId, fileId } = req.params;
+    try {
+        const link = await generateShareLink(documentId, fileId);
+        res.json({ success: true, link });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Failed to generate share link' });
+    }
+};
 /**
  * Get document audit logs
  */

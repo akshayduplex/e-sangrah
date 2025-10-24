@@ -7,6 +7,20 @@ import Folder from "../models/Folder.js";
 //Page controllers
 
 // Render Dashboard page
+export const showAdminDashboardPage = (req, res) => {
+    try {
+        res.render("pages/admin/adminDashboard", {
+            title: " Admin Dashboard",
+            user: req.user
+        });
+    } catch (err) {
+        logger.error("Dashboard render error:", err);
+        res.status(500).render("pages/error", {
+            user: req.user,
+            message: "Unable to load dashboard"
+        });
+    }
+};
 export const showAdminApprovalPage = (req, res) => {
     try {
         res.render("pages/admin/approval", {

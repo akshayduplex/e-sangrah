@@ -989,50 +989,50 @@ export const accessViaToken = async (req, res) => {
  */
 export const updateFolderPermission = async (req, res) => {
     const { id } = req.params;
-    const { principalId, canDownload, access, status } = req.body;
+    const { permissions = [], status } = req.body;
     const updatedBy = req.user?._id || null;
+
     try {
         const folder = await Folder.findById(id);
         if (!folder) return res.status(404).json({ message: 'Folder not found' });
 
-        // Update folder status if provided
+        // Update folder status
         if (status && ['active', 'inactive'].includes(status)) {
             folder.status = status;
         }
 
-        // Find existing permission
-        let permission = folder.permissions.find(p => String(p.principal) === String(principalId));
+        // Bulk Update Permissions
+        permissions.forEach(p => {
+            let existing = folder.permissions.find(item => String(item.principal) === String(p.principalId));
 
-        if (permission) {
-            // Update fields
-            if (typeof canDownload === 'boolean') permission.canDownload = canDownload;
-            if (access) permission.access = access;
-        } else {
-            permission = folder.permissions.create({
-                principal: principalId,
-                model: 'User',
-                canDownload: canDownload || false,
-                access: access || 'view'
-            });
-            folder.permissions.push(permission);
-        }
+            if (existing) {
+                if (typeof p.canDownload === 'boolean') existing.canDownload = p.canDownload;
+                if (p.access) existing.access = p.access;
+            } else {
+                folder.permissions.push({
+                    principal: p.principalId,
+                    model: 'User',
+                    access: p.access || 'view',
+                    canDownload: p.canDownload || false
+                });
+            }
+        });
 
         folder.updatedBy = updatedBy;
         await folder.save();
 
-        // Retrieve the updated permission from saved document
-        const updatedPermission = folder.permissions.find(p => String(p.principal) === String(principalId));
-
         return res.json({
-            message: 'Permission updated successfully',
-            permission: updatedPermission,
+            message: "Permissions updated successfully",
+            permissions: folder.permissions,
             folderStatus: folder.status
         });
+
     } catch (err) {
         console.error(err);
         return res.status(500).json({ message: 'Server error', error: err.message });
     }
 };
+
 
 
 

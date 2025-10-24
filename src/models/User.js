@@ -2,6 +2,7 @@
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import { API_CONFIG } from "../config/ApiEndpoints.js";
 
 // Sub-schema for User Details
 const userDetailsSchema = new mongoose.Schema(
@@ -97,13 +98,17 @@ const userSchema = new mongoose.Schema(
             enum: ["pending", "verified"],
             default: "verified"
         },
+        otp: { type: String, select: false },              // Stores temporary OTP
+        otpExpiresAt: { type: Date, select: false },      // OTP expiration timestamp
         lastLogin: { type: Date, default: null },
 
         // Role-specific details
         userDetails: userDetailsSchema,
         vendorDetails: vendorDetailsSchema,
         donorDetails: donorDetailsSchema,
+
     },
+
     { timestamps: true } // still keeps createdAt and updatedAt
 );
 
@@ -134,11 +139,12 @@ userSchema.methods.comparePassword = async function (candidatePassword) {
 };
 
 // Generate JWT token
+
 userSchema.methods.generateAuthToken = function () {
     return jwt.sign(
         { userId: this._id, email: this.email, profile_type: this.profile_type },
-        process.env.JWT_SECRET,
-        { expiresIn: process.env.JWT_EXPIRES_IN || "7d" }
+        API_CONFIG.JWT_SECRET,
+        { expiresIn: API_CONFIG.TOKEN_LOGIN_EXPIRES_IN || "7d" }
     );
 };
 

@@ -30,7 +30,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 projectsContainer.innerHTML = '<p>No projects found.</p>';
             }
         } catch (error) {
-            console.error("Error fetching projects:", error);
             if (!append) projectsContainer.innerHTML = '<p>Error loading projects.</p>';
         } finally {
             isLoading = false;

@@ -4,6 +4,20 @@ import Document from "../models/Document.js";
 //Page controllers
 
 // Render Dashboard page
+export const showEmployeeDashboardPage = (req, res) => {
+    try {
+        res.render("pages/employee/employeeDashboard", {
+            title: "Employee Dashboard",
+            user: req.user
+        });
+    } catch (err) {
+        logger.error("Dashboard render error:", err);
+        res.status(500).render("pages/error", {
+            user: req.user,
+            message: "Unable to load dashboard"
+        });
+    }
+};
 export const showEmployeeApprovalPage = (req, res) => {
     try {
         res.render("pages/employee/approval", {

@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>File Preview - <%= file ? file.originalName : 'No File' %>
+    <title>File Preview - <%= file ? file.originalName : "No File" %>
     </title>
     <style>
         html,
@@ -16,7 +16,6 @@
 
         iframe,
         img {
-            display: block;
             width: 100%;
             height: 100%;
             border: none;
@@ -27,63 +26,87 @@
             background-color: #000;
         }
 
-        /* Optional: center "file not found" text */
         .fallback {
             display: flex;
-            align-items: center;
             justify-content: center;
+            align-items: center;
             height: 100%;
             color: #fff;
             font-family: Arial, sans-serif;
             text-align: center;
+            padding: 20px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            background: #007bff;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 15px;
         }
     </style>
 </head>
 
 <body>
-    <% if (!file || !file.fileUrl) { %>
-        <div class="fallback">
-            <div>
-                <h2>File not available</h2>
-                <% if (expiredMessage) { %>
-                    <p>
-                        <%= expiredMessage %>
+
+    <% const expired=sharedAccess && sharedAccess.expiresAt && new Date()> sharedAccess.expiresAt; %>
+
+        <% if (!sharedAccess || expired) { %>
+
+            <!-- Access Not Granted UI -->
+            <div class="fallback">
+                <div>
+                    <h2>Access Restricted</h2>
+                    <p>You do not have permission to view this file.</p>
+                    <form method="POST" action="/api/documents/<%= documentId %>/request-access">
+                        <button type="submit" class="btn">Request Access</button>
+                    </form>
+                </div>
+            </div>
+
+            <% } else { %>
+
+                <!-- Access Granted Info -->
+                <% if (sharedAccess.expiresAt) { %>
+                    <p style="color:#fff; text-align:center;">
+                        Access granted until: <%= sharedAccess.expiresAt.toLocaleString() %>
                     </p>
                     <% } else { %>
-                        <p>The file could not be loaded.</p>
+                        <p style="color:#fff; text-align:center;">Lifetime access granted</p>
                         <% } %>
-            </div>
-        </div>
-        <% } else { %>
 
-            <% if (file.fileType.isPDF) { %>
-                <!-- PDF Preview -->
-                <iframe src="/api/file/pdf/<%= file._id %>" title="PDF Preview of <%= file.originalName %>"></iframe>
-
-                <% } else if (file.fileType.isWord || file.fileType.isExcel || file.fileType.isPowerPoint) { %>
-                    <!-- Office Preview -->
-                    <iframe
-                        src="https://view.officeapps.live.com/op/embed.aspx?src=<%= encodeURIComponent(file.fileUrl) %>"
-                        title="Office Preview of <%= file.originalName %>"></iframe>
-
-                    <% } else if (file.originalName.match(/\.(jpg|jpeg|png|gif|webp)$/i)) { %>
-                        <!-- Image Preview -->
-                        <img src="<%= file.fileUrl %>" alt="<%= file.originalName %>">
-
-                        <% } else { %>
-                            <!-- Other file types -->
-                            <div class="fallback">
-                                <div>
-                                    <h2>Preview not available</h2>
-                                    <p>This file type (.<%= file.fileType.extension %>) cannot be previewed in the
-                                            browser.</p>
-                                    <p><a href="<%= file.fileUrl %>" style="color:#0af;" target="_blank">Download
-                                            File</a></p>
+                            <!-- Preview Section -->
+                            <% if (!file || !file.fileUrl) { %>
+                                <div class="fallback">
+                                    <h2>File not available</h2>
                                 </div>
-                            </div>
-                            <% } %>
 
-                                <% } %>
+                                <% } else if (file.fileType.isPDF) { %>
+                                    <iframe src="/api/file/pdf/<%= file._id %>" title="PDF Preview"></iframe>
+
+                                    <% } else if (file.fileType.isWord || file.fileType.isExcel ||
+                                        file.fileType.isPowerPoint) { %>
+                                        <iframe
+                                            src="https://view.officeapps.live.com/op/embed.aspx?src=<%= encodeURIComponent(file.fileUrl) %>"
+                                            title="Office Preview">
+                                        </iframe>
+
+                                        <% } else if (/\.(jpg|jpeg|png|gif|webp)$/i.test(file.originalName)) { %>
+                                            <img src="<%= file.fileUrl %>" alt="Image Preview">
+
+                                            <% } else { %>
+                                                <div class="fallback">
+                                                    <h2>Preview not available</h2>
+                                                    <p>This file type cannot be previewed.</p>
+                                                    <p><a href="<%= file.fileUrl %>" target="_blank"
+                                                            style="color:#0af;">Download file</a></p>
+                                                </div>
+                                                <% } %>
+
+                                                    <% } %>
+
 </body>
 
 </html>

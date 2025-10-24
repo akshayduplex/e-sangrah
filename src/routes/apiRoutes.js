@@ -11,6 +11,7 @@ import * as AdminController from "../controllers/AdminController.js";
 import * as EmployeeController from "../controllers/EmployeeController.js";
 import * as UserController from "../controllers/UserController.js";
 import * as DonerVenderController from "../controllers/DonerVenderController.js";
+import * as AdminDashboard from "../controllers/DashboardController.js"
 import * as DepartmentController from "../controllers/DepartmentController.js";
 import * as DesignationController from "../controllers/DesignationController.js";
 import * as DocumentController from "../controllers/DocumentController.js";
@@ -60,16 +61,16 @@ import UserFolderHistory from "../models/UserFolderHistory.js";
 import { createS3Uploader, s3uploadfolder } from "../middlewares/multer-s3.js";
 import { generateShareLink } from "../helper/GenerateUniquename.js";
 import { ParentFolderName } from "../middlewares/parentFolderName.js";
+import accessLogger from "../middlewares/accessLogger.js";
 
 const router = express.Router();
-
-
 // ---------------------------
 // Auth routes
 // ---------------------------
 router.post("/auth/register", registerValidator, AuthController.register);
 
 router.post("/auth/login", AuthController.login);
+router.post("/auth/verify/token", AuthController.verifyTokenOtp);
 
 router.post("/auth/send-otp", sendOtpValidator, validate, AuthController.sendOtp);
 
@@ -129,7 +130,11 @@ router.get('/export/formats', authenticate, CommonController.getExportFormats);
 // Admin routes
 // ---------------------------
 router.get("/my-approvals", AdminController.getMyApprovals);
-
+router.get("/dashboard/stats", AdminDashboard.getDashboardStats);
+router.get("/dashboard/file-status", AdminDashboard.getFileStatusRecentActivity);
+router.get("/dashboard/recent-activity", AdminDashboard.getRecentActivities);
+router.get("/dashboard/uploads", AdminDashboard.getDepartmentDocumentUploads);
+router.get("/dashboard/summary", AdminDashboard.getDocumentsStatusSummary);
 
 // ---------------------------
 // Employee routes
@@ -190,16 +195,19 @@ router.get("/documents/recyclebin", DocumentController.getRecycleBinDocuments);
  * Document Sharing & Permissions
  */
 // Share a document
-router.patch("/documents/:id/share", DocumentController.shareDocument);
+router.patch("/documents/:id/share", authorize('admin', 'superadmin'), DocumentController.shareDocument);
 
 // List all users a document is shared with
 router.get("/documents/:documentId/shared-users", DocumentController.getSharedUsers);
 
+// Done for updating the permission of all people with access
+router.patch("/documents/:documentId/permissions", authorize('admin', 'superadmin'), DocumentController.bulkPermissionUpdate);
+
 // Update user access level for a shared document
-router.put("/documents/share/:documentId", DocumentController.updateSharedUser);
+router.put("/documents/share/:documentId", authorize('admin', 'superadmin'), DocumentController.updateSharedUser);
 
 // Remove user from shared list
-router.delete("/documents/share/:documentId", DocumentController.removeSharedUser);
+router.delete("/documents/share/:documentId", authorize('admin', 'superadmin'), DocumentController.removeSharedUser);
 
 // Invite a user to a document (sends email)
 router.post("/documents/:documentId/invite", DocumentController.inviteUser);
@@ -208,22 +216,13 @@ router.post("/documents/:documentId/invite", DocumentController.inviteUser);
 router.get("/documents/:documentId/invite/:userId/auto-accept", DocumentController.autoAcceptInvite);
 
 // Request access again
-router.post("/documents/:documentId/request-access-again", DocumentController.requestAccessAgain);
+router.post("/documents/:documentId/request-access", DocumentController.requestAccessAgain);
 
 // Grant access via token
-router.get("/documents/grant-access/:token", DocumentController.grantAccessViaToken);
+router.post("/documents/grant-access/:token", authorize('admin', 'superadmin'), DocumentController.grantAccessViaToken);
 
 // Generate shareable link for a document file
-router.get('/documents/:documentId/:fileId/share-link', async (req, res) => {
-    const { documentId, fileId } = req.params;
-    try {
-        const link = generateShareLink(documentId, fileId);
-        res.json({ success: true, link });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ success: false, message: 'Failed to generate share link' });
-    }
-});
+router.get('/documents/:documentId/:fileId/share-link', DocumentController.generateShareableLink)
 
 
 /**
@@ -254,21 +253,21 @@ router.patch('/documents/:id/versions/:version/restore', DocumentController.rest
  * Document Approval Workflow
  */
 // Create an approval request
-router.post('/documents/:documentId/add', DocumentController.createApprovalRequest);
+router.post('/documents/:documentId/add', authenticate, DocumentController.createApprovalRequest);
 
 // Track approvals
-router.get('/documents/:documentId/approval/track', DocumentController.getApprovals);
+router.get('/documents/:documentId/approval/track', authenticate, DocumentController.getApprovals);
 
 // Update approval status for a document
-router.patch('/documents/:documentId/approvals/:approver', DocumentController.updateApprovalStatus);
+router.patch('/documents/:documentId/approvals/:approver', authenticate, DocumentController.updateApprovalStatus);
 
 
 // ---------------------------
 // Departments routes
 // ---------------------------
 // Publicly exposed API routes
-router.get('/departments', DepartmentController.getAllDepartments);
-router.get('/departments/search', DepartmentController.searchDepartments);
+router.get('/departments', authenticate, DepartmentController.getAllDepartments);
+router.get('/departments/search', authenticate, DepartmentController.searchDepartments);
 router.get('/departments/:id', authenticate, DepartmentController.getDepartmentById);
 
 // Admin-only routes (CRUD)
@@ -302,8 +301,7 @@ router.delete('/designations/:id', authenticate, authorize('admin'), Designation
 // ---------------------------
 
 // Save selected project to session
-// Save selected project to session
-router.post("/session/project", async (req, res) => {
+router.post("/session/project", authenticate, async (req, res) => {
     const { projectId } = req.body;
 
     if (!projectId) return res.status(400).json({ error: "Project ID is required" });
@@ -328,8 +326,29 @@ router.post("/session/project", async (req, res) => {
 });
 
 // Get selected project from session
-router.get("/session/project", (req, res) => {
-    res.json({ selectedProject: req.session.selectedProject || null, selectedProjectName: req.session.selectedProjectName });
+router.get("/session/project", async (req, res) => {
+    try {
+        if (!req.session.user) {
+            return res.status(401).json({
+                error: "Not logged in",
+                selectedProject: null,
+                selectedProjectName: null
+            });
+        }
+
+        // Respond with session project data
+        res.json({
+            selectedProject: req.session.selectedProject || null,
+            selectedProjectName: req.session.selectedProjectName || null
+        });
+    } catch (err) {
+        console.error("Error in /session/project:", err);
+        res.status(500).json({
+            error: "Server error",
+            selectedProject: null,
+            selectedProjectName: null
+        });
+    }
 });
 
 
