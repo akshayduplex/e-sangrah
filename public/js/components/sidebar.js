@@ -1,9 +1,15 @@
 document.addEventListener("DOMContentLoaded", loadSidebar);
 
 async function loadSidebar() {
+    const fetchJson = async (url) => {
+        const response = await fetch(url, { credentials: 'include' });
+        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+        return await response.json();
+    };
+
     try {
-        const data = await apiFetch(`${baseUrl}/api/sidebar`);
-        const recentData = await apiFetch(`${baseUrl}/api/session/recent-folders`);
+        const data = await fetchJson(`${baseUrl}/api/sidebar`);
+        const recentData = await fetchJson(`${baseUrl}/api/session/recent-folders`);
 
         // Icon helper
         const getIcon = (item) => {
@@ -34,10 +40,9 @@ async function loadSidebar() {
             </ul>
         </li>`;
                 } else {
-                    // Fix: ensure href is absolute
                     let href = item.url || (item.folderId ? `/folders/viewer/${item.folderId}` : '#');
                     if (!href.startsWith('http') && !href.startsWith('/')) {
-                        href = '/' + href; // prepend slash to make it absolute
+                        href = '/' + href;
                     }
                     return `<li>
         <a href="${href}" ${titleAttr}>
@@ -48,8 +53,6 @@ async function loadSidebar() {
             }).join('');
         };
 
-
-
         const buildRecentMenu = (items) => {
             return items.map(item => {
                 const title = item.folderName || item.name || 'Untitled';
@@ -58,10 +61,10 @@ async function loadSidebar() {
 
                 return `
                     <li class="recent-parent" data-folder="${item.folderId}">
-                       <a href="${hasChildren ? 'javascript:void(0);' : `/folders/viewer/${item.folderId}`}" 
+                       <a href="${hasChildren ? 'javascript:void(0);' : `/folders/viewer/${item.folderId}`}"
    class="menu-link recent-toggle" ${titleAttr}>
                             <i class="ti ti-chevron-down arrow-icon"></i>
-                            <i class="ti ti-folder-filled"></i> 
+                            <i class="ti ti-folder-filled"></i>
                             <span class="truncate-recent">${title}</span>
                         </a>
                         ${hasChildren ? `
@@ -76,7 +79,6 @@ async function loadSidebar() {
         const otherItems = data.data.filter(m => m.type !== "Dashboard");
 
         let menuHtml = '';
-
 
         if (dashboardItems.length) {
             menuHtml += `
@@ -94,7 +96,7 @@ async function loadSidebar() {
 
         menuHtml += buildMenu(otherItems);
 
-        if (recentData.success && recentData.recentFolders && recentData.recentFolders.length > 0) {
+        if (recentData.success && recentData.recentFolders?.length) {
             menuHtml += `
                 <li class="submenu">
                     <a href="javascript:void(0);" class="menu-link">
@@ -124,13 +126,11 @@ async function loadSidebar() {
 
         document.getElementById("menu-list").innerHTML = menuHtml;
 
+        // Tooltips
+        document.querySelectorAll('[data-bs-toggle="tooltip"]')
+            .forEach(el => new bootstrap.Tooltip(el));
 
-        const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-        tooltipTriggerList.map(function (tooltipTriggerEl) {
-            return new bootstrap.Tooltip(tooltipTriggerEl);
-        });
-
-
+        // Sidebar toggles
         document.querySelectorAll(".submenu > .menu-link").forEach(link => {
             link.addEventListener("click", (e) => {
                 e.preventDefault();
@@ -149,14 +149,13 @@ async function loadSidebar() {
                     }
                 });
 
-
                 const isVisible = submenu.style.display === "block";
                 submenu.style.display = isVisible ? "none" : "block";
                 link.classList.toggle("subdrop", !isVisible);
             });
         });
 
-
+        // Recent folder toggle
         document.addEventListener("click", function (e) {
             const toggleLink = e.target.closest(".recent-toggle");
             if (!toggleLink) return;
@@ -182,12 +181,11 @@ async function loadSidebar() {
             toggleLink.classList.toggle("subdrop", !isVisible);
         });
 
-
+        // Highlight active menu item
         const currentPath = window.location.pathname;
         document.querySelectorAll("#menu-list a").forEach(link => {
             if (link.getAttribute("href") === currentPath) {
                 link.classList.add("active");
-
 
                 let parent = link.closest("ul.dropdown_wrap, ul.recent-child");
                 while (parent) {
@@ -202,6 +200,6 @@ async function loadSidebar() {
         });
 
     } catch (err) {
-        showToast("Error loading sidebar: " + err, 'error');
+        showToast("Error loading sidebar: " + err.message, "error");
     }
 }

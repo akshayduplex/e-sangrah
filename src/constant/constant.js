@@ -24,10 +24,12 @@ export const COMPLIANCE_OPTIONS = {
 };
 
 export const FILTER_PERIODS = {
-    DAILY: "daily",
-    MONTHLY: "monthly",
-    YEARLY: "yearly"
+    DAILY: "today",
+    WEEKLY: "week",
+    MONTHLY: "month",
+    YEARLY: "year"
 };
+
 
 export const Document_STATUS = {
     DRAFT: "Draft",

@@ -523,27 +523,34 @@
                             res.data.forEach(user => {
                                 const checkboxId = `download-${user.userId}`;
 
+                                // Check if user is owner
+                                const isOwner = user.accessLevel === 'owner';
+
                                 const row = `
-                    <div class="user-accssrow dynamic">
-                        <div class="empname_eml">
-                            <div class="fw-normal fs-18">${user.name}</div>
-                            <small class="fs-16">${user.email}</small>
-                            ${user.inviteStatus === 'pending' ? '<span class="badge bg-warning ms-2">Pending</span>' : ''}
-                        </div>
-                        <div class="d-flex align-items-center gap-4">
-                            <div class="form-check form-switch">
-                                <input class="form-check-input download-access" type="checkbox" id="${checkboxId}" 
-                                    data-user-id="${user.userId}" ${user.canDownload ? 'checked' : ''}>
-                                <label class="form-check-label" for="${checkboxId}">Download</label>
-                            </div>
-                            <select class="form-select form-select-sm access-level" style="width:100px;" data-user-id="${user.userId}">
-                                <option value="edit" ${user.accessLevel === 'edit' ? 'selected' : ''}>Edit</option>
-                                <option value="view" ${user.accessLevel === 'view' ? 'selected' : ''}>View</option>
-                            </select>
-                            <button class="btn btn-sm remvaccessbtn remove-user" data-user-id="${user.userId}">Remove</button>
-                        </div>
+        <div class="user-accssrow dynamic">
+            <div class="empname_eml">
+                <div class="fw-normal fs-18">${user.name}</div>
+                <small class="fs-16">${user.email}</small>
+                ${user.inviteStatus === 'pending' ? '<span class="badge bg-warning ms-2">Pending</span>' : ''}
+            </div>
+            <div class="d-flex align-items-center gap-4">
+                ${!isOwner ? `
+                    <div class="form-check form-switch">
+                        <input class="form-check-input download-access" type="checkbox" id="${checkboxId}" 
+                            data-user-id="${user.userId}" ${user.canDownload ? 'checked' : ''}>
+                        <label class="form-check-label" for="${checkboxId}">Download</label>
                     </div>
-                `;
+                    <select class="form-select form-select-sm access-level" style="width:100px;" data-user-id="${user.userId}">
+                        <option value="edit" ${user.accessLevel === 'edit' ? 'selected' : ''}>Edit</option>
+                        <option value="view" ${user.accessLevel === 'view' ? 'selected' : ''}>View</option>
+                    </select>
+                ` : `
+                    <div class="fw-bold fs-16 text-primary">Owner</div>
+                `}
+                ${!isOwner ? `<button class="btn btn-sm remvaccessbtn remove-user" data-user-id="${user.userId}">Remove</button>` : ''}
+            </div>
+        </div>
+    `;
 
                                 container.append(row);
                             });
@@ -727,122 +734,104 @@
                     });
                 });
                 // Update user access level
-                $('#sharedoc-modal').on('change', '.access-level', function () {
-                    const userId = $(this).data('user-id');
-                    const accessLevel = $(this).val();
+                // $('#sharedoc-modal').on('change', '.access-level', function () {
+                //     const userId = $(this).data('user-id');
+                //     const accessLevel = $(this).val();
 
-                    if (!currentDocId || !userId) return;
+                //     if (!currentDocId || !userId) return;
 
-                    $.ajax({
-                        url: `${baseUrl}/api/documents/share/${currentDocId}`,
-                        method: 'PUT',
-                        contentType: 'application/json',
-                        data: JSON.stringify({
-                            userId: userId,
-                            accessLevel: accessLevel
-                        }),
-                        success: function () {
-                            showToast('Access level updated successfully', 'success');
-                        },
-                        error: function (err) {
-                            showToast(err.responseJSON?.message || 'Failed to update access level', 'error');
-                        }
-                    });
-                });
+                //     $.ajax({
+                //         url: `${baseUrl}/api/documents/share/${currentDocId}`,
+                //         method: 'PUT',
+                //         contentType: 'application/json',
+                //         data: JSON.stringify({
+                //             userId: userId,
+                //             accessLevel: accessLevel
+                //         }),
+                //         success: function () {
+                //             showToast('Access level updated successfully', 'success');
+                //         },
+                //         error: function (err) {
+                //             showToast(err.responseJSON?.message || 'Failed to update access level', 'error');
+                //         }
+                //     });
+                // });
 
                 // Update download access
-                $('#sharedoc-modal').on('change', '.download-access', function () {
-                    const userId = $(this).data('user-id');
-                    const canDownload = $(this).is(':checked');
+                // $('#sharedoc-modal').on('change', '.download-access', function () {
+                //     const userId = $(this).data('user-id');
+                //     const canDownload = $(this).is(':checked');
 
-                    if (!currentDocId || !userId) return;
+                //     if (!currentDocId || !userId) return;
 
-                    $.ajax({
-                        url: `${baseUrl}/api/documents/share/${currentDocId}`,
-                        method: 'PUT',
-                        contentType: 'application/json',
-                        data: JSON.stringify({
-                            userId: userId,
-                            canDownload: canDownload
-                        }),
-                        success: function () {
-                            showToast('Download access updated successfully', 'success');
-                        },
-                        error: function (err) {
-                            showToast(err.responseJSON?.message || 'Failed to update download access', 'error');
-                        }
-                    });
-                });
+                //     $.ajax({
+                //         url: `${baseUrl}/api/documents/share/${currentDocId}`,
+                //         method: 'PUT',
+                //         contentType: 'application/json',
+                //         data: JSON.stringify({
+                //             userId: userId,
+                //             canDownload: canDownload
+                //         }),
+                //         success: function () {
+                //             showToast('Download access updated successfully', 'success');
+                //         },
+                //         error: function (err) {
+                //             showToast(err.responseJSON?.message || 'Failed to update download access', 'error');
+                //         }
+                //     });
+                // });
 
                 // Share button in footer
                 $('#sharedoc-modal .modal-footer .site-btnmd').on('click', function () {
-                    const accessLevel = $('#accessLevelSelect').val();
-                    const duration = $('input[name="time"]:checked').attr('id');
-                    const customStart = $('#startDate').val();
-                    const customEnd = $('#endDate').val();
-                    const accessType = $('#accessType').val();
-                    const roleType = $('#roleType').val();
-
                     if (!currentDocId) {
                         showToast('No document selected', 'info');
                         return;
                     }
 
-                    if (!duration) {
-                        showToast('Please select a time duration', 'info');
-                        return;
-                    }
+                    // Collect all users with access from modal
+                    const users = $('#usersWithAccessContainer .user-accssrow').map(function () {
+                        const userId = $(this).find('.access-level').data('user-id');
+                        const accessLevel = $(this).find('.access-level').val();
+                        const canDownload = $(this).find('.download-access').is(':checked');
+                        return { userId, accessLevel, canDownload };
+                    }).get(); // convert to plain array
 
-                    if (duration === 'custom' && !customEnd) {
-                        showToast('Please select an end date for custom duration', 'info');
-                        return;
-                    }
-
-                    const generalAccess = accessType === 'anyone';
-                    let shareData = {
-                        accessLevel: generalAccess ? (roleType === 'editor' ? 'edit' : 'view') : accessLevel,
-                        duration: duration,
-                        generalAccess: generalAccess,
-                        generalRole: roleType
-                    };
-
-                    // Always collect all user IDs
-                    const userIds = $('#usersWithAccessContainer .user-accssrow')
-                        .map(function () {
-                            return $(this).find('.access-level').data('user-id');
-                        })
-                        .get(); // Convert jQuery object to plain array
-
-                    if (!userIds.length) {
+                    if (users.length === 0) {
                         showToast('Please add at least one user to share with', 'info');
                         return;
                     }
 
-                    shareData.userIds = userIds; // Always send array of userIds
+                    // Prepare general access info
+                    const accessType = $('#accessType').val();
+                    const roleType = $('#roleType').val();
+                    const generalAccess = accessType === 'anyone';
+                    const generalRole = roleType; // 'viewer' or 'editor'
 
-                    if (duration === 'custom') {
-                        shareData.customEnd = customEnd;
-                        if (customStart) shareData.customStart = customStart;
-                    }
+                    const data = {
+                        users,
+                        generalAccess,
+                        generalRole
+                    };
 
                     $.ajax({
-                        url: `${baseUrl}/api/documents/${currentDocId}/share`,
+                        url: `${baseUrl}/api/documents/${currentDocId}/permissions`,
                         method: 'PATCH',
                         contentType: 'application/json',
-                        data: JSON.stringify(shareData),
-                        success: function (response) {
-                            showToast(response.message || 'Document shared successfully!', 'success');
+                        data: JSON.stringify(data),
+                        success: function (res) {
+                            showToast(res.message || 'Permissions updated successfully!', 'success');
                             $('#sharedoc-modal').modal('hide');
 
                             if (typeof table !== 'undefined' && table.ajax?.reload) {
-                                table.ajax.reload(null, false);
+                                table.ajax.reload(null, false); // reload table without resetting pagination
                             }
                         },
                         error: function (err) {
-                            showToast(err.responseJSON?.message || 'Failed to share document', 'error');
+                            showToast(err.responseJSON?.message || 'Failed to update permissions', 'error');
                         }
                     });
                 });
+
 
                 // -------------------------
                 // Load version history into modal

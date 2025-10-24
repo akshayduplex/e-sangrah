@@ -10,6 +10,7 @@ import Department from "../models/Departments.js";
 import User from "../models/User.js";
 import UserPermission from "../models/UserPermission.js";
 import { incrementGlobalPermissionsVersion } from "../middlewares/checkPermission.js";
+import { API_CONFIG } from "../config/ApiEndpoints.js";
 
 //Page Controllers
 
@@ -410,7 +411,7 @@ export const getSidebarForUser = async (req, res) => {
         return res.status(500).json({
             success: false,
             message: "Error fetching sidebar",
-            error: process.env.NODE_ENV === "development" ? error.message : {},
+            error: API_CONFIG.NODE_ENV === "development" ? error.message : {},
         });
     }
 };

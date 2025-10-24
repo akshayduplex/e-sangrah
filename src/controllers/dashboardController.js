@@ -94,11 +94,8 @@ export const getFileStatusRecentActivity = async (req, res) => {
 /** Get Recent Activities */
 export const getRecentActivities = async (req, res) => {
     try {
-        const { documentId, limit = 10 } = req.query;
-
-        if (!documentId) return res.status(400).json({ message: "documentId is required." });
-
-        const document = await Document.findById(documentId)
+        const { limit = 10 } = req.query;
+        const document = await Document.find()
             .populate("activityLog.user", "name email") // populate user details
             .select("activityLog");
 
@@ -117,51 +114,11 @@ export const getRecentActivities = async (req, res) => {
 };
 
 
-// ------------------- Document Type Uploads -------------------
-export const getDocumentTypeUploads = async (req, res) => {
+// More efficient version with fewer stages
+export const getDepartmentDocumentUploads = async (req, res) => {
     try {
         const { period = "monthly" } = req.query;
-        if (!validPeriods.includes(period)) {
-            return failResponse(res, "Invalid period. Must be daily, weekly, monthly, or yearly", 400);
-        }
 
-        const startDate = calculateStartDate(period);
-
-        const result = await Document.aggregate([
-            { $match: { createdAt: { $gte: startDate } } },
-            { $unwind: "$files" },
-            {
-                $lookup: {
-                    from: "files",
-                    localField: "files", // ✅ updated
-                    foreignField: "_id",
-                    as: "fileInfo"
-                }
-            },
-            { $unwind: "$fileInfo" },
-            { $group: { _id: "$fileInfo.extension", count: { $sum: 1 } } },
-            { $group: { _id: null, total: { $sum: "$count" }, types: { $push: { type: "$_id", count: "$count" } } } },
-            { $unwind: "$types" },
-            {
-                $project: {
-                    _id: 0,
-                    type: "$types.type",
-                    percentage: { $round: [{ $multiply: [{ $divide: ["$types.count", "$total"] }, 100] }, 2] }
-                }
-            },
-            { $sort: { percentage: -1 } }
-        ]);
-
-        return successResponse(res, result, `Document uploads for period "${period}" fetched successfully`);
-    } catch (err) {
-        return errorResponse(res, err);
-    }
-};
-
-// ------------------- Documents Summary -------------------
-export const getDocumentsSummary = async (req, res) => {
-    try {
-        const { period = "monthly", fileType } = req.query;
         if (!validPeriods.includes(period)) {
             return failResponse(res, "Invalid period. Must be daily, weekly, monthly, or yearly", 400);
         }
@@ -169,35 +126,167 @@ export const getDocumentsSummary = async (req, res) => {
         const startDate = calculateStartDate(period);
 
         const pipeline = [
-            { $match: { createdAt: { $gte: startDate } } },
-            { $unwind: "$files" },
             {
-                $lookup: {
-                    from: "files",
-                    localField: "files", // ✅ updated
-                    foreignField: "_id",
-                    as: "fileInfo"
+                $match: {
+                    createdAt: { $gte: startDate },
+                    isDeleted: false,
+                    department: { $exists: true, $ne: null }
                 }
             },
-            { $unwind: "$fileInfo" }
+
+            // Lookup department first
+            {
+                $lookup: {
+                    from: "departments",
+                    localField: "department",
+                    foreignField: "_id",
+                    as: "dept"
+                }
+            },
+
+            { $unwind: { path: "$dept", preserveNullAndEmptyArrays: true } },
+
+            { $match: { "dept._id": { $exists: true } } },
+
+            // Group by department
+            {
+                $group: {
+                    _id: {
+                        departmentId: "$department",
+                        departmentName: "$dept.name"
+                    },
+                    documentCount: { $sum: 1 }
+                }
+            },
+
+            // Calculate total
+            {
+                $group: {
+                    _id: null,
+                    totalDocuments: { $sum: "$documentCount" },
+                    departments: {
+                        $push: {
+                            departmentId: "$_id.departmentId",
+                            departmentName: "$_id.departmentName",
+                            documentCount: "$documentCount"
+                        }
+                    }
+                }
+            },
+
+            { $unwind: "$departments" },
+
+            // Calculate percentage and format
+            {
+                $project: {
+                    _id: 0,
+                    departmentId: "$departments.departmentId",
+                    departmentName: "$departments.departmentName",
+                    documentCount: "$departments.documentCount",
+                    percentage: {
+                        $cond: [
+                            { $gt: ["$totalDocuments", 0] },
+                            { $round: [{ $multiply: [{ $divide: ["$departments.documentCount", "$totalDocuments"] }, 100] }, 2] },
+                            0
+                        ]
+                    }
+                }
+            },
+
+            { $sort: { documentCount: -1 } },
+
+            // Limit to top 10 departments for better visualization
+            { $limit: 10 }
         ];
 
-        if (fileType) {
-            pipeline.push({ $match: { "fileInfo.extension": fileType.toLowerCase() } });
-        }
+        const result = await Document.aggregate(pipeline);
 
-        pipeline.push({ $group: { _id: "$status", count: { $sum: 1 } } });
-
-        const docsByStatus = await Document.aggregate(pipeline);
-
-        const summary = {
-            totalDocs: docsByStatus.reduce((sum, d) => sum + d.count, 0),
-            pendingDocs: docsByStatus.find(d => d._id === "Pending")?.count || 0,
-            approvedDocs: docsByStatus.find(d => d._id === "Approved")?.count || 0,
-            rejectedDocs: docsByStatus.find(d => d._id === "Rejected")?.count || 0
+        const chartData = {
+            labels: result.map(item => item.departmentName),
+            datasets: [{
+                data: result.map(item => item.percentage),
+                counts: result.map(item => item.documentCount),
+                backgroundColor: [
+                    '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0',
+                    '#9966FF', '#FF9F40', '#8AC926', '#1982C4',
+                    '#6A4C93', '#F15BB5'
+                ].slice(0, result.length)
+            }],
+            total: result.reduce((sum, item) => sum + item.documentCount, 0)
         };
 
-        return successResponse(res, { period, fileType: fileType || "all", ...summary }, "Documents summary fetched successfully");
+        return successResponse(res, {
+            period,
+            startDate,
+            departmentUploads: result,
+            chartData: chartData
+        }, "Department document uploads fetched successfully");
+
+    } catch (err) {
+        console.error("Error in getDepartmentDocumentUploads:", err);
+        return errorResponse(res, err);
+    }
+};
+
+// ------------------- Documents Summary -------------------
+export const getDocumentsStatusSummary = async (req, res) => {
+    try {
+        const { period = "monthly", department, docType } = req.query;
+
+        if (!validPeriods.includes(period)) {
+            return failResponse(res, "Invalid period. Must be daily, weekly, monthly, or yearly", 400);
+        }
+
+        const startDate = calculateStartDate(period);
+
+        const match = {
+            createdAt: { $gte: startDate },
+            isDeleted: false
+        };
+
+        if (department) match.department = mongoose.Types.ObjectId(department);
+        if (docType) match.docType = docType;
+
+        // Determine grouping key based on period
+        let dateGroup = {};
+        if (period === "monthly") {
+            dateGroup = { $month: "$createdAt" };
+        } else if (period === "weekly") {
+            dateGroup = { $week: "$createdAt" };
+        } else if (period === "daily") {
+            dateGroup = { $dayOfMonth: "$createdAt" };
+        } else if (period === "yearly") {
+            dateGroup = { $year: "$createdAt" };
+        }
+
+        const pipeline = [
+            { $match: match },
+            {
+                $group: {
+                    _id: { month: dateGroup, status: "$status" },
+                    count: { $sum: 1 }
+                }
+            }
+        ];
+
+        const results = await Document.aggregate(pipeline);
+
+        // Initialize month categories and empty status counts
+        const categories = Array.from({ length: 12 }, (_, i) => i + 1);
+        const series = [
+            { name: "Pending", data: Array(12).fill(0) },
+            { name: "Approved", data: Array(12).fill(0) },
+            { name: "Rejected", data: Array(12).fill(0) }
+        ];
+
+        results.forEach(item => {
+            const monthIndex = item._id.month - 1; // 0-based
+            const status = item._id.status;
+            const seriesItem = series.find(s => s.name === status);
+            if (seriesItem) seriesItem.data[monthIndex] = item.count;
+        });
+
+        return successResponse(res, { categories, series }, "Document status summary fetched ✅");
 
     } catch (err) {
         return errorResponse(res, err);

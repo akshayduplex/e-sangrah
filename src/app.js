@@ -15,7 +15,7 @@ import pageRoutes from "./routes/webRoutes.js";
 import errorHandler from "./middlewares/errorHandler.js";
 import { formatDateDDMMYYYY } from "./utils/formatDate.js";
 import { startCleanupJob } from "./helper/NodeCron.js";
-import { connectDB } from "./database/db.js";
+import { connectDB } from "./database/Db.js";
 import { loadMenuMap } from './middlewares/checkPermission.js';
 import fs from "fs";
 import { API_CONFIG } from "./config/ApiEndpoints.js";
@@ -29,7 +29,7 @@ const app = express();
     await connectDB();
     console.timeEnd("MongoDB Connect");
     app.use(cors({
-        origin: [API_CONFIG.FrontendUrl, 'http://localhost:5000'],
+        origin: [API_CONFIG.baseUrl, 'http://localhost:5000'],
         methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
         credentials: true
     }));

@@ -315,26 +315,14 @@
                         </div>
                         <div class="card-body pb-0">
                             <div class="d-flex align-items-center justify-content-end">
-                                <div class="dropdown mb-2">
-                                    <a href="javascript:void(0);"
-                                        class="dropdown-toggle border text-black btn btn-outline-secondary fs-13 me-2"
-                                        data-bs-toggle="dropdown">
-                                        All Departments
-                                    </a>
-                                    <ul class="dropdown-menu dropdown-menu-end p-3">
-                                        <li>
-                                            <a href="javascript:void(0);" class="dropdown-item rounded-1">UI/UX
-                                                Designer</a>
-                                        </li>
-                                        <li>
-                                            <a href="javascript:void(0);" class="dropdown-item rounded-1">HR Manager</a>
-                                        </li>
-                                        <li>
-                                            <a href="javascript:void(0);" class="dropdown-item rounded-1">Junior
-                                                Tester</a>
-                                        </li>
-                                    </ul>
+                                <!-- Department Select using Select2 -->
+                                <div class="mb-2">
+                                    <select id="uploadDepartment" class="form-select fs-13 select2">
+                                        <option value="">-- All Departments --</option>
+                                        <!-- Options will be dynamically loaded via AJAX -->
+                                    </select>
                                 </div>
+
                                 <div class="dropdown mb-2">
                                     <a href="javascript:void(0);"
                                         class="btn btn-white border text-black btn btn-outline-secondary"
@@ -366,36 +354,26 @@
                     <div class="dflexbtwn">
                         <h3 class="fs-20 fw-normal">Recent Activity</h3>
                         <div class="d-flex gap-2 align-items-center">
-                            <div class="dropdown">
-                                <a href="javascript:void(0);"
-                                    class="dropdown-toggle border text-black btn btn-outline-secondary fs-13 me-2"
-                                    data-bs-toggle="dropdown">
-                                    Select Department
-                                </a>
-                                <ul class="dropdown-menu dropdown-menu-end p-3">
-                                    <li>
-                                        <a href="javascript:void(0);" class="dropdown-item rounded-1">UI/UX Designer</a>
-                                    </li>
-                                    <li>
-                                        <a href="javascript:void(0);" class="dropdown-item rounded-1">HR Manager</a>
-                                    </li>
-                                    <li>
-                                        <a href="javascript:void(0);" class="dropdown-item rounded-1">Junior Tester</a>
-                                    </li>
-                                </ul>
+                            <!-- Department Select using Select2 -->
+                            <div class="mb-2">
+                                <select id="recentActivityDepartment" class="form-select fs-13 select2">
+                                    <option value="">-- Select Department --</option>
+                                    <!-- Options will be dynamically loaded via AJAX -->
+                                </select>
                             </div>
+
                             <div class="dropdown">
                                 <div class="input-group">
                                     <span class="input-group-text border">Sort by:</span>
-                                    <select class="form-select select2 text-black">
-                                        <option selected>Doc type</option>
-                                        <option value="1">Date</option>
-                                        <option value="2">Name</option>
-                                        <option value="3">Status</option>
+                                    <select id="recentActivitySort" class="form-select select2 text-black">
+                                        <option value="updatedAt" selected>Doc type</option>
+                                        <option value="createdAt">Date</option>
+                                        <option value="metadata.fileName">Name</option>
+                                        <option value="status">Status</option>
                                     </select>
                                 </div>
                             </div>
-                            <a href="#" class="fs-16 ms-4 fw-normal text-primary">View All</a>
+                            <a href="/documents/list" class="fs-16 ms-4 fw-normal text-primary">View All</a>
                         </div>
                     </div>
                 </div>
@@ -788,4 +766,128 @@
     </div>
     <!-- /Page Wrapper -->
     <%- include('../../partials/footer') %>
+        <!-- <script>
+            document.addEventListener("DOMContentLoaded", function () {
+                let myDonutChart; // global chart instance
+
+                async function loadDepartmentChart(period = 'monthly') {
+                    try {
+                        const response = await fetch(`http://localhost:5000/api/dashboard/uploads?period=${period}`);
+                        const result = await response.json();
+
+                        if (result.success && result.data) {
+                            const chartData = result.data.chartData;
+                            const ctx = document.getElementById('department').getContext('2d');
+
+                            // Destroy previous chart to avoid duplicates
+                            if (myDonutChart) myDonutChart.destroy();
+
+                            // Create new donut chart
+                            myDonutChart = new Chart(ctx, {
+                                type: 'doughnut',
+                                data: {
+                                    labels: chartData.labels,
+                                    datasets: [{
+                                        label: 'Donut',
+                                        data: chartData.datasets[0].data,
+                                        backgroundColor: chartData.datasets[0].backgroundColor,
+                                        borderWidth: 5,
+                                        borderRadius: 10,
+                                        borderColor: '#fff',
+                                        hoverBorderWidth: 0,
+                                        cutout: '63%',
+                                    }]
+                                },
+                                options: {
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    plugins: {
+                                        legend: {
+                                            display: false
+                                        },
+                                        tooltip: {
+                                            callbacks: {
+                                                label: function (context) {
+                                                    const idx = context.dataIndex;
+                                                    const count = chartData.datasets[0].counts[idx];
+                                                    const percent = chartData.datasets[0].data[idx];
+                                                    return `${context.label}: ${count} documents (${percent}%)`;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            });
+
+                            // Update center total text
+                            const total = chartData.total;
+                            document.querySelector('.attendance-canvas h3').textContent = `${total}%`;
+                        }
+                    } catch (err) {
+                        console.error("Error loading chart data:", err);
+                    }
+                }
+
+                // Bind chart dropdown
+                const chartDropdownItems = document.querySelectorAll('.col-md-5 .dropdown-menu a.dropdown-item');
+                chartDropdownItems.forEach(item => {
+                    item.addEventListener('click', function (e) {
+                        e.preventDefault();
+                        const text = this.textContent.trim().toLowerCase();
+                        let period = 'monthly';
+                        if (text === 'today') period = 'daily';
+                        else if (text === 'this week') period = 'weekly';
+                        else if (text === 'this month') period = 'monthly';
+
+                        this.closest('.dropdown').querySelector('a.btn').textContent = this.textContent + ' ';
+                        loadDepartmentChart(period);
+                    });
+                });
+
+                // Initial load
+                loadDepartmentChart('monthly');
+            });
+        </script> -->
+        <script>function loadDocumentChart(department) {
+                $.ajax({
+                    url: "/api/documents/status-summary?period=monthly" + (department ? "&department=" + department : ""),
+                    method: "GET",
+                    success: function (res) {
+                        var sColStacked = {
+                            chart: {
+                                height: 290,
+                                type: 'bar',
+                                stacked: true,
+                                toolbar: { show: false }
+                            },
+                            colors: ['#197BF7', '#F15C44', '#2BB68D'],
+                            plotOptions: { bar: { borderRadius: 5, borderRadiusWhenStacked: 'all', horizontal: false, endingShape: 'rounded' } },
+                            series: res.data.series,
+                            xaxis: {
+                                categories: res.data.categories.map(m => ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][m - 1]),
+                                labels: { style: { colors: '#6B7280', fontSize: '13px' } }
+                            },
+                            yaxis: { labels: { offsetX: -15, style: { colors: '#6B7280', fontSize: '13px' } } },
+                            grid: { borderColor: '#E5E7EB', strokeDashArray: 5, padding: { left: -8 } },
+                            legend: { show: false },
+                            dataLabels: { enabled: false },
+                            fill: { opacity: 1 },
+                        };
+
+                        if (window.documentChart) window.documentChart.destroy();
+                        window.documentChart = new ApexCharts(document.querySelector("#sales-income"), sColStacked);
+                        window.documentChart.render();
+                    }
+                });
+            }
+
+            // On department change
+            $('#uploadDepartment').on('change', function () {
+                const dept = $(this).val();
+                loadDocumentChart(dept);
+            });
+
+            // Initial load
+            loadDocumentChart();
+        </script>
         <script src="/js/pages/dashboard/adminDashboard.js"></script>

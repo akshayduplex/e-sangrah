@@ -1,6 +1,70 @@
 $(document).ready(function () {
     const baseUrl = window.baseUrl;
+    // Initialize Select2 for Recent Activity Department
+    function initializeRecentActivityDepartment() {
+        $("#recentActivityDepartment").select2({
+            placeholder: "-- Select Department --",
+            allowClear: true,
+            width: '100%',
+            ajax: {
+                url: '/api/departments/search',
+                dataType: 'json',
+                delay: 250,
+                data: function (params) {
+                    return {
+                        search: params.term || '',
+                        page: params.page || 1,
+                        limit: 50
+                    };
+                },
+                processResults: function (data) {
+                    let results = data.data.map(dep => ({ id: dep._id, text: dep.name }));
+                    results.unshift({ id: '', text: '-- Select Department --' });
+                    return { results: results };
+                },
+                cache: true
+            }
+        });
 
+        $("#recentActivityDepartment").on('change', function () {
+            console.log("Selected Recent Activity Department ID:", $(this).val());
+        });
+    }
+
+    // Initialize Select2 for Upload Department
+    function initializeUploadDepartment() {
+        $("#uploadDepartment").select2({
+            placeholder: "-- All Departments --",
+            allowClear: true,
+            width: '100%',
+            ajax: {
+                url: '/api/departments/search',
+                dataType: 'json',
+                delay: 250,
+                data: function (params) {
+                    return {
+                        search: params.term || '',
+                        page: params.page || 1,
+                        limit: 50
+                    };
+                },
+                processResults: function (data) {
+                    let results = data.data.map(dep => ({ id: dep._id, text: dep.name }));
+                    results.unshift({ id: '', text: '-- Select Department --' });
+                    return { results: results };
+                },
+                cache: true
+            }
+        });
+
+        $("#uploadDepartment").on('change', function () {
+            console.log("Selected Upload Department ID:", $(this).val());
+        });
+    }
+
+    // Call both initializations
+    initializeRecentActivityDepartment();
+    initializeUploadDepartment();
     // Load dashboard stats
     $.ajax({
         url: `${baseUrl}/api/dashboard/stats`,

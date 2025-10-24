@@ -18,8 +18,9 @@ export const API_ENDPOINTS = {
 // Centralized API config
 export const API_CONFIG = {
     FrontendUrl: process.env.FrontendUrl,
-    baseUrl: process.env.BASE_URL || 'http://localhost:5000/api',
+    baseUrl: process.env.BASE_URL,
     JWT_SECRET: process.env.JWT_SECRET,
+    NODE_ENV: process.env.NODE_ENV,
     TOKEN_LOGIN_EXPIRES_IN: process.env.TOKEN_LOGIN_EXPIRES_IN,
     MONGO_URI: process.env.MONGO_URI,
     DB_NAME: process.env.DB_NAME,

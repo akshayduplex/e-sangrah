@@ -827,6 +827,45 @@
 						new bootstrap.Modal(document.getElementById("confirmDeleteModal")).show();
 					});
 
+					//shareBtn or done btn
+					document.getElementById("shareBtn").addEventListener("click", async () => {
+						if (!currentShareFolderId) return;
+
+						const permissionData = [];
+
+						// Collect all updated user permissions
+						usersWithAccessContainer.querySelectorAll(".user-accssrow").forEach(row => {
+							const userId = row.querySelector(".download-access").dataset.userId;
+							const canDownload = row.querySelector(".download-access").checked;
+							const access = row.querySelector("select").value;
+
+							permissionData.push({
+								principalId: userId,
+								canDownload,
+								access
+							});
+						});
+
+						try {
+							const res = await fetch(`/api/folders/${currentShareFolderId}/permissions`, {
+								method: "PATCH",
+								headers: { "Content-Type": "application/json" },
+								body: JSON.stringify({ permissions: permissionData })
+							});
+
+							const data = await res.json();
+							if (!res.ok) throw new Error(data.message || "Bulk update failed");
+
+							showToast("Permissions updated successfully", "success");
+							bootstrap.Modal.getInstance(shareModalEl).hide();
+
+						} catch (err) {
+							console.error(err);
+							showToast("Failed to update permissions", "error");
+						}
+					});
+
+
 					// Handle confirm delete button
 					document.getElementById("confirmDeleteBtn").addEventListener("click", async () => {
 						if (!userToRemove || !currentShareFolderId) return;
@@ -853,58 +892,6 @@
 							userToRemove = null;
 						}
 					});
-
-					usersWithAccessContainer.addEventListener("change", async (e) => {
-						if (!e.target.classList.contains("download-access")) return;
-
-						const userId = e.target.dataset.userId;
-						const canDownload = e.target.checked;
-
-						if (!currentShareFolderId || !userId) return;
-
-						try {
-							const res = await fetch(`/api/folders/${currentShareFolderId}/permissions`, {
-								method: "PATCH",
-								headers: { "Content-Type": "application/json" },
-								body: JSON.stringify({ principalId: userId, canDownload })
-							});
-
-							const data = await res.json();
-							if (!res.ok) throw new Error(data.error || "Failed to update download access");
-
-							showToast(`Download access ${canDownload ? "enabled" : "disabled"} for user`, 'success');
-						} catch (err) {
-							console.error(err);
-							showToast("Failed to update download access", 'error');
-							e.target.checked = !canDownload; // revert checkbox on failure
-						}
-					});
-					usersWithAccessContainer.addEventListener("change", async (e) => {
-						if (!e.target.classList.contains("access-level")) return;
-
-						const userId = e.target.dataset.userId;
-						const access = e.target.value; // "view" or "edit"
-
-						if (!currentShareFolderId || !userId) return;
-
-						try {
-							const res = await fetch(`/api/folders/${currentShareFolderId}/permissions`, {
-								method: "PATCH",
-								headers: { "Content-Type": "application/json" },
-								body: JSON.stringify({ principalId: userId, access })
-							});
-
-							const data = await res.json();
-							if (!res.ok) throw new Error(data.error || "Failed to update access level");
-
-							showToast(`Access level updated to ${access} for user`, 'success');
-						} catch (err) {
-							console.error(err);
-							showToast("Failed to update access level", 'error');
-						}
-					});
-
-
 					// Copy share link
 					copyLinkBtn.addEventListener("click", () => {
 						shareLinkInput.select();
