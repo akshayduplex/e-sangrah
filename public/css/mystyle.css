@@ -1043,8 +1043,67 @@
         vertical-align: middle;
     }
 
+    /* circular avatars with tooltip */
 
+    .avatar-group {
+        display: flex;
+        align-items: center;
+    }
 
+    .avatar {
+        width: 35px;
+        height: 35px;
+        border-radius: 50%;
+        border: 2px solid #fff;
+        object-fit: cover;
+        margin-left: -10px;
+        cursor: pointer;
+        position: relative;
+    }
+
+    .avatar:first-child {
+        margin-left: 0;
+    }
+
+    .avatar:hover {
+        transform: scale(1.1);
+        z-index: 2;
+    }
+
+    /* Tooltip Name */
+    .avatar::after {
+        content: attr(data-name);
+        position: absolute;
+        bottom: 120%;
+        left: 50%;
+        transform: translateX(-50%);
+        color: #fff;
+        padding: 3px 7px;
+        border-radius: 4px;
+        font-size: 11px;
+        white-space: nowrap;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.2s ease;
+    }
+
+    .avatar:hover::after {
+        opacity: 1;
+    }
+
+    /* +N Style */
+    .avatar-more {
+        width: 35px;
+        height: 35px;
+        margin-left: -10px;
+        border-radius: 50%;
+        border: 2px solid #fff;
+        background: #bbb;
+        font-size: 12px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
 
 
     /* chnages i do in style 17264*/

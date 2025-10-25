@@ -1,12 +1,11 @@
 import { S3Client } from "@aws-sdk/client-s3";
-import dotenv from "dotenv";
+import { API_CONFIG } from "./ApiEndpoints.js";
 
-dotenv.config();
 export const s3Client = new S3Client({
-    region: process.env.AWS_DEFAULT_REGION,
+    region: API_CONFIG.AWS_REGION || "us-east-1",
     credentials: {
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+        accessKeyId: API_CONFIG.AWS_ACCESS_KEY_ID,
+        secretAccessKey: API_CONFIG.AWS_SECRET_ACCESS_KEY,
     },
-    endpoint: process.env.AWS_ENDPOINT || undefined, // optional if using custom endpoint
+    endpoint: API_CONFIG.AWS_ENDPOINT || undefined, // optional if using custom endpoint
 });

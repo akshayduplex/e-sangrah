@@ -179,9 +179,9 @@
                 // -------------------------
                 // Initialize Select2 with Clear Option
                 // -------------------------
-                function initSelect2(selector, url, textKey) {
+                function initSelect2(selector, url, placeholder, textKey) {
                     $(selector).select2({
-                        placeholder: `-- Select ${textKey} --`,
+                        placeholder: placeholder,   // Use explicit placeholder
                         allowClear: true,
                         ajax: {
                             url,
@@ -189,25 +189,27 @@
                             delay: 250,
                             data: params => ({ search: params.term }),
                             processResults: data => {
-                                const results = [
-                                    { id: '', text: `-- Select ${textKey} --` }, // empty string for reset
-                                    ...data.data.map(item => ({ id: item._id, text: item[textKey] }))
-                                ];
+                                const results = data.data.map(item => ({
+                                    id: item._id,
+                                    text: item[textKey]
+                                }));
                                 return { results };
                             }
                         }
                     });
 
+                    // Reset selection when clearing
                     $(selector).on('select2:select', function (e) {
-                        if (!e.params.data.id) { // empty string selected
+                        if (!e.params.data.id) {
                             $(this).val(null).trigger('change');
                         }
                     });
                 }
 
+                // Initialize
+                initSelect2('#department', `${baseUrl}/api/departments/search`, 'Select Department', 'name');
+                initSelect2('#projectName', `${baseUrl}/api/projects`, 'Select Project', 'projectName');
 
-                initSelect2('#department', `${baseUrl}/api/departments/search`, 'name');
-                initSelect2('#projectName', `${baseUrl}/api/projects`, 'projectName');
 
 
                 // -------------------------
@@ -296,7 +298,16 @@
                 function renderRow(doc) {
                     var fileSizeKB = doc.files[0]?.fileSize ? (doc.files[0].fileSize / 1024).toFixed(2) + ' KB' : '-';
                     const lastModified = new Date(doc.updatedAt).toLocaleString();
-                    const owner = doc.owner?.name || '-';
+                    const owner = doc.owner
+                        ? (() => {
+                            const imgSrc = doc.owner.profile_image || '/img/users/user-08.jpg';
+                            return `
+        <div class="avatar-group">
+          <img src="${imgSrc}" class="avatar" data-name="${doc.owner.name}" title="${doc.owner.name}" />
+        </div>
+      `;
+                        })()
+                        : '-';
                     const departmentName = doc.department?.name || '-';
                     const projectName = doc.project?.projectName || '-';
                     const tags = doc.tags?.length ? doc.tags.join(', ') : '-';
@@ -309,14 +320,19 @@
                     const metadata = doc.metadata ? `${doc.metadata.fileName || '-'}, ${doc.metadata.fileDescription || '-'}` : '-';
                     const sharedWith = doc.sharedWithUsers?.length
                         ? (() => {
-                            const names = doc.sharedWithUsers.map(sw => sw.name);
-                            if (names.length > 2) {
-                                const remainingCount = names.length - 2;
-                                const displayedNames = names.slice(0, 2).join(', ') +
-                                    ` <span style="color:green; font-weight:bold;">+${remainingCount}</span>`;
-                                return `<span title="${names.join(', ')}">${displayedNames}</span>`;
-                            }
-                            return names.join(', ');
+                            const users = doc.sharedWithUsers.slice(0, 3); // show max 3
+                            const remaining = doc.sharedWithUsers.length - users.length;
+
+                            const avatars = users.map(u => {
+                                const imgSrc = u.profile_image || '/img/users/user-01.jpg';
+                                return `<img src="${imgSrc}" class="avatar" data-name="${u.name}" title="${u.name}" />`;
+                            }).join('');
+
+                            const more = remaining > 0
+                                ? `<div class="avatar avatar-more">+${remaining}</div>`
+                                : '';
+
+                            return `<div class="avatar-group">${avatars}${more}</div>`;
                         })()
                         : '-';
                     const donor = doc.documentDonor?.name || '-';
@@ -733,54 +749,6 @@
                         });
                     });
                 });
-                // Update user access level
-                // $('#sharedoc-modal').on('change', '.access-level', function () {
-                //     const userId = $(this).data('user-id');
-                //     const accessLevel = $(this).val();
-
-                //     if (!currentDocId || !userId) return;
-
-                //     $.ajax({
-                //         url: `${baseUrl}/api/documents/share/${currentDocId}`,
-                //         method: 'PUT',
-                //         contentType: 'application/json',
-                //         data: JSON.stringify({
-                //             userId: userId,
-                //             accessLevel: accessLevel
-                //         }),
-                //         success: function () {
-                //             showToast('Access level updated successfully', 'success');
-                //         },
-                //         error: function (err) {
-                //             showToast(err.responseJSON?.message || 'Failed to update access level', 'error');
-                //         }
-                //     });
-                // });
-
-                // Update download access
-                // $('#sharedoc-modal').on('change', '.download-access', function () {
-                //     const userId = $(this).data('user-id');
-                //     const canDownload = $(this).is(':checked');
-
-                //     if (!currentDocId || !userId) return;
-
-                //     $.ajax({
-                //         url: `${baseUrl}/api/documents/share/${currentDocId}`,
-                //         method: 'PUT',
-                //         contentType: 'application/json',
-                //         data: JSON.stringify({
-                //             userId: userId,
-                //             canDownload: canDownload
-                //         }),
-                //         success: function () {
-                //             showToast('Download access updated successfully', 'success');
-                //         },
-                //         error: function (err) {
-                //             showToast(err.responseJSON?.message || 'Failed to update download access', 'error');
-                //         }
-                //     });
-                // });
-
                 // Share button in footer
                 $('#sharedoc-modal .modal-footer .site-btnmd').on('click', function () {
                     if (!currentDocId) {

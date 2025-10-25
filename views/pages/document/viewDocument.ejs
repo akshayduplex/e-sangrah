@@ -42,34 +42,6 @@
         </div>
     </div>
 
-    <!-- Renew Modal -->
-    <div class="modal fade" id="renewModal" tabindex="-1" aria-labelledby="renewModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="renewModalLabel">Renew Share Expiry</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <label for="renewDuration" class="form-label">Choose Duration:</label>
-                    <select id="renewDuration" class="form-select">
-                        <option value="oneday">1 Day</option>
-                        <option value="oneweek">1 Week</option>
-                        <option value="onemonth">1 Month</option>
-                        <option value="lifetime">Lifetime</option>
-                        <option value="onetime">One-time</option>
-                        <option value="custom">Custom (pick date below)</option>
-                    </select>
-                    <input type="date" id="customExpiry" class="form-control mt-2" style="display:none;">
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" id="confirmRenewBtn" class="btn btn-primary">Renew</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <%- include('../../partials/footer') %>
 
         <script>

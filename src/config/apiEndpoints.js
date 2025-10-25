@@ -1,8 +1,10 @@
+// Import dotenv to load environment variables
 import dotenv from 'dotenv';
+dotenv.config(); // Load variables from .env file
 
-// Load environment variables from .env file
-dotenv.config();
-
+// ----------------------------
+// API Endpoints
+// ----------------------------
 export const API_ENDPOINTS = {
     documents: '/documents',
     users: '/users',
@@ -15,34 +17,48 @@ export const API_ENDPOINTS = {
     settings: '/settings'
 };
 
-// Centralized API config
+// ----------------------------
+// Centralized API Configuration
+// ----------------------------
 export const API_CONFIG = {
+    // Application URLs
     FrontendUrl: process.env.FrontendUrl,
     baseUrl: process.env.BASE_URL,
+
+    // Security / Secrets
+    SESSION_SECRET: process.env.SESSION_SECRET,
     JWT_SECRET: process.env.JWT_SECRET,
-    NODE_ENV: process.env.NODE_ENV,
-    TOKEN_LOGIN_EXPIRES_IN: process.env.TOKEN_LOGIN_EXPIRES_IN,
-    MONGO_URI: process.env.MONGO_URI,
-    DB_NAME: process.env.DB_NAME,
-    Bucket: process.env.AWS_BUCKET,
     ACCESS_GRANT_SECRET: process.env.ACCESS_GRANT_SECRET,
     encryptedKey: process.env.URL_ENCRYPTION_KEY || '12345678901234567890123456789012',
+
+    // Environment
+    NODE_ENV: process.env.NODE_ENV,
+    PORT: process.env.PORT,
+
+    // Database
+    MONGO_URI: process.env.MONGO_URI,
+    DB_NAME: process.env.DB_NAME,
+
+    // AWS Configuration
+    Bucket: process.env.AWS_BUCKET,
+    AWS_DEFAULT_REGION: process.env.AWS_DEFAULT_REGION,
+    AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID,
+    AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY,
+    AWS_ENDPOINT: process.env.AWS_ENDPOINT,
+
+    // Cloudinary
+    CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME,
+    CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY,
+    CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET,
+
+    // API Behavior
+    TOKEN_LOGIN_EXPIRES_IN: process.env.TOKEN_LOGIN_EXPIRES_IN,
     timeout: Number(process.env.API_TIMEOUT) || 5000,
+    retryAttempts: Number(process.env.API_RETRY_ATTEMPTS) || 3,
+
+    // Default headers
     headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json'
-    },
-    retryAttempts: Number(process.env.API_RETRY_ATTEMPTS) || 3
+    }
 };
-
-
-// import { API_ENDPOINTS, API_CONFIG } from './config';
-
-// async function fetchDocuments() {
-//     const response = await fetch(`${API_CONFIG.baseUrl}${API_ENDPOINTS.documents}`, {
-//         method: 'GET',
-//         headers: API_CONFIG.headers,
-//         timeout: API_CONFIG.timeout
-//     });
-//     return response.json();
-// }

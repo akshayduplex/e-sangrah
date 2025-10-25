@@ -1,4 +1,3 @@
-import "dotenv/config";
 import express from "express";
 import path from "path";
 import morgan from "morgan";
@@ -41,7 +40,7 @@ const app = express();
     if (!fs.existsSync(logDir)) fs.mkdirSync(logDir);
     const accessLogStream = fs.createWriteStream(path.join(logDir, "access.log"), { flags: "a" });
 
-    if (process.env.NODE_ENV === "development") {
+    if (API_CONFIG.NODE_ENV === "development") {
         app.use(morgan("dev"));
     } else {
         app.use(morgan("combined", { stream: accessLogStream }));
@@ -58,11 +57,11 @@ const app = express();
     // Session setup (MongoStore with touchAfter optimization)
     app.use(
         session({
-            secret: process.env.SESSION_SECRET,
+            secret: API_CONFIG.SESSION_SECRET,
             resave: false,
             saveUninitialized: false,
             store: MongoStore.create({
-                mongoUrl: process.env.MONGO_URI,
+                mongoUrl: API_CONFIG.MONGO_URI,
                 collectionName: "sessions",
                 ttl: 60 * 60,          // 1 hour
                 touchAfter: 24 * 3600, // avoid rewriting unchanged sessions
@@ -87,7 +86,7 @@ const app = express();
     // ------------------- Global Locals -------------------
     app.use((req, res, next) => {
         const user = req.user || req.session.user || {};
-        res.locals.BASE_URL = process.env.BASE_URL || "";
+        res.locals.BASE_URL = API_CONFIG.baseUrl || "";
         res.locals.designation_id = user.designation_id || null;
         res.locals.department = user.department || null;
         res.locals.profile_image = user.profile_image || null;

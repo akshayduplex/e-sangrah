@@ -38,7 +38,6 @@
     "express-session": "^1.18.2",
     "express-validator": "^7.2.1",
     "formidable": "^3.5.4",
-    "geoip-lite": "^1.4.10",
     "helmet": "^8.1.0",
     "json2csv": "^6.0.0-alpha.2",
     "jsonwebtoken": "^9.0.2",
