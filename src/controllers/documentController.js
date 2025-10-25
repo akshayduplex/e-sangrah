@@ -22,6 +22,7 @@ import { accessRequestTemplate } from "../emailTemplates/accessRequestTemplate.j
 import { accessExpiredTemplate, alertRedirectTemplate } from "../emailTemplates/accessExpiredTemplate.js";
 import { inviteUserTemplate } from "../emailTemplates/inviteUserTemplate.js";
 import { API_CONFIG } from "../config/ApiEndpoints.js";
+import PermissionLogs from "../models/PermissionLogs.js";
 
 //Page Controllers
 
@@ -257,7 +258,7 @@ export const viewDocumentFiles = async (req, res) => {
 export const viewGrantAccessPage = async (req, res) => {
     try {
         const { token } = req.params;
-        const decoded = jwt.verify(token, API_CONFIG.JWT_SECRET || "supersecretkey");
+        const decoded = jwt.verify(token, API_CONFIG.ACCESS_GRANT_SECRET || "supersecretkey");
 
         const { docId, userId, action } = decoded;
         if (action !== "approveAccess") throw new Error("Invalid token");
@@ -376,10 +377,10 @@ export const getDocuments = async (req, res) => {
             .select("files updatedAt createdAt signature isDeleted isArchived comment sharedWithUsers compliance status metadata tags owner documentVendor documentDonor department project description")
             .populate("department", "name")
             .populate("project", "projectName")
-            .populate("owner", "name email")
-            .populate("documentDonor", "name")
-            .populate("documentVendor", "name")
-            .populate("sharedWithUsers", "name")
+            .populate("owner", "name email profile_image")
+            .populate("documentDonor", "name profile_image")
+            .populate("documentVendor", "name profile_image")
+            .populate("sharedWithUsers", "name profile_image email")
             .populate("files", "originalName version fileSize")
             .sort({ [sortField]: sortOrder })
             .skip(skip)
@@ -1888,7 +1889,7 @@ export const inviteUser = async (req, res) => {
         await Document.findByIdAndUpdate(documentId, { $addToSet: { sharedWithUsers: user._id } });
 
         // Link using session-based route
-        const inviteLink = `${baseUrl}/api/documents/${documentId}/invite/${user._id}/auto-accept`;
+        const inviteLink = `${API_CONFIG.baseUrl}/api/documents/${documentId}/invite/${user._id}/auto-accept`;
 
         await sendEmail({
             to: userEmail,
@@ -1950,11 +1951,56 @@ export const autoAcceptInvite = async (req, res) => {
  * RE-REQUEST ACCESS
  * Allows a user to request new access after expiration.
  */
+// export const requestAccessAgain = async (req, res) => {
+//     try {
+//         const { documentId } = req.params;
+//         const userId = req.session.user?._id;
+//         if (!userId) return res.status(401).json({ success: false, message: "Not logged in" });
+
+//         const doc = await Document.findById(documentId).populate("owner", "email name");
+//         if (!doc) return res.status(404).json({ success: false, message: "Document not found" });
+
+//         const owner = doc.owner;
+//         if (!owner?.email) return res.status(400).json({ success: false, message: "Owner email not found" });
+
+//         // Create a JWT token for owner approval
+//         const token = jwt.sign({
+//             docId: documentId,
+//             userId,
+//             action: "approveAccess"
+//         }, process.env.JWT_SECRET || "supersecretkey", { expiresIn: "3d" });
+
+//         const baseUrl = process.env.APP_BASE_URL || "http://localhost:5000";
+//         const approvalLink = `${baseUrl}/documents/approve-access/${token}`;
+
+//         // Send email to owner
+//         await sendEmail({
+//             to: owner.email,
+//             subject: `Access Request for Document: ${doc.metadata?.fileName || 'Untitled'}`,
+//             html: `
+//                 <p>${req.session.user.name} (${req.session.user.email}) requested access to <strong>${doc.metadata?.fileName || 'your document'}</strong>.</p>
+//                 <p>Click below to approve and set access duration:</p>
+//                 <a href="${approvalLink}" style="padding:10px 20px;background:#007bff;color:#fff;text-decoration:none;border-radius:5px;">Approve Access</a>
+//             `
+//         });
+
+//         res.json({ success: true, message: `Request sent to ${owner.name || owner.email}` });
+
+//     } catch (err) {
+//         console.error(err);
+//         res.status(500).json({ success: false, message: "Server error: " + err.message });
+//     }
+// };
+
 export const requestAccessAgain = async (req, res) => {
     try {
         const { documentId } = req.params;
+        const { email } = req.body; // Only email is provided for external users
         const userId = req.session.user?._id;
-        if (!userId) return res.status(401).json({ success: false, message: "Not logged in" });
+
+        if (!userId && !email) {
+            return res.status(401).json({ success: false, message: "Not logged in or email not provided" });
+        }
 
         const doc = await Document.findById(documentId).populate("owner", "email name");
         if (!doc) return res.status(404).json({ success: false, message: "Document not found" });
@@ -1962,14 +2008,35 @@ export const requestAccessAgain = async (req, res) => {
         const owner = doc.owner;
         if (!owner?.email) return res.status(400).json({ success: false, message: "Owner email not found" });
 
-        // Create a JWT token for owner approval
+        // Check if user exists
+        let user = null;
+        let isExternal = false;
+        let userName = "";
+
+        if (userId) {
+            user = await User.findById(userId);
+            userName = user?.name;
+        } else if (email) {
+            user = await User.findOne({ email });
+            if (user) {
+                isExternal = false;
+                userName = user.name;
+            } else {
+                isExternal = true;
+                userName = ""; // external, name unknown
+            }
+        }
+
+        // Create JWT token for owner approval
         const token = jwt.sign({
             docId: documentId,
-            userId,
+            userId: user?._id || null,
+            userEmail: email || user?.email,
+            userName: userName,
             action: "approveAccess"
-        }, process.env.JWT_SECRET || "supersecretkey", { expiresIn: "3d" });
+        }, API_CONFIG.ACCESS_GRANT_SECRET || "supersecretkey", { expiresIn: "3d" });
 
-        const baseUrl = process.env.APP_BASE_URL || "http://localhost:5000";
+        const baseUrl = API_CONFIG.baseUrl || "http://localhost:5000";
         const approvalLink = `${baseUrl}/documents/approve-access/${token}`;
 
         // Send email to owner
@@ -1977,11 +2044,28 @@ export const requestAccessAgain = async (req, res) => {
             to: owner.email,
             subject: `Access Request for Document: ${doc.metadata?.fileName || 'Untitled'}`,
             html: `
-                <p>${req.session.user.name} (${req.session.user.email}) requested access to <strong>${doc.metadata?.fileName || 'your document'}</strong>.</p>
+                <p>${userName || email} (${email || user?.email}) requested access to <strong>${doc.metadata?.fileName || 'your document'}</strong>.</p>
                 <p>Click below to approve and set access duration:</p>
                 <a href="${approvalLink}" style="padding:10px 20px;background:#007bff;color:#fff;text-decoration:none;border-radius:5px;">Approve Access</a>
             `
         });
+
+        // Log request in PermissionLogs
+        await PermissionLogs.findOneAndUpdate(
+            {
+                document: documentId,
+                "user.email": email || user?.email
+            },
+            {
+                document: documentId,
+                owner: owner._id,
+                user: { username: userName, email: email || user?.email },
+                access: "view",
+                isExternal,
+                requestStatus: "pending",
+            },
+            { new: true, upsert: true }
+        );
 
         res.json({ success: true, message: `Request sent to ${owner.name || owner.email}` });
 
@@ -1992,13 +2076,59 @@ export const requestAccessAgain = async (req, res) => {
 };
 
 
+// export const grantAccessViaToken = async (req, res) => {
+//     try {
+//         const { token } = req.params;
+//         const { duration } = req.body;
+
+//         const decoded = jwt.verify(token, process.env.JWT_SECRET || "supersecretkey");
+//         const { docId, userId, action } = decoded;
+//         if (action !== "approveAccess") return res.status(403).send("Invalid action");
+
+//         const doc = await Document.findById(docId).populate("owner");
+//         if (!doc) return res.status(404).send("Document not found");
+
+//         // Calculate expiration
+//         const now = new Date();
+//         let expiresAt;
+//         switch (duration) {
+//             case "oneday": expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); break;
+//             case "oneweek": expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); break;
+//             case "onemonth": expiresAt = new Date(now); expiresAt.setMonth(expiresAt.getMonth() + 1); break;
+//             case "lifetime": expiresAt = new Date(now); expiresAt.setFullYear(expiresAt.getFullYear() + 50); break;
+//             default: expiresAt = null;
+//         }
+
+//         // Update or create SharedWith
+//         await SharedWith.findOneAndUpdate(
+//             { document: docId, user: userId },
+//             { accessLevel: "view", duration, expiresAt, generalAccess: true },
+//             { new: true, upsert: true }
+//         );
+
+//         // Notify user
+//         const user = await User.findById(userId);
+//         await sendEmail({
+//             to: user.email,
+//             subject: "Access Granted",
+//             html: `<p>Your access to "${doc.metadata?.fileName}" has been granted for ${duration}.</p>`
+//         });
+
+//         res.send(`<h2>Access granted to ${user.name}</h2><p>Email notification sent.</p>`);
+
+//     } catch (err) {
+//         res.send(`<h2>Error</h2><p>${err.message}</p>`);
+//     }
+// };
+
 export const grantAccessViaToken = async (req, res) => {
     try {
         const { token } = req.params;
         const { duration } = req.body;
 
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || "supersecretkey");
-        const { docId, userId, action } = decoded;
+        const decoded = jwt.verify(token, API_CONFIG.ACCESS_GRANT_SECRET || "supersecretkey");
+        const { docId, userId, userEmail, userName, action } = decoded;
+
         if (action !== "approveAccess") return res.status(403).send("Invalid action");
 
         const doc = await Document.findById(docId).populate("owner");
@@ -2015,22 +2145,47 @@ export const grantAccessViaToken = async (req, res) => {
             default: expiresAt = null;
         }
 
-        // Update or create SharedWith
-        await SharedWith.findOneAndUpdate(
-            { document: docId, user: userId },
-            { accessLevel: "view", duration, expiresAt, generalAccess: true },
-            { new: true, upsert: true }
+        // Check if user exists (internal) or external
+        let user = null;
+        let isExternal = false;
+        if (userId) {
+            user = await User.findById(userId);
+            isExternal = false;
+        } else {
+            user = await User.findOne({ email: userEmail });
+            if (!user) isExternal = true;
+        }
+
+        if (!isExternal) {
+            // Internal user → update or create SharedWith
+            await SharedWith.findOneAndUpdate(
+                { document: docId, user: user._id },
+                { accessLevel: "view", duration, expiresAt, generalAccess: true },
+                { new: true, upsert: true }
+            );
+        }
+
+        // Update PermissionLogs as approved
+        await PermissionLogs.findOneAndUpdate(
+            { document: docId, "user.email": userEmail },
+            {
+                approved: true,
+                approvedBy: doc.owner._id,
+                isExternal
+            },
+            { new: true }
         );
 
-        // Notify user
-        const user = await User.findById(userId);
-        await sendEmail({
-            to: user.email,
-            subject: "Access Granted",
-            html: `<p>Your access to "${doc.metadata?.fileName}" has been granted for ${duration}.</p>`
-        });
+        // Send email notification only if internal
+        if (!isExternal && user) {
+            await sendEmail({
+                to: user.email,
+                subject: "Access Granted",
+                html: `<p>Your access to "${doc.metadata?.fileName}" has been granted for ${duration}.</p>`
+            });
+        }
 
-        res.send(`<h2>Access granted to ${user.name}</h2><p>Email notification sent.</p>`);
+        res.send(`<h2>Access granted to ${userName || userEmail}</h2><p>${isExternal ? 'External user logged in PermissionLogs only.' : 'Email notification sent.'}</p>`);
 
     } catch (err) {
         res.send(`<h2>Error</h2><p>${err.message}</p>`);

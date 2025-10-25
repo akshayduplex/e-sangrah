@@ -59,9 +59,7 @@ import UserFolderHistory from "../models/UserFolderHistory.js";
 // ---------------------------
 
 import { createS3Uploader, s3uploadfolder } from "../middlewares/multer-s3.js";
-import { generateShareLink } from "../helper/GenerateUniquename.js";
 import { ParentFolderName } from "../middlewares/parentFolderName.js";
-import accessLogger from "../middlewares/accessLogger.js";
 
 const router = express.Router();
 // ---------------------------
@@ -135,6 +133,10 @@ router.get("/dashboard/file-status", AdminDashboard.getFileStatusRecentActivity)
 router.get("/dashboard/recent-activity", AdminDashboard.getRecentActivities);
 router.get("/dashboard/uploads", AdminDashboard.getDepartmentDocumentUploads);
 router.get("/dashboard/summary", AdminDashboard.getDocumentsStatusSummary);
+// Permission Logs
+router.get("/permission-logs", authorize('admin', 'superadmin'), AdminController.getPermissionLogs);
+router.patch("/permission-logs/requestStatus", authorize('admin', 'superadmin'), AdminController.updateRequestStatus);
+router.post("/permission-logs/grant-access", authorize('admin', 'superadmin'), AdminController.grantAccess)
 
 // ---------------------------
 // Employee routes

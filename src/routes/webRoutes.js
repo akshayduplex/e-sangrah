@@ -124,6 +124,7 @@ router.get("/admin/approval", authenticate, checkPermissions, AdminController.sh
 router.get("/document/:id/admin/approval/track", authenticate, checkPermissions, AdminController.showApprovalTrackPage);
 router.get("/documents/admin/recyclebin", authenticate, checkPermissions, AdminController.showRecycleBinPage);
 router.get("/admin/folders/:folderId/manage-access", authenticate, AdminController.showManageAccessPage);
+router.get("/admin/permissionslogs", authenticate, AdminController.showPermissionLogsPage);
 
 /* =========================================
    EMPLOYEE ROUTE

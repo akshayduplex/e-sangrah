@@ -3,6 +3,10 @@ import Document from "../models/Document.js";
 import logger from "../utils/logger.js";
 import Designation from "../models/Designation.js";
 import Folder from "../models/Folder.js";
+import PermissionLogs from "../models/PermissionLogs.js";
+import User from "../models/User.js";
+import SharedWith from "../models/SharedWith.js";
+import { sendEmail } from "../services/emailService.js";
 
 //Page controllers
 
@@ -107,6 +111,21 @@ export const showManageAccessPage = async (req, res) => {
         });
     }
 };
+export const showPermissionLogsPage = async (req, res) => {
+    try {
+        res.render("pages/admin/permissionLogs", {
+            title: "Permission Logs",
+            user: req.user
+        });
+
+    } catch (err) {
+        logger.error("Admin render error:", err);
+        res.status(500).render("pages/error", {
+            user: req.user,
+            message: "Unable to load manage access page"
+        });
+    }
+};
 //API Controllers
 
 /**
@@ -191,6 +210,157 @@ export const getMyApprovals = async (req, res) => {
     } catch (error) {
         console.error("Error in getMyApprovals:", error);
         res.status(500).json({ success: false, message: "Server Error" });
+    }
+};
+
+export const getPermissionLogs = async (req, res) => {
+    const ownerId = req.user._id;
+    const { page = 1, limit = 10, startDate, endDate } = req.query;
+    try {
+        const query = { owner: ownerId };
+
+        // Optional date filter
+        if (startDate || endDate) {
+            query.requestedAt = {};
+            if (startDate) query.requestedAt.$gte = new Date(startDate);
+            if (endDate) query.requestedAt.$lte = new Date(endDate);
+        }
+
+        const total = await PermissionLogs.countDocuments(query);
+
+        const logs = await PermissionLogs.find(query)
+            .select("user document requestedAt isExternal requestStatus access expiresAt duration")
+            .populate({
+                path: "document",
+                select: "files", // only these fields from document
+                populate: {
+                    path: "files",
+                    select: "originalName version fileType fileSize" // only these fields from files
+                }
+            })
+            .populate("user", "username email")
+            .sort({ requestedAt: -1 })
+            .skip((page - 1) * limit)
+            .limit(parseInt(limit))
+            .lean();
+
+        res.status(200).json({
+            success: true,
+            data: logs,
+            pagination: {
+                total,
+                page: parseInt(page),
+                limit: parseInt(limit),
+                totalPages: Math.ceil(total / limit),
+            },
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Failed to fetch permission logs' });
+    }
+};
+
+export const updateRequestStatus = async (req, res) => {
+    const { logId, requestStatus } = req.body;
+    console.log(logId, requestStatus);
+    if (!["approved", "pending", "rejected"].includes(requestStatus)) {
+        return res.status(400).json({ success: false, message: "Invalid request status" });
+    }
+
+    try {
+        const log = await PermissionLogs.findByIdAndUpdate(
+            logId,
+            { requestStatus, approvedBy: req.user._id },
+            { new: true }
+        );
+        if (!log) return res.status(404).json({ success: false, message: "Permission log not found" });
+
+        res.status(200).json({ success: true, data: log });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: "Failed to update request status" });
+    }
+};
+
+export const grantAccess = async (req, res) => {
+    try {
+        const { logId, duration, customDates } = req.body;
+
+        if (!logId || !duration) {
+            return res.status(400).json({ message: "logId & duration are required." });
+        }
+
+        const log = await PermissionLogs.findById(logId).populate("document owner");
+        if (!log) return res.status(404).json({ message: "Permission log not found" });
+
+        const doc = log.document;
+        if (!doc) return res.status(404).json({ message: "Document not found in log" });
+
+        const loggedUser = log.user; // embedded data
+        const userEmail = loggedUser?.email;
+
+        // Determine external or internal user
+        const internalUser = await User.findOne({ email: userEmail });
+        const isExternal = !internalUser;
+
+        // Duration Handling
+        const now = new Date();
+        let expiresAt = null;
+
+        const durationMap = {
+            oneday: () => new Date(now.getTime() + 24 * 60 * 60 * 1000),
+            oneweek: () => new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
+            onemonth: () => new Date(now.setMonth(now.getMonth() + 1)),
+            lifetime: () => new Date(now.setFullYear(now.getFullYear() + 50)),
+            onetime: () => null
+        };
+
+        if (duration === "custom" && customDates) {
+            const [, end] = customDates.split(" to ");
+            expiresAt = new Date(end);
+        } else {
+            expiresAt = durationMap[duration]?.() ?? null;
+        }
+        // If Internal User → Update SharedWith
+        if (!isExternal && internalUser) {
+            await SharedWith.findOneAndUpdate(
+                { document: doc._id, user: internalUser._id },
+                {
+                    accessLevel: "view",
+                    duration,
+                    expiresAt,
+                    generalAccess: true
+                },
+                { new: true, upsert: true }
+            );
+        }
+
+        // Update Permission Log
+        log.requestStatus = "approved";
+        log.approvedBy = doc.owner;
+        log.isExternal = isExternal;
+        log.duration = duration;
+        log.expiresAt = expiresAt;
+        await log.save();
+
+        // Email Notification
+        if (!isExternal && userEmail) {
+            await sendEmail({
+                to: userEmail,
+                subject: "Access Granted",
+                html: `<p>Your access to "${doc.metadata?.fileName}" has been granted.</p>`
+            });
+        }
+
+        return res.status(200).json({
+            message: `Access granted to ${loggedUser?.username || userEmail}`,
+            expiresAt,
+            isExternal
+        });
+
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ error: err.message });
     }
 };
 
