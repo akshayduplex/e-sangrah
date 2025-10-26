@@ -41,10 +41,11 @@ export const API_CONFIG = {
 
     // AWS Configuration
     Bucket: process.env.AWS_BUCKET,
-    AWS_DEFAULT_REGION: process.env.AWS_DEFAULT_REGION,
+    AWS_REGION: process.env.AWS_DEFAULT_REGION,
     AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID,
     AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY,
     AWS_ENDPOINT: process.env.AWS_ENDPOINT,
+    AWS_URL: process.env.AWS_URL,
 
     // Cloudinary
     CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME,

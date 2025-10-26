@@ -90,7 +90,7 @@ export const showEditDocumentPage = async (req, res) => {
             });
         }
 
-        res.render("pages/document/add-document", {
+        res.render("pages/document/edit", {
             title: "E-Sangrah - Edit Document",
             user: req.user,
             document,
@@ -319,10 +319,11 @@ export const getDocuments = async (req, res) => {
 
         // --- Status ---
         if (status) {
-            if (status === "Compliance and Retention") {
+            const normalizedStatus = status.replace(/\s+/g, ' ').trim();
+            if (normalizedStatus === "Compliance and Retention") {
                 filter["compliance.isCompliance"] = true;
             } else {
-                filter.status = status;
+                filter.status = normalizedStatus;
             }
         }
 
@@ -888,6 +889,9 @@ export const createDocument = async (req, res) => {
 /**
  Update document with versioning
  */
+/**
+ * Update document with versioning - FIXED DATE HANDLING
+ */
 export const updateDocument = async (req, res) => {
     try {
         const { id } = req.params;
@@ -959,18 +963,74 @@ export const updateDocument = async (req, res) => {
                     break;
 
                 case "expiryDate":
-                    if (value) {
+                    if (value && value.trim() !== '') {
                         try {
-                            const [d, m, y] = value.split("-");
-                            const newExpiry = new Date(`${y}-${m}-${d}`);
-                            if (!document.compliance.expiryDate || document.compliance.expiryDate.getTime() !== newExpiry.getTime()) {
-                                document.compliance.expiryDate = newExpiry;
-                                hasChanges = true;
-                                changeReason = "Expiry date updated";
-                                changedFields.push("compliance");
+                            // Simple approach: Let MongoDB handle the date parsing
+                            const newExpiry = new Date(value);
+
+                            if (!isNaN(newExpiry.getTime())) {
+                                const currentExpiry = document.compliance.expiryDate;
+                                if (!currentExpiry || currentExpiry.getTime() !== newExpiry.getTime()) {
+                                    document.compliance.expiryDate = newExpiry;
+                                    hasChanges = true;
+                                    changeReason = "Expiry date updated";
+                                    changedFields.push("compliance");
+                                    console.log('✅ Expiry date updated to:', newExpiry);
+                                }
+                            } else {
+                                console.warn("❌ Invalid expiry date, skipping:", value);
                             }
                         } catch (error) {
-                            console.warn("Invalid expiry date format:", error.message);
+                            console.warn("❌ Expiry date error, skipping:", error.message);
+                        }
+                    } else if (value === '' || value === null) {
+                        // Clear expiry date
+                        if (document.compliance.expiryDate !== null) {
+                            document.compliance.expiryDate = null;
+                            hasChanges = true;
+                            changeReason = "Expiry date removed";
+                            changedFields.push("compliance");
+                        }
+                    }
+                    break;
+
+                case "documentDate":
+                    if (value && value.trim() !== '') {
+                        try {
+                            let newDocumentDate;
+
+                            if (value.includes('-')) {
+                                // Handle DD-MM-YYYY format from frontend
+                                const [d, m, y] = value.split("-");
+                                if (d && m && y) {
+                                    newDocumentDate = new Date(`${y}-${m}-${d}`);
+                                }
+                            } else if (value.includes('/')) {
+                                // Handle DD/MM/YYYY format
+                                const [d, m, y] = value.split("/");
+                                if (d && m && y) {
+                                    newDocumentDate = new Date(`${y}-${m}-${d}`);
+                                }
+                            } else {
+                                // Handle ISO format or other formats
+                                newDocumentDate = new Date(value);
+                            }
+
+                            // Validate the date
+                            if (newDocumentDate && !isNaN(newDocumentDate.getTime())) {
+                                const currentDocDate = document.documentDate;
+                                if (!currentDocDate || currentDocDate.getTime() !== newDocumentDate.getTime()) {
+                                    document.documentDate = newDocumentDate;
+                                    hasChanges = true;
+                                    changeReason = "Document date updated";
+                                    changedFields.push("documentDate");
+                                    console.log('✅ Document date updated:', newDocumentDate);
+                                }
+                            } else {
+                                console.warn("❌ Invalid document date format:", value);
+                            }
+                        } catch (error) {
+                            console.warn("❌ Document date parsing error:", error.message, "Value:", value);
                         }
                     }
                     break;
@@ -981,7 +1041,7 @@ export const updateDocument = async (req, res) => {
                             const parsedIds = Array.isArray(value) ? value : JSON.parse(value);
                             const validIds = parsedIds.filter(id => mongoose.Types.ObjectId.isValid(id));
                             if (validIds.length > 0) {
-                                await processFileUpdates(document, validIds, req.user);
+                                await processFileUpdates(document, validIds, req.user, changedFields);
                                 hasChanges = true;
                                 fileUpdates = true;
                                 changeReason = "Files updated";
@@ -996,8 +1056,8 @@ export const updateDocument = async (req, res) => {
                 case "description":
                 case "comment":
                 case "link":
-
                 case "signature":
+                    // Handle these fields separately or let default case handle them
                     break;
 
                 default:
@@ -1017,10 +1077,43 @@ export const updateDocument = async (req, res) => {
             changedFields.push("signature");
         }
 
+        // Handle description, comment, link fields that might have been missed
+        const textFields = ['description', 'comment', 'link', 'documentName', 'documentType', 'documentStatus', 'documentPriority', 'documentReference', 'documentVersion'];
+        for (const field of textFields) {
+            if (req.body[field] !== undefined && document[field] !== req.body[field]) {
+                document[field] = req.body[field];
+                hasChanges = true;
+                changedFields.push(field);
+            }
+        }
+
+        // Handle project, department, projectManager, documentDonor, documentVendor
+        const referenceFields = ['project', 'department', 'projectManager', 'documentDonor', 'documentVendor'];
+        for (const field of referenceFields) {
+            if (req.body[field] !== undefined) {
+                const newValue = req.body[field] === '' ? null : req.body[field];
+                const currentValue = document[field]?.toString();
+
+                if (currentValue !== newValue?.toString()) {
+                    document[field] = newValue && mongoose.Types.ObjectId.isValid(newValue) ? newValue : null;
+                    hasChanges = true;
+                    changedFields.push(field);
+                }
+            }
+        }
+
         // Save and create version history
         if (hasChanges) {
             if (fileUpdates) changeReason = "Files and content updated";
-            bumpVersion(document);
+
+            // Bump version only if there are actual content changes (not just metadata)
+            const contentFields = ['description', 'files', 'signature', 'documentName', 'documentType'];
+            const hasContentChanges = changedFields.some(field => contentFields.includes(field));
+
+            if (hasContentChanges) {
+                bumpVersion(document);
+            }
+
             await createVersionHistory(document, req.user, changeReason, changedFields);
             await document.save();
 
@@ -1028,17 +1121,25 @@ export const updateDocument = async (req, res) => {
                 .populate('files')
                 .populate('owner', 'name email')
                 .populate('folderId', 'name')
+                .populate('project', 'projectName name')
+                .populate('department', 'name')
+                .populate('projectManager', 'name')
+                .populate('documentDonor', 'name')
+                .populate('documentVendor', 'name')
                 .populate('versionHistory.changedBy', 'name email');
 
             return successResponse(res, {
                 document: populatedDoc,
                 changes: changeReason,
-                version: document.versioning.currentVersion.toString()
+                version: document.versioning.currentVersion.toString(),
+                changedFields: changedFields
             }, "Document updated successfully");
         } else {
             const populatedDoc = await Document.findById(document._id)
                 .populate('files')
-                .populate('owner', 'name email');
+                .populate('owner', 'name email')
+                .populate('project', 'projectName name')
+                .populate('department', 'name');
 
             return successResponse(res, {
                 document: populatedDoc

@@ -18,17 +18,17 @@
             </div>
             <!-- /Breadcrumb -->
 
-            <!-- DEBUG SECTION - Check EJS rendering -->
-            <div class="alert alert-warning mb-3" id="debugInfo">
+            <!-- DEBUG SECTION -->
+            <div class="alert alert-info mb-3" id="debugInfo">
                 <h6>Debug Information:</h6>
-                <p><strong>Document ID from EJS:</strong> <span id="debugDocId">
+                <p><strong>Document ID:</strong> <span id="debugDocId">
                         <%= document._id %>
                     </span></p>
-                <p><strong>Is Document Defined:</strong> <span id="debugDocDefined">
-                        <%= typeof document %>
+                <p><strong>Signature Present:</strong> <span id="debugSignature">
+                        <%= document.signature ? 'Yes' : 'No' %>
                     </span></p>
-                <p><strong>Document Title:</strong> <span id="debugDocTitle">
-                        <%= document.metadata ? document.metadata.fileName : 'No metadata' %>
+                <p><strong>Files Count:</strong> <span id="debugFiles">
+                        <%= document.files ? document.files.length : 0 %>
                     </span></p>
             </div>
 
@@ -43,14 +43,63 @@
 
                     <div class="modal-body">
                         <div class="row">
-                            <!-- Your form fields here (keep all your existing form fields) -->
+                            <!-- Document Name -->
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label class="form-label">Document Name <span class="text-danger">*</span></label>
+                                    <input type="text" id="documentName" name="documentName" class="form-control"
+                                        value="<%= document.documentName || '' %>" required>
+                                </div>
+                            </div>
+
+                            <!-- Document Type -->
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label class="form-label">Document Type</label>
+                                    <select id="documentType" name="documentType" class="form-select select2">
+                                        <option value="">-- Select Type --</option>
+                                        <option value="contract" <%=document.documentType==='contract' ? 'selected' : ''
+                                            %>>Contract</option>
+                                        <option value="report" <%=document.documentType==='report' ? 'selected' : '' %>
+                                            >Report</option>
+                                        <option value="proposal" <%=document.documentType==='proposal' ? 'selected' : ''
+                                            %>>Proposal</option>
+                                        <option value="invoice" <%=document.documentType==='invoice' ? 'selected' : ''
+                                            %>>Invoice</option>
+                                        <option value="other" <%=document.documentType==='other' ? 'selected' : '' %>
+                                            >Other</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Document Status -->
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label class="form-label">Document Status</label>
+                                    <select id="documentStatus" name="documentStatus" class="form-select select2">
+                                        <option value="">-- Select Status --</option>
+                                        <option value="draft" <%=document.documentStatus==='draft' ? 'selected' : '' %>
+                                            >Draft</option>
+                                        <option value="in-review" <%=document.documentStatus==='in-review' ? 'selected'
+                                            : '' %>>In Review</option>
+                                        <option value="approved" <%=document.documentStatus==='approved' ? 'selected'
+                                            : '' %>>Approved</option>
+                                        <option value="rejected" <%=document.documentStatus==='rejected' ? 'selected'
+                                            : '' %>>Rejected</option>
+                                        <option value="archived" <%=document.documentStatus==='archived' ? 'selected'
+                                            : '' %>>Archived</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Project Name -->
                             <div class="col-md-4">
                                 <div class="mb-3">
                                     <label class="form-label">Project Name <span class="text-danger">*</span></label>
                                     <select id="projectName" name="project" class="form-select select2" required>
                                         <% if (document.project) { %>
                                             <option value="<%= document.project._id %>" selected>
-                                                <%= document.project.projectName %>
+                                                <%= document.project.projectName || document.project.name %>
                                             </option>
                                             <% } %>
                                     </select>
@@ -75,8 +124,7 @@
                             <div class="col-md-4">
                                 <div class="mb-3">
                                     <label class="form-label">Project Manager</label>
-                                    <select id="projectManager" name="projectManager" class="form-select select2"
-                                        required>
+                                    <select id="projectManager" name="projectManager" class="form-select select2">
                                         <% if (document.projectManager) { %>
                                             <option value="<%= document.projectManager._id %>" selected>
                                                 <%= document.projectManager.name %>
@@ -86,15 +134,42 @@
                                 </div>
                             </div>
 
+                            <!-- Document Donor -->
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label class="form-label">Document Donor</label>
+                                    <select id="documentDonor" name="documentDonor" class="form-select select2">
+                                        <% if (document.documentDonor) { %>
+                                            <option value="<%= document.documentDonor._id %>" selected>
+                                                <%= document.documentDonor.name %>
+                                            </option>
+                                            <% } %>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Document Vendor -->
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label class="form-label">Document Vendor</label>
+                                    <select id="documentVendor" name="documentVendor" class="form-select select2">
+                                        <% if (document.documentVendor) { %>
+                                            <option value="<%= document.documentVendor._id %>" selected>
+                                                <%= document.documentVendor.name %>
+                                            </option>
+                                            <% } %>
+                                    </select>
+                                </div>
+                            </div>
+
                             <!-- Document Date -->
                             <div class="col-md-4">
                                 <div class="mb-3">
-                                    <label class="form-label">Select Date</label>
+                                    <label class="form-label">Document Date</label>
                                     <div class="input-icon-end position-relative">
                                         <input type="text" name="documentDate" class="form-control datetimepicker"
                                             placeholder="dd/mm/yyyy"
-                                            value="<%= document.documentDate ? new Date(document.documentDate).toLocaleDateString('en-GB') : '' %>"
-                                            required>
+                                            value="<%= document.documentDate ? new Date(document.documentDate).toLocaleDateString('en-GB') : '' %>">
                                         <span class="input-icon-addon"><i class="ti ti-calendar text-gray-7"></i></span>
                                     </div>
                                 </div>
@@ -103,9 +178,45 @@
                             <!-- Tags -->
                             <div class="col-md-4">
                                 <div class="mb-3">
-                                    <label class="form-label">Add Tags (comma separated)</label>
+                                    <label class="form-label">Tags (comma separated)</label>
                                     <input type="text" name="tags" class="form-control" placeholder="tag1, tag2, tag3"
                                         value="<%= document.tags ? document.tags.join(', ') : '' %>">
+                                </div>
+                            </div>
+
+                            <!-- Document Reference -->
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label class="form-label">Document Reference</label>
+                                    <input type="text" id="documentReference" name="documentReference"
+                                        class="form-control" value="<%= document.documentReference || '' %>">
+                                </div>
+                            </div>
+
+                            <!-- Document Version -->
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label class="form-label">Document Version</label>
+                                    <input type="text" id="documentVersion" name="documentVersion" class="form-control"
+                                        value="<%= document.documentVersion || '' %>">
+                                </div>
+                            </div>
+
+                            <!-- Document Priority -->
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label class="form-label">Document Priority</label>
+                                    <select id="documentPriority" name="documentPriority" class="form-select select2">
+                                        <option value="">-- Select Priority --</option>
+                                        <option value="low" <%=document.documentPriority==='low' ? 'selected' : '' %>
+                                            >Low</option>
+                                        <option value="medium" <%=document.documentPriority==='medium' ? 'selected' : ''
+                                            %>>Medium</option>
+                                        <option value="high" <%=document.documentPriority==='high' ? 'selected' : '' %>
+                                            >High</option>
+                                        <option value="urgent" <%=document.documentPriority==='urgent' ? 'selected' : ''
+                                            %>>Urgent</option>
+                                    </select>
                                 </div>
                             </div>
 
@@ -115,9 +226,9 @@
                                     <label class="form-label">Meta Data</label>
                                     <div class="position-relative">
                                         <input type="text" id="metadataDisplay" class="form-control" readonly
-                                            value="<%= document.metadata ? document.metadata.fileName + ' - ' + document.metadata.fileDescription : '' %>">
+                                            value="<%= document.metadata ? (document.metadata.fileName || '') + ' - ' + (document.metadata.fileDescription || '') : '' %>">
                                         <input type="hidden" id="metadataInput" name="metadata"
-                                            value="<%= document.metadata ? JSON.stringify(document.metadata) : '' %>">
+                                            value="<%= document.metadata ? JSON.stringify(document.metadata) : '{}' %>">
                                         <button type="button" class="border-0 fieldright_btn" data-bs-toggle="modal"
                                             data-bs-target="#metadata-modal">
                                             <img src="/img/icons/fieldbtn.png">
@@ -146,14 +257,16 @@
                                         <label class="form-label mb-0">Compliance and Retention Document</label>
                                         <div class="form-check">
                                             <input class="form-check-input" type="radio" name="compliance" value="yes"
-                                                id="complianceYes" <%=document.compliance?.isCompliance ? 'checked' : ''
-                                                %>>
+                                                id="complianceYes" <%=document.compliance==='yes' ||
+                                                (document.compliance && document.compliance.isCompliance) ? 'checked'
+                                                : '' %>>
                                             <label class="form-check-label" for="complianceYes">Yes</label>
                                         </div>
                                         <div class="form-check">
                                             <input class="form-check-input" type="radio" name="compliance" value="no"
-                                                id="complianceNo" <%=!document.compliance?.isCompliance ? 'checked' : ''
-                                                %>>
+                                                id="complianceNo" <%=!document.compliance || document.compliance==='no'
+                                                || (document.compliance && !document.compliance.isCompliance)
+                                                ? 'checked' : '' %>>
                                             <label class="form-check-label" for="complianceNo">No</label>
                                         </div>
                                     </div>
@@ -162,15 +275,16 @@
 
                             <!-- Expiry Date -->
                             <div class="col-md-6" id="expiryDateContainer"
-                                style="display: <%= document.compliance?.isCompliance ? 'block' : 'none' %>;">
+                                style="display: <%= document.compliance === 'yes' || (document.compliance && document.compliance.isCompliance) ? 'block' : 'none' %>;">
                                 <div class="mb-3">
                                     <div class="d-flex align-items-center gap-5">
                                         <label class="form-label mb-0">Enter Expiry Date</label>
                                         <div class="input-icon-end position-relative">
                                             <input type="text" class="form-control datetimepicker" name="expiryDate"
                                                 placeholder="dd/mm/yyyy"
-                                                value="<%= document.compliance?.expiryDate ? new Date(document.compliance.expiryDate).toLocaleDateString('en-GB') : '' %>"
-                                                <%=document.compliance?.isCompliance ? 'required' : '' %>>
+                                                value="<%= document.expiryDate ? new Date(document.expiryDate).toLocaleDateString('en-GB') : (document.compliance && document.compliance.expiryDate ? new Date(document.compliance.expiryDate).toLocaleDateString('en-GB') : '') %>"
+                                                <%=document.compliance==='yes' || (document.compliance &&
+                                                document.compliance.isCompliance) ? 'required' : '' %>>
                                             <span class="input-icon-addon"><i
                                                     class="ti ti-calendar text-gray-7"></i></span>
                                         </div>
@@ -184,6 +298,15 @@
                                     <label class="form-label">Leave a comment (Optional)</label>
                                     <input type="text" class="form-control" name="comment"
                                         value="<%= document.comment ? document.comment : '' %>">
+                                </div>
+                            </div>
+
+                            <!-- Link -->
+                            <div class="col-md-12">
+                                <div class="mb-3">
+                                    <label class="form-label">Add Link (if any)</label>
+                                    <input type="url" class="form-control" name="link" placeholder="https://example.com"
+                                        value="<%= document.link ? document.link : '' %>">
                                 </div>
                             </div>
 
@@ -202,7 +325,8 @@
                                 <div id="folderContainer" class="d-flex flex-wrap gap-2">
                                     <!-- Folder buttons will be injected here -->
                                 </div>
-                                <input type="hidden" name="folderId" id="selectedFolderId">
+                                <input type="hidden" name="folderId" id="selectedFolderId"
+                                    value="<%= document.folderId ? (document.folderId._id || document.folderId) : '' %>">
                             </div>
 
                             <!-- File Upload -->
@@ -215,30 +339,61 @@
                                     <input type="file" class="form-control d-none" id="fileInput" name="files" multiple>
                                 </div>
 
-                                <div id="fileList">
+                                <!-- Existing Files Display -->
+                                <div id="existingFilesList" class="mb-3">
                                     <% if (document.files && document.files.length) { %>
-                                        <% document.files.forEach(file=> { %>
-                                            <div class="file-item col-sm-5 mb-3 p-3 border rounded"
-                                                data-file-id="<%= file._id %>">
-                                                <div class="file-info d-flex align-items-center">
-                                                    <i class="fa-solid fa-file fa-2x me-3"></i>
-                                                    <div class="flex-grow-1">
-                                                        <h6 class="mb-0 text-truncate">
-                                                            <%= file.originalName || "Unnamed file" %>
-                                                        </h6>
+                                        <h6 class="mb-2">Existing Files:</h6>
+                                        <div class="row">
+                                            <% document.files.forEach(file=> { %>
+                                                <div class="col-sm-6 col-md-4 mb-3">
+                                                    <div class="file-item card p-3" data-file-id="<%= file._id %>">
+                                                        <div class="file-info d-flex align-items-center">
+                                                            <i class="fa-solid fa-file fa-2x me-3 text-primary"></i>
+                                                            <div class="flex-grow-1">
+                                                                <h6 class="mb-0 text-truncate"
+                                                                    title="<%= file.originalName || file.filename || 'Unnamed file' %>">
+                                                                    <%= file.originalName || file.filename
+                                                                        || 'Unnamed file' %>
+                                                                </h6>
+                                                                <small class="text-muted">
+                                                                    <%= file.size ? (file.size / 1024 / 1024).toFixed(2)
+                                                                        + ' MB' : 'Size unknown' %>
+                                                                </small>
+                                                                <div class="mt-1">
+                                                                    <small class="text-success">
+                                                                        <i class="fa-solid fa-check-circle"></i> Already
+                                                                        uploaded
+                                                                    </small>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <div class="file-actions mt-2 d-flex gap-2">
+                                                            <% if (file.file) { %>
+                                                                <a href="<%= file.file %>" target="_blank"
+                                                                    class="btn btn-sm btn-info flex-fill">
+                                                                    <i class="fa-solid fa-eye"></i> View
+                                                                </a>
+                                                                <% } %>
+                                                                    <button
+                                                                        class="remove-existing-btn btn btn-sm btn-danger flex-fill"
+                                                                        data-file-id="<%= file._id %>"
+                                                                        data-file-name="<%= file.originalName || file.filename %>">
+                                                                        <i class="fa-solid fa-trash"></i> Remove
+                                                                    </button>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                                <a href="<%= file.file %>" target="_blank"
-                                                    class="btn btn-sm btn-info mt-2 me-2">
-                                                    <i class="fa-solid fa-eye"></i> View
-                                                </a>
-                                                <button class="remove-btn btn btn-sm btn-danger mt-2"
-                                                    data-file-id="<%= file._id %>">
-                                                    <i class="fa-solid fa-xmark"></i> Remove
-                                                </button>
-                                            </div>
-                                            <% }) %>
-                                                <% } %>
+                                                <% }) %>
+                                        </div>
+                                        <% } %>
+                                </div>
+
+                                <!-- New Files Upload Area -->
+                                <div id="fileList" class="mt-3">
+                                    <h6 class="mb-2">New Files:</h6>
+                                    <div class="row" id="newFilesContainer">
+                                        <!-- New files will be added here -->
+                                    </div>
                                 </div>
                             </div>
 
@@ -246,13 +401,16 @@
                             <div class="col-md-12">
                                 <label class="form-label">Add Your Signature</label>
                                 <div class="signtrboxwrp mb-3">
-                                    <div class="signbox form-control" id="signaturePreview" style="width:70%;">
-                                        <% if (document.signature?.fileUrl) { %>
-                                            <img src="<%= document.signature.fileUrl %>" alt="Signature"
-                                                style="max-height:100%; max-width:100%; object-fit:contain;">
-                                            <% } %>
+                                    <div class="signbox form-control" id="signaturePreview"
+                                        style="width:70%; min-height: 150px; display: flex; align-items: center; justify-content: center;">
+                                        <% if (document.signature) { %>
+                                            <img src="<%= document.signature %>" alt="Signature"
+                                                style="max-height: 140px; max-width: 100%; object-fit: contain;">
+                                            <% } else { %>
+                                                <div class="text-muted">No signature uploaded</div>
+                                                <% } %>
                                     </div>
-                                    <div class="signupld d-flex gap-2">
+                                    <div class="signupld d-flex gap-2 mt-2">
                                         <input type="file" class="form-control d-none" id="fileSign"
                                             name="signatureFile" accept="image/*">
                                         <button type="button" class="btn btn-primary rounded-pill" id="uploadSignBtn">
@@ -261,23 +419,24 @@
                                         <button type="button" class="btn btn-secondary rounded-pill" id="drawSignBtn">
                                             Draw Signature
                                         </button>
+                                        <% if (document.signature) { %>
+                                            <button type="button" class="btn btn-warning rounded-pill"
+                                                id="clearSignBtn">
+                                                Clear Signature
+                                            </button>
+                                            <% } %>
                                     </div>
-                                    <input type="hidden" name="signature" id="signatureData">
-                                </div>
-                            </div>
-
-                            <!-- Link -->
-                            <div class="col-md-12">
-                                <div class="mb-3">
-                                    <label class="form-label">Add Link (if any)</label>
-                                    <input type="url" class="form-control" name="link" placeholder="https://example.com"
-                                        value="<%= document.link ? document.link : '' %>">
+                                    <input type="hidden" name="signature" id="signatureData"
+                                        value="<%= document.signature || '' %>">
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="d-flex align-items-center justify-content-end">
+                    <div class="d-flex align-items-center justify-content-end gap-3">
+                        <button type="button" class="btn btn-secondary rounded-pill" onclick="window.history.back()">
+                            Cancel
+                        </button>
                         <button class="btn btn-primary rounded-pill" type="submit" id="submitBtn">
                             Update Document
                         </button>
@@ -296,18 +455,24 @@
     <!-- /Page Wrapper -->
 
     <script>
-        // Method 1: Try direct EJS variables first
+        // Initialize data for JavaScript
         try {
             window.isEdit = true;
             window.documentId = "<%= document._id %>";
-            window.documentData = <% - JSON.stringify(document) %>
+            window.documentData = <% - JSON.stringify(document) %>;
+            console.log('✅ EJS data loaded successfully:', {
+                documentId: window.documentId,
+                signature: !!window.documentData.signature,
+                files: window.documentData.files ? window.documentData.files.length : 0
+            });
         } catch (e) {
             console.error('❌ EJS Variables Failed:', e);
-
-            // Method 2: Fallback to DOM elements
-            window.documentId = document.getElementById('hiddenDocumentId').value;
-            const hiddenData = document.getElementById('hiddenDocumentData').getAttribute('data-document');
-            window.documentData = JSON.parse(decodeURIComponent(hiddenData));
+            // Fallback to DOM elements
+            window.documentId = document.getElementById('hiddenDocumentId')?.value;
+            const hiddenData = document.getElementById('hiddenDocumentData')?.getAttribute('data-document');
+            if (hiddenData) {
+                window.documentData = JSON.parse(decodeURIComponent(hiddenData));
+            }
             window.isEdit = true;
         }
 
@@ -315,17 +480,12 @@
         if (!window.documentId || window.documentId === 'undefined' || !window.documentData) {
             console.error('❌ ALL METHODS FAILED - Document Data:', {
                 documentId: window.documentId,
-                documentData: window.documentData,
-                hiddenElement: document.getElementById('hiddenDocumentId'),
-                dataElement: document.getElementById('hiddenDocumentData')
+                documentData: window.documentData
             });
-
-            // Show error to user
             document.getElementById('debugInfo').className = 'alert alert-danger';
             document.getElementById('debugInfo').innerHTML = `
             <h6>Configuration Error</h6>
             <p>Failed to load document data. Please refresh the page.</p>
-            <p>Document ID: ${window.documentId}</p>
             <button onclick="window.location.reload()" class="btn btn-sm btn-warning">Refresh Page</button>
         `;
         }

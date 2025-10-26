@@ -118,7 +118,7 @@ export const login = async (req, res) => {
 
         if (userToken && userToken.expiresAt > now) {
             try {
-                const decoded = jwt.verify(userToken.token, process.env.JWT_SECRET);
+                const decoded = jwt.verify(userToken.token, API_CONFIG.JWT_SECRET);
 
                 if (decoded.email !== user.email) {
                     return failResponse(res, "Token invalid for this user", 401);

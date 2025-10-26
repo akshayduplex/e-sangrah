@@ -33,7 +33,6 @@
                         <div class="d-flex gap-2 align-items-center">
                             <div class="mb-0">
                                 <select id="department" class="form-select select2" style="width: 200px;">
-                                    <option value="">-- Select Department --</option>
                                 </select>
                             </div>
                             <div class="input-icon-end position-relative">
@@ -170,6 +169,7 @@
         <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
         <script>
             document.addEventListener("DOMContentLoaded", function () {
+
                 // -------------------------
                 // Approve / Decline Modal Buttons
                 // -------------------------
@@ -187,12 +187,12 @@
                 });
 
                 // -------------------------
-                // Initialize Select2 for Department
+                // Initialize Select2 for Department with "Select Department" option
                 // -------------------------
                 function initSelect2(selector, url, textKey) {
                     $(selector).select2({
-                        placeholder: `-- Select ${textKey} --`,
-                        allowClear: false,
+                        placeholder: '-- Select Department --',
+                        allowClear: true,
                         ajax: {
                             url,
                             dataType: 'json',
@@ -200,7 +200,7 @@
                             data: params => ({ search: params.term }),
                             processResults: data => {
                                 const results = [
-                                    { id: 'clear', text: `-- Select ${textKey} --` },
+                                    { id: '', text: 'Select Department' }, // Option to clear selection
                                     ...data.data.map(item => ({ id: item._id, text: item[textKey] }))
                                 ];
                                 return { results };
@@ -208,12 +208,14 @@
                         }
                     });
 
+                    // When "Select Department" is clicked, clear selection
                     $(selector).on('select2:select', function (e) {
-                        if (e.params.data.id === 'clear') {
+                        if (e.params.data.id === '') {
                             $(this).val(null).trigger('change');
                         }
                     });
                 }
+
                 initSelect2('#department', `${baseUrl}/api/departments/search`, 'name');
 
                 // -------------------------
@@ -233,7 +235,6 @@
                             const columnIdx = data.order[0].column;
                             sortOrder = data.order[0].dir;
 
-                            // Map column index to field name
                             const columnMap = {
                                 1: 'metadata.fileName',
                                 2: 'createdAt',
@@ -337,7 +338,7 @@
                         },
                         {
                             data: "_id",
-                            render: function (data, type, row) {
+                            render: function (data) {
                                 return `<a href="/document/${data}/admin/approval/track" class="site-btnmd">Track</a>`;
                             }
                         },
@@ -367,10 +368,13 @@
                 // -------------------------
                 function formatDate(input) {
                     if (!input) return '';
-                    const parts = input.split(/[-\/]/); // supports "dd-mm-yyyy" or "dd/mm/yyyy"
-                    if (parts.length !== 3) return input;
-                    const [day, month, year] = parts;
-                    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+                    const date = new Date(input);
+                    if (isNaN(date)) return input;
+                    const yyyy = date.getFullYear();
+                    const mm = String(date.getMonth() + 1).padStart(2, '0');
+                    const dd = String(date.getDate()).padStart(2, '0');
+                    return `${yyyy}-${mm}-${dd}`;
                 }
+
             });
         </script>

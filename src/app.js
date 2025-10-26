@@ -60,6 +60,7 @@ const app = express();
             secret: API_CONFIG.SESSION_SECRET,
             resave: false,
             saveUninitialized: false,
+            rolling: true,
             store: MongoStore.create({
                 mongoUrl: API_CONFIG.MONGO_URI,
                 collectionName: "sessions",
@@ -68,7 +69,7 @@ const app = express();
             }),
             cookie: {
                 maxAge: 1000 * 60 * 60,
-                // httpOnly: true,
+                httpOnly: true,
                 // secure: process.env.NODE_ENV === "production",
                 sameSite: "lax",
             },
