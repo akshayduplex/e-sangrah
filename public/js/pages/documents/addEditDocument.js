@@ -1255,6 +1255,10 @@ $(document).ready(function () {
                 fileItem.setAttribute("data-file-id", fileId);
                 removeBtn.setAttribute("data-file-id", fileId);
                 removeBtn.disabled = false;
+                // Now that fileId is real, enable opening file on double-click
+                fileItem.addEventListener('dblclick', () => {
+                    window.location.href = `/folders/view/${fileId}`;
+                });
 
                 progressBar.style.width = "100%";
                 progressBar.textContent = "Uploaded";

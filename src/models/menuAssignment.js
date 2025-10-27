@@ -15,9 +15,9 @@ const menuAssignmentSchema = new mongoose.Schema(
             required: true,
         },
         permissions: {
-            read: { type: Boolean, default: true },
-            write: { type: Boolean, default: true },
-            delete: { type: Boolean, default: true },
+            read: { type: Boolean, default: false },
+            write: { type: Boolean, default: false },
+            delete: { type: Boolean, default: false },
         },
         assigned_date: {
             type: Date,

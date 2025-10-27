@@ -1070,6 +1070,20 @@ router.get('/folders/tree/structure', FolderController.getFolderTree);
 
 
 /**
+ * Folders Permissions Management
+ */
+
+// GET list
+router.get("/folders/permissions", FolderController.getFolderPermissions);
+router.get('/folders/:folderId/access', FolderController.getFolderAccessByEmail);
+//  PATCH update
+router.patch("/folders/permissions/:logId", FolderController.updateFolderPermission);
+
+// DELETE remove
+router.delete("/folders/permissions/:logId", FolderController.deleteFolderPermission);
+
+
+/**
  * File Management within Folders
  */
 // Upload files to a specific folder

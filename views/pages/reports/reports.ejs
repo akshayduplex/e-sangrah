@@ -53,7 +53,7 @@
 					<!-- Filters Section -->
 					<div class="d-flex flex-wrap gap-2 align-items-center w-100 justify-content-between">
 						<div class="select-dropdown flex-grow-1">
-							<select id="roleSelect" class="select w-100">
+							<select id="roleSelect" class="select w-50">
 								<option value="">Select Role</option>
 								<% roles.forEach(role=> { %>
 									<option value="<%= role %>">
@@ -63,13 +63,13 @@
 							</select>
 						</div>
 						<div class="select-dropdown flex-grow-1">
-							<select id="department" class="form-select select2" style="width: 200px;">
-								<option value="">-- Select Department --</option>
+							<select id="department" class="form-select select2" style="width: 120px;">
+								<option value="">Select Department</option>
 							</select>
 						</div>
 						<div class="select-dropdown flex-grow-1">
 							<select id="docTypeSelect" class="select w-100">
-								<option value="" id="clear">Select Doc type</option> <!-- always visible placeholder -->
+								<option value="" id="clear">Select Doc type</option>
 								<% docTypes.forEach(doc=> { %>
 									<option value="<%= doc.value %>">
 										<%= doc.label %>
@@ -79,7 +79,7 @@
 						</div>
 						<div class="select-dropdown flex-grow-1">
 							<!-- Select -->
-							<select class="select2 w-100" id="designation_select">
+							<select class="select2 w-70" id="designation_select">
 								<option value="">Select Designation</option>
 								<% designation.forEach(d=> { %>
 									<option value="<%= d._id %>">
@@ -246,7 +246,7 @@
 				// -------------------------
 				function initSelect2(selector, url, textKey) {
 					$(selector).select2({
-						placeholder: `-- Select Department --`,
+						placeholder: `Select Department`,
 						allowClear: true,
 						ajax: {
 							url: url,
@@ -336,7 +336,10 @@
 							return json.data.documents.map(doc => ({
 								fileName: `${doc.metadata.fileName} <br><small>${doc.files[0]?.fileSize ? (doc.files[0].fileSize / 1024).toFixed(2) + ' KB' : ''}</small>`,
 								owner: doc.owner?.name || '',
-								designation: doc.owner?.designation || '',
+								designation: doc.owner?.userDetails?.designation?.name
+									? doc.owner.userDetails.designation.name.charAt(0).toUpperCase() +
+									doc.owner.userDetails.designation.name.slice(1).toLowerCase()
+									: '',
 								department: doc.department?.name || '',
 								role: 'Admin', // Adjust if needed
 								approver: doc.projectManager || '',

@@ -19,24 +19,161 @@
                             <%= expiredMessage %>
                         </div>
                         <% } %>
-                            <!-- Renew Button -->
-                            <% if (canRenew) { %>
-                                <div class="mb-3">
-                                    <button id="renewExpiryBtn" class="btn btn-primary">Renew Expiry</button>
+
+                            <!-- Document Details -->
+                            <form id="documentForm">
+                                <div class="row g-3">
+
+                                    <!-- Document Information -->
+                                    <div class="col-12 mt-3">
+                                        <h5 class="fw-bold border-bottom pb-2">Document Information</h5>
+                                    </div>
+
+                                    <div class="col-md-4">
+                                        <label class="form-label fw-semibold">Document Name</label>
+                                        <input type="text" id="fileName" class="form-control" readonly>
+                                    </div>
+
+                                    <div class="col-md-8">
+                                        <label class="form-label fw-semibold">Description</label>
+                                        <div id="description" class="form-control bg-light" style="height:auto;"></div>
+                                    </div>
+
+                                    <div class="col-md-4">
+                                        <label class="form-label fw-semibold">Status</label>
+                                        <input type="text" id="status" class="form-control" readonly>
+                                    </div>
+
+                                    <div class="col-md-8">
+                                        <label class="form-label fw-semibold">Tags</label>
+                                        <div id="tagsContainer" class="d-flex gap-2 flex-wrap"></div>
+                                    </div>
+
+                                    <!-- Version Info -->
+                                    <div class="col-12 mt-4">
+                                        <h5 class="fw-bold border-bottom pb-2">Version Details</h5>
+                                    </div>
+
+                                    <div class="col-md-3">
+                                        <label class="form-label fw-semibold">Version</label>
+                                        <input type="text" id="versionNum" class="form-control" readonly>
+                                    </div>
+
+                                    <div class="col-md-4">
+                                        <label class="form-label fw-semibold">Version Date</label>
+                                        <input type="text" id="versionDate" class="form-control" readonly>
+                                    </div>
+
+                                    <div class="col-md-5">
+                                        <label class="form-label fw-semibold">Changed By</label>
+                                        <input type="text" id="changedBy" class="form-control" readonly>
+                                    </div>
+
+                                    <div class="col-12">
+                                        <label class="form-label fw-semibold">Change Comments</label>
+                                        <textarea id="changeComment" class="form-control" rows="2" readonly></textarea>
+                                    </div>
+
+                                    <!-- Project & Department -->
+                                    <div class="col-12 mt-4">
+                                        <h5 class="fw-bold border-bottom pb-2">Project & Department</h5>
+                                    </div>
+
+                                    <div class="col-md-4">
+                                        <label class="form-label fw-semibold">Project Name</label>
+                                        <input type="text" id="projectName" class="form-control" readonly>
+                                    </div>
+
+                                    <div class="col-md-4">
+                                        <label class="form-label fw-semibold">Department</label>
+                                        <input type="text" id="department" class="form-control" readonly>
+                                    </div>
+
+                                    <div class="col-md-4">
+                                        <label class="form-label fw-semibold">Folder</label>
+                                        <input type="text" id="folder" class="form-control" readonly>
+                                    </div>
+
+                                    <div class="col-md-4">
+                                        <label class="form-label fw-semibold">Project Manager</label>
+                                        <input type="text" id="projectManager" class="form-control" readonly>
+                                    </div>
+
+                                    <!-- Stakeholders -->
+                                    <div class="col-12 mt-4">
+                                        <h5 class="fw-bold border-bottom pb-2">Stakeholders</h5>
+                                    </div>
+
+                                    <div class="col-md-4">
+                                        <label class="form-label fw-semibold">Owner</label>
+                                        <input type="text" id="owner" class="form-control" readonly>
+                                    </div>
+
+                                    <div class="col-md-4">
+                                        <label class="form-label fw-semibold">Donor</label>
+                                        <input type="text" id="donor" class="form-control" readonly>
+                                    </div>
+
+                                    <div class="col-md-4">
+                                        <label class="form-label fw-semibold">Vendor</label>
+                                        <input type="text" id="vendor" class="form-control" readonly>
+                                    </div>
+
+                                    <!-- Compliance -->
+                                    <div class="col-12 mt-4">
+                                        <h5 class="fw-bold border-bottom pb-2">Compliance Information</h5>
+                                    </div>
+
+                                    <div class="col-md-4">
+                                        <label class="form-label fw-semibold">Compliance Required</label>
+                                        <input type="text" id="compliance" class="form-control" readonly>
+                                    </div>
+
+                                    <div class="col-md-4">
+                                        <label class="form-label fw-semibold">Expiry Date</label>
+                                        <input type="text" id="expiryDate" class="form-control" readonly>
+                                    </div>
+
+                                    <!-- Dates -->
+                                    <div class="col-12 mt-4">
+                                        <h5 class="fw-bold border-bottom pb-2">Dates</h5>
+                                    </div>
+
+                                    <div class="col-md-4">
+                                        <label class="form-label fw-semibold">Document Date</label>
+                                        <input type="text" id="documentDate" class="form-control" readonly>
+                                    </div>
+
+                                    <div class="col-md-4">
+                                        <label class="form-label fw-semibold">Created At</label>
+                                        <input type="text" id="createdAt" class="form-control" readonly>
+                                    </div>
+
+                                    <div class="col-md-4">
+                                        <label class="form-label fw-semibold">Updated At</label>
+                                        <input type="text" id="updatedAt" class="form-control" readonly>
+                                    </div>
+
+                                    <!-- Files -->
+                                    <div class="col-12 mt-4">
+                                        <h5 class="fw-bold border-bottom pb-2">Files Attached</h5>
+                                    </div>
+
+                                    <div class="col-12">
+                                        <ul id="fileList" class="list-group"></ul>
+                                    </div>
+
+                                    <!-- External Link -->
+                                    <div class="col-12 mt-4 mb-5">
+                                        <h5 class="fw-bold border-bottom pb-2">External Link</h5>
+                                    </div>
+
+                                    <div class="col-12">
+                                        <a id="externalLink" target="_blank"></a>
+                                    </div>
+
                                 </div>
-                                <% } %>
-
-                                    <!-- Version & Document Info -->
-                                    <form id="documentForm">
-                                        <div class="row g-3">
-                                            <div class="col-md-4">
-                                                <label class="form-label fw-semibold">Project Name</label>
-                                                <input type="text" id="projectName" class="form-control" readonly>
-                                            </div>
-                                            <!-- Add other fields like Department, Project Manager, etc. -->
-                                        </div>
-                                    </form>
-
+                            </form>
                 </div>
             </div>
         </div>
@@ -47,68 +184,68 @@
         <script>
             document.addEventListener('DOMContentLoaded', async () => {
                 const documentId = "<%= documentId %>";
-                const sharedId = "<%= sharedId %>";
                 const version = new URLSearchParams(window.location.search).get('version');
 
-                if (!documentId || !version) return;
-
-                // Load document version details
                 try {
                     const res = await fetch(`/api/documents/${documentId}/versions/view?version=${version}`);
-                    if (!res.ok) throw new Error('Version not found');
                     const data = await res.json();
                     const doc = data.document;
-                    const snapshot = doc.snapshot || {};
 
-                    document.getElementById('projectName').value = snapshot.projectName || doc.project?.projectName || '-';
+                    document.getElementById('fileName').value = doc.metadata?.fileName || '-';
+                    document.getElementById('description').innerHTML = doc.metadata?.fileDescription || doc.description || '-';
+                    document.getElementById('status').value = doc.status || '-';
+
+                    // Tags Styling
+                    let tagsHtml = '';
+                    (doc.tags || []).forEach(tag => {
+                        tagsHtml += `<span class="badge bg-primary">${tag}</span>`;
+                    });
+                    document.getElementById('tagsContainer').innerHTML = tagsHtml;
+
+                    // Version Details
+                    document.getElementById('versionNum').value = version;
+                    document.getElementById('versionDate').value = formatDate(data.timestamp) || '-';
+                    document.getElementById('changedBy').value = data.changedBy?.name || '-';
+                    document.getElementById('changeComment').value = data.changes || '-';
+
+                    // Project & Department
+                    document.getElementById('projectName').value = doc.project?.projectName || '-';
+                    document.getElementById('department').value = doc.department?.name || '-';
+                    document.getElementById('folder').value = doc.folderId?.name || '-';
+                    document.getElementById('projectManager').value = doc.projectManager?.name || '-';
+
+                    // Stakeholders
+                    document.getElementById('owner').value = doc.owner?.name || '-';
+                    document.getElementById('donor').value = doc.documentDonor?.name || '-';
+                    document.getElementById('vendor').value = doc.documentVendor?.name || '-';
+
+                    // Compliance
+                    document.getElementById('compliance').value = doc.compliance?.isCompliance ? 'Yes' : 'No';
+                    document.getElementById('expiryDate').value = formatDate(doc.compliance?.expiryDate) || '-';
+
+                    // Dates
+                    document.getElementById('documentDate').value = formatDate(doc.documentDate) || '-';
+                    document.getElementById('createdAt').value = formatDate(doc.createdAt) || '-';
+                    document.getElementById('updatedAt').value = formatDate(doc.updatedAt) || '-';
+
+                    // Files
+                    const fileList = document.getElementById('fileList');
+                    fileList.innerHTML = '';
+                    (doc.files || []).forEach(f => {
+                        const li = document.createElement('li');
+                        li.className = "list-group-item";
+                        li.innerHTML = `<a href="/uploads/${f._id}" download>${f.originalName}</a>`;
+                        fileList.appendChild(li);
+                    });
+
+                    // External Link
+                    const link = document.getElementById('externalLink');
+                    link.href = doc.link;
+                    link.textContent = doc.link;
+
                 } catch (err) {
                     console.error(err);
-                    alert('Failed to load document details.');
+                    alert("Failed to load document version details.");
                 }
-
-                // Renew button shows modal
-                const renewBtn = document.getElementById('renewExpiryBtn');
-                const renewModal = new bootstrap.Modal(document.getElementById('renewModal'));
-                const renewDuration = document.getElementById('renewDuration');
-                const customExpiry = document.getElementById('customExpiry');
-
-                renewDuration.addEventListener('change', () => {
-                    customExpiry.style.display = renewDuration.value === 'custom' ? 'block' : 'none';
-                });
-
-                renewBtn?.addEventListener('click', () => {
-                    renewModal.show();
-                });
-
-                // Confirm renewal
-                document.getElementById('confirmRenewBtn').addEventListener('click', async () => {
-                    let duration = renewDuration.value;
-                    let body = { duration };
-
-                    if (duration === 'custom') {
-                        const customDate = customExpiry.value;
-                        if (!customDate) return alert('Please select a custom expiry date.');
-                        body.customDate = customDate;
-                    }
-
-                    try {
-                        const res = await fetch(`/api/shared/${sharedId}/renew`, {
-                            method: 'PATCH',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(body)
-                        });
-                        const data = await res.json();
-
-                        if (res.ok) {
-                            alert('Expiry renewed successfully!');
-                            location.reload();
-                        } else {
-                            alert(data.message || 'Failed to renew.');
-                        }
-                    } catch (err) {
-                        console.error(err);
-                        alert('Server error while renewing expiry.');
-                    }
-                });
             });
         </script>

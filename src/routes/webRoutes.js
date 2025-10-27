@@ -125,14 +125,14 @@ router.get("/document/:id/admin/approval/track", authenticate, checkPermissions,
 router.get("/documents/admin/recyclebin", authenticate, checkPermissions, AdminController.showRecycleBinPage);
 router.get("/admin/folders/:folderId/manage-access", authenticate, AdminController.showManageAccessPage);
 router.get("/admin/permissionslogs", authenticate, AdminController.showPermissionLogsPage);
-
+router.get("/admin/folders/permission", authenticate, AdminController.showFolderPermissionLogsPage);
 /* =========================================
    EMPLOYEE ROUTE
    ========================================= */
-router.get("/employee/approval", authenticate, checkPermissions, EmployeeController.showEmployeeApprovalPage);
-router.get("/employee/dashboard", authenticate, checkPermissions, EmployeeController.showEmployeeDashboardPage);
+router.get("/employee/approval", authenticate, EmployeeController.showEmployeeApprovalPage);
+router.get("/employee/dashboard", authenticate, EmployeeController.showEmployeeDashboardPage);
 // router.get("/employee/track", authenticate, checkPermissions, EmployeeController.showEmployeeApprovalPage);
-router.get("/documents/employee/recyclebin", authenticate, checkPermissions, EmployeeController.showEmployeeRecycleBinPage);
+router.get("/documents/employee/recyclebin", authenticate, EmployeeController.showEmployeeRecycleBinPage);
 //Approvals
 // Render approval page
 router.get('/document/:id/approval/track', authenticate, DocumentController.getDocumentApprovalsPage);
@@ -141,7 +141,7 @@ router.get('/document/:id/approval/track', authenticate, DocumentController.getD
    Reports ROUTES
    ========================================= */
 // Add Designation page
-router.get("/report", authenticate, authorize("admin"), checkPermissions, ReportsController.showReportPage);
+router.get("/report", authenticate, authorize("admin"), ReportsController.showReportPage);
 
 
 /* =========================================
@@ -333,7 +333,7 @@ router.get("/notifications", authenticate, checkPermissions, NotificationControl
 /* =========================================
    MY PROFILE ROUTE
    ========================================= */
-router.get("/my-profile", authenticate, checkPermissions, AuthController.showMyProfile);
+router.get("/my-profile", authenticate, AuthController.showMyProfile);
 
 
 /* ===========================

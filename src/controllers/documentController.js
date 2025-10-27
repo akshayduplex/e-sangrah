@@ -378,7 +378,14 @@ export const getDocuments = async (req, res) => {
             .select("files updatedAt createdAt signature isDeleted isArchived comment sharedWithUsers compliance status metadata tags owner documentVendor documentDonor department project description")
             .populate("department", "name")
             .populate("project", "projectName")
-            .populate("owner", "name email profile_image")
+            .populate({
+                path: "owner",
+                select: "name email profile_image userDetails.designation",
+                populate: {
+                    path: "userDetails.designation",
+                    select: "name"
+                }
+            })
             .populate("documentDonor", "name profile_image")
             .populate("documentVendor", "name profile_image")
             .populate("sharedWithUsers", "name profile_image email")

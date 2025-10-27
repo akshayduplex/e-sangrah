@@ -126,6 +126,22 @@ export const showPermissionLogsPage = async (req, res) => {
         });
     }
 };
+
+export const showFolderPermissionLogsPage = async (req, res) => {
+    try {
+        res.render("pages/reports/folderPermissionLogs", {
+            title: "Permission Logs",
+            user: req.user
+        });
+
+    } catch (err) {
+        logger.error("Admin render error:", err);
+        res.status(500).render("pages/error", {
+            user: req.user,
+            message: "Unable to load manage access page"
+        });
+    }
+};
 //API Controllers
 
 /**
