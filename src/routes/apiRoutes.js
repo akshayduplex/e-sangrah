@@ -1039,7 +1039,7 @@ router.delete('/session/clear-recent-folders', async (req, res) => {
  */
 // Create a new folder
 router.post('/folders', FolderController.createFolder);
-
+router.post('/folders/automatic', FolderController.automaticPojectDepartmentFolderCreate);
 // List folders (optionally filter by parent)
 router.get('/folders', FolderController.listFolders);
 router.get('/folders/all', FolderController.getAllFolders);

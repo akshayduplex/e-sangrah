@@ -119,13 +119,13 @@ router.get("/departments/:id", authenticate, checkPermissions, DepartmentControl
 /* =========================================
    ADMIN ROUTE
    ========================================= */
-router.get("/admin/dashboard", authenticate, checkPermissions, AdminController.showAdminDashboardPage);
-router.get("/admin/approval", authenticate, checkPermissions, AdminController.showAdminApprovalPage);
-router.get("/document/:id/admin/approval/track", authenticate, checkPermissions, AdminController.showApprovalTrackPage);
+router.get("/admin/dashboard", authenticate, authorize('admin', 'superadmin'), checkPermissions, AdminController.showAdminDashboardPage);
+router.get("/admin/approval", authenticate, authorize('admin', 'superadmin'), checkPermissions, AdminController.showAdminApprovalPage);
+router.get("/document/:id/admin/approval/track", authenticate, authorize('admin', 'superadmin'), checkPermissions, AdminController.showApprovalTrackPage);
 router.get("/documents/admin/recyclebin", authenticate, checkPermissions, AdminController.showRecycleBinPage);
-router.get("/admin/folders/:folderId/manage-access", authenticate, AdminController.showManageAccessPage);
-router.get("/admin/permissionslogs", authenticate, AdminController.showPermissionLogsPage);
-router.get("/admin/folders/permission", authenticate, AdminController.showFolderPermissionLogsPage);
+router.get("/admin/folders/:folderId/manage-access", authorize('admin', 'superadmin'), authenticate, AdminController.showManageAccessPage);
+router.get("/admin/permissionslogs", authenticate, authorize('admin', 'superadmin'), AdminController.showPermissionLogsPage);
+router.get("/admin/folders/permission", authenticate, authorize('admin', 'superadmin'), AdminController.showFolderPermissionLogsPage);
 /* =========================================
    EMPLOYEE ROUTE
    ========================================= */
@@ -170,7 +170,7 @@ router.get("/documents/archived", authenticate, checkPermissions, DocumentContro
 
 
 // Add Document page
-router.get("/documents/add", authenticate, checkPermissions, DocumentController.showAddDocumentPage);
+router.get("/documents/add", authenticate, DocumentController.showAddDocumentPage);
 
 // Edit Document page
 router.get("/documents/edit/:id", authenticate, checkPermissions, DocumentController.showEditDocumentPage);
@@ -197,7 +197,7 @@ router.get("/projects", authenticate, checkPermissions, ProjectController.showMa
    ========================================= */
 
 // Assign Permissions page
-router.get("/permissions/assign", authenticate, checkPermissions, async (req, res) => {
+router.get("/permissions/assign", authenticate, authorize('admin', 'superadmin'), checkPermissions, async (req, res) => {
     try {
         const departments = await Department.find({ status: "Active" }, "name").lean();
         const designations = await Designation.find({ status: "Active" }).sort({ name: 1 }).lean();

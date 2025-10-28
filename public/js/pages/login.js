@@ -22,7 +22,31 @@ function showSuccess(message) {
         loginMessage.classList.add("text-success");
     }
 }
+async function logoutUser(event) {
+    event.preventDefault();
 
+    try {
+        const response = await fetch("api/auth/logout", {
+            method: "POST",
+            credentials: "include",
+            headers: {
+                "Content-Type": "application/json"
+            }
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            showToast(data.message || "Logged out successfully", 'success');
+            window.location.href = "/login"; // redirect after logout
+        } else {
+            showToast(data.message || "Logout failed. Try again.", "error");
+        }
+    } catch (error) {
+        console.error("Logout error:", error);
+        showToast("An error occurred while logging out.", "error");
+    }
+}
 // Show/Hide Password
 function togglePassword(inputId, toggleEl) {
     const input = document.getElementById(inputId);

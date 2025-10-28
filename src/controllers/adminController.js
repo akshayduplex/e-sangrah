@@ -229,6 +229,7 @@ export const getMyApprovals = async (req, res) => {
     }
 };
 
+
 export const getPermissionLogs = async (req, res) => {
     const ownerId = req.user._id;
     const { page = 1, limit = 10, startDate, endDate } = req.query;

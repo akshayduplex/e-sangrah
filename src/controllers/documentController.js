@@ -297,8 +297,14 @@ export const getDocuments = async (req, res) => {
             orderColumn,
             orderDir
         } = req.query;
-
-        const filter = { isDeleted: false, isArchived: false };
+        const userId = req.user?._id;
+        const filter = {
+            isDeleted: false, isArchived: false,
+            $or: [
+                { owner: userId },
+                { sharedWithUsers: userId }
+            ]
+        };
         const toArray = val => {
             if (!val) return [];
             if (Array.isArray(val)) return val;
@@ -504,20 +510,27 @@ export const getDocument = async (req, res) => {
  */
 export const getRecycleBinDocuments = async (req, res) => {
     try {
-        // Parse pagination params
+        const userId = req.user?._id;
+        if (!userId) {
+            return res.status(401).json({ success: false, message: "Unauthorized" });
+        }
+
+        // Pagination
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 10;
         const skip = (page - 1) * limit;
 
-        // Search and filter
+        // Filters
         const search = req.query.search ? req.query.search.trim() : "";
         const department = req.query.department || "";
 
+        // Only documents owned by the current user
         const query = {
-            isDeleted: true,
-            // isArchived: false
+            owner: userId,
+            isDeleted: true
         };
 
+        // Search filter
         if (search) {
             query.$or = [
                 { "metadata.fileName": { $regex: search, $options: "i" } },
@@ -526,13 +539,15 @@ export const getRecycleBinDocuments = async (req, res) => {
             ];
         }
 
+        // Department filter
         if (department) {
             query.department = department;
         }
 
+        // Fetch documents & total count
         const [documents, total] = await Promise.all([
             Document.find(query)
-                .select(" files tags createdAt isDeleted deletedAt department metadata")
+                .select("files tags createdAt isDeleted deletedAt department metadata")
                 .populate("department", "name")
                 .populate("files", "originalName version fileSize")
                 .populate("owner", "name email")
@@ -552,7 +567,11 @@ export const getRecycleBinDocuments = async (req, res) => {
         });
     } catch (err) {
         console.error("Get recycle bin documents error:", err);
-        return res.status(500).json({ success: false, message: "Failed to fetch documents", error: err.message });
+        return res.status(500).json({
+            success: false,
+            message: "Failed to fetch documents",
+            error: err.message
+        });
     }
 };
 
@@ -610,21 +629,28 @@ export const getArchivedDocuments = async (req, res) => {
         const orderColumn = req.query.orderColumn || 'updatedAt';
         const orderDir = req.query.orderDir === 'asc' ? 1 : -1;
 
-        // Start query
-        const query = { isArchived: true, isDeleted: false };
+        const userId = req.user?._id; // ensure your auth middleware sets req.user
 
-        // Department filter
+        // --- Base query: only archived docs owned by user ---
+        const query = {
+            isArchived: true,
+            isDeleted: false,
+            owner: userId  // Only owner documents
+        };
+
+        // --- Department filter ---
         if (req.query.department && req.query.department !== 'all') {
             query.department = req.query.department;
         }
 
-        // Search filter
+        // --- Search filter ---
         if (search) {
             query['files'] = {
                 $elemMatch: { originalName: { $regex: search, $options: 'i' } }
             };
         }
 
+        // --- Fetch documents + total count ---
         const [documents, total] = await Promise.all([
             Document.find(query)
                 .populate("department", "name")
@@ -641,6 +667,7 @@ export const getArchivedDocuments = async (req, res) => {
             recordsFiltered: total,
             data: documents
         });
+
     } catch (err) {
         console.error(err);
         return res.status(500).json({ success: false, message: err.message });
@@ -982,13 +1009,13 @@ export const updateDocument = async (req, res) => {
                                     hasChanges = true;
                                     changeReason = "Expiry date updated";
                                     changedFields.push("compliance");
-                                    console.log('✅ Expiry date updated to:', newExpiry);
+                                    console.log('Expiry date updated to:', newExpiry);
                                 }
                             } else {
-                                console.warn("❌ Invalid expiry date, skipping:", value);
+                                console.warn("Invalid expiry date, skipping:", value);
                             }
                         } catch (error) {
-                            console.warn("❌ Expiry date error, skipping:", error.message);
+                            console.warn("Expiry date error, skipping:", error.message);
                         }
                     } else if (value === '' || value === null) {
                         // Clear expiry date
@@ -1031,13 +1058,12 @@ export const updateDocument = async (req, res) => {
                                     hasChanges = true;
                                     changeReason = "Document date updated";
                                     changedFields.push("documentDate");
-                                    console.log('✅ Document date updated:', newDocumentDate);
                                 }
                             } else {
-                                console.warn("❌ Invalid document date format:", value);
+                                console.warn("Invalid document date format:", value);
                             }
                         } catch (error) {
-                            console.warn("❌ Document date parsing error:", error.message, "Value:", value);
+                            console.warn("Document date parsing error:", error.message, "Value:", value);
                         }
                     }
                     break;

@@ -10,13 +10,14 @@ document.addEventListener("DOMContentLoaded", () => {
         Toastify({
             text: message || "No message provided",
             duration,
-            gravity: "top",
+            gravity: "bottom",
             position: "right",
             backgroundColor: colors[type] || colors.info,
             stopOnFocus: true,
             close: true
-        }).showToast(); // <--- must call this
+        }).showToast(); // make sure this line stays
     }
 
+    // Expose globally so you can call it anywhere
     window.showToast = showToast;
 });

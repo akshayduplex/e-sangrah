@@ -65,8 +65,6 @@ function initializeEditDocument() {
     initializeEditFormSubmission();
     initializeFileUpload();
     initializeExistingFileHandlers();
-
-    console.log('✅ Edit document initialization complete');
 }
 
 function storeOriginalFormData() {
@@ -394,7 +392,6 @@ function formatDateForSubmission(dateString) {
                 if (!isNaN(date.getTime())) {
                     // Return in ISO format for backend
                     const result = date.toISOString();
-                    console.log('✅ Date formatted successfully:', dateString, '→', result);
                     return result;
                 }
             }
@@ -772,9 +769,6 @@ function initializeFileUpload() {
 
                 const uploadedFile = data.files[0];
                 const fileId = uploadedFile.fileId;
-
-                console.log('✅ File uploaded successfully:', fileId);
-
                 window.uploadedFileIds.push(fileId);
                 fileItemDiv.setAttribute("data-file-id", fileId);
                 removeBtn.setAttribute("data-file-id", fileId);
@@ -1063,5 +1057,3 @@ function showToast(message, type = 'info') {
         alert('ℹ️ ' + message);
     }
 }
-
-console.log('✅ document-edit.js loaded successfully');

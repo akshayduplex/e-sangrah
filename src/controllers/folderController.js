@@ -17,6 +17,8 @@ import { s3Client } from '../config/S3Client.js';
 import checkFolderAccess from '../utils/checkFolderAccess.js';
 import FolderPermissionLogs from '../models/FolderPermissionLogs.js';
 import { calculateExpiration } from '../helper/CalculateExpireDate.js';
+import Project from '../models/Project.js';
+import Department from '../models/Departments.js';
 
 //Page controlers
 
@@ -216,6 +218,58 @@ export const createFolder = async (req, res) => {
             success: false,
             message: 'Server error while creating folder'
         });
+    }
+};
+
+// Auto-create root folder if none exists
+export const automaticPojectDepartmentFolderCreate = async (req, res) => {
+    try {
+        const { projectId, departmentId } = req.body;
+        const ownerId = req.user._id;
+
+        if (!projectId || !departmentId) {
+            return res.status(400).json({ success: false, message: "Project and Department are required." });
+        }
+
+        // Check if any folder exists under this project+department
+        const existingFolders = await Folder.find({
+            projectId,
+            departmentId,
+            isDeleted: false,
+            parent: null
+        });
+
+        if (existingFolders.length > 0) {
+            return res.json({ success: true, folder: existingFolders[0], created: false });
+        }
+
+        // No folder found → create default folder
+        const project = await Project.findById(projectId);
+        const department = await Department.findById(departmentId);
+
+        const defaultName = `${project.projectName}_${department.name}`.replace(/\s+/g, "_");
+
+        const newFolder = new Folder({
+            owner: ownerId,
+            name: defaultName,
+            projectId,
+            departmentId,
+            parent: null,
+            createdBy: ownerId,
+            updatedBy: ownerId
+        });
+
+        await newFolder.save();
+
+        res.status(201).json({
+            success: true,
+            message: "Default folder created.",
+            folder: newFolder,
+            created: true
+        });
+    } catch (err) {
+        console.error("Auto folder creation failed:", err);
+        res.status(500).json({ success: false, message: "Server error." });
     }
 };
 
@@ -573,47 +627,113 @@ export const uploadToFolder = async (req, res) => {
 export const getFolderTree = async (req, res) => {
     try {
         const { rootId, departmentId, projectId } = req.query;
+        const userId = req.user?._id;
 
+        if (!userId) {
+            return res.status(401).json({ success: false, message: "Unauthorized" });
+        }
+
+        // ---- Aggregation pipeline to prefetch all allowed folders fast ----
+        const match = {
+            isArchived: false,
+            deletedAt: null,
+            $or: [
+                { owner: new mongoose.Types.ObjectId(userId) },
+                { "permissions.principal": new mongoose.Types.ObjectId(userId) }
+            ]
+        };
+
+        if (departmentId && departmentId !== "all") {
+            match.departmentId = new mongoose.Types.ObjectId(departmentId);
+        }
+
+        if (projectId && projectId !== "all") {
+            match.projectId = new mongoose.Types.ObjectId(projectId);
+        }
+
+        const foldersAgg = await Folder.aggregate([
+            { $match: match },
+            {
+                $lookup: {
+                    from: "projects",
+                    localField: "projectId",
+                    foreignField: "_id",
+                    as: "projectId"
+                }
+            },
+            {
+                $lookup: {
+                    from: "departments",
+                    localField: "departmentId",
+                    foreignField: "_id",
+                    as: "departmentId"
+                }
+            },
+            {
+                $lookup: {
+                    from: "files",
+                    localField: "files",
+                    foreignField: "_id",
+                    as: "files"
+                }
+            },
+            {
+                $project: {
+                    name: 1,
+                    slug: 1,
+                    path: 1,
+                    parent: 1,
+                    status: 1,
+                    owner: 1,
+                    projectId: { $arrayElemAt: ["$projectId", 0] },
+                    departmentId: { $arrayElemAt: ["$departmentId", 0] },
+                    files: {
+                        $map: {
+                            input: "$files",
+                            as: "f",
+                            in: {
+                                _id: "$$f._id",
+                                file: "$$f.file",
+                                originalName: "$$f.originalName",
+                                fileType: "$$f.fileType",
+                                size: "$$f.fileSize"
+                            }
+                        }
+                    }
+                }
+            },
+            { $sort: { name: 1 } }
+        ]);
+
+        // ---- In-memory map for fast recursive tree build ----
+        const folderMap = new Map();
+        foldersAgg.forEach(folder => {
+            folderMap.set(folder._id.toString(), { ...folder, children: [] });
+        });
+
+        // ---- Recursive builder (same as before, logic preserved) ----
         const buildTree = async (parentId = null) => {
-            // Build query dynamically
-            const query = { parent: parentId, isArchived: false };
-
-            if (departmentId && departmentId !== 'all') query.departmentId = departmentId;
-            if (projectId && projectId !== 'all') query.projectId = projectId;
-
-            const folders = await Folder.find(query)
-                .populate('projectId', 'name')
-                .populate('departmentId', 'name')
-                .populate('files')
-                .sort({ name: 1 })
-                .lean();
-
-            const tree = await Promise.all(folders.map(async (folder) => {
-                const children = await buildTree(folder._id);
-
-                // Map files to only include the desired fields
-                const files = (folder.files || []).map(f => ({
-                    _id: f._id,
-                    file: f.file,
-                    originalName: f.originalName,
-                    fileType: f.fileType,
-                    size: f.fileSize
-                }));
-
-                return {
-                    _id: folder._id,
-                    name: folder.name,
-                    status: folder.status,
-                    slug: folder.slug,
-                    path: folder.path,
-                    projectId: folder.projectId,
-                    departmentId: folder.departmentId,
-                    files,
-                    children: children.length > 0 ? children : null
-                };
-            }));
-
-            return tree;
+            const currentLevel = [];
+            for (const folder of folderMap.values()) {
+                const isChild =
+                    (parentId === null && !folder.parent) ||
+                    (folder.parent && folder.parent.toString() === String(parentId));
+                if (isChild) {
+                    const children = await buildTree(folder._id);
+                    currentLevel.push({
+                        _id: folder._id,
+                        name: folder.name,
+                        status: folder.status,
+                        slug: folder.slug,
+                        path: folder.path,
+                        projectId: folder.projectId,
+                        departmentId: folder.departmentId,
+                        files: folder.files,
+                        children: children.length > 0 ? children : null
+                    });
+                }
+            }
+            return currentLevel;
         };
 
         const tree = rootId ? await buildTree(rootId) : await buildTree();
@@ -622,14 +742,16 @@ export const getFolderTree = async (req, res) => {
             success: true,
             tree
         });
+
     } catch (err) {
-        logger.error('Get folder tree error:', err);
+        console.error("Get folder tree error:", err);
         res.status(500).json({
             success: false,
-            message: 'Server error while fetching folder tree'
+            message: "Server error while fetching folder tree"
         });
     }
 };
+
 
 export const archiveFolder = async (req, res) => {
     try {
@@ -1157,7 +1279,7 @@ export const requestFolderAccess = async (req, res) => {
         const owner = folder.owner;
         if (!owner?.email) return res.status(400).json({ success: false, message: "Owner email not found" });
 
-        // ✅ Is internal? (Existing permission)
+        // Is internal? (Existing permission)
         const isInternal = folder.permissions.some(
             p => p.principal.toString() === user._id.toString()
         );
@@ -1177,7 +1299,7 @@ export const requestFolderAccess = async (req, res) => {
             { upsert: true, new: true }
         );
 
-        // ✅ Only send email if user is external
+        //Only send email if user is external
         if (!isInternal) {
             const baseUrl = API_CONFIG.baseUrl || "http://localhost:5000";
             const manageLink = `${baseUrl}/admin/folders/${folderId}/manage-access?userEmail=${user.email}`;
@@ -1350,14 +1472,14 @@ export const grantFolderAccess = async (req, res) => {
         folder.updatedBy = owner._id;
         await folder.save();
 
-        // ✅ Update logs
+        // Update logs
         await FolderPermissionLogs.findOneAndUpdate(
             { folder: folder._id, "user.email": user.email },
             {
                 requestStatus: "approved",
                 expiresAt,
                 duration,
-                isExternal: false, // ✅ Now internal
+                isExternal: false, // Now internal
                 approvedBy: owner._id
             },
             { new: true }
@@ -1392,12 +1514,17 @@ export const getFolderPermissions = async (req, res) => {
             status
         } = req.query;
 
+        const userId = req.user?._id;
+        if (!userId) {
+            return res.status(401).json({ success: false, message: "Unauthorized" });
+        }
+
         page = parseInt(page);
         limit = parseInt(limit);
 
-        const query = {};
+        const query = { owner: userId };
 
-        // ✅ Search by username or email
+        //Search by username or email
         if (search) {
             query.$or = [
                 { "user.username": { $regex: search, $options: "i" } },
@@ -1405,7 +1532,6 @@ export const getFolderPermissions = async (req, res) => {
             ];
         }
 
-        // ✅ Filter by status
         if (status && status !== "all") {
             query.requestStatus = status;
         }
@@ -1432,9 +1558,11 @@ export const getFolderPermissions = async (req, res) => {
         });
 
     } catch (error) {
+        console.error("getFolderPermissions error:", error);
         res.status(500).json({ success: false, message: error.message });
     }
 };
+
 
 export const getFolderAccessByEmail = async (req, res) => {
     try {

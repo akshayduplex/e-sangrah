@@ -95,7 +95,14 @@ export const login = async (req, res) => {
         const { email, password } = req.body;
 
         // Find user
-        const user = await User.findOne({ email }).select("+password");
+        const user = await User.findOne({ email })
+            .select(
+                "+password name email isActive preferences profile_type phone_number passwordVerification profile_image address userDetails status"
+            )
+            .populate([
+                { path: "userDetails.designation", select: "name" },
+                { path: "userDetails.department", select: "name" }
+            ]);
         if (!user) return failResponse(res, "User not found", 401);
 
         //Password change verification check
@@ -127,10 +134,9 @@ export const login = async (req, res) => {
                 if (user.status !== "Active") {
                     return failResponse(res, "User is not active", 403);
                 }
-
                 req.session.user = {
                     _id: user._id,
-                    designation_id: user.userDetails?.designation || null,
+                    designation: user.userDetails?.designation || null,
                     department: user.userDetails?.department || null,
                     email: user.email,
                     profile_type: user.profile_type,

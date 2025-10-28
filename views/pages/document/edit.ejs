@@ -460,11 +460,6 @@
             window.isEdit = true;
             window.documentId = "<%= document._id %>";
             window.documentData = <% - JSON.stringify(document) %>;
-            console.log('✅ EJS data loaded successfully:', {
-                documentId: window.documentId,
-                signature: !!window.documentData.signature,
-                files: window.documentData.files ? window.documentData.files.length : 0
-            });
         } catch (e) {
             console.error('❌ EJS Variables Failed:', e);
             // Fallback to DOM elements

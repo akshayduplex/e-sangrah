@@ -286,7 +286,7 @@ export const getDocumentsStatusSummary = async (req, res) => {
             if (seriesItem) seriesItem.data[monthIndex] = item.count;
         });
 
-        return successResponse(res, { categories, series }, "Document status summary fetched ✅");
+        return successResponse(res, { categories, series }, "Document status summary fetched");
 
     } catch (err) {
         return errorResponse(res, err);
