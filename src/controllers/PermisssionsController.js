@@ -9,7 +9,6 @@ import { profile_type } from "../constant/Constant.js";
 import Department from "../models/Departments.js";
 import User from "../models/User.js";
 import UserPermission from "../models/UserPermission.js";
-import { incrementGlobalPermissionsVersion } from "../middlewares/checkPermission.js";
 import { API_CONFIG } from "../config/ApiEndpoints.js";
 
 //Page Controllers
@@ -234,7 +233,7 @@ export const assignMenusToDesignation = async (req, res) => {
             await MenuAssignment.insertMany(assignments);
         }
 
-        incrementGlobalPermissionsVersion(designation_id);
+        // incrementGlobalPermissionsVersion(designation_id);
         res.json({
             success: true,
             message: "Menus assigned successfully",

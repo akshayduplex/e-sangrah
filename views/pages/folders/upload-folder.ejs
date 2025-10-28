@@ -70,7 +70,7 @@
 				</div>
 				<div class="col-md-12 ">
 					<div class="my-4">
-						<button id="uploadFilesBtn" class="btn btn-primary rounded-pill">
+						<button class="btn btn-primary rounded-pill">
 							<span id="uploadBtnText">Upload Folders</span>
 							<span id="uploadBtnSpinner" class="spinner-border spinner-border-sm ms-2 d-none"></span>
 						</button>
@@ -265,25 +265,39 @@
 							window.selectedProjectId
 						);
 					});
-				} else if (type === 'file') {
+				}
+				else if (type === 'file') {
 					div.innerHTML = `
-			<div class="folder-card p-4 bg-white rounded shadow-sm hover-shadow cursor-pointer d-flex flex-column justify-content-between">
-				<div class="d-flex align-items-center gap-2">
-					<img src="${getFileIcon(item.originalName)}" alt="icon" style="width:24px;height:24px">
-					<span class="text-truncate" style="max-width:120px" title="${item.originalName}">
-						${item.originalName}
-					</span>
-				</div>
-				<span class="text-muted small pt-2">${(item.size / 1024).toFixed(1)} KB</span>
-			</div>
-		`;
+    <div class="folder-card p-3 bg-white rounded shadow-sm hover-shadow position-relative d-flex flex-column justify-content-between">
+        <div class="d-flex align-items-center gap-2 mb-2">
+            <img src="${getFileIcon(item.originalName)}" alt="icon" style="width:24px;height:24px">
+            <span class="text-truncate" style="max-width:120px" title="${item.originalName}">
+                ${item.originalName}
+            </span>
+        </div>
+        <div class="d-flex justify-content-between align-items-center">
+            <small class="text-muted">${(item.size / 1024).toFixed(1)} KB</small>
+            <button class="btn btn-sm btn-link text-danger p-0 delete-file-btn" data-id="${item._id}" title="Delete file">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+    </div>
+    `;
 
 					// File double-click → open in new tab
 					div.querySelector('.folder-card').addEventListener('dblclick', () => {
 						window.open(`/folders/view/${item._id}`, '_blank');
 					});
-				}
 
+					// Attach delete button logic
+					div.querySelector('.delete-file-btn').addEventListener('click', async (e) => {
+						e.stopPropagation();
+						const fileId = e.currentTarget.dataset.id;
+						if (confirm('Are you sure you want to delete this file?')) {
+							await deleteFile(fileId, div);
+						}
+					});
+				}
 				return div;
 			}
 
@@ -521,23 +535,48 @@
 			}
 
 			function handleFiles(files) {
-				if (!folderState.currentFolderId) return showToast("Please select a folder first.", "warning");
-				Array.from(files).forEach(file => { pendingUploads.push({ file, folderId: folderState.currentFolderId }); renderPendingFile({ file, folderId: folderState.currentFolderId }); });
+				if (!folderState.currentFolderId) {
+					return showToast("Please select a folder first.", "warning");
+				}
+
+				Array.from(files).forEach(async (file) => {
+					const item = { file, folderId: folderState.currentFolderId };
+					pendingUploads.push(item);
+					const div = renderPendingFile(item);
+					const progressBar = div.querySelector('.progress-bar');
+
+					const updateProgress = (p, failed = false) => {
+						progressBar.style.width = `${p}%`;
+						progressBar.textContent = failed ? 'Failed' : `${p}%`;
+						progressBar.classList.toggle('bg-success', !failed);
+						progressBar.classList.toggle('bg-danger', failed);
+					};
+
+					// Automatically upload immediately
+					const success = await uploadFileToServer(item, updateProgress);
+					updateProgress(100, !success);
+					item.uploadSuccess = success;
+				});
 			}
 
+
+			// Handle full folder uploads
 			function handleFolderFiles(files) {
-				if (!folderState.currentFolderId) return showToast("Please select a folder first.", "warning");
+				if (!folderState.currentFolderId) {
+					return showToast("Please select a folder first.", "warning");
+				}
 
-				Array.from(files).forEach(file => {
+				const folderItems = Array.from(files).map(file => ({
+					file,
+					folderId: folderState.currentFolderId,
+					relativePath: file.webkitRelativePath,
+				}));
 
-					const item = {
-						file,
-						folderId: folderState.currentFolderId,
-						relativePath: file.webkitRelativePath
-					};
-					pendingUploads.push(item);
-					renderPendingFile(item);
-				});
+				// Render all pending files
+				folderItems.forEach((item) => renderPendingFile(item));
+
+				// Automatically start uploading the folder
+				uploadFolderToServer(folderItems);
 			}
 
 			// ---------------- FILE UPLOAD TO SERVER ----------------
@@ -558,11 +597,12 @@
 					};
 
 					xhr.onload = function () {
-						if (xhr.status === 200) {
+						if (xhr.status >= 200 && xhr.status < 300) {
 							progressCallback(100);
 							resolve(true);
 						} else {
-							progressCallback(0, true);
+							console.error('Upload failed:', xhr.responseText);
+							progressCallback(100, true);
 							resolve(false);
 						}
 					};
@@ -715,6 +755,29 @@
 						loadFolders(null, [], selectedId);
 					}
 				});
+
+				// ---------------- FILE DELETE ----------------
+				async function deleteFile(fileId, element) {
+					try {
+						const res = await fetch(`/api/files/${fileId}`, {
+							method: 'DELETE',
+							credentials: 'include'
+						});
+
+						const data = await res.json();
+
+						if (res.ok && data.success) {
+							element.remove();
+							showToast('File deleted successfully', 'success');
+						} else {
+							showToast(data.message || 'Failed to delete file', 'danger');
+						}
+					} catch (err) {
+						console.error('Error deleting file:', err);
+						showToast('Error deleting file', 'danger');
+					}
+				}
+
 
 				$('#department').on('change', async function () {
 					const projectId = window.selectedProjectId;

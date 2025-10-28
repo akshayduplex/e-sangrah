@@ -172,14 +172,14 @@
                                     $('#confirmDeleteModal').modal('hide');
                                     if (res.success) {
                                         table.ajax.reload(null, false);
-                                        alert('User deleted successfully');
+                                        showToast('User deleted successfully', 'success');
                                     } else {
-                                        alert(res.message || 'Failed to delete user');
+                                        showToast(res.message || 'Failed to delete user', 'error');
                                     }
                                 },
                                 error: function () {
                                     $('#confirmDeleteModal').modal('hide');
-                                    alert('Error deleting user');
+                                    showToast('Error deleting user', 'error');
                                 }
                             });
                         });

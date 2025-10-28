@@ -1,6 +1,8 @@
 import mongoose from 'mongoose';
 import { successResponse, failResponse, errorResponse } from '../utils/responseHandler.js';
 import Designation from '../models/Designation.js';
+import Menu from '../models/Menu.js';
+import MenuAssignment from '../models/MenuAssignment.js';
 
 //Page Controllers
 
@@ -98,6 +100,9 @@ export const getDesignationById = async (req, res) => {
 
 // Create new designation
 export const createDesignation = async (req, res) => {
+    const session = await Designation.startSession();
+    session.startTransaction();
+
     try {
         if (!req.user) return failResponse(res, 'Unauthorized', 401);
 
@@ -118,15 +123,44 @@ export const createDesignation = async (req, res) => {
             }
         };
 
+        // Create Designation
         const designation = new Designation(designationData);
-        await designation.save();
+        await designation.save({ session });
 
-        return successResponse(res, designation, 'Designation created successfully');
+        //  Fetch all menus
+        const allMenus = await Menu.find({}, '_id').lean();
+
+        // Prepare bulk MenuAssignment documents
+        const assignments = allMenus.map(menu => ({
+            designation_id: designation._id,
+            menu_id: menu._id,
+            permissions: {
+                read: true,
+                write: true,
+                delete: true
+            },
+            assigned_date: new Date()
+        }));
+
+        // Insert all menu assignments
+        if (assignments.length > 0) {
+            await MenuAssignment.insertMany(assignments, { session });
+        }
+
+        // Commit transaction
+        await session.commitTransaction();
+        session.endSession();
+
+        return successResponse(res, designation, 'Designation created successfully and menus assigned');
     } catch (err) {
+        await session.abortTransaction();
+        session.endSession();
+
         // Handle duplicate name error
         if (err.code === 11000 && err.keyValue?.name) {
             return failResponse(res, 'Designation name already exists', 400);
         }
+
         return errorResponse(res, err);
     }
 };

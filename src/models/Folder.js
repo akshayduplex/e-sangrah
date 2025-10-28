@@ -30,6 +30,7 @@ const folderSchema = new Schema({
             used: { type: Boolean, default: false }, // for onetime shares
         }
     ],
+    isDeleted: { type: Boolean, default: false, index: true },
     deletedAt: { type: Date, default: null, index: true },
     status: {
         type: String,

@@ -69,7 +69,7 @@
 
                     <!-- Submit -->
                     <div class="d-flex align-items-center justify-content-end mt-4">
-                        <button class="btn btn-primary btn-w-lg rounded-pill" type="submit">
+                        <button id="submitBtn" class="btn btn-primary btn-w-lg rounded-pill" type="submit">
                             <%= designation ? 'Update' : 'Add' %>
                         </button>
                     </div>
@@ -87,39 +87,52 @@
         </div>
     </div>
 
-    <script>
-        const form = document.getElementById('designationForm');
-
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-
-            const formData = new FormData(form);
-            const data = Object.fromEntries(formData.entries());
-
-            // Set the correct URL and method based on Add or Edit
-            const designationId = "<%= designation ? designation._id : '' %>";
-            const url = designationId ? `/api/designations/${designationId}` : '/api/designations';
-            const method = designationId ? 'PATCH' : 'POST';
-
-            try {
-                const res = await fetch(url, {
-                    method,
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
-                });
-
-                const result = await res.json();
-
-                if (res.ok) {
-                    showToast(result.message || 'Designation saved successfully!', 'success');
-                    setTimeout(() => { window.location.href = '/designations/list'; }, 1000);
-                } else {
-                    showToast(result.message || 'Failed to save designation.', 'danger');
-                }
-            } catch (err) {
-                showToast('Something went wrong!', 'danger');
-            }
-        });
-    </script>
-
     <%- include('../../partials/footer') %>
+        <script>
+            const form = document.getElementById('designationForm');
+            const submitBtn = document.getElementById('submitBtn');
+
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+
+                // Save the original button text
+                const originalBtnText = submitBtn.innerHTML;
+
+                // Show loader in the button
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = `
+      <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+      Processing...
+    `;
+
+                const formData = new FormData(form);
+                const data = Object.fromEntries(formData.entries());
+
+                const designationId = "<%= designation ? designation._id : '' %>";
+                const url = designationId ? `/api/designations/${designationId}` : '/api/designations';
+                const method = designationId ? 'PATCH' : 'POST';
+
+                try {
+                    const res = await fetch(url, {
+                        method,
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data)
+                    });
+
+                    const result = await res.json();
+
+                    if (res.ok) {
+                        showToast(result.message || 'Designation saved successfully!', 'success');
+                        setTimeout(() => { window.location.href = '/designations/list'; }, 1000);
+                    } else {
+                        showToast(result.message || 'Failed to save designation.', 'danger');
+                    }
+                } catch (err) {
+                    showToast('Something went wrong!', 'danger');
+                } finally {
+                    // Restore button text and state
+                    submitBtn.innerHTML = originalBtnText;
+                    submitBtn.disabled = false;
+                }
+            });
+        </script>

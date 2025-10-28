@@ -100,7 +100,7 @@ export const getDepartmentById = async (req, res) => {
 // Create new department
 export const createDepartment = async (req, res) => {
     try {
-        if (!req.user) return failResponse(res, 'Unauthorized', 401);
+        if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
 
         const departmentData = {
             ...req.body,
@@ -113,10 +113,11 @@ export const createDepartment = async (req, res) => {
 
         const department = new Department(departmentData);
         await department.save();
-        res.redirect('/departments/list?message=' + encodeURIComponent('Department added!') + '&type=success');
+
+        res.status(200).json({ message: 'Department added successfully!' });
     } catch (err) {
         logger.error(err);
-        res.redirect('/departments/list?message=' + encodeURIComponent('Failed to add department') + '&type=error');
+        res.status(500).json({ error: 'Failed to add department' });
     }
 };
 

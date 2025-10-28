@@ -222,54 +222,133 @@ export const createFolder = async (req, res) => {
 };
 
 // Auto-create root folder if none exists
-export const automaticPojectDepartmentFolderCreate = async (req, res) => {
+export const automaticProjectDepartmentFolderCreate = async (req, res) => {
     try {
         const { projectId, departmentId } = req.body;
         const ownerId = req.user._id;
 
-        if (!projectId || !departmentId) {
-            return res.status(400).json({ success: false, message: "Project and Department are required." });
+        if (!projectId) {
+            return res.status(400).json({ success: false, message: "Project ID is required." });
         }
 
-        // Check if any folder exists under this project+department
-        const existingFolders = await Folder.find({
-            projectId,
-            departmentId,
-            isDeleted: false,
-            parent: null
-        });
-
-        if (existingFolders.length > 0) {
-            return res.json({ success: true, folder: existingFolders[0], created: false });
-        }
-
-        // No folder found → create default folder
+        // --- Ensure project exists ---
         const project = await Project.findById(projectId);
-        const department = await Department.findById(departmentId);
+        if (!project) {
+            return res.status(404).json({ success: false, message: "Project not found." });
+        }
 
-        const defaultName = `${project.projectName}_${department.name}`.replace(/\s+/g, "_");
+        // ---Find or create project folder ---
+        const projectName = project.projectName.replace(/\s+/g, "_");
 
-        const newFolder = new Folder({
+        let projectFolder = await Folder.findOne({
             owner: ownerId,
-            name: defaultName,
+            projectId,
+            parent: null,
+            name: projectName,
+            isArchived: false,
+            deletedAt: null,
+        });
+
+        if (!projectFolder) {
+            try {
+                projectFolder = await Folder.create({
+                    owner: ownerId,
+                    name: projectName,
+                    projectId,
+                    parent: null,
+                    createdBy: ownerId,
+                    updatedBy: ownerId,
+                });
+            } catch (err) {
+                // Handle race condition if folder was just created
+                if (err.code === 11000) {
+                    projectFolder = await Folder.findOne({
+                        owner: ownerId,
+                        projectId,
+                        parent: null,
+                        name: projectName,
+                        isArchived: false,
+                        deletedAt: null,
+                    });
+                } else {
+                    throw err;
+                }
+            }
+        }
+
+        // --- If no department, return project folder only ---
+        if (!departmentId) {
+            return res.status(200).json({
+                success: true,
+                message: "Project folder ensured successfully.",
+                projectFolder,
+                departmentFolder: null,
+            });
+        }
+
+        // --- Ensure department exists ---
+        const department = await Department.findById(departmentId);
+        if (!department) {
+            return res.status(404).json({ success: false, message: "Department not found." });
+        }
+
+        // --- Find or create department folder under project ---
+        const departmentName = department.name.replace(/\s+/g, "_");
+
+        let departmentFolder = await Folder.findOne({
+            owner: ownerId,
             projectId,
             departmentId,
-            parent: null,
-            createdBy: ownerId,
-            updatedBy: ownerId
+            parent: projectFolder._id,
+            name: departmentName,
+            isArchived: false,
+            deletedAt: null,
         });
 
-        await newFolder.save();
+        if (!departmentFolder) {
+            try {
+                departmentFolder = await Folder.create({
+                    owner: ownerId,
+                    name: departmentName,
+                    projectId,
+                    departmentId,
+                    parent: projectFolder._id,
+                    createdBy: ownerId,
+                    updatedBy: ownerId,
+                });
+            } catch (err) {
+                if (err.code === 11000) {
+                    // Folder already created in parallel request
+                    departmentFolder = await Folder.findOne({
+                        owner: ownerId,
+                        projectId,
+                        departmentId,
+                        parent: projectFolder._id,
+                        name: departmentName,
+                        isArchived: false,
+                        deletedAt: null,
+                    });
+                } else {
+                    throw err;
+                }
+            }
+        }
 
-        res.status(201).json({
+        // --- Success response ---
+        return res.status(200).json({
             success: true,
-            message: "Default folder created.",
-            folder: newFolder,
-            created: true
+            message: "Project and department folders ensured successfully.",
+            projectFolder,
+            departmentFolder,
         });
+
     } catch (err) {
         console.error("Auto folder creation failed:", err);
-        res.status(500).json({ success: false, message: "Server error." });
+        return res.status(500).json({
+            success: false,
+            message: "Server error.",
+            error: err.message,
+        });
     }
 };
 
@@ -624,58 +703,78 @@ export const uploadToFolder = async (req, res) => {
 
 
 // Get folder tree structure including files with selected fields
+
 export const getFolderTree = async (req, res) => {
     try {
         const { rootId, departmentId, projectId } = req.query;
         const userId = req.user?._id;
 
         if (!userId) {
-            return res.status(401).json({ success: false, message: "Unauthorized" });
+            return res.status(401).json({
+                success: false,
+                message: "Unauthorized",
+            });
         }
 
-        // ---- Aggregation pipeline to prefetch all allowed folders fast ----
         const match = {
             isArchived: false,
             deletedAt: null,
             $or: [
                 { owner: new mongoose.Types.ObjectId(userId) },
-                { "permissions.principal": new mongoose.Types.ObjectId(userId) }
-            ]
+                { "permissions.principal": new mongoose.Types.ObjectId(userId) },
+            ],
         };
-
-        if (departmentId && departmentId !== "all") {
-            match.departmentId = new mongoose.Types.ObjectId(departmentId);
-        }
 
         if (projectId && projectId !== "all") {
             match.projectId = new mongoose.Types.ObjectId(projectId);
         }
 
-        const foldersAgg = await Folder.aggregate([
+        // If department is selected, find only that branch
+        let departmentFolderId = null;
+
+        if (departmentId && departmentId !== "all") {
+            // Find the department folder under the project
+            const departmentFolder = await Folder.findOne({
+                projectId: projectId ? new mongoose.Types.ObjectId(projectId) : null,
+                departmentId: new mongoose.Types.ObjectId(departmentId),
+                isArchived: false,
+                deletedAt: null,
+            }).lean();
+
+            if (departmentFolder) {
+                departmentFolderId = departmentFolder._id;
+            } else {
+                // If no folder found for that department, return empty
+                return res.json({ success: true, tree: [] });
+            }
+        }
+
+        // Fetch all folders that match user + project + department filters
+        const folders = await Folder.aggregate([
             { $match: match },
             {
                 $lookup: {
                     from: "projects",
                     localField: "projectId",
                     foreignField: "_id",
-                    as: "projectId"
-                }
+                    as: "projectId",
+                },
             },
             {
                 $lookup: {
                     from: "departments",
                     localField: "departmentId",
                     foreignField: "_id",
-                    as: "departmentId"
-                }
+                    as: "departmentId",
+                },
             },
             {
                 $lookup: {
                     from: "files",
                     localField: "files",
                     foreignField: "_id",
-                    as: "files"
-                }
+                    as: "files",
+                },
             },
             {
                 $project: {
@@ -696,58 +795,60 @@ export const getFolderTree = async (req, res) => {
                                 file: "$$f.file",
                                 originalName: "$$f.originalName",
                                 fileType: "$$f.fileType",
-                                size: "$$f.fileSize"
-                            }
-                        }
-                    }
-                }
+                                size: "$$f.fileSize",
+                            },
+                        },
+                    },
+                },
             },
-            { $sort: { name: 1 } }
+            { $sort: { name: 1 } },
         ]);
 
-        // ---- In-memory map for fast recursive tree build ----
+        if (!folders.length) {
+            return res.json({ success: true, tree: [] });
+        }
+
+        // Build folder map
         const folderMap = new Map();
-        foldersAgg.forEach(folder => {
-            folderMap.set(folder._id.toString(), { ...folder, children: [] });
-        });
+        folders.forEach(f => folderMap.set(f._id.toString(), { ...f, children: [] }));
 
-        // ---- Recursive builder (same as before, logic preserved) ----
-        const buildTree = async (parentId = null) => {
-            const currentLevel = [];
-            for (const folder of folderMap.values()) {
-                const isChild =
-                    (parentId === null && !folder.parent) ||
-                    (folder.parent && folder.parent.toString() === String(parentId));
-                if (isChild) {
-                    const children = await buildTree(folder._id);
-                    currentLevel.push({
-                        _id: folder._id,
-                        name: folder.name,
-                        status: folder.status,
-                        slug: folder.slug,
-                        path: folder.path,
-                        projectId: folder.projectId,
-                        departmentId: folder.departmentId,
-                        files: folder.files,
-                        children: children.length > 0 ? children : null
-                    });
-                }
+        // Build parent-child relationships
+        const roots = [];
+        for (const folder of folderMap.values()) {
+            if (folder.parent) {
+                const parent = folderMap.get(folder.parent.toString());
+                if (parent) parent.children.push(folder);
+            } else {
+                roots.push(folder);
             }
-            return currentLevel;
-        };
+        }
 
-        const tree = rootId ? await buildTree(rootId) : await buildTree();
+        let tree = [];
 
-        res.json({
+        // Priority 1: If rootId is explicitly provided → show its subtree
+        if (rootId) {
+            const rootNode = folderMap.get(rootId);
+            if (rootNode) tree = [rootNode];
+        }
+        // Priority 2: If departmentId given → show only that department branch
+        else if (departmentFolderId) {
+            const deptNode = folderMap.get(departmentFolderId.toString());
+            if (deptNode) tree = [deptNode];
+        }
+        // Priority 3: Otherwise show top-level project folders
+        else {
+            tree = roots;
+        }
+
+        return res.json({
             success: true,
-            tree
+            tree,
         });
-
     } catch (err) {
         console.error("Get folder tree error:", err);
         res.status(500).json({
             success: false,
-            message: "Server error while fetching folder tree"
+            message: "Server error while fetching folder tree",
         });
     }
 };
@@ -782,6 +883,58 @@ export const archiveFolder = async (req, res) => {
         res.status(500).json({ success: false, message: "Server error while archiving folder" });
     }
 };
+
+export const getRecycleBinFolders = async (req, res) => {
+    try {
+        const ownerId = req.user._id;
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const search = req.query.search || "";
+        const sortBy = req.query.sortBy || "updatedAt";
+        const sortOrder = req.query.sortOrder === "asc" ? 1 : -1;
+        const departmentFilter = req.query.department || "all";
+
+        // Build filter
+        const filter = {
+            owner: ownerId,
+            isDeleted: true,
+            ...(departmentFilter !== "all" ? { departmentId: departmentFilter } : {})
+        };
+
+        // Search
+        if (search) {
+            filter.$or = [
+                { name: { $regex: search, $options: "i" } },
+                { status: { $regex: search, $options: "i" } }
+            ];
+        }
+
+        const total = await Folder.countDocuments(filter);
+
+        const folders = await Folder.find(filter)
+            .sort({ [sortBy]: sortOrder })
+            .skip((page - 1) * limit)
+            .limit(limit)
+            .populate('departmentId', 'name')
+            .populate('owner', 'name email')
+            .populate('projectId', 'projectName')
+            .populate('createdBy', 'name')
+            .populate('updatedBy', 'name')
+            .lean();
+
+        res.json({
+            success: true,
+            folders,
+            total,
+            page,
+            totalPages: Math.ceil(total / limit)
+        });
+    } catch (err) {
+        console.error("Error fetching archived folders:", err);
+        res.status(500).json({ success: false, message: "Server error while fetching archived folders" });
+    }
+};
+
 export const getArchivedFolders = async (req, res) => {
     try {
         const ownerId = req.user._id;

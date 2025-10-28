@@ -27,7 +27,7 @@ import * as CommonController from "../controllers/CommonController.js"
 // Middleware imports
 // ---------------------------
 import { authenticate, authorize } from "../middlewares/authMiddleware.js";
-import checkPermissions, { incrementGlobalPermissionsVersion } from '../middlewares/checkPermission.js';
+import checkPermissions from '../middlewares/checkPermission.js';
 import upload from "../middlewares/fileUploads.js";
 import { validate } from "../middlewares/validate.js";
 
@@ -273,9 +273,9 @@ router.get('/departments/search', authenticate, DepartmentController.searchDepar
 router.get('/departments/:id', authenticate, DepartmentController.getDepartmentById);
 
 // Admin-only routes (CRUD)
-router.post('/departments', authenticate, authorize('admin', 'user'), checkPermissions, DepartmentController.createDepartment);
-router.patch('/departments/:id', authenticate, authorize('admin', 'user'), checkPermissions, DepartmentController.updateDepartment);
-router.delete('/departments/:id', authenticate, authorize('admin', 'user'), checkPermissions, DepartmentController.deleteDepartment);
+router.post('/departments', authenticate, checkPermissions, DepartmentController.createDepartment);
+router.patch('/departments/:id', authenticate, checkPermissions, DepartmentController.updateDepartment);
+router.delete('/departments/:id', authenticate, checkPermissions, DepartmentController.deleteDepartment);
 
 
 // ---------------------------
@@ -288,13 +288,13 @@ router.patch("/shared/:sharedId/renew", authenticate, DocumentHandlerController.
 // Designation routes
 // ---------------------------
 // Public API
-router.get('/designations', DesignationController.getAllDesignations);
+router.get('/designations', authenticate, DesignationController.getAllDesignations);
 router.get('/designations/search', authenticate, DesignationController.searchDesignations)
 router.get('/designations/:id', authenticate, DesignationController.getDesignationById);
 // Admin-only CRUD
-router.post('/designations', authenticate, authorize('admin'), DesignationController.createDesignation);
-router.patch('/designations/:id', authenticate, authorize('admin'), DesignationController.updateDesignation);
-router.delete('/designations/:id', authenticate, authorize('admin'), DesignationController.deleteDesignation);
+router.post('/designations', authenticate, authorize('admin', 'superadmin'), DesignationController.createDesignation);
+router.patch('/designations/:id', authenticate, authorize('admin', 'superadmin'), DesignationController.updateDesignation);
+router.delete('/designations/:id', authenticate, authorize('admin', 'superadmin'), DesignationController.deleteDesignation);
 
 
 
@@ -742,7 +742,7 @@ router.post("permisssions/user/permissions/:userId", authenticate, async (req, r
             );
         }
         // Increment global permissions version to auto-refresh sessions
-        incrementGlobalPermissionsVersion(designation_id);
+        // incrementGlobalPermissionsVersion(designation_id);
         res.json({ success: true, message: "Permissions assigned successfully." });
     } catch (err) {
         logger.error(err);
@@ -1039,7 +1039,8 @@ router.delete('/session/clear-recent-folders', async (req, res) => {
  */
 // Create a new folder
 router.post('/folders', FolderController.createFolder);
-router.post('/folders/automatic', FolderController.automaticPojectDepartmentFolderCreate);
+
+router.post('/folders/automatic', FolderController.automaticProjectDepartmentFolderCreate);
 // List folders (optionally filter by parent)
 router.get('/folders', FolderController.listFolders);
 router.get('/folders/all', FolderController.getAllFolders);
@@ -1061,6 +1062,9 @@ router.patch('/folders/:id/archive', FolderController.archiveFolder);
 
 // Restore an archived folder
 router.patch('/folders/:id/restore', FolderController.restoreFolder);
+
+// Get all RecycleBin folders for the current user
+router.get('/folders/recyclebin', FolderController.getRecycleBinFolders);
 
 // Get all archived folders for the current user
 router.get('/folders/archived', FolderController.getArchivedFolders);

@@ -15,7 +15,6 @@ import errorHandler from "./middlewares/errorHandler.js";
 import { formatDateDDMMYYYY } from "./utils/formatDate.js";
 import { startCleanupJob } from "./helper/NodeCron.js";
 import { connectDB } from "./database/Db.js";
-import { loadMenuMap } from './middlewares/checkPermission.js';
 import fs from "fs";
 import { API_CONFIG } from "./config/ApiEndpoints.js";
 
@@ -112,7 +111,7 @@ const app = express();
     app.use(errorHandler);
 
     // ------------------- Load Menu Map in Background -------------------
-    loadMenuMap();
+    // loadMenuMap();
 })();
 
 export default app;

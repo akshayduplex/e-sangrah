@@ -6,6 +6,8 @@ import logger from "../utils/logger.js";
 import Department from "../models/Departments.js";
 import Designation from "../models/Designation.js";
 import Project from "../models/Project.js";
+import UserPermission from "../models/UserPermission.js";
+import Menu from "../models/Menu.js";
 
 
 //page routes controllers
@@ -85,9 +87,6 @@ export const registerUser = async (req, res) => {
             });
         }
 
-        // Generate employee ID
-        // const employee_id = await generateEmployeeId();
-
         // Generate random password
         const randomPassword = generateRandomPassword();
 
@@ -109,6 +108,28 @@ export const registerUser = async (req, res) => {
 
         await newUser.save();
 
+        // === Assign ALL MENU PERMISSIONS to this user ===
+        const allMenus = await Menu.find({});
+        if (allMenus.length > 0) {
+            const permissionDocs = allMenus.map(menu => ({
+                user_id: newUser._id,
+                menu_id: menu._id,
+                permissions: {
+                    read: true,
+                    write: true,
+                    delete: true
+                },
+                assigned_by: {
+                    user_id: req.user._id,
+                    name: req.user.name,
+                    email: req.user.email,
+                },
+            }));
+
+            await UserPermission.insertMany(permissionDocs);
+        }
+
+        // === Send Email ===
         const htmlContent = `
             <p>Hello ${name},</p>
             <p>Your account has been created successfully.</p>
@@ -130,11 +151,10 @@ export const registerUser = async (req, res) => {
 
         res.status(201).json({
             success: true,
-            message: "User registered successfully. Login details sent to email.",
-            data: {
-                user: newUser.toJSON()
-            },
+            message: "User registered successfully and assigned all menu permissions.",
+            data: { user: newUser },
         });
+
     } catch (error) {
         logger.error("Registration error:", error);
         res.status(500).json({
