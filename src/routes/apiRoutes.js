@@ -1039,6 +1039,7 @@ router.delete('/session/clear-recent-folders', async (req, res) => {
  */
 // Create a new folder
 router.post('/folders', FolderController.createFolder);
+router.patch('/folderstatus/:folderId', FolderController.updateFolderStatus);
 
 router.post('/folders/automatic', FolderController.automaticProjectDepartmentFolderCreate);
 // List folders (optionally filter by parent)
@@ -1051,8 +1052,7 @@ router.get('/folders/details/:id', FolderController.getFolder);
 // Rename a folder
 router.patch('/folders/:id/rename', FolderController.renameFolder);
 
-// Move a folder to another location
-router.patch('/folders/:id/move', FolderController.moveFolder);
+// Update Folder status
 
 // Soft delete a folder
 router.delete('/folders/:id', FolderController.deleteFolder);

@@ -30,16 +30,10 @@
             <div class="row">
                 <div class="seprate_crdhdr mb-4">
                     <div class="d-flex gap-2 align-items-center">
-                        <div class="dropdown">
-                            <a href="javascript:void(0);"
-                                class="dropdown-toggle border text-black btn btn-outline-secondary fs-13 me-2"
-                                data-bs-toggle="dropdown">
-                                Select Department
-                            </a>
-                            <ul class="dropdown-menu dropdown-menu-end p-3" id="departmentFilter">
-                                <li><a href="javascript:void(0);" class="dropdown-item rounded-1" data-dept="all">All
-                                        Departments</a></li>
-                            </ul>
+                        <div class="select-dropdown">
+                            <select id="department" class="form-select select2">
+                                <option value="">Select Department</option>
+                            </select>
                         </div>
                     </div>
                 </div>
@@ -89,6 +83,45 @@
         <!-- Archived Folders Logic -->
         <script>
             $(document).ready(function () {
+
+                function initSelect2(selector, url, textKey) {
+                    $(selector).select2({
+                        placeholder: `Select Department`,
+                        allowClear: true,
+                        ajax: {
+                            url: url,
+                            dataType: 'json',
+                            delay: 250,
+                            data: params => ({ search: params.term }),
+                            processResults: data => {
+
+                                const results = [
+                                    { id: '', text: `-- Select Department --` },
+                                    ...data.data.map(item => ({
+                                        id: item._id,
+                                        text: item[textKey]
+                                            .split(' ')
+                                            .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+                                            .join(' ') // Capitalize each word
+                                    }))
+                                ];
+
+                                return { results };
+                            }
+                        }
+                    });
+
+                    // Handle empty selection
+                    $(selector).on('select2:select', function (e) {
+                        if (!e.params.data.id) {
+                            $(this).val(null).trigger('change');
+                        }
+                    });
+                }
+
+                initSelect2('#department', `${baseUrl}/api/departments/search`, 'name');
+
+
                 const $table = $('#archived_folders_table');
 
                 const dataTable = $table.DataTable({

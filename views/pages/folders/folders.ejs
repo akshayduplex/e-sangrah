@@ -222,12 +222,16 @@
 						const queryParams = new URLSearchParams();
 						if (projectId) queryParams.append('projectId', projectId);
 
-						const response = await fetch(`/api/folders/tree/structure?${queryParams}`, { credentials: 'include' });
+
+						queryParams.append('_ts', Date.now());
+
+						const response = await fetch(`/api/folders/tree/structure?${queryParams}`, { credentials: 'include', cache: 'no-store' });
 						if (!response.ok) throw new Error(`HTTP error! ${response.status}`);
 						const data = await response.json();
 						if (!data.success) throw new Error(data.message || 'API request failed');
 						return data.tree || [];
 					};
+
 
 					function openDownloadModal(folderId, folderName) {
 						// Set modal content
@@ -502,19 +506,73 @@
 						}
 					});
 
+					// Replace existing confirm-trash-folder handler with this improved version
 					document.getElementById("confirm-trash-folder")?.addEventListener("click", async () => {
 						if (!pendingFolderId) return;
+
+						const trashModalEl = document.getElementById("trashdoc-modal");
+						const trashModal = bootstrap.Modal.getInstance(trashModalEl);
+
 						try {
-							const res = await fetch(`/api/folders/${pendingFolderId}`, { method: "DELETE" });
-							const data = await res.json();
-							if (!data.success) return showToast(data.message || "Failed to delete folder", "warning");
-							showToast(data.message || "Folder deleted successfully", 'success');
-							loadFolders(folderState.currentFolderId, folderState.selectedFolders);
+							// Immediately hide the modal to give instant feedback
+							if (trashModal) trashModal.hide();
+
+							// Show small UI toast while request runs
+							showToast("Moving folder to Trash...", "info");
+
+							// Call API (use no-store cache policy already used by fetchFolders, server should return updated tree)
+							const res = await fetch(`/api/folderstatus/${pendingFolderId}`, {
+								method: "PATCH",
+								headers: { "Content-Type": "application/json" }
+							});
+
+							// parse body safely
+							let data = {};
+							try {
+								data = await res.json();
+							} catch (err) {
+								console.warn("No JSON in response or parse failed:", err);
+							}
+
+							if (!res.ok || !data.success) {
+								// If server responded with error, show message and restore modal state
+								console.error("Failed to move to trash:", res.status, data);
+								showToast(data.message || "Failed to move to Recyclebin", "error");
+								pendingFolderId = null;
+								return;
+							}
+
+							// Optimistically remove the folder element from the DOM for instant visual update
+							try {
+								const el = elements.container.querySelector(`.folderbox[data-id="${pendingFolderId}"]`);
+								if (el) el.remove();
+							} catch (err) {
+								console.warn("Could not remove folder element from DOM:", err);
+							}
+
+							showToast(data.message || "Folder successfully moved", "success");
+
+							// Refresh the folder list properly — pass current projectId
+							setLoadingState(true);
+							try {
+								// await to ensure UI updates after successful reload
+								await loadFolders(folderState.currentFolderId, folderState.selectedFolders, window.selectedProjectId);
+							} catch (err) {
+								console.error("Error while reloading folders after trashing:", err);
+								showToast("Folder moved but failed to refresh view", "warning");
+							} finally {
+								setLoadingState(false);
+							}
+
 						} catch (err) {
-							showToast("Failed to delete folder", "error");
+							console.error("Error moving folder to trash:", err);
+							showToast("Failed to move folder", "error");
 						} finally {
 							pendingFolderId = null;
-							bootstrap.Modal.getInstance(document.getElementById("trashdoc-modal")).hide();
+							// ensure modal backdrop removed if any leftover
+							const backdrop = document.querySelector('.modal-backdrop');
+							if (backdrop) backdrop.remove();
+							document.body.classList.remove('modal-open');
 						}
 					});
 
@@ -544,7 +602,7 @@
 							const data = await res.json();
 							if (!res.ok) throw new Error(data.error || "Failed to generate share link");
 
-							// Use the link returned by API directly
+
 							const shareLink = data.link;
 							window.currentShareLink = shareLink;
 							shareLinkInput.value = shareLink;
@@ -599,7 +657,6 @@
 					// --------------------
 					// Folder Share Modal
 					// --------------------
-					// SINGLE event delegation for share buttons
 					elements.container.addEventListener("click", async (e) => {
 						const shareBtn = e.target.closest(".share-btn");
 						if (!shareBtn) return;
@@ -709,8 +766,6 @@
 						}
 					}
 
-
-					// Invite user
 					// Invite user
 					inviteUserBtn.addEventListener("click", async () => {
 						const userId = userInviteSelect.value;
@@ -892,6 +947,34 @@
 							userToRemove = null;
 						}
 					});
+
+					// Confirm Archive Folder
+					document.getElementById("confirm-archive-folder")?.addEventListener("click", async () => {
+						if (!pendingFolderId) return;
+						try {
+							const res = await fetch(`/api/folders/${pendingFolderId}/archive`, { method: "PATCH" });
+							const data = await res.json();
+
+							if (!data.success) {
+								showToast(data.message || "Failed to move to Archive", "warning");
+								return;
+							}
+
+							showToast(data.message || "Folder successfully archived", "success");
+
+							// Reload folder table to show updated data
+							await loadFolders(folderState.currentFolderId, folderState.selectedFolders, window.selectedProjectId);
+
+						} catch (err) {
+							console.error(err);
+							showToast("Failed to archive folder", "error");
+						} finally {
+							pendingFolderId = null;
+							const modal = bootstrap.Modal.getInstance(document.getElementById("archivedoc-modal"));
+							if (modal) modal.hide();
+						}
+					});
+
 					// Copy share link
 					copyLinkBtn.addEventListener("click", () => {
 						shareLinkInput.select();

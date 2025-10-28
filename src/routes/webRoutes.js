@@ -318,7 +318,7 @@ router.get("/upload-folder", authenticate, FolderController.showUploadFolderPage
 router.get("/archived", authenticate, checkPermissions, FolderController.showArchivedFoldersPage);
 
 // Recycle-bin Folders page
-router.get("/recyclebin", authenticate, checkPermissions, FolderController.showRecycleBinPage);
+router.get("/folders/recyclebin", authenticate, checkPermissions, FolderController.showRecycleBinPage);
 
 // Main Folders page
 router.get("/folders", authenticate, FolderController.showMainFoldersPage);

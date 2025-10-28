@@ -386,7 +386,7 @@
 
 				breadcrumbEl.innerHTML = '';
 
-				// --- 1. Project ---
+				// // --- 1. Project ---
 				if (window.selectedProjectName) {
 					const projectLink = document.createElement('a');
 					projectLink.href = "javascript:void(0);";
@@ -395,19 +395,19 @@
 					breadcrumbEl.appendChild(projectLink);
 				}
 
-				// --- 2. Department ---
-				const deptData = $('#department').select2('data')[0];
-				if (deptData && deptData.text && deptData.text !== '-- Select Department --') {
-					const separator1 = document.createElement('span');
-					separator1.textContent = ' / ';
-					breadcrumbEl.appendChild(separator1);
+				// // --- 2. Department ---
+				// const deptData = $('#department').select2('data')[0];
+				// if (deptData && deptData.text && deptData.text !== '-- Select Department --') {
+				// 	const separator1 = document.createElement('span');
+				// 	separator1.textContent = ' / ';
+				// 	breadcrumbEl.appendChild(separator1);
 
-					const deptLink = document.createElement('a');
-					deptLink.href = "javascript:void(0);";
-					deptLink.dataset.id = 'DEPARTMENT'; // special ID for department
-					deptLink.textContent = deptData.text;
-					breadcrumbEl.appendChild(deptLink);
-				}
+				// 	const deptLink = document.createElement('a');
+				// 	deptLink.href = "javascript:void(0);";
+				// 	deptLink.dataset.id = 'DEPARTMENT'; // special ID for department
+				// 	deptLink.textContent = deptData.text;
+				// 	breadcrumbEl.appendChild(deptLink);
+				// }
 
 				// --- 3. Folder hierarchy ---
 				parentPath.forEach((item, index) => {

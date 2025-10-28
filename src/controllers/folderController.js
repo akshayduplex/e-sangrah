@@ -564,42 +564,54 @@ export const renameFolder = async (req, res) => {
     }
 };
 
-// Move folder
-export const moveFolder = async (req, res) => {
+// Update FolderStatus
+export const updateFolderStatus = async (req, res) => {
     try {
-        const { id } = req.params;
-        const { newParentId } = req.body;
-        const ownerId = req.user._id;
+        const { folderId } = req.params;
+        const { isDeleted = 'true', cascade = 'true' } = req.query;
+        const userId = req.user?._id;
 
-        const folder = await Folder.findOne({ _id: id, owner: ownerId, isDeleted: false });
+        // Convert query params to proper boolean values
+        const markDeleted = isDeleted === 'true' || isDeleted === true;
+        const cascadeBool = cascade === 'true' || cascade === true;
 
+        // Find the folder
+        const folder = await Folder.findById(folderId);
         if (!folder) {
-            return res.status(404).json({
-                success: false,
-                message: 'Folder not found'
-            });
+            return res.status(404).json({ error: 'Folder not found.' });
         }
-        const isCircular = await Folder.isDescendant(newParentId, folder._id);
-        if (isCircular) throw new Error("Cannot move folder into its own subfolder");
 
-        const updatedFolder = await Folder.moveFolder(id, newParentId, ownerId);
+        // Update the main folder
+        folder.isDeleted = markDeleted;
+        folder.deletedAt = markDeleted ? new Date() : null;
+        folder.status = markDeleted ? 'inactive' : 'active';
+        folder.updatedBy = userId;
+        await folder.save();
 
-        res.json({
-            success: true,
-            message: 'Folder moved successfully',
-            folder: {
-                _id: updatedFolder._id,
-                name: updatedFolder.name,
-                parent: updatedFolder.parent,
-                path: updatedFolder.path
-            }
+        // Cascade to descendants if requested
+        if (cascadeBool) {
+            await Folder.updateMany(
+                { ancestors: folder._id },
+                {
+                    $set: {
+                        isDeleted: markDeleted,
+                        deletedAt: markDeleted ? new Date() : null,
+                        status: markDeleted ? 'inactive' : 'active',
+                        updatedBy: userId
+                    }
+                }
+            );
+        }
+
+        return res.json({
+            message: markDeleted
+                ? `Folder moved to recycle bin${cascadeBool ? ' (including subfolders)' : ''}.`
+                : `Folder restored${cascadeBool ? ' (including subfolders)' : ''}.`,
+            folder
         });
     } catch (err) {
-        logger.error('Move folder error:', err);
-        res.status(500).json({
-            success: false,
-            message: err.message || 'Server error while moving folder'
-        });
+        console.error('Error updating folder recycle status:', err);
+        return res.status(500).json({ error: 'Internal server error.' });
     }
 };
 
@@ -718,6 +730,7 @@ export const getFolderTree = async (req, res) => {
 
         const match = {
             isArchived: false,
+            // isDeleted: false,
             deletedAt: null,
             $or: [
                 { owner: new mongoose.Types.ObjectId(userId) },
@@ -990,19 +1003,50 @@ export const getArchivedFolders = async (req, res) => {
 export const restoreFolder = async (req, res) => {
     try {
         const { id } = req.params;
+        const { cascade = 'true' } = req.query;
         const ownerId = req.user._id;
 
-        const folder = await Folder.findOne({ _id: id, owner: ownerId });
-        if (!folder) return res.status(404).json({ success: false, message: "Folder not found" });
+        const cascadeBool = cascade === 'true' || cascade === true;
 
-        folder.isArchived = false;
+        // Find the folder owned by the user
+        const folder = await Folder.findOne({ _id: id, owner: ownerId });
+        if (!folder) {
+            return res.status(404).json({ success: false, message: "Folder not found" });
+        }
+
+        // Restore main folder
+        folder.isDeleted = false;
+        folder.deletedAt = null;
+        folder.status = 'active';
         folder.updatedBy = ownerId;
         await folder.save();
 
-        res.json({ success: true, message: "Folder restored successfully", folder });
+        // Cascade restoration if requested
+        if (cascadeBool) {
+            await Folder.updateMany(
+                { ancestors: folder._id },
+                {
+                    $set: {
+                        isDeleted: false,
+                        deletedAt: null,
+                        status: 'active',
+                        updatedBy: ownerId
+                    }
+                }
+            );
+        }
+
+        return res.json({
+            success: true,
+            message: `Folder restored successfully${cascadeBool ? ' (including subfolders)' : ''}`,
+            folder
+        });
     } catch (err) {
-        logger.error(err);
-        res.status(500).json({ success: false, message: "Server error while restoring folder" });
+        console.error('Error restoring folder from recycle bin:', err);
+        return res.status(500).json({
+            success: false,
+            message: "Server error while restoring folder"
+        });
     }
 };
 
@@ -1269,10 +1313,6 @@ export const updateFolderPermission = async (req, res) => {
         const { logId } = req.params;
         const { requestStatus, access, duration, customEnd } = req.body;
         const updatedBy = req.user?._id || null;
-
-        if (!["approved", "rejected"].includes(requestStatus)) {
-            return res.status(400).json({ message: "Invalid requestStatus" });
-        }
 
         const log = await FolderPermissionLogs.findById(logId);
         if (!log) return res.status(404).json({ message: "Log not found" });
