@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 const sharedWithSchema = new mongoose.Schema({
     document: { type: mongoose.Schema.Types.ObjectId, ref: 'Document', required: true },
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    addedby: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     accessLevel: { type: String, enum: ['view', 'edit'], default: 'view' },
     canDownload: { type: Boolean, default: false },
     inviteStatus: { type: String, enum: ["pending", "accepted", "rejected"], default: "pending" },

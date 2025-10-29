@@ -933,8 +933,15 @@
 
 <script>
     $(document).ready(function () {
-        const $headerProjectSelect = $('#selectHeaderProject');
 
+        document.addEventListener('hidden.bs.modal', () => {
+            // Remove stray backdrops (in case of interrupted modal close)
+            document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+            document.body.classList.remove('modal-open');
+        });
+
+
+        const $headerProjectSelect = $('#selectHeaderProject');
         if ($headerProjectSelect.length) {
             $headerProjectSelect.select2({
                 placeholder: 'Select project',

@@ -52,7 +52,7 @@
                 <div class="col-xxl-12">
                     <div class="row flex-fill">
                         <div class="col-md-3 d-flex">
-                            <div class="card flex-fill">
+                            <div class="card flex-fill dashboard-card" data-status="">
                                 <div class="card-body">
                                     <h3 class="fs-32 fw-medium mb-2" id="totalDocs">0</h3>
                                     <h6 class="fs-16 fw-light text-default mb-3">Total Documents</h6>
@@ -69,7 +69,7 @@
                             </div>
                         </div>
                         <div class="col-md-3 d-flex">
-                            <div class="card flex-fill">
+                            <div class="card flex-fill dashboard-card" data-status="Approved">
                                 <div class="card-body">
                                     <h3 class="fs-32 fw-medium mb-2" id="approvedDocs">0</h3>
                                     <h6 class="fs-16 fw-light text-default mb-3">Approved Documents</h6>
@@ -86,7 +86,7 @@
                             </div>
                         </div>
                         <div class="col-md-3 d-flex">
-                            <div class="card flex-fill">
+                            <div class="card flex-fill dashboard-card" data-status="Pending">
                                 <div class="card-body">
                                     <h3 class="fs-32 fw-medium mb-2" id="pendingDocs">0</h3>
                                     <h6 class="fs-16 fw-light text-default mb-3">Pending Documents</h6>
@@ -103,7 +103,7 @@
                             </div>
                         </div>
                         <div class="col-md-3 d-flex">
-                            <div class="card flex-fill">
+                            <div class="card flex-fill dashboard-card" data-status="Rejected">
                                 <div class="card-body">
                                     <h3 class="fs-32 fw-medium mb-2" id="rejectedDocs">0</h3>
                                     <h6 class="fs-16 fw-light text-default mb-3">Rejected Documents</h6>
@@ -207,51 +207,11 @@
                                 </div>
                             </div>
                             <div class="card flex-fill">
-                                <div class="card-body">
-                                    <div class="dflexbtwn mb-2">
-                                        <div class="flxtblleft">
-                                            <span class="mb-2">
-                                                <img src="/img/icons/usrround.png">
-                                            </span>
-                                            <div class="flxtbltxt ms-3">
-                                                <p class="fs-16 mb-1 fw-normal">Atul have edited the document for DMS
-                                                    Project</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="dflexbtwn mb-2">
-                                        <div class="flxtblleft">
-                                            <span class="mb-2">
-                                                <img src="/img/icons/usrround.png">
-                                            </span>
-                                            <div class="flxtbltxt ms-3">
-                                                <p class="fs-16 mb-1 fw-normal">Shikha have added a new document</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="dflexbtwn mb-2">
-                                        <div class="flxtblleft">
-                                            <span class="mb-2">
-                                                <img src="/img/icons/usrround.png">
-                                            </span>
-                                            <div class="flxtbltxt ms-3">
-                                                <p class="fs-16 mb-1 fw-normal">Atul have edited your the document</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="dflexbtwn mb-2">
-                                        <div class="flxtblleft">
-                                            <span class="mb-2">
-                                                <img src="/img/icons/usrround.png">
-                                            </span>
-                                            <div class="flxtbltxt ms-3">
-                                                <p class="fs-16 mb-1 fw-normal">Shweta have edited the document for DMS
-                                                    Project</p>
-                                            </div>
-                                        </div>
-                                    </div>
+                                <div class="card-body" id="recentActivityContainer">
+                                    <!-- Recent activities will load here dynamically -->
                                 </div>
                             </div>
+
                         </div>
                         <div class="col-md-5">
                             <div class="card flex-fill">
@@ -501,6 +461,32 @@
                 loadDepartmentChart('monthly');
             });
         </script> -->
+        <script>// Dashboard card click handlers
+            document.addEventListener('DOMContentLoaded', function () {
+                const dashboardCards = document.querySelectorAll('.dashboard-card');
+
+                dashboardCards.forEach(card => {
+                    card.style.cursor = 'pointer';
+                    card.addEventListener('click', function () {
+                        const status = this.getAttribute('data-status');
+                        redirectToDocumentsWithStatus(status);
+                    });
+                });
+            });
+
+            function redirectToDocumentsWithStatus(status) {
+                // Construct the URL with status parameter
+                const baseUrl = window.location.origin;
+                let url = `${baseUrl}/documents/list`;
+
+                // Add status parameter if not "all"
+                if (status && status !== 'all') {
+                    url += `?status=${encodeURIComponent(status)}`;
+                }
+
+                // Redirect to documents list page
+                window.location.href = url;
+            }</script>
         <script>function loadDocumentChart(department) {
                 $.ajax({
                     url: "/api/documents/status-summary?period=monthly" + (department ? "&department=" + department : ""),

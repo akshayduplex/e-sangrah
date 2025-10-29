@@ -32,18 +32,33 @@ export const getDashboardStats = async (req, res) => {
         const user = req.user || req.session.user;
         const userId = new mongoose.Types.ObjectId(user._id);
         const userDepartment = user.department ? new mongoose.Types.ObjectId(user.department) : null;
+        const profileType = user.profile_type;
+
+        const matchConditions = [
+            { isDeleted: { $ne: true } },
+            { isArchived: { $ne: true } }
+        ];
+
+        if (profileType !== "superadmin") {
+            const accessConditions = [
+                { owner: userId },
+                { sharedWithUsers: userId }
+            ];
+            if (userDepartment) accessConditions.push({ department: userDepartment });
+
+            matchConditions.push({ $or: accessConditions });
+        }
 
         const documentStats = await Document.aggregate([
             {
-                $match: {
-                    $or: [
-                        { owner: userId },
-                        { sharedWithUsers: userId },
-                        ...(userDepartment ? [{ department: userDepartment }] : [])
-                    ]
-                }
+                $match: { $and: matchConditions }
             },
-            { $group: { _id: "$status", count: { $sum: 1 } } }
+            {
+                $group: {
+                    _id: "$status",
+                    count: { $sum: 1 }
+                }
+            }
         ]);
 
         const stats = { total: 0, draft: 0, pending: 0, approved: 0, rejected: 0 };
@@ -56,25 +71,27 @@ export const getDashboardStats = async (req, res) => {
 
         return successResponse(res, stats, "Dashboard stats fetched successfully");
     } catch (err) {
-        return errorResponse(res, err);
+        console.error("Error fetching dashboard stats:", err);
+        return errorResponse(res, err, "Failed to fetch dashboard stats");
     }
 };
 
-export const getFileStatusRecentActivity = async (req, res) => {
+export const getFileStatus = async (req, res) => {
     try {
-        // Optional: Filter by user, department, project, etc.
         const { limit = 4, projectId, departmentId, userId } = req.query;
 
         const query = { status: "active" };
 
-        if (projectId) query.projectId = projectId;
-        if (departmentId) query.departmentId = departmentId;
-        if (userId) query.uploadedBy = userId;
+        if (projectId) query.projectId = new mongoose.Types.ObjectId(projectId);
+        if (departmentId) query.departmentId = new mongoose.Types.ObjectId(departmentId);
+        if (userId) query.uploadedBy = new mongoose.Types.ObjectId(userId);
 
+        // NOTE: Added 'fileSize' and populated 'uploadedBy' user to provide a richer response
         const recentFiles = await File.find(query)
-            .select("originalName version fileType status ")
+            .select("originalName version fileType status fileSize uploadedAt")
+            .populate("uploadedBy", "name") // Assuming User model has a 'name' field
             .sort({ uploadedAt: -1 })
-            .limit(Number(limit))
+            .limit(Number(limit));
 
         return res.status(200).json({
             success: true,
@@ -82,10 +99,10 @@ export const getFileStatusRecentActivity = async (req, res) => {
             data: recentFiles
         });
     } catch (error) {
-        console.error("Error fetching recent file activity:", error);
+        console.error("Error fetching recent file status:", error);
         return res.status(500).json({
             success: false,
-            message: "Failed to fetch recent file activity",
+            message: "Failed to fetch recent file status",
             error: error.message
         });
     }
@@ -94,25 +111,68 @@ export const getFileStatusRecentActivity = async (req, res) => {
 /** Get Recent Activities */
 export const getRecentActivities = async (req, res) => {
     try {
-        const { limit = 10 } = req.query;
-        const document = await Document.find()
-            .populate("activityLog.user", "name email") // populate user details
-            .select("activityLog");
+        const { limit = 5 } = req.query;
+        const userId = req.user?._id;
+        const profile_type = req.user?.profile_type;
 
-        if (!document) return res.status(404).json({ message: "Document not found." });
 
-        // Return latest `limit` activities
-        const recentActivities = document.activityLog
-            .sort((a, b) => b.timestamp - a.timestamp)
-            .slice(0, limit);
+        const matchStage = {
+            isDeleted: false,
+            isArchived: false
+        };
+
+        if (profile_type !== "superadmin") {
+            matchStage.$or = [
+                { owner: userId },
+                { sharedWithUsers: userId }
+            ];
+        }
+
+        const recentActivities = await Document.aggregate([
+
+            { $match: matchStage },
+
+
+            { $unwind: "$versionHistory" },
+
+
+            { $sort: { "versionHistory.timestamp": -1 } },
+
+
+            { $limit: Number(limit) },
+
+            {
+                $lookup: {
+                    from: "users",
+                    localField: "versionHistory.changedBy",
+                    foreignField: "_id",
+                    as: "changedByUser"
+                }
+            },
+
+            { $unwind: { path: "$changedByUser", preserveNullAndEmptyArrays: true } },
+
+
+            {
+                $project: {
+                    _id: 0,
+                    documentId: "$_id",
+                    documentName: "$metadata.fileName",
+                    activity: "$versionHistory.changes",
+                    timestamp: "$versionHistory.timestamp",
+                    userName: "$changedByUser.name",
+                    userId: "$changedByUser._id",
+                    version: "$versionHistory.version"
+                }
+            }
+        ]);
 
         res.status(200).json({ recentActivities });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: "Server error" });
+        console.error("Error fetching recent activities:", error);
+        res.status(500).json({ message: "Server error", error: error.message });
     }
 };
-
 
 // More efficient version with fewer stages
 export const getDepartmentDocumentUploads = async (req, res) => {

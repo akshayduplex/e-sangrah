@@ -98,6 +98,7 @@ const userSchema = new mongoose.Schema(
             enum: ["pending", "verified"],
             default: "verified"
         },
+        addedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
         otp: { type: String, select: false },              // Stores temporary OTP
         otpExpiresAt: { type: Date, select: false },      // OTP expiration timestamp
         lastLogin: { type: Date, default: null },

@@ -150,7 +150,11 @@ export const showFolderPermissionLogsPage = async (req, res) => {
  */
 export const getMyApprovals = async (req, res) => {
     try {
-        const userId = req.user._id;
+        const user = req.user || req.session.user;
+        const userId = new mongoose.Types.ObjectId(user._id);
+        const profileType = user.profile_type;
+        const userDepartment = user.department ? new mongoose.Types.ObjectId(user.department) : null;
+
         const {
             status,
             department,
@@ -161,16 +165,28 @@ export const getMyApprovals = async (req, res) => {
             sortOrder = "desc"
         } = req.query;
 
-        const filter = { owner: userId };
+        const filter = {
+            isDeleted: { $ne: true },
+            isArchived: { $ne: true },
+        };
 
-        // Status filter
-        if (status && status !== "All") filter.status = status;
+        if (profileType !== "superadmin") {
+            const accessConditions = [
+                { owner: userId },
+                { sharedWithUsers: userId }
+            ];
+            if (userDepartment) accessConditions.push({ department: userDepartment });
+            filter.$or = accessConditions;
+        }
 
-        // Department filter
-        if (department && mongoose.Types.ObjectId.isValid(department))
-            filter.department = department;
+        if (status && status !== "All") {
+            filter.status = status;
+        }
 
-        // Date filter
+        if (department && mongoose.Types.ObjectId.isValid(department)) {
+            filter.department = new mongoose.Types.ObjectId(department);
+        }
+
         if (createdAt) {
             const [day, month, year] = createdAt.split("-").map(Number);
             if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
@@ -180,14 +196,10 @@ export const getMyApprovals = async (req, res) => {
             }
         }
 
-        // Pagination
-        const skip = (parseInt(page) - 1) * parseInt(limit);
+        const pageNum = Math.max(1, parseInt(page));
+        const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
+        const skip = (pageNum - 1) * limitNum;
 
-        // Sorting
-        const sortObj = {};
-        const order = sortOrder === "asc" ? 1 : -1;
-
-        // Validate sortField to avoid injection
         const allowedFields = [
             "metadata.fileName",
             "createdAt",
@@ -196,11 +208,9 @@ export const getMyApprovals = async (req, res) => {
             "status",
             "comment"
         ];
-        if (allowedFields.includes(sortField)) {
-            sortObj[sortField] = order;
-        } else {
-            sortObj["createdAt"] = -1;
-        }
+        const sortFieldValidated = allowedFields.includes(sortField) ? sortField : "createdAt";
+        const sortOrderValidated = sortOrder === "asc" ? 1 : -1;
+        const sortObj = { [sortFieldValidated]: sortOrderValidated };
 
         const [documents, total] = await Promise.all([
             Document.find(filter)
@@ -209,7 +219,8 @@ export const getMyApprovals = async (req, res) => {
                 .populate("files")
                 .sort(sortObj)
                 .skip(skip)
-                .limit(parseInt(limit)),
+                .limit(limitNum)
+                .lean(),
             Document.countDocuments(filter)
         ]);
 
@@ -218,9 +229,9 @@ export const getMyApprovals = async (req, res) => {
             data: documents,
             pagination: {
                 total,
-                page: parseInt(page),
-                pages: Math.ceil(total / parseInt(limit)),
-                limit: parseInt(limit)
+                page: pageNum,
+                pages: Math.ceil(total / limitNum),
+                limit: limitNum
             }
         });
     } catch (error) {
@@ -228,7 +239,6 @@ export const getMyApprovals = async (req, res) => {
         res.status(500).json({ success: false, message: "Server Error" });
     }
 };
-
 
 export const getPermissionLogs = async (req, res) => {
     const ownerId = req.user._id;

@@ -56,7 +56,7 @@
 				<!-- Folder Display -->
 				<div class="mb-3 p-2 bg-light rounded" id="folderPathContainer">
 					<div id="folder-no-project" class="text-center py-2 d-none">
-						<h6 class="text-muted mb-0">Please select above options first</h6>
+						<h6 class="text-muted mb-0">Please select a project first</h6>
 					</div>
 					<div id="folder-container" class="row g-2"></div>
 					<div id="folder-loading" class="text-center py-3 d-none">
@@ -70,12 +70,8 @@
 				</div>
 				<div class="col-md-12 ">
 					<div class="my-4">
-						<button class="btn btn-primary rounded-pill">
-							<span id="uploadBtnText">Upload Folders</span>
-							<span id="uploadBtnSpinner" class="spinner-border spinner-border-sm ms-2 d-none"></span>
-						</button>
+						<button id="uploadFilesBtn" class="btn btn-primary rounded-pill">Upload Folders</button>
 					</div>
-
 				</div>
 			</div>
 		</div>
@@ -246,16 +242,16 @@
 				if (type === 'folder') {
 					div.dataset.id = item._id;
 					div.innerHTML = `
-			<div class="folder-card p-3 bg-white rounded shadow-sm hover-shadow cursor-pointer d-flex flex-column justify-content-between">
-				<div class="d-flex align-items-center mb-2">
-					<img src="/img/icons/folder.png" style="width:40px; height:40px;" />
-					<h6 class="mb-0 ms-2 text-truncate" title="${item.name}">${item.name}</h6>
-				</div>
-				<div class="folder-footer text-muted small">
-					${item.files?.length || 0} files
-				</div>
-			</div>
-		`;
+                <div class="folder-card p-3 bg-white rounded shadow-sm hover-shadow cursor-pointer d-flex flex-column justify-content-between">
+                    <div class="d-flex align-items-center mb-2">
+                        <img src="/img/icons/folder.png" style="width:40px; height:40px;" />
+                        <h6 class="mb-0 ms-2 text-truncate" title="${item.name}">${item.name}</h6>
+                    </div>
+                    <div class="folder-footer text-muted small">
+                        ${item.files?.length || 0} files
+                    </div>
+                </div>
+            `;
 
 					//Folder double-click → normal in-page load
 					div.querySelector('.folder-card').addEventListener('dblclick', () => {
@@ -270,19 +266,19 @@
 					div.innerHTML = `
     <div class="folder-card p-3 bg-white rounded shadow-sm hover-shadow position-relative d-flex flex-column justify-content-between">
         <div class="d-flex align-items-center gap-2 mb-2">
-            <img src="${getFileIcon(item.originalName)}" alt="icon" style="width:24px;height:24px">
+                        <img src="${getFileIcon(item.originalName)}" alt="icon" style="width:24px;height:24px">
             <span class="text-truncate" style="max-width:120px" title="${item.originalName}">
                 ${item.originalName}
             </span>
-        </div>
+                    </div>
         <div class="d-flex justify-content-between align-items-center">
             <small class="text-muted">${(item.size / 1024).toFixed(1)} KB</small>
             <button class="btn btn-sm btn-link text-danger p-0 delete-file-btn" data-id="${item._id}" title="Delete file">
                 <i class="fa-solid fa-xmark"></i>
             </button>
         </div>
-    </div>
-    `;
+                </div>
+            `;
 
 					// File double-click → open in new tab
 					div.querySelector('.folder-card').addEventListener('dblclick', () => {
@@ -303,21 +299,14 @@
 
 			async function loadFolders(parentId = null, parentPath = [], projectId = null) {
 				projectId = projectId || window.selectedProjectId;
-				const departmentId = $('#department').val();
-
-				if (!projectId || !departmentId) {
-					showNoProject(true);
-					setEmptyState(true);
-					elements.container.innerHTML = "";
-					showToast("Please select Department first.", "warning");
-					return;
-				}
+				if (!projectId) return showNoProject(true);
 
 				showNoProject(false);
 				setLoadingState(true);
 
 				try {
-					const res = await fetch(`/api/folders/tree/structure?projectId=${projectId}&departmentId=${departmentId}`, { credentials: 'include' });
+					// Fetch folder tree from server
+					const res = await fetch(`/api/folders/tree/structure?projectId=${projectId}&departmentId=${$('#department').val() || 'all'}`, { credentials: 'include' });
 					const data = await res.json();
 					if (!data.success) return setEmptyState(true);
 
@@ -327,17 +316,29 @@
 					const files = currentFolder?.files || [];
 
 					setLoadingState(false);
-					if (!subfolders.length && !files.length) setEmptyState(true);
-					else {
+
+					if (!subfolders.length && !files.length) {
+						setEmptyState(true);
+					} else {
 						setEmptyState(false);
 						elements.container.innerHTML = '';
+
+						// Render folders
 						subfolders.forEach(f => elements.container.appendChild(renderFolderCard(f, 'folder')));
+						// Render files
 						files.forEach(f => elements.container.appendChild(renderFolderCard(f, 'file')));
 					}
 
 					folderState.selectedFolders = parentPath;
 					folderState.currentFolderId = parentId;
+
+					// Track folder visit if this is an actual folder
+					if (parentId) {
+						trackFolderVisit(parentId);
+					}
+
 					renderBreadcrumb(parentPath);
+
 				} catch (err) {
 					console.error("Error loading folders:", err);
 					setLoadingState(false);
@@ -386,7 +387,7 @@
 
 				breadcrumbEl.innerHTML = '';
 
-				// // --- 1. Project ---
+				// --- 1. Project ---
 				if (window.selectedProjectName) {
 					const projectLink = document.createElement('a');
 					projectLink.href = "javascript:void(0);";
@@ -662,11 +663,6 @@
 				} catch (err) {
 					console.error("Upload error:", err);
 				}
-			}
-			function toggleUploadSpinner(show) {
-				const spinner = document.getElementById("uploadBtnSpinner");
-				if (!spinner) return;
-				spinner.classList.toggle("d-none", !show);
 			}
 
 

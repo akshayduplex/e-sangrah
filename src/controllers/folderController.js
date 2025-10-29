@@ -765,6 +765,7 @@ export const getFolderTree = async (req, res) => {
     try {
         const { rootId, departmentId, projectId } = req.query;
         const userId = req.user?._id;
+        const profileType = req.user?.profile_type;
 
         if (!userId) {
             return res.status(401).json({
@@ -773,21 +774,27 @@ export const getFolderTree = async (req, res) => {
             });
         }
 
+        // --- Base query ---
         const match = {
             isArchived: false,
             // isDeleted: false,
             deletedAt: null,
-            $or: [
-                { owner: new mongoose.Types.ObjectId(userId) },
-                { "permissions.principal": new mongoose.Types.ObjectId(userId) },
-            ],
         };
 
+        // --- Restrict to user's own or shared folders if not superadmin ---
+        if (profileType !== "superadmin") {
+            match.$or = [
+                { owner: new mongoose.Types.ObjectId(userId) },
+                { "permissions.principal": new mongoose.Types.ObjectId(userId) },
+            ];
+        }
+
+        // --- Project filter ---
         if (projectId && projectId !== "all") {
             match.projectId = new mongoose.Types.ObjectId(projectId);
         }
 
-        // If department is selected, find only that branch
+        // --- Department filter ---
         let departmentFolderId = null;
 
         if (departmentId && departmentId !== "all") {
@@ -803,6 +810,7 @@ export const getFolderTree = async (req, res) => {
                 departmentFolderId = departmentFolder._id;
 
                 // Include department folder and all its descendants
+                if (!match.$or) match.$or = [];
                 match.$or.push({ _id: departmentFolder._id });
                 match.$or.push({ ancestors: departmentFolder._id });
             } else {
@@ -810,7 +818,7 @@ export const getFolderTree = async (req, res) => {
             }
         }
 
-        // --- Fetch folders with files, project, department info ---
+        // --- Fetch folders with files, project, and department info ---
         const folders = await Folder.aggregate([
             { $match: match },
             {
@@ -909,6 +917,7 @@ export const getFolderTree = async (req, res) => {
         });
     }
 };
+
 
 export const archiveFolder = async (req, res) => {
     try {
@@ -1188,7 +1197,8 @@ export const shareFolder = async (req, res) => {
                 duration,
                 expiresAt: expiresAt ? new Date(expiresAt) : null,
                 customStart: customStart ? new Date(customStart) : null,
-                customEnd: customEnd ? new Date(customEnd) : null
+                customEnd: customEnd ? new Date(customEnd) : null,
+                addedby: req.user?._id
             });
         }
 

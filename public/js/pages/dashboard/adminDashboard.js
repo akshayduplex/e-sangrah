@@ -30,7 +30,56 @@ $(document).ready(function () {
             console.log("Selected Recent Activity Department ID:", $(this).val());
         });
     }
+    // Load Recent Activities
+    async function loadRecentActivities() {
+        try {
+            const response = await fetch(`${baseUrl}/api/dashboard/recent-activity`);
+            const result = await response.json();
 
+            if (!result.recentActivities || !Array.isArray(result.recentActivities)) {
+                console.error('No recent activities found');
+                return;
+            }
+
+            const container = $('#recentActivityContainer');
+            container.empty();
+
+            result.recentActivities.forEach(activity => {
+                const user = activity.userName || 'Unknown User';
+                const docName = activity.documentName || 'Unnamed Document';
+                const action = activity.activity || 'updated';
+                const version = activity.version?.$numberDecimal ? `(v${activity.version.$numberDecimal})` : '';
+
+                // Format date to DD/MM/YYYY
+                const date = new Date(activity.timestamp);
+                const formattedDate = date.toLocaleDateString('en-GB'); // e.g. 27/10/2025
+
+                const cardItem = `
+               <div class="dflexbtwn mb-2" style="display: flex; justify-content: space-between; align-items: center;">
+    <!-- Left side: icon + sentence -->
+    <div class="flxtblleft gap-0" style="display: flex; align-items: center;">
+        <img src="/img/icons/usrround.png" alt="User" style="width: 32px; height: 32px;">
+        <div class="flxtbltxt ms-3">
+            <p class="fs-16 mb-1 fw-normal">
+                ${user} has ${action.toLowerCase()} the document ${docName} ${version}
+            </p>
+        </div>
+    </div>
+
+    <!-- Right side: date only -->
+    <div class="flxtblright">
+        <p class="fs-13 text-muted mb-0">${formattedDate}</p>
+    </div>
+</div>
+
+            `;
+                container.append(cardItem);
+            });
+
+        } catch (err) {
+            console.error('Error loading recent activities:', err);
+        }
+    }
     // Initialize Select2 for Upload Department
     function initializeUploadDepartment() {
         $("#uploadDepartment").select2({
@@ -65,6 +114,7 @@ $(document).ready(function () {
     // Call both initializations
     initializeRecentActivityDepartment();
     initializeUploadDepartment();
+    loadRecentActivities();
     // Load dashboard stats
     $.ajax({
         url: `${baseUrl}/api/dashboard/stats`,

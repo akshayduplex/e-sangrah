@@ -98,6 +98,7 @@ export const registerUser = async (req, res) => {
             raw_password: randomPassword,
             profile_type: "user",
             profile_image,
+            addedBy: req.user ? req.user._id : null,
             userDetails: {
                 employee_id,
                 department,
@@ -168,36 +169,47 @@ export const registerUser = async (req, res) => {
 // Get all users with profile type 'user'
 export const getAllUsers = async (req, res) => {
     try {
-        let profile_type = req.query.profile_type || "user";
-        const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 10;
-        const search = req.query.search || "";
-        const sortBy = req.query.sortBy || "createdAt";
-        const sortOrder = req.query.sortOrder === "asc" ? 1 : -1;
+        const loggedInUser = req.user;
+        const { profile_type, page = 1, limit = 10, search = "", sortBy = "createdAt", sortOrder = "desc" } = req.query;
 
-        // Build filter
-        const filter = {
-            profile_type,
-            $or: [
-                { name: { $regex: search, $options: "i" } },
-                { email: { $regex: search, $options: "i" } },
-                ...(search
-                    ? [{ $expr: { $regexMatch: { input: { $toString: "$phone_number" }, regex: search, options: "i" } } }]
-                    : [])
-            ]
-        };
+        let filter = {};
 
-        // Total count
+        if (loggedInUser.profile_type !== "superadmin") {
+            filter.addedBy = loggedInUser._id;
+
+            if (profile_type) filter.profile_type = profile_type;
+        } else {
+
+            if (profile_type) filter.profile_type = profile_type;
+        }
+
+
+        filter.$or = [
+            { name: { $regex: search, $options: "i" } },
+            { email: { $regex: search, $options: "i" } },
+        ];
+
+        if (search) {
+            filter.$or.push({
+                $expr: {
+                    $regexMatch: {
+                        input: { $toString: "$phone_number" },
+                        regex: search,
+                        options: "i",
+                    },
+                },
+            });
+        }
+
         const total = await User.countDocuments(filter);
 
-        // Fetch users with pagination and sorting
         const users = await User.find(filter)
             .populate("userDetails.department", "name")
             .populate("userDetails.designation", "name")
             .select("-password -raw_password")
-            .sort({ [sortBy]: sortOrder })
+            .sort({ [sortBy]: sortOrder === "asc" ? 1 : -1 })
             .skip((page - 1) * limit)
-            .limit(limit)
+            .limit(parseInt(limit))
             .lean();
 
         const mappedUsers = users.map(user => ({
@@ -209,7 +221,7 @@ export const getAllUsers = async (req, res) => {
             status: user.status || "-",
             userDetails: {
                 department: user.userDetails?.department || null,
-                designation: user.userDetails?.designation || null
+                designation: user.userDetails?.designation || null,
             },
             lastLogin: user.lastLogin || null,
             createdAt: user.createdAt
@@ -219,14 +231,15 @@ export const getAllUsers = async (req, res) => {
             success: true,
             users: mappedUsers,
             total,
-            page,
-            totalPages: Math.ceil(total / limit)
+            page: parseInt(page),
+            totalPages: Math.ceil(total / limit),
         });
     } catch (error) {
-        console.error("DataTable error:", error);
+        console.error("getAllUsers error:", error);
         res.status(500).json({ success: false, message: "Internal server error" });
     }
 };
+
 
 export const searchUsers = async (req, res) => {
     try {

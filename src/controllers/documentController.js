@@ -29,6 +29,7 @@ import PermissionLogs from "../models/PermissionLogs.js";
 // Document List page
 export const showDocumentListPage = async (req, res) => {
     try {
+        const status = req.query.status;
         const designations = await Designation.find({ status: "Active" })
             .sort({ name: 1 })
             .lean();
@@ -36,7 +37,8 @@ export const showDocumentListPage = async (req, res) => {
         res.render("pages/document/document-list", {
             title: "E-Sangrah - Documents-List",
             designations,
-            user: req.user
+            user: req.user,
+            status
         });
     } catch (err) {
         logger.error("Error loading document list:", err);
@@ -297,30 +299,43 @@ export const getDocuments = async (req, res) => {
             orderColumn,
             orderDir
         } = req.query;
+
         const userId = req.user?._id;
+        const profile_type = req.user?.profile_type;
+        // --- Base filter ---
         const filter = {
-            isDeleted: false, isArchived: false,
-            $or: [
+            isDeleted: false,
+            isArchived: false,
+        };
+
+        // --- If not superadmin, restrict documents ---
+        if (profile_type !== "superadmin") {
+            filter.$or = [
                 { owner: userId },
                 { sharedWithUsers: userId }
-            ]
-        };
+            ];
+        }
+
         const toArray = val => {
             if (!val) return [];
             if (Array.isArray(val)) return val;
             return val.split(',').map(v => v.trim()).filter(Boolean);
         };
+
         // --- Search ---
         if (search?.trim()) {
             const safeSearch = search.trim();
-            filter.$or = [
-                { "metadata.fileName": { $regex: safeSearch, $options: "i" } },
-                { "metadata.fileDescription": { $regex: safeSearch, $options: "i" } },
-                { description: { $regex: safeSearch, $options: "i" } },
-                { tags: { $in: [new RegExp(safeSearch, "i")] } },
-                { "files.originalName": { $regex: safeSearch, $options: "i" } },
-                { remark: { $regex: safeSearch, $options: "i" } }
-            ];
+            filter.$and = filter.$and || [];
+            filter.$and.push({
+                $or: [
+                    { "metadata.fileName": { $regex: safeSearch, $options: "i" } },
+                    { "metadata.fileDescription": { $regex: safeSearch, $options: "i" } },
+                    { description: { $regex: safeSearch, $options: "i" } },
+                    { tags: { $in: [new RegExp(safeSearch, "i")] } },
+                    { "files.originalName": { $regex: safeSearch, $options: "i" } },
+                    { remark: { $regex: safeSearch, $options: "i" } }
+                ]
+            });
         }
 
         // --- Status ---
@@ -333,7 +348,7 @@ export const getDocuments = async (req, res) => {
             }
         }
 
-        // Department filter
+        // --- Department filter ---
         if (department) {
             const deptArray = toArray(department).filter(id => mongoose.Types.ObjectId.isValid(id));
             if (deptArray.length > 0) {
@@ -341,7 +356,7 @@ export const getDocuments = async (req, res) => {
             }
         }
 
-        // Project filter
+        // --- Project filter ---
         if (project) {
             const projArray = toArray(project).filter(id => mongoose.Types.ObjectId.isValid(id));
             if (projArray.length > 0) {
@@ -371,7 +386,6 @@ export const getDocuments = async (req, res) => {
             10: "metadata",
             14: "status"
         };
-
         const sortField = columnMap[orderColumn] || "createdAt";
         const sortOrder = orderDir === "asc" ? 1 : -1;
 
@@ -380,6 +394,7 @@ export const getDocuments = async (req, res) => {
         const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
         const skip = (pageNum - 1) * limitNum;
 
+        // --- Fetch documents ---
         const documents = await Document.find(filter)
             .select("files updatedAt createdAt signature isDeleted isArchived comment sharedWithUsers compliance status metadata tags owner documentVendor documentDonor department project description")
             .populate("department", "name")
@@ -511,6 +526,8 @@ export const getDocument = async (req, res) => {
 export const getRecycleBinDocuments = async (req, res) => {
     try {
         const userId = req.user?._id;
+        const profileType = req.user?.profile_type;
+
         if (!userId) {
             return res.status(401).json({ success: false, message: "Unauthorized" });
         }
@@ -524,13 +541,20 @@ export const getRecycleBinDocuments = async (req, res) => {
         const search = req.query.search ? req.query.search.trim() : "";
         const department = req.query.department || "";
 
-        // Only documents owned by the current user
-        const query = {
-            owner: userId,
-            isDeleted: true
-        };
+        // --- Base query: only deleted documents ---
+        const query = { isDeleted: true };
 
-        // Search filter
+        // --- Restrict to user's own docs if NOT superadmin ---
+        if (profileType !== "superadmin") {
+            query.owner = userId;
+        }
+
+        // --- Department filter ---
+        if (department && department !== "all") {
+            query.department = department;
+        }
+
+        // --- Search filter ---
         if (search) {
             query.$or = [
                 { "metadata.fileName": { $regex: search, $options: "i" } },
@@ -539,12 +563,7 @@ export const getRecycleBinDocuments = async (req, res) => {
             ];
         }
 
-        // Department filter
-        if (department) {
-            query.department = department;
-        }
-
-        // Fetch documents & total count
+        // --- Fetch documents & total count ---
         const [documents, total] = await Promise.all([
             Document.find(query)
                 .select("files tags createdAt isDeleted deletedAt department metadata")
@@ -565,6 +584,7 @@ export const getRecycleBinDocuments = async (req, res) => {
             page,
             limit
         });
+
     } catch (err) {
         console.error("Get recycle bin documents error:", err);
         return res.status(500).json({
@@ -629,28 +649,28 @@ export const getArchivedDocuments = async (req, res) => {
         const orderColumn = req.query.orderColumn || 'updatedAt';
         const orderDir = req.query.orderDir === 'asc' ? 1 : -1;
 
-        const userId = req.user?._id; // ensure your auth middleware sets req.user
+        const userId = req.user?._id;
+        const profileType = req.user?.profile_type;
 
-        // --- Base query: only archived docs owned by user ---
         const query = {
             isArchived: true,
             isDeleted: false,
-            owner: userId  // Only owner documents
         };
 
-        // --- Department filter ---
+        if (profileType !== 'superadmin') {
+            query.owner = userId;
+        }
+
         if (req.query.department && req.query.department !== 'all') {
             query.department = req.query.department;
         }
 
-        // --- Search filter ---
         if (search) {
             query['files'] = {
                 $elemMatch: { originalName: { $regex: search, $options: 'i' } }
             };
         }
 
-        // --- Fetch documents + total count ---
         const [documents, total] = await Promise.all([
             Document.find(query)
                 .populate("department", "name")
@@ -1932,28 +1952,53 @@ export const removeSharedUser = async (req, res) => {
 export const getSharedUsers = async (req, res) => {
     try {
         const { documentId } = req.params;
+        const userId = req.user?._id;
+        const profileType = req.user?.profile_type;
 
         if (!mongoose.Types.ObjectId.isValid(documentId)) {
             return res.status(400).json({ success: false, message: "Invalid document ID" });
         }
 
-        // Fetch the document and populate the owner
-        const document = await Document.findById(documentId).populate("owner", "name email");
-        if (!document) return res.status(404).json({ success: false, message: "Document not found" });
+        if (!userId) {
+            return res.status(401).json({ success: false, message: "Unauthorized" });
+        }
 
-        // Fetch shared users
-        const shares = await SharedWith.find({ document: documentId, inviteStatus: 'accepted' })
-            .populate("user", "name email");
+        // --- Fetch the document ---
+        const document = await Document.findById(documentId).populate("owner", "name email");
+        if (!document) {
+            return res.status(404).json({ success: false, message: "Document not found" });
+        }
+
+        // --- Build query for shared users ---
+        const query = {
+            document: documentId,
+            inviteStatus: "accepted"
+        };
+
+        // If NOT superadmin, only show shares added by this user
+        if (profileType !== "superadmin") {
+            query.addedby = userId;
+        }
+
+        // --- Fetch shared users ---
+        const shares = await SharedWith.find(query)
+            .populate("user", "name email")
+            .populate("addedby", "name email");
 
         const sharedUsers = shares.map(sw => ({
-            userId: sw.user._id,
-            name: sw.user.name,
-            email: sw.user.email,
+            userId: sw.user?._id,
+            name: sw.user?.name,
+            email: sw.user?.email,
             accessLevel: sw.accessLevel,
             canDownload: sw.canDownload,
+            addedBy: sw.addedby ? {
+                id: sw.addedby._id,
+                name: sw.addedby.name,
+                email: sw.addedby.email
+            } : null
         }));
 
-        // Include owner
+        // --- Always include the owner ---
         const ownerData = {
             userId: document.owner._id,
             name: document.owner.name,
@@ -1964,10 +2009,18 @@ export const getSharedUsers = async (req, res) => {
 
         const data = [ownerData, ...sharedUsers];
 
-        return res.json({ success: true, data });
+        return res.json({
+            success: true,
+            message: "Shared users fetched successfully",
+            data
+        });
     } catch (err) {
-        console.error(err);
-        return res.status(500).json({ success: false, message: "Server error" });
+        console.error("Get shared users error:", err);
+        return res.status(500).json({
+            success: false,
+            message: "Server error",
+            error: err.message
+        });
     }
 };
 
@@ -1999,6 +2052,7 @@ export const inviteUser = async (req, res) => {
                 name: userEmail.split("@")[0],
                 password: Math.random().toString(36).slice(-8),
                 isTemporary: true,
+
             });
             await user.save();
         }
@@ -2016,7 +2070,7 @@ export const inviteUser = async (req, res) => {
         // Create or update share entry
         const share = await SharedWith.findOneAndUpdate(
             { document: documentId, user: user._id },
-            { accessLevel, expiresAt, duration, inviteStatus: "pending", generalAccess: true },
+            { accessLevel, expiresAt, duration, inviteStatus: "pending", generalAccess: true, addedby: inviterId },
             { new: true, upsert: true }
         );
 

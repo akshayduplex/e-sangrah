@@ -159,8 +159,12 @@
         <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
         <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
         <script>
+
             (function ($) {
                 "use strict";
+
+                // Get initial status from server-side variable
+                const initialStatus = "<%= status %>";
                 let currentDocId = null;
                 let customFlatpickr = null;
                 let isModalInitializing = false;
@@ -175,6 +179,68 @@
                     pdf: "/img/icons/fn4.png",
                     default: "/img/icons/fn1.png"
                 };
+
+                // Initialize status tabs based on query parameter
+                // Initialize status tabs based on query parameter
+                function initializeStatusTabs() {
+
+                    // Remove active class from all tabs first
+                    $('.status-tab').removeClass('btn-primary').addClass('btn-outline-primary');
+
+                    if (initialStatus === "all" || !initialStatus) {
+                        // Set "All" as active
+                        $('.status-tab').each(function () {
+                            if ($(this).text().trim() === 'All') {
+                                $(this).removeClass('btn-outline-primary').addClass('btn-primary');
+                                return false;
+                            }
+                        });
+                    } else {
+                        // Find and activate the matching tab
+                        let found = false;
+                        $('.status-tab').each(function () {
+                            const tabText = $(this).text().trim();
+                            const statusText = initialStatus;
+
+                            // Handle special case for "Compliance and Retention"
+                            if (statusText === 'Compliance and Retention' && tabText.includes('Compliance')) {
+                                $(this).removeClass('btn-outline-primary').addClass('btn-primary');
+                                found = true;
+                                return false;
+                            }
+                            // Exact match for other statuses
+                            else if (tabText === statusText) {
+                                $(this).removeClass('btn-outline-primary').addClass('btn-primary');
+                                found = true;
+                                return false;
+                            }
+                        });
+
+                        // If no exact match found, default to "All"
+                        if (!found) {
+                            $('.status-tab').each(function () {
+                                if ($(this).text().trim() === 'All') {
+                                    $(this).removeClass('btn-outline-primary').addClass('btn-primary');
+                                    return false;
+                                }
+                            });
+                        }
+                    }
+                }
+                // Get current active status for API calls
+                let currentStatus = initialStatus || 'all';
+
+                function getCurrentStatus() {
+                    const statusForApi = currentStatus === 'All' || currentStatus === 'all' ? '' : currentStatus;
+                    return statusForApi;
+                }
+
+
+                // Initialize when document is ready
+                $(document).ready(function () {
+                    initializeStatusTabs();
+                });
+
                 document.getElementById("columnFilterBtn").addEventListener("click", function () {
                     const dropdown = document.querySelector(".filter-dropdown");
                     dropdown.classList.toggle("d-none");
@@ -194,7 +260,7 @@
                 // -------------------------
                 function initSelect2(selector, url, placeholder, textKey) {
                     $(selector).select2({
-                        placeholder: placeholder,   // Use explicit placeholder
+                        placeholder: placeholder,
                         allowClear: true,
                         ajax: {
                             url,
@@ -219,11 +285,9 @@
                     });
                 }
 
-                // Initialize
+                // Initialize Select2
                 initSelect2('#department', `${baseUrl}/api/departments/search`, 'Select Department', 'name');
                 initSelect2('#projectName', `${baseUrl}/api/projects`, 'Select Project', 'projectName');
-
-
 
                 // -------------------------
                 // Initialize DataTable
@@ -235,15 +299,12 @@
                         url: `${baseUrl}/api/documents`,
                         type: 'GET',
                         data: function (d) {
-                            //filter tab
                             const filterColumns = [];
 
                             $('.filter-dropdown .form-check-input:checked').each(function () {
                                 filterColumns.push($(this).val());
                             });
 
-                            // Determine active status tab
-                            const activeTab = $('.status-tab.btn-primary').text().trim();
                             const searchValue = $('#searchInput').val()?.trim() || '';
                             const selectedDate = $('.datetimepicker').val();
 
@@ -254,7 +315,7 @@
                             return {
                                 page: (d.start / d.length) + 1,
                                 limit: d.length,
-                                status: activeTab === 'All' ? '' : activeTab,
+                                status: getCurrentStatus(), // Use the current active status
                                 department: $('#department').val(),
                                 project: $('#projectName').val(),
                                 date: selectedDate,
@@ -292,19 +353,18 @@
                     lengthChange: true,
                     pageLength: 10,
                     lengthMenu: [10, 25, 50, 100],
-                    order: [[2, 'desc']], // default sort
+                    order: [[2, 'desc']],
                     deferRender: true,
                     stateSave: true,
-                    // dom: 'lfrtip'
                     dom: "<'row'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6'f>>" +
                         "<'row'<'col-sm-12'tr>>" +
                         "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
                     drawCallback: function () {
-                        // Align info & pagination properly
                         $('#documents_table_wrapper .dataTables_paginate').addClass('float-end mt-2');
                         $('#documents_table_wrapper .dataTables_info').addClass('text-start mt-2');
                     }
                 });
+
                 // Enable Bootstrap tooltips on table redraw
                 $('#documents_table').on('draw.dt', function () {
                     const tooltipTriggerList = [].slice.call(document.querySelectorAll('#documents_table [title]'));
@@ -314,9 +374,90 @@
                 });
 
                 // -------------------------
-                // Render each row
+                // Status Tab Handling with URL Update
+                // -------------------------
+                $('.status-tab').on('click', function () {
+                    $('.status-tab').removeClass('btn-primary').addClass('btn-outline-primary');
+                    $(this).removeClass('btn-outline-primary').addClass('btn-primary');
+
+                    // Get the selected status
+                    const selectedStatus = $(this).text().trim();
+                    const statusParam = selectedStatus === 'All' ? 'all' : selectedStatus;
+
+                    // Update the global variable
+                    currentStatus = selectedStatus;
+
+                    // Update URL without page reload
+                    updateUrlParameter('status', statusParam);
+
+                    // Reload table with new status filter
+                    table.ajax.reload();
+                });
+
+
+                // Helper function to update URL parameters
+                function updateUrlParameter(key, value) {
+                    const url = new URL(window.location);
+                    if (value === 'all' || value === '') {
+                        url.searchParams.delete(key);
+                    } else {
+                        url.searchParams.set(key, value);
+                    }
+                    window.history.pushState({}, '', url);
+                }
+
+                // Handle browser back/forward buttons
+                window.addEventListener('popstate', function () {
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const statusFromUrl = urlParams.get('status') || 'all';
+
+                    currentStatus = statusFromUrl; //update global variable
+                    initializeStatusTabs();
+                    table.ajax.reload();
+                });
+
+
+                // -------------------------
+                // Other Event Handlers
+                // -------------------------
+                $("#applyFilter").on("click", function () {
+                    $(".filter-dropdown").addClass("d-none");
+                    table.ajax.reload();
+                });
+
+                $("#clearFilter").on("click", function () {
+                    $('.filter-dropdown .form-check-input').prop("checked", false);
+                    $(".filter-dropdown").addClass("d-none");
+                    table.ajax.reload();
+                });
+
+                $('#department, #projectName').on('change', function () {
+                    table.ajax.reload();
+                });
+
+                $('#searchInput').on('input', debounce(() => {
+                    table.ajax.reload();
+                }, 500));
+
+                $('#searchInput').on('keypress', function (e) {
+                    if (e.which === 13) {
+                        table.ajax.reload();
+                    }
+                });
+
+                function debounce(fn, delay = 500) {
+                    let timer;
+                    return function (...args) {
+                        clearTimeout(timer);
+                        timer = setTimeout(() => fn.apply(this, args), delay);
+                    };
+                }
+
+                // -------------------------
+                // Render each row (your existing renderRow function)
                 // -------------------------
                 function renderRow(doc) {
+                    // Your existing renderRow implementation
                     var fileSizeKB = doc.files[0]?.fileSize ? (doc.files[0].fileSize / 1024).toFixed(2) + ' KB' : '-';
                     const lastModified = new Date(doc.updatedAt).toLocaleString();
                     const owner = doc.owner
@@ -341,7 +482,7 @@
                     const metadata = doc.metadata ? `${doc.metadata.fileName || '-'}, ${doc.metadata.fileDescription || '-'}` : '-';
                     const sharedWith = doc.sharedWithUsers?.length
                         ? (() => {
-                            const users = doc.sharedWithUsers.slice(0, 3); // show max 3
+                            const users = doc.sharedWithUsers.slice(0, 3);
                             const remaining = doc.sharedWithUsers.length - users.length;
 
                             const avatars = users.map(u => {
@@ -369,14 +510,14 @@
 
                     const filesInfo = doc.files?.[0]
                         ? `<div class="d-flex align-items-center">
-                            <span class="avatar rounded bg-light me-2">
-                                <img src="${fileIcons[doc.files[0].originalName.split('.').pop().toLowerCase()] || fileIcons.default}" style="height:30px;">
-                            </span>
-                            <div>
-                                <p class="mb-0 text-dark">${doc.files[0].originalName}</p>
-                                <small class="text-muted">${fileSizeKB}</small>
-                            </div>
-                        </div>`
+                    <span class="avatar rounded bg-light me-2">
+                        <img src="${fileIcons[doc.files[0].originalName.split('.').pop().toLowerCase()] || fileIcons.default}" style="height:30px;">
+                    </span>
+                    <div>
+                        <p class="mb-0 text-dark">${doc.files[0].originalName}</p>
+                        <small class="text-muted">${fileSizeKB}</small>
+                    </div>
+                </div>`
                         : '-';
 
                     const dropdown = `
@@ -429,12 +570,7 @@
 
                 // -------------------------
                 // Filters & Tabs
-                // -------------------------
-                $('.status-tab').on('click', function () {
-                    $('.status-tab').removeClass('btn-primary').addClass('btn-outline-primary');
-                    $(this).removeClass('btn-outline-primary').addClass('btn-primary');
-                    table.ajax.reload();
-                });
+                // ------------------------
 
                 $('#department, #projectName').on('change', function () {
                     table.ajax.reload();

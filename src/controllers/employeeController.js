@@ -53,17 +53,45 @@ export const showEmployeeRecycleBinPage = async (req, res) => {
  */
 export const getApprovalRequests = async (req, res) => {
     try {
-        let { status, department, createdAt, page = 1, limit = 10, sortField = 'createdAt', sortOrder = 'desc' } = req.query;
+        const user = req.user || req.session.user;
+        const userId = new mongoose.Types.ObjectId(user._id);
+        const profileType = user.profile_type;
+        const userDepartment = user.department ? new mongoose.Types.ObjectId(user.department) : null;
+
+        let {
+            status,
+            department,
+            createdAt,
+            page = 1,
+            limit = 10,
+            sortField = "createdAt",
+            sortOrder = "desc"
+        } = req.query;
 
         page = parseInt(page);
         limit = parseInt(limit);
 
-        const filter = {};
+        const filter = {
+            isDeleted: { $ne: true },
+            isArchived: { $ne: true }
+        };
 
-        if (status && status !== "All") filter.status = status;
+        if (profileType !== "superadmin") {
+            const accessConditions = [
+                { owner: userId },
+                { sharedWithUsers: userId }
+            ];
+            if (userDepartment) accessConditions.push({ department: userDepartment });
+            filter.$or = accessConditions;
+        }
+
+        if (status && status !== "All") {
+            filter.status = status;
+        }
+
 
         if (department && mongoose.Types.ObjectId.isValid(department)) {
-            filter.department = department;
+            filter.department = new mongoose.Types.ObjectId(department);
         }
 
         if (createdAt) {
@@ -75,23 +103,35 @@ export const getApprovalRequests = async (req, res) => {
             }
         }
 
-        const allowedFields = ['metadata.fileName', 'createdAt', 'department.name', 'projectManager.name', 'status', 'comment'];
+        const allowedFields = [
+            "metadata.fileName",
+            "createdAt",
+            "department.name",
+            "projectManager.name",
+            "status",
+            "comment"
+        ];
         const sortObj = {};
-        sortObj[allowedFields.includes(sortField) ? sortField : 'createdAt'] = sortOrder === 'asc' ? 1 : -1;
+        sortObj[allowedFields.includes(sortField) ? sortField : "createdAt"] =
+            sortOrder === "asc" ? 1 : -1;
 
         const skip = (page - 1) * limit;
+
 
         const [documents, total] = await Promise.all([
             Document.find(filter)
                 .populate("department", "name")
-                .populate("owner", "name")
-                .populate("projectManager", "name")
-                .populate("files")
+                .populate("owner", "name email profile_image")
+                .populate("projectManager", "name email profile_image")
+                .populate("sharedWithUsers", "name email profile_image")
+                .populate("files", "originalName version fileSize")
                 .sort(sortObj)
                 .skip(skip)
-                .limit(limit),
+                .limit(limit)
+                .lean(),
             Document.countDocuments(filter)
         ]);
+
 
         res.status(200).json({
             success: true,

@@ -142,22 +142,26 @@
 					.then(res => res.json())
 					.then(data => {
 						if (!data.success || !data.user) {
-							toggleProfile(); // No profile → show form
+							toggleProfile();
 							return;
 						}
-						const user = data.user;
 
+						const user = data.user;
 
 						// Header & avatar
 						document.getElementById('profileName').textContent = user.name;
-						document.getElementById('profileDesignation').textContent = user.userDetails.designation.name || "Guest";
+						document.getElementById('profileDesignation').textContent =
+							user.userDetails?.designation?.name ||
+							user.position ||
+							user.profile_type ||
+							"N/A";
 						document.getElementById('profileImage').src = user.profile_image || '/img/profiles/avatar-12.jpg';
 
 						// Editable fields
-						document.getElementById('inputName').value = user.name;
-						document.getElementById('inputEmail').value = user.email;
+						document.getElementById('inputName').value = user.name || '';
+						document.getElementById('inputEmail').value = user.email || '';
 						document.getElementById('inputPhone').value = user.phone_number || '';
-						document.getElementById('inputAddress').value = user.address || ''; // <-- Add this line
+						document.getElementById('inputAddress').value = user.address || '';
 
 						// Read-only fields
 						document.getElementById('inputStatus').value = user.status || '';
@@ -166,18 +170,24 @@
 						document.getElementById('inputUpdatedAt').value = formatDateDDMMYYYY(user.updatedAt);
 
 						// View mode display
-						document.getElementById('viewName').textContent = user.name;
-						document.getElementById('viewEmail').textContent = user.email;
+						document.getElementById('viewName').textContent = user.name || '';
+						document.getElementById('viewEmail').textContent = user.email || '';
 						document.getElementById('viewPhone').textContent = user.phone_number || '';
 						document.getElementById('viewStatus').textContent = user.status || '';
 						document.getElementById('viewProfileType').textContent = user.profile_type || '';
-						document.getElementById('viewPosition').textContent = user.userDetails.designation.name || '';
+
+						document.getElementById('viewPosition').textContent =
+							user.userDetails?.designation?.name ||
+							user.position ||
+							user.profile_type ||
+							'N/A';
+
 						document.getElementById('viewAddress').textContent = user.address || '';
 						document.getElementById('viewCreatedAt').textContent = formatDateDDMMYYYY(user.createdAt);
 						document.getElementById('viewUpdatedAt').textContent = formatDateDDMMYYYY(user.updatedAt);
-
 					})
 					.catch(err => {
+						console.error(err);
 						showToast('Failed to load profile', 'error');
 					});
 			};

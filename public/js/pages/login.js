@@ -117,7 +117,7 @@ async function verifyOtp(email, otp) {
             document.querySelector(".otp-section .text-success").style.display = "block";
             setTimeout(() => {
                 const profileType = data?.data?.user?.profile_type;
-                if (profileType === "admin") {
+                if (profileType === "admin" || profileType === "superadmin") {
                     window.location.href = "/admin/dashboard";
                 } else {
                     window.location.href = "/employee/dashboard";
@@ -189,7 +189,7 @@ async function handleLogin({ emailInput, passwordInput, loginBtn }) {
                 showSuccess("Login successful! Redirecting...");
                 setTimeout(() => {
                     const profileType = data?.data?.user?.profile_type;
-                    if (profileType === "admin") {
+                    if (profileType === "admin" || profileType === "superadmin") {
                         window.location.href = "/admin/dashboard";
                     } else {
                         window.location.href = "/employee/dashboard";

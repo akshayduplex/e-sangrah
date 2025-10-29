@@ -129,7 +129,7 @@ router.get('/export/formats', authenticate, CommonController.getExportFormats);
 // ---------------------------
 router.get("/my-approvals", AdminController.getMyApprovals);
 router.get("/dashboard/stats", AdminDashboard.getDashboardStats);
-router.get("/dashboard/file-status", AdminDashboard.getFileStatusRecentActivity);
+router.get("/dashboard/file-status", AdminDashboard.getFileStatus);
 router.get("/dashboard/recent-activity", AdminDashboard.getRecentActivities);
 router.get("/dashboard/uploads", AdminDashboard.getDepartmentDocumentUploads);
 router.get("/dashboard/summary", AdminDashboard.getDocumentsStatusSummary);
@@ -357,7 +357,6 @@ router.get("/session/project", async (req, res) => {
 // Basic CRUD routes
 router.route('/projects')
     .get(
-        authorize('superadmin', 'admin', 'manager', 'employee', 'viewer', "user"),
         ProjectController.getAllProjects
     )
     .post(
@@ -770,7 +769,7 @@ router.get("/user", UserController.getAllUsers);
 router.get("/user/search", UserController.searchUsers);
 router.get("/user/:id", UserController.getUserById);
 router.put("/user/:id", UserController.updateUser);
-router.delete("/user/:id", UserController.deleteUser);
+router.delete("/user/:id", authorize('admin', 'superadmin'), UserController.deleteUser);
 
 
 // ---------------------------
