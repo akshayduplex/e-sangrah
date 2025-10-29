@@ -145,15 +145,21 @@
 
                                 const folders = res.folders.map(folder => ({
                                     actions: `
-                            <div class="action-icon d-inline-flex">
-                                <a href="#" class="restore-folder me-2" data-folder-id="${folder._id}" data-bs-toggle="modal" data-bs-target="#restore-folder-modal">
-                                    <i class="ti ti-restore"></i>
-                                </a>
-                                <a href="#" class="trash-folder" data-folder-id="${folder._id}" data-bs-toggle="modal" data-bs-target="#trashdocfile-modal">
-                                    <i class="ti ti-trash"></i>
-                                </a>
-                            </div>
-                        `,
+    <div class="action-icon d-inline-flex">
+        <a href="#" 
+            class="restore-folder me-2" 
+            data-folder-id="${folder._id}" 
+            data-folder-name="${folder.name}"  
+            data-folder-size="${folder.size || '190KB'}">
+            <i class="ti ti-restore"></i>
+        </a>
+        <a href="#" 
+            class="trash-folder" 
+            data-folder-id="${folder._id}">
+            <i class="ti ti-trash"></i>
+        </a>
+    </div>
+`,
                                     name: folder.name || "-",
                                     ownerName: folder.owner?.name || "-",
                                     ownerEmail: folder.owner?.email || "-",
@@ -189,34 +195,94 @@
                     dataTable.ajax.reload();
                 });
 
-                // Trash folder
+                // Trash (delete permanently) single folder
                 $(document).on('click', '.trash-folder', function (e) {
                     e.preventDefault();
                     const folderId = $(this).data('folder-id');
+
+                    // Open confirmation modal
+                    $('#trashdoc-modal').modal('show');
+
                     $('#confirm-trash-folder').off('click').on('click', function () {
                         $.ajax({
                             url: `${baseUrl}/api/folders/${folderId}`,
                             type: 'DELETE',
                             success: function (res) {
-                                if (res.success) dataTable.ajax.reload();
+                                if (res.success) {
+                                    $('#trashdoc-modal').modal('hide');
+                                    showToast(res.message || "Folder deleted successfully", "success");
+                                    dataTable.ajax.reload();
+                                } else {
+                                    showToast(res.message || "Failed to delete folder", "error");
+                                }
+                            },
+                            error: function (xhr) {
+                                showToast(xhr.responseJSON?.message || "Server error while deleting folder", "error");
                             }
                         });
                     });
                 });
 
-                // Restore folder
+                // Restore (unarchive) folder
+                // Handle Restore click
                 $(document).on('click', '.restore-folder', function (e) {
                     e.preventDefault();
+
                     const folderId = $(this).data('folder-id');
-                    $('#confirm-restore-folder').off('click').on('click', function () {
+
+                    // Example static data — replace with actual folder data if available
+                    const folderName = $(this).data('folder-name') || "Untitled Folder";
+                    const folderSize = $(this).data('folder-size') || "190KB";
+                    const folderCount = $(this).data('folder-count') || "+2";
+
+                    // Fill modal dynamically
+                    $('#restore-file-name').text(folderName);
+                    $('#restore-file-size').text(folderSize);
+                    $('#restore-file-count').text(folderCount);
+
+                    // Show the modal
+                    $('#restore-modal').modal('show');
+
+                    // Confirm restore
+                    $('#confirm-restore').off('click').on('click', function () {
                         $.ajax({
-                            url: `${baseUrl}/api/documents/${folderId}/restore`,
+                            url: `${baseUrl}/api/folders/${folderId}/archive?isArchived=false`,
                             type: 'PATCH',
                             success: function (res) {
-                                if (res.success) dataTable.ajax.reload();
+                                if (res.success) {
+                                    $('#restore-modal').modal('hide');
+                                    showToast(res.message || "Folder restored successfully", "success");
+                                    dataTable.ajax.reload();
+                                } else {
+                                    showToast(res.message || "Failed to restore folder", "error");
+                                }
+                            },
+                            error: function (xhr) {
+                                showToast(xhr.responseJSON?.message || "Server error while restoring folder", "error");
                             }
                         });
                     });
                 });
+
+                // Empty Recycle Bin
+                $(document).on('click', '#confirm-empty-bin', function () {
+                    $.ajax({
+                        url: `${baseUrl}/api/folders/recyclebin/empty`,
+                        type: 'DELETE',
+                        success: function (res) {
+                            if (res.success) {
+                                $('#emptybin-modal').modal('hide');
+                                showToast(res.message || "Recycle bin emptied successfully", "success");
+                                dataTable.ajax.reload();
+                            } else {
+                                showToast(res.message || "Failed to empty recycle bin", "error");
+                            }
+                        },
+                        error: function (xhr) {
+                            showToast(xhr.responseJSON?.message || "Server error while emptying recycle bin", "error");
+                        }
+                    });
+                });
+
             });
         </script>

@@ -1056,6 +1056,7 @@ router.patch('/folders/:id/rename', FolderController.renameFolder);
 
 // Soft delete a folder
 router.delete('/folders/:id', FolderController.deleteFolder);
+router.delete('/folders/recyclebin/empty', FolderController.emptyRecycleBin);
 
 // Archive a folder
 router.patch('/folders/:id/archive', FolderController.archiveFolder);

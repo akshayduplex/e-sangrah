@@ -273,37 +273,25 @@ const fetchUserPermissions = async (userId, designationId, menuId) => {
 // Main RBAC middleware — no caching
 const checkPermissions = async (req, res, next) => {
     try {
-        console.log('--- CHECK PERMISSIONS START ---');
-        console.log('Original URL:', req.originalUrl);
-        console.log('Request Method:', req.method);
-        console.log('User from req.user:', req.user);
-        console.log('User from req.session:', req.session?.user);
 
         const user = req.user || req.session.user;
         const isApi = req.originalUrl.startsWith('/api') || req.headers.accept?.includes('application/json');
 
         if (!user) {
-            console.log('❌ No user found — redirecting or returning 401');
             if (isApi) return res.status(401).json({ error: 'Unauthorized' });
             return res.redirect('/login');
         }
 
-        console.log('User profile type:', user.profile_type);
-
         // Superadmin/Admin bypass
         if (['superadmin', 'admin'].includes(user.profile_type)) {
-            console.log('✅ Admin/Superadmin bypassing permission check');
             return next();
         }
 
         const userId = user._id.toString();
         const designationId = user.userDetails.designation?.toString();
-        console.log('User ID:', userId);
-        console.log('Designation ID:', designationId);
 
         // Normalize URL
         const url = normalizeUrl(req.originalUrl);
-        console.log('Normalized URL:', url);
 
         // Load menu directly from DB (no caching)
         const menu = await Menu.findOne({
@@ -315,24 +303,18 @@ const checkPermissions = async (req, res, next) => {
         }).lean();
 
         if (!menu) {
-            console.log('❌ No menu found for URL:', url);
             if (isApi) return res.status(404).json({ error: 'Menu not found or inactive', requestedUrl: url });
             return res.status(404).render('error', { title: 'Menu Not Found', message: 'Menu not found or inactive' });
         }
 
         const menuId = menu._id.toString();
         const requiredPermission = methodMap[req.method] || 'read';
-        console.log('Menu ID:', menuId);
-        console.log('Required Permission:', requiredPermission);
 
         // Fetch permissions directly from DB
-        console.log('🔄 Fetching permissions from DB for user:', userId, 'menu:', menuId);
         const perms = await fetchUserPermissions(userId, designationId, menuId);
-        console.log('Fetched permissions:', JSON.stringify(perms, null, 2));
 
         // Allow if either designation OR user override has permission
         const hasPermission = !!(perms.designation[requiredPermission] || perms.user[requiredPermission]);
-        console.log('Permission check result:', hasPermission ? '✅ ALLOWED' : '❌ DENIED');
 
         if (hasPermission) {
             console.log('--- CHECK PERMISSIONS END (Allowed) ---');
@@ -340,12 +322,10 @@ const checkPermissions = async (req, res, next) => {
         }
 
         // Permission denied
-        console.log('❌ User lacks required permission:', requiredPermission);
         if (isApi) return res.status(403).json({ error: 'Forbidden', required: requiredPermission });
         return res.status(403).render('no-permission', { title: '403 - Forbidden', message: 'You do not have permission.' });
 
     } catch (error) {
-        console.error('💥 Error in checkPermissions:', error);
         if (req.originalUrl.startsWith('/api') || req.headers.accept?.includes('application/json')) {
             return res.status(500).json({ error: 'Internal Server Error', details: error.message });
         }

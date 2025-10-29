@@ -160,7 +160,10 @@
 								success: function () {
 									$('#archivedoc-modal').modal('hide');
 									showToast('Folder restored successfully.', 'success');
-									loadRecycleBinFolders();
+
+									// Remove only the restored row from the table
+									const row = $(`.restore-folder[data-folder-id="${folderId}"]`).closest('tr');
+									recycleTable.row(row).remove().draw(false);
 								},
 								error: function (err) {
 									console.error(err);
@@ -169,6 +172,7 @@
 							});
 						});
 				});
+
 
 				// ------------------------
 				// 3. Delete a single folder
@@ -195,7 +199,8 @@
 								success: function () {
 									$('#fileDelete-modal').modal('hide');
 									showToast(`"${folderName}" permanently deleted.`, 'success');
-									loadRecycleBinFolders();
+
+									$(`.delete-folder[data-folder-id="${folderId}"]`).closest('tr').remove();
 								},
 								error: function (err) {
 									console.error(err);
@@ -204,7 +209,6 @@
 							});
 						});
 				});
-
 				// ------------------------
 				// 4. Empty Recycle Bin
 				// ------------------------

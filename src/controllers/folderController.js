@@ -648,6 +648,51 @@ export const deleteFolder = async (req, res) => {
     }
 };
 
+export const emptyRecycleBin = async (req, res) => {
+    try {
+        const ownerId = req.user._id;
+
+        // Find all deleted folders belonging to the user
+        const deletedFolders = await Folder.find({ owner: ownerId, isDeleted: true });
+
+        if (!deletedFolders || deletedFolders.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: "Recycle bin is already empty."
+            });
+        }
+
+        // Check if any deleted folder still has undeleted subfolders or files
+        for (const folder of deletedFolders) {
+            const fileCount = folder.files?.length || 0;
+            const subfolderCount = await Folder.countDocuments({
+                parent: folder._id,
+                owner: ownerId,
+                isDeleted: false
+            });
+
+            if (fileCount > 0 || subfolderCount > 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: `Cannot empty recycle bin because folder "${folder.name}" is not empty.`
+                });
+            }
+        }
+
+        // Permanently delete all folders in the recycle bin
+        await Folder.deleteMany({ owner: ownerId, isDeleted: true });
+
+        res.json({ success: true, message: "Recycle bin emptied successfully." });
+    } catch (err) {
+        console.error("Error emptying recycle bin:", err);
+        res.status(500).json({
+            success: false,
+            message: err.message || "Server error while emptying recycle bin"
+        });
+    }
+};
+
+
 // Upload files to folder
 export const uploadToFolder = async (req, res) => {
     try {
@@ -756,13 +801,16 @@ export const getFolderTree = async (req, res) => {
 
             if (departmentFolder) {
                 departmentFolderId = departmentFolder._id;
+
+                // Include department folder and all its descendants
+                match.$or.push({ _id: departmentFolder._id });
+                match.$or.push({ ancestors: departmentFolder._id });
             } else {
-                // If no folder found for that department, return empty
                 return res.json({ success: true, tree: [] });
             }
         }
 
-        // Fetch all folders that match user + project + department filters
+        // --- Fetch folders with files, project, department info ---
         const folders = await Folder.aggregate([
             { $match: match },
             {
@@ -821,11 +869,10 @@ export const getFolderTree = async (req, res) => {
             return res.json({ success: true, tree: [] });
         }
 
-        // Build folder map
+        // --- Build folder hierarchy ---
         const folderMap = new Map();
         folders.forEach(f => folderMap.set(f._id.toString(), { ...f, children: [] }));
 
-        // Build parent-child relationships
         const roots = [];
         for (const folder of folderMap.values()) {
             if (folder.parent) {
@@ -838,18 +885,14 @@ export const getFolderTree = async (req, res) => {
 
         let tree = [];
 
-        // Priority 1: If rootId is explicitly provided → show its subtree
+        // --- Determine which subtree to return ---
         if (rootId) {
             const rootNode = folderMap.get(rootId);
             if (rootNode) tree = [rootNode];
-        }
-        // Priority 2: If departmentId given → show only that department branch
-        else if (departmentFolderId) {
+        } else if (departmentFolderId) {
             const deptNode = folderMap.get(departmentFolderId.toString());
             if (deptNode) tree = [deptNode];
-        }
-        // Priority 3: Otherwise show top-level project folders
-        else {
+        } else {
             tree = roots;
         }
 
@@ -862,28 +905,38 @@ export const getFolderTree = async (req, res) => {
         res.status(500).json({
             success: false,
             message: "Server error while fetching folder tree",
+            error: err.message,
         });
     }
 };
 
-
 export const archiveFolder = async (req, res) => {
     try {
         const { id } = req.params;
+        let { isArchived = true } = req.query;
         const ownerId = req.user._id;
+
+        // Convert string to boolean if needed
+        if (typeof isArchived === 'string') {
+            isArchived = isArchived === 'true';
+        }
+
+        console.log("ArchiveFolder called with id:", id, "isArchived:", isArchived);
 
         const folder = await Folder.findOne({ _id: id, owner: ownerId, deletedAt: null });
         if (!folder) {
             return res.status(404).json({ success: false, message: "Folder not found" });
         }
 
-        folder.isArchived = true;
+        folder.isArchived = isArchived;
         folder.updatedBy = ownerId;
         await folder.save();
 
         res.json({
             success: true,
-            message: "Folder archived successfully",
+            message: isArchived
+                ? "Folder archived successfully"
+                : "Folder unarchived successfully",
             folder: {
                 _id: folder._id,
                 name: folder.name,
@@ -892,10 +945,11 @@ export const archiveFolder = async (req, res) => {
             }
         });
     } catch (err) {
-        logger.error("Archive folder error:", err);
-        res.status(500).json({ success: false, message: "Server error while archiving folder" });
+        console.error("Archive/Unarchive folder error:", err);
+        res.status(500).json({ success: false, message: "Server error while updating folder archive state" });
     }
 };
+;
 
 export const getRecycleBinFolders = async (req, res) => {
     try {
