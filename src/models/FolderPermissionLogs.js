@@ -27,6 +27,7 @@ const FolderPermissionLogsSchema = new mongoose.Schema({
     },
     used: { type: Boolean, default: false }, // for onetime shares
     approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    requestedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: false },
     requestedAt: { type: Date, default: Date.now },
 },
     { timestamps: true }

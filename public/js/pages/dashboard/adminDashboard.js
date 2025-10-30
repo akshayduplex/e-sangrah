@@ -1,6 +1,115 @@
 $(document).ready(function () {
     const baseUrl = window.baseUrl;
+    let currentProjectId = '';
+    let currentPeriod = 'today';
+
+    // ==============================
+    // Load current project from session
+    // ==============================
+    async function loadCurrentProject() {
+        try {
+            const response = await fetch(`${baseUrl}/api/session/project`, {
+                credentials: 'include'
+            });
+            const data = await response.json();
+
+            if (data.selectedProject) {
+                currentProjectId = data.selectedProject;
+                console.log("Loaded project from session:", currentProjectId);
+
+                // Update the header display
+                $('#currentProjectName').text(data.selectedProjectName || 'No project selected');
+
+                // Set the project in the upload department dropdown if needed
+                if ($('#uploadDepartment').length && currentProjectId) {
+                    $('#uploadDepartment').val(currentProjectId).trigger('change');
+                }
+
+                // Load charts with the current project
+                loadDepartmentUploads(currentProjectId, currentPeriod);
+            }
+        } catch (error) {
+            console.error('Error loading current project:', error);
+        }
+    }
+
+    // ==============================
+    // Initialize Header Project Select
+    // ==============================
+    function initializeHeaderProjectSelect() {
+        const $headerProjectSelect = $('#selectHeaderProject');
+        if (!$headerProjectSelect.length) return;
+
+        $headerProjectSelect.select2({
+            placeholder: 'Select project',
+            allowClear: true,
+            width: '200px',
+            ajax: {
+                url: `${baseUrl}/api/projects`,
+                dataType: 'json',
+                delay: 250,
+                data: function (params) {
+                    return {
+                        search: params.term || '',
+                        page: params.page || 1,
+                        limit: 10
+                    };
+                },
+                processResults: function (data) {
+                    return {
+                        results: (data.data || []).map(p => ({
+                            id: p._id,
+                            text: p.projectName || p.name
+                        }))
+                    };
+                },
+                cache: true
+            }
+        });
+
+        $headerProjectSelect.on('select2:select select2:unselect', async function () {
+            const projectId = $(this).val();
+            const projectName = $(this).find('option:selected').text();
+
+            try {
+                const res = await fetch(`${baseUrl}/api/session/project`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        projectId: projectId || null,
+                        projectName: projectName || ''
+                    })
+                });
+
+                if (!res.ok) throw new Error('Failed to save project selection');
+
+                // Update current project and reload charts
+                currentProjectId = projectId || '';
+
+                if (projectId) {
+                    $('#currentProjectName').text(projectName);
+                    console.log("Project selected:", projectId);
+
+                    // Reload all charts with new project
+                    loadDepartmentUploads(projectId, currentPeriod);
+                    loadDashboardStats(projectId);
+                } else {
+                    $('#currentProjectName').text('No project selected');
+                    // Reload with no project filter
+                    loadDepartmentUploads('', currentPeriod);
+                    loadDashboardStats('');
+                }
+
+            } catch (err) {
+                console.error('Error saving project selection:', err);
+            }
+        });
+    }
+
+    // ==============================
     // Initialize Select2 for Recent Activity Department
+    // ==============================
     function initializeRecentActivityDepartment() {
         $("#recentActivityDepartment").select2({
             placeholder: "-- Select Department --",
@@ -30,10 +139,73 @@ $(document).ready(function () {
             console.log("Selected Recent Activity Department ID:", $(this).val());
         });
     }
-    // Load Recent Activities
-    async function loadRecentActivities() {
+
+    // ==============================
+    // File Status Loader
+    // ==============================
+    async function loadFileStatus(projectId = '') {
         try {
-            const response = await fetch(`${baseUrl}/api/dashboard/recent-activity`);
+            const url = projectId
+                ? `/api/dashboard/file-status?projectId=${projectId}`
+                : '/api/dashboard/file-status';
+
+            const response = await fetch(url);
+            const data = await response.json();
+
+            if (!data.success) {
+                console.error('Failed to load file data');
+                return;
+            }
+
+            const fileList = document.getElementById('fileList');
+            fileList.innerHTML = '';
+
+            data.files.forEach(file => {
+                const fileItem = document.createElement('div');
+                fileItem.classList.add('dflexbtwn', 'mb-2');
+
+                fileItem.innerHTML = `
+                    <div class="flxtblleft">
+                        <span class="avatar rounded bg-light mb-2">
+                            <img src="${file.icon}" alt="icon" data-id="${file._id}" class="file-icon">
+                        </span>
+                        <div class="flxtbltxt">
+                            <p class="fs-14 mb-1 fw-normal">${file.name}</p>
+                            <span class="fs-11 fw-light text-black">${file.fileSize}</span>
+                        </div>
+                    </div>
+                    <div class="flxtblright">
+                        <p class="fs-12 fw-light text-black">${file.status}</p>
+                    </div>
+                `;
+
+                fileList.appendChild(fileItem);
+            });
+
+            document.querySelectorAll('.file-icon').forEach(img => {
+                img.addEventListener('dblclick', (e) => {
+                    const fileId = e.target.getAttribute('data-id');
+                    if (fileId) {
+                        const url = `/folders/view/${fileId}`;
+                        window.open(url, '_blank');
+                    }
+                });
+            });
+        } catch (error) {
+            console.error('Error fetching file data:', error);
+        }
+    }
+
+    // ==============================
+    // Load Recent Activities
+    // ==============================
+    async function loadRecentActivities(projectId = '') {
+        try {
+            const url = projectId
+                ? `${baseUrl}/api/dashboard/recent-activity?projectId=${projectId}`
+                : `${baseUrl}/api/dashboard/recent-activity`;
+
+            const response = await fetch(url);
             const result = await response.json();
 
             if (!result.recentActivities || !Array.isArray(result.recentActivities)) {
@@ -50,29 +222,18 @@ $(document).ready(function () {
                 const action = activity.activity || 'updated';
                 const version = activity.version?.$numberDecimal ? `(v${activity.version.$numberDecimal})` : '';
 
-                // Format date to DD/MM/YYYY
-                const date = new Date(activity.timestamp);
-                const formattedDate = date.toLocaleDateString('en-GB'); // e.g. 27/10/2025
-
                 const cardItem = `
-               <div class="dflexbtwn mb-2" style="display: flex; justify-content: space-between; align-items: center;">
-    <!-- Left side: icon + sentence -->
-    <div class="flxtblleft gap-0" style="display: flex; align-items: center;">
-        <img src="/img/icons/usrround.png" alt="User" style="width: 32px; height: 32px;">
-        <div class="flxtbltxt ms-3">
-            <p class="fs-16 mb-1 fw-normal">
-                ${user} has ${action.toLowerCase()} the document ${docName} ${version}
-            </p>
-        </div>
-    </div>
-
-    <!-- Right side: date only -->
-    <div class="flxtblright">
-        <p class="fs-13 text-muted mb-0">${formattedDate}</p>
-    </div>
-</div>
-
-            `;
+                    <div class="dflexbtwn mb-2" style="display: flex; justify-content: space-between; align-items: center;">
+                        <div class="flxtblleft gap-0" style="display: flex; align-items: center;">
+                            <img src="/img/icons/usrround.png" alt="User" style="width: 32px; height: 32px;">
+                            <div class="flxtbltxt ms-3">
+                                <p class="fs-16 mb-1 fw-normal">
+                                    ${user} has ${action.toLowerCase()} the document ${docName} ${version}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                `;
                 container.append(cardItem);
             });
 
@@ -80,7 +241,10 @@ $(document).ready(function () {
             console.error('Error loading recent activities:', err);
         }
     }
-    // Initialize Select2 for Upload Department
+
+    // ==============================
+    // Initialize Upload Department
+    // ==============================
     function initializeUploadDepartment() {
         $("#uploadDepartment").select2({
             placeholder: "-- All Departments --",
@@ -107,36 +271,45 @@ $(document).ready(function () {
         });
 
         $("#uploadDepartment").on('change', function () {
-            console.log("Selected Upload Department ID:", $(this).val());
+            const departmentId = $(this).val();
+            console.log("Selected Upload Department ID:", departmentId);
+            // Reload charts with department filter if needed
+            loadDepartmentUploads(currentProjectId, currentPeriod, departmentId);
         });
     }
 
-    // Call both initializations
-    initializeRecentActivityDepartment();
-    initializeUploadDepartment();
-    loadRecentActivities();
-    // Load dashboard stats
-    $.ajax({
-        url: `${baseUrl}/api/dashboard/stats`,
-        type: "GET",
-        success: function (response) {
-            if (response.success) {
-                $('#totalDocs').text(response.data.total);
-                $('#approvedDocs').text(response.data.approved);
-                $('#pendingDocs').text(response.data.pending);
-                $('#rejectedDocs').text(response.data.rejected);
-                $('#pendingCount').text(response.data.pending);
-            } else {
-                console.error('Failed to fetch dashboard stats');
-            }
-        },
-        error: function () {
-            console.error("Failed to fetch dashboard stats");
-        }
-    });
+    // ==============================
+    // Dashboard Stats with Project Filter
+    // ==============================
+    function loadDashboardStats(projectId = '') {
+        const url = projectId
+            ? `${baseUrl}/api/dashboard/stats?projectId=${projectId}`
+            : `${baseUrl}/api/dashboard/stats`;
 
-    // Load documents
-    async function loadDocuments() {
+        $.ajax({
+            url: url,
+            type: "GET",
+            success: function (response) {
+                if (response.success) {
+                    $('#totalDocs').text(response.data.total);
+                    $('#approvedDocs').text(response.data.approved);
+                    $('#pendingDocs').text(response.data.pending);
+                    $('#rejectedDocs').text(response.data.rejected);
+                    $('#pendingCount').text(response.data.pending);
+                } else {
+                    console.error('Failed to fetch dashboard stats');
+                }
+            },
+            error: function () {
+                console.error("Failed to fetch dashboard stats");
+            }
+        });
+    }
+
+    // ==============================
+    // Load Documents with Project Filter
+    // ==============================
+    async function loadDocuments(projectId = '') {
         try {
             const response = await fetch(`${baseUrl}/api/documents`);
             const result = await response.json();
@@ -221,6 +394,164 @@ $(document).ready(function () {
         }
     }
 
-    // Call the function to load documents
-    loadDocuments();
+    // ==============================
+    // Department Uploads Chart (UPDATED)
+    // ==============================
+    function loadDepartmentUploads(projectId = '', period = 'today', departmentId = '') {
+        if (!$('#department').length) return;
+
+        // Destroy existing chart if it exists
+        const chartCanvas = document.getElementById('department');
+        const existingChart = Chart.getChart(chartCanvas);
+        if (existingChart) {
+            existingChart.destroy();
+        }
+
+        // Build query parameters
+        const params = new URLSearchParams();
+        if (projectId) params.append('projectId', projectId);
+        if (period) params.append('period', period);
+        if (departmentId) params.append('departmentId', departmentId);
+
+        const url = `${baseUrl}/api/dashboard/uploads?${params.toString()}`;
+
+        $.ajax({
+            url: url,
+            method: "GET",
+            dataType: "json",
+            success: function (result) {
+                if (result.success && result.data && result.data.departmentUploads) {
+                    const departments = result.data.departmentUploads;
+                    const labels = departments.map(dep => dep.departmentName);
+                    const dataValues = departments.map(dep => dep.percentage);
+
+                    const backgroundColors = [
+                        '#10A37F', '#33A3D2', '#F15C44', '#2B1871',
+                        '#8A38F5', '#8A4167', '#E8B730', '#24A19C'
+                    ];
+
+                    const ctx = chartCanvas.getContext('2d');
+                    new Chart(ctx, {
+                        type: 'doughnut',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: 'Department Uploads (%)',
+                                data: dataValues,
+                                backgroundColor: backgroundColors.slice(0, labels.length),
+                                borderWidth: 5,
+                                borderRadius: 10,
+                                borderColor: '#fff',
+                                hoverBorderWidth: 0,
+                                cutout: '63%',
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function (context) {
+                                            const department = departments[context.dataIndex];
+                                            return ` ${department.documentCount} documents`;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+
+                    // Update center text if needed
+                    updateChartCenterText(departments);
+                } else {
+                    console.warn("Unexpected API response", result);
+                    // Create empty chart
+                    createEmptyChart();
+                }
+            },
+            error: function (xhr, status, error) {
+                console.error("Error loading department uploads:", error);
+                createEmptyChart();
+            }
+        });
+    }
+
+    function updateChartCenterText(departments) {
+        const centerElement = document.querySelector('.attendance-canvas');
+        if (centerElement && departments.length > 0) {
+            const topDepartment = departments[0];
+            centerElement.innerHTML = `
+                <p class="fs-13 mb-1">${topDepartment.departmentName}</p>
+                <h3>${topDepartment.percentage}%</h3>
+            `;
+        }
+    }
+
+    function createEmptyChart() {
+        const ctx = document.getElementById('department').getContext('2d');
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['No Data'],
+                datasets: [{
+                    data: [100],
+                    backgroundColor: ['#e9ecef'],
+                    borderWidth: 5,
+                    borderColor: '#fff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } }
+            }
+        });
+    }
+
+    // ==============================
+    // Handle period dropdown selection
+    // ==============================
+    $(document).on('click', '.period-option', function () {
+        const selectedPeriod = $(this).data('period');
+        const selectedLabel = $(this).text();
+
+        // Update current period
+        currentPeriod = selectedPeriod;
+
+        // Update label in dropdown button
+        $('#currentPeriodLabel').text(selectedLabel);
+
+        console.log('Selected Period:', selectedPeriod);
+        console.log('Current Project ID:', currentProjectId);
+
+        // Reload chart with current project and new period
+        loadDepartmentUploads(currentProjectId, selectedPeriod);
+    });
+
+    // ==============================
+    // Initialize and load everything
+    // ==============================
+    async function initializeDashboard() {
+        // Initialize all select2 components
+        initializeHeaderProjectSelect();
+        initializeRecentActivityDepartment();
+        initializeUploadDepartment();
+
+        // Load current project from session
+        await loadCurrentProject();
+
+        // Load initial data
+        loadDashboardStats(currentProjectId);
+        loadRecentActivities(currentProjectId);
+        loadFileStatus(currentProjectId);
+        loadDocuments(currentProjectId);
+
+        // Load initial chart
+        loadDepartmentUploads(currentProjectId, currentPeriod);
+    }
+
+    // Start the dashboard
+    initializeDashboard();
 });

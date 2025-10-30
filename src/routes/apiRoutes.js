@@ -811,7 +811,7 @@ router.post("/files/upload/:folderId", async (req, res, next) => {
     }
 });
 
-// Fix uploader to read folderName from body
+// uploader to read folderName from body
 router.post("/files/upload-folder/:folderId", ParentFolderName, s3uploadfolder.array('file'), async (req, res, next) => {
     try {
         const { folderId } = req.params;
@@ -1081,7 +1081,7 @@ router.get('/folders/tree/structure', FolderController.getFolderTree);
 router.get("/folders/permissions", FolderController.getFolderPermissions);
 router.get('/folders/:folderId/access', FolderController.getFolderAccessByEmail);
 //  PATCH update
-router.patch("/folders/permissions/:logId", FolderController.updateFolderPermission);
+router.patch("/folders/permissions/:logId", FolderController.updateFolderLogPermission);
 
 // DELETE remove
 router.delete("/folders/permissions/:logId", FolderController.deleteFolderPermission);
@@ -1101,7 +1101,7 @@ router.get('/folders/download/:fileId', authenticate, FolderController.downloadF
  * Folder Sharing & Permissions
  */
 // Update folder permissions
-router.patch('/folders/:id/permissions', FolderController.updateFolderPermission);
+router.patch('/update/folders/:id/permissions', FolderController.updateFolderPermission);
 
 // Fetch users with access and folder share info
 router.get('/folders/:folderId', FolderController.getFolderShareInfo);

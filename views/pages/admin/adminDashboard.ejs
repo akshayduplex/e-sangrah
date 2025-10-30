@@ -39,11 +39,6 @@
                             </p>
                         </div>
                     </div>
-                    <div class="d-flex align-items-center flex-wrap mb-1">
-                        <a href="#" class="btn btn-primary btn-md me-2 mb-2" data-bs-toggle="modal"
-                            data-bs-target="#add_project">
-                            <i class="ti ti-plus me-1"></i>Add New Document</a>
-                    </div>
                 </div>
             </div>
             <!-- /Welcome Wrap -->
@@ -140,64 +135,9 @@
                                             <h4 class="fs-16 fw-normal">File Name</h4>
                                             <h4 class="fs-16 fw-normal">File Status</h4>
                                         </div>
-                                        <div class="flxtblbody">
-                                            <div class="dflexbtwn mb-2">
-                                                <div class="flxtblleft">
-                                                    <span class="avatar rounded bg-light mb-2">
-                                                        <img src="/img/icons/fn1.png">
-                                                    </span>
-                                                    <div class="flxtbltxt">
-                                                        <p class="fs-14 mb-1 fw-normal">Dev Presentation </p>
-                                                        <span class="fs-11 fw-light text-black">190KB</span>
-                                                    </div>
-                                                </div>
-                                                <div class="flxtblright">
-                                                    <p class="fs-12 fw-light text-black">Opened the file</p>
-                                                </div>
-                                            </div>
-                                            <div class="dflexbtwn mb-2">
-                                                <div class="flxtblleft">
-                                                    <span class="avatar rounded bg-light mb-2">
-                                                        <img src="/img/icons/fn2.png">
-                                                    </span>
-                                                    <div class="flxtbltxt">
-                                                        <p class="fs-14 mb-1 fw-normal">Project Proposal </p>
-                                                        <span class="fs-11 fw-light text-black">190KB</span>
-                                                    </div>
-                                                </div>
-                                                <div class="flxtblright">
-                                                    <p class="fs-12 fw-light text-black">Seen the file</p>
-                                                </div>
-                                            </div>
-                                            <div class="dflexbtwn mb-2">
-                                                <div class="flxtblleft">
-                                                    <span class="avatar rounded bg-light mb-2">
-                                                        <img src="/img/icons/fn3.png">
-                                                    </span>
-                                                    <div class="flxtbltxt">
-                                                        <p class="fs-14 mb-1 fw-normal">Team Management </p>
-                                                        <span class="fs-11 fw-light text-black">190KB</span>
-                                                    </div>
-                                                </div>
-                                                <div class="flxtblright">
-                                                    <p class="fs-12 fw-light text-black">Modified the file</p>
-                                                </div>
-                                            </div>
-                                            <div class="dflexbtwn mb-2">
-                                                <div class="flxtblleft">
-                                                    <span class="avatar rounded bg-light mb-2">
-                                                        <img src="/img/icons/fn4.png">
-                                                    </span>
-                                                    <div class="flxtbltxt">
-                                                        <p class="fs-14 mb-1 fw-normal">Work Flow File </p>
-                                                        <span class="fs-11 fw-light text-black">190KB</span>
-                                                    </div>
-                                                </div>
-                                                <div class="flxtblright">
-                                                    <p class="fs-12 fw-light text-black">Closed the file</p>
-                                                </div>
-                                            </div>
-                                        </div>
+
+                                        <!-- Dynamic content will be injected here -->
+                                        <div class="flxtblbody" id="fileList"></div>
                                     </div>
                                 </div>
                             </div>
@@ -219,23 +159,19 @@
                                     class="card-header border-0 pb-2 d-flex align-items-center justify-content-between flex-wrap">
                                     <h5 class="fs-20 mb-2 mxw-70">Department Document Uploads type</h5>
                                     <div class="dropdown mb-2">
-                                        <a href="javascript:void(0);"
-                                            class="btn btn-white border btn-sm d-inline-flex align-items-center"
+                                        <a href="javascript:void(0);" id="periodDropdown"
+                                            class="btn btn-white border text-black btn btn-outline-secondary"
                                             data-bs-toggle="dropdown">
-                                            <i class="ti ti-calendar me-1"></i>Today
+                                            <i class="ti ti-calendar me-1"></i><span
+                                                id="currentPeriodLabel">Today</span>
                                         </a>
                                         <ul class="dropdown-menu dropdown-menu-end p-3">
-                                            <li>
-                                                <a href="javascript:void(0);" class="dropdown-item rounded-1">This
-                                                    Month</a>
-                                            </li>
-                                            <li>
-                                                <a href="javascript:void(0);" class="dropdown-item rounded-1">This
-                                                    Week</a>
-                                            </li>
-                                            <li>
-                                                <a href="javascript:void(0);" class="dropdown-item rounded-1">Today</a>
-                                            </li>
+                                            <li><a href="javascript:void(0);" class="dropdown-item period-option"
+                                                    data-period="month">This Month</a></li>
+                                            <li><a href="javascript:void(0);" class="dropdown-item period-option"
+                                                    data-period="week">This Week</a></li>
+                                            <li><a href="javascript:void(0);" class="dropdown-item period-option"
+                                                    data-period="today">Today</a></li>
                                         </ul>
                                     </div>
                                 </div>
@@ -282,25 +218,23 @@
                                         <!-- Options will be dynamically loaded via AJAX -->
                                     </select>
                                 </div>
-
                                 <div class="dropdown mb-2">
-                                    <a href="javascript:void(0);"
+                                    <a href="javascript:void(0);" id="DocTypeperiodDropdown"
                                         class="btn btn-white border text-black btn btn-outline-secondary"
                                         data-bs-toggle="dropdown">
-                                        <i class="ti ti-calendar me-1"></i>Today
+                                        <i class="ti ti-calendar me-1"></i><span
+                                            id="currentDocTypePeriodLabel">Today</span>
                                     </a>
                                     <ul class="dropdown-menu dropdown-menu-end p-3">
-                                        <li>
-                                            <a href="javascript:void(0);" class="dropdown-item rounded-1">This Month</a>
-                                        </li>
-                                        <li>
-                                            <a href="javascript:void(0);" class="dropdown-item rounded-1">This Week</a>
-                                        </li>
-                                        <li>
-                                            <a href="javascript:void(0);" class="dropdown-item rounded-1">Today</a>
-                                        </li>
+                                        <li><a href="javascript:void(0);" class="dropdown-item period-option"
+                                                data-period="month">This Month</a></li>
+                                        <li><a href="javascript:void(0);" class="dropdown-item period-option"
+                                                data-period="week">This Week</a></li>
+                                        <li><a href="javascript:void(0);" class="dropdown-item period-option"
+                                                data-period="today">Today</a></li>
                                     </ul>
                                 </div>
+
                             </div>
                             <div id="sales-income"></div>
                         </div>
@@ -379,6 +313,7 @@
     </div>
     <!-- /Page Wrapper -->
     <%- include('../../partials/footer') %>
+
         <!-- <script>
             document.addEventListener("DOMContentLoaded", function () {
                 let myDonutChart; // global chart instance

@@ -548,36 +548,6 @@ $(function () {
 		});
 	}
 
-	if ($('#department').length > 0) {
-		var ctx = document.getElementById('department').getContext('2d');
-		var myDonutChart = new Chart(ctx, {
-			type: 'doughnut', // Full donut chart
-			data: {
-				labels: ['Marketing', 'Finance', 'Human Resource', 'Operation', 'Designer', 'Management'],
-				datasets: [{
-					label: 'Donut',
-					data: [20, 15, 22, 15, 8, 20],
-					backgroundColor: ['#10A37F', '#33A3D2', '#F15C44', '#2B1871', '#8A38F5', '#8A4167'],
-					borderWidth: 5,
-					borderRadius: 10,
-					borderColor: '#fff',
-					hoverBorderWidth: 0,
-					cutout: '63%',  // Controls thickness of donut
-				}]
-			},
-			options: {
-				responsive: true,
-				maintainAspectRatio: false,
-				plugins: {
-					legend: {
-						display: false // Hide legend
-					}
-				}
-			}
-		});
-	}
-
-
 	if ($('#attendance').length > 0) {
 		var ctx = document.getElementById('attendance').getContext('2d');
 		var mySemiDonutChart = new Chart(ctx, {

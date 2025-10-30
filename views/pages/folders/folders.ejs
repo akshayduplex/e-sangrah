@@ -950,7 +950,7 @@
 					});
 
 					try {
-						const res = await fetch(`/api/folders/${currentShareFolderId}/permissions`, {
+						const res = await fetch(`/api/update/folders/${currentShareFolderId}/permissions`, {
 							method: "PATCH",
 							headers: { "Content-Type": "application/json" },
 							body: JSON.stringify({ permissions: permissionData })

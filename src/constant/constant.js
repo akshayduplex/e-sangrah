@@ -23,12 +23,7 @@ export const COMPLIANCE_OPTIONS = {
     NO: "no"
 };
 
-export const FILTER_PERIODS = {
-    DAILY: "today",
-    WEEKLY: "week",
-    MONTHLY: "month",
-    YEARLY: "year"
-};
+export const FILTER_PERIODS = ["today", "week", "month", "year"];
 
 
 export const Document_STATUS = {

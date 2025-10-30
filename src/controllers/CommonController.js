@@ -6,9 +6,7 @@ import archiver from "archiver";
 import Document from '../models/Document.js';
 import ExcelJS from 'exceljs';
 import PDFDocument from 'pdfkit';
-import { createObjectCsvStringifier } from 'csv-writer';
 import { Parser } from 'json2csv';
-import { getObjectUrl } from "../utils/s3Helpers.js";
 import { API_CONFIG } from "../config/ApiEndpoints.js";
 
 export const servePDF = async (req, res) => {
@@ -17,7 +15,7 @@ export const servePDF = async (req, res) => {
         const file = await File.findById(fileId);
 
         if (!file) {
-            return res.status(404).send('File not found');
+            return res.status(404).send("File not found");
         }
 
         const command = new GetObjectCommand({
@@ -27,16 +25,27 @@ export const servePDF = async (req, res) => {
 
         const response = await s3Client.send(command);
 
-        res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `inline; filename="${file.originalName}"`);
-        res.setHeader('Content-Length', response.ContentLength);
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Disposition", `inline; filename="${file.originalName}"`);
+        res.setHeader("Content-Length", response.ContentLength);
 
-        // Stream the file
+        // Stream the PDF to the browser
         response.Body.pipe(res);
 
+        // --- Log file open activity (non-blocking) ---
+        const userId = req.user?._id || null;
+        file.activityLog.push({
+            action: "opened",
+            performedBy: userId,
+            details: `PDF "${file.originalName}" viewed in browser by ${userId || "unknown user"}`
+        });
+
+        // Save the log without delaying the response
+        file.save().catch(err => console.error("Failed to log PDF view:", err));
+
     } catch (error) {
-        console.error('Error serving PDF:', error);
-        res.status(500).send('Error loading PDF');
+        console.error("Error serving PDF:", error);
+        res.status(500).send("Error loading PDF");
     }
 };
 
@@ -115,10 +124,22 @@ export const downloadFile = async (req, res) => {
 
         const s3Object = await s3Client.send(command);
 
+        // Set headers before streaming the file
         res.setHeader("Content-Disposition", `attachment; filename="${file.originalName}"`);
         res.setHeader("Content-Type", file.fileType || "application/octet-stream");
 
+        // Pipe file stream to response
         s3Object.Body.pipe(res);
+
+        // --- Add activity log entry asynchronously ---
+        const userId = req.user?._id; // assuming auth middleware sets req.user
+        file.activityLog.push({
+            action: "downloaded",
+            performedBy: userId || null,
+            details: `File "${file.originalName}" downloaded by user ${userId || "unknown"}`
+        });
+
+        await file.save();
 
     } catch (error) {
         console.error("Download error:", error);

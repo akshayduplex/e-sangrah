@@ -89,25 +89,38 @@ export const showviewFoldersPage = async (req, res) => {
 
     try {
         const folder = await Folder.findById(folderId).lean();
-        if (!folder) return res.status(404).send('Folder not found');
+        if (!folder) return res.status(404).send("Folder not found");
 
-        const access = checkFolderAccess(folder, req);
+        // Always return a valid object
+        const access = await checkFolderAccess(folder, req) || {};
 
-        res.render('pages/folders/viewFolders', {
+        // Ensure defaults exist (prevents EJS crash)
+        const defaults = {
+            canView: false,
+            canRequestAccess: false,
+            folderExpired: false,
+            isExternal: false,
+            reason: "none"
+        };
+
+        res.render("pages/folders/viewFolders", {
             folder,
             user: req.user,
-            ...access
+            ...defaults,
+            ...access // override defaults if defined
         });
 
     } catch (err) {
-        console.error(err);
-        res.status(500).send('Server error');
+        console.error("Error rendering folder view:", err);
+        res.status(500).send("Server error");
     }
 };
+
 
 export const viewFile = async (req, res) => {
     try {
         const { fileId } = req.params;
+
         const formatFileSize = (bytes) => {
             if (!bytes) return "0 Bytes";
             const k = 1024;
@@ -133,7 +146,7 @@ export const viewFile = async (req, res) => {
         };
 
         // Fetch file document from DB
-        const file = await File.findById(fileId).lean();
+        const file = await File.findById(fileId);
         if (!file) {
             return res.render("pages/folders/viewFile", {
                 file: null,
@@ -142,12 +155,23 @@ export const viewFile = async (req, res) => {
             });
         }
 
-        // Generate signed URL from S3 with proper headers
+        // Generate signed URL (or reuse saved one)
         const fileUrl = file.s3Url || await getObjectUrl(file.file, 3600);
 
+        // --- Log the file view activity (non-blocking) ---
+        const userId = req.user?._id || null;
+        file.activityLog.push({
+            action: "opened",
+            performedBy: userId,
+            details: `File "${file.originalName}" viewed by ${userId || "unknown user"}`
+        });
+
+        file.save().catch(err => console.error("Failed to log file view:", err));
+
+        // Render view page
         res.render("pages/folders/viewFile", {
             file: {
-                ...file,
+                ...file.toObject(),
                 formattedSize: formatFileSize(file.fileSize),
                 fileUrl,
                 fileType: getFileType(file.originalName, file.mimeType)
@@ -157,7 +181,7 @@ export const viewFile = async (req, res) => {
         });
 
     } catch (error) {
-        console.error(error);
+        console.error("Error viewing file:", error);
         res.render("pages/folders/viewFile", {
             file: null,
             documentTitle: "Document",
@@ -1365,36 +1389,51 @@ export const accessViaToken = async (req, res) => {
     }
 };
 
-/**
- * Toggle or update permission for a folder.
- * @param req.params.id - Folder ID
- * @param req.body.principalId - User ID
- * @param req.body.canDownload - Boolean (optional)
- * @param req.body.access - Array of access strings: ['view','edit','owner'] (optional)
- */
-export const updateFolderPermission = async (req, res) => {
+
+export const updateFolderLogPermission = async (req, res) => {
     try {
+        console.log("🔍 [DEBUG] Incoming request to updateFolderLogPermission");
+        console.log("🧾 Params:", req.params);
+        console.log("📦 Body:", req.body);
+        console.log("👤 User:", req.user?._id);
+
         const { logId } = req.params;
         const { requestStatus, access, duration, customEnd } = req.body;
         const updatedBy = req.user?._id || null;
 
+        debugger; // <-- sets a breakpoint for step-by-step debugging if using a debugger tool
+
         const log = await FolderPermissionLogs.findById(logId);
-        if (!log) return res.status(404).json({ message: "Log not found" });
+        console.log("📘 Found Log:", log);
+
+        if (!log) {
+            console.warn("⚠️ Log not found");
+            return res.status(404).json({ message: "Log not found" });
+        }
 
         const folder = await Folder.findById(log.folder);
-        if (!folder) return res.status(404).json({ message: "Folder not found" });
+        console.log("📁 Found Folder:", folder);
+
+        if (!folder) {
+            console.warn("⚠️ Folder not found");
+            return res.status(404).json({ message: "Folder not found" });
+        }
 
         const isExternal = log.isExternal;
-        const principalId = log.requestedBy;
+        const principalId = log.user._id;
+        console.log("👥 isExternal:", isExternal, "| principalId:", principalId);
 
-        // Handle Rejection
+        // --- Handle Rejection ---
         if (requestStatus === "rejected") {
+            console.log("❌ Rejecting request for log:", logId);
+
             log.requestStatus = "rejected";
             log.rejectedBy = updatedBy;
             log.rejectedAt = new Date();
             log.expiresAt = null;
 
             await log.save();
+            console.log("✅ Log rejection saved.");
 
             return res.json({
                 message: "Permission request rejected successfully",
@@ -1402,41 +1441,51 @@ export const updateFolderPermission = async (req, res) => {
             });
         }
 
-        //Update Folder Permissions if Approved
-        let existingPermission = folder.permissions.find(
-            item => String(item.principal) === String(principalId)
-        );
-
-        if (existingPermission) {
-            if (access) existingPermission.access = access;
-        } else if (!isExternal) {
-            folder.permissions.push({
-                principal: principalId,
-                model: "User",
-                access: access || "view",
-                canDownload: false,
-                expiresAt: null
-            });
-            existingPermission = folder.permissions.at(-1);
-        }
-
-        // Use Global Expiration Utility
+        // --- Handle Approvals ---
+        console.log("✅ Approving permission update...");
         const expiresAt = calculateExpiration(duration, customEnd);
-
-        // Apply expiration to both folder + log
-        if (existingPermission) existingPermission.expiresAt = expiresAt;
-        log.expiresAt = expiresAt;
-        log.duration = duration;
+        console.log("🕒 Calculated expiration:", expiresAt);
 
         log.requestStatus = "approved";
         log.approvedBy = updatedBy;
         log.approvedAt = new Date();
         log.access = access;
+        log.duration = duration;
+        log.expiresAt = expiresAt;
 
-        folder.updatedBy = updatedBy;
+        // ✅ Update folder permissions only if INTERNAL user
+        if (!isExternal) {
+            console.log("🔧 Updating internal user permissions...");
+            let existingPermission = folder.permissions.find(
+                item => item.principal.equals(principalId)
+            );
 
-        await folder.save();
+            if (existingPermission) {
+                console.log("♻️ Existing permission found, updating...");
+                if (access) existingPermission.access = access;
+                existingPermission.expiresAt = expiresAt;
+                existingPermission.duration = duration;
+            } else {
+                console.log("➕ Adding new permission entry...");
+                folder.permissions.push({
+                    principal: principalId,
+                    model: "User",
+                    access: access || "view",
+                    canDownload: false,
+                    expiresAt,
+                    duration,
+                });
+            }
+
+            folder.updatedBy = updatedBy;
+            await folder.save();
+            console.log("📁 Folder permissions updated successfully.");
+        } else {
+            console.log("🌐 External user — skipping folder permission update.");
+        }
+
         await log.save();
+        console.log("📝 Log updated successfully.");
 
         return res.json({
             message: "Permission updated successfully",
@@ -1444,12 +1493,12 @@ export const updateFolderPermission = async (req, res) => {
             access,
             duration,
             expiresAt,
-            updatedPermissions: folder.permissions,
+            updatedPermissions: !isExternal ? folder.permissions : undefined,
             isExternal,
         });
 
     } catch (err) {
-        console.error(err);
+        console.error("💥 [ERROR] updateFolderLogPermission failed:", err);
         return res.status(500).json({
             message: "Server Error",
             error: err.message,
@@ -1458,6 +1507,114 @@ export const updateFolderPermission = async (req, res) => {
 };
 
 
+/**
+ * Toggle or update permission for a folder.
+ * @param req.params.id - Folder ID
+ * @param req.body.principalId - User ID
+ * @param req.body.canDownload - Boolean (optional)
+ * @param req.body.access - Array of access strings: ['view','edit','owner'] (optional)
+ */
+export const updateFolderPermission = async (req, res) => {
+    const { id } = req.params;
+    // Support either a single permission payload or a bulk array called `permissions`
+    const { permissions, principalId, canDownload, access, status } = req.body;
+    const updatedBy = req.user?._id || null;
+
+    // helper to normalize one entry
+    const normalizeEntry = (entry) => {
+        if (!entry) return null;
+        return {
+            principalId: entry.principalId || entry.principal || null,
+            canDownload: typeof entry.canDownload === 'boolean' ? entry.canDownload : (entry.canDownload === undefined ? undefined : Boolean(entry.canDownload)),
+            access: typeof entry.access === 'string' ? entry.access : undefined,
+            model: entry.model || 'User',
+            expiresAt: entry.expiresAt || null,
+            customStart: entry.customStart || null,
+            customEnd: entry.customEnd || null,
+            duration: entry.duration || undefined
+        };
+    };
+
+    try {
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({ message: 'Invalid folder id' });
+        }
+
+        const folder = await Folder.findById(id);
+        if (!folder) return res.status(404).json({ message: 'Folder not found' });
+
+        // Update status if provided and valid
+        if (status && ['active', 'inactive'].includes(status)) {
+            folder.status = status;
+        }
+
+        // Build list of entries to process
+        let entriesToProcess = [];
+
+        if (Array.isArray(permissions)) {
+            entriesToProcess = permissions.map(normalizeEntry).filter(Boolean);
+        } else if (principalId) {
+            entriesToProcess = [normalizeEntry({ principalId, canDownload, access })];
+        } else {
+            return res.status(400).json({ message: 'No permission data provided' });
+        }
+
+        // Process each entry (update existing ACE or create new)
+        const processedPrincipals = [];
+        for (const entry of entriesToProcess) {
+            const pid = entry.principalId;
+            if (!pid || !mongoose.Types.ObjectId.isValid(pid)) {
+                // skip invalid principal
+                continue;
+            }
+
+            // find existing permission subdoc
+            let ace = folder.permissions.find(p => String(p.principal) === String(pid));
+
+            if (ace) {
+                // Update only provided fields (note: allow canDownload = false)
+                if (entry.access !== undefined) ace.access = entry.access;
+                if (entry.canDownload !== undefined) ace.canDownload = entry.canDownload;
+                if (entry.expiresAt !== null && entry.expiresAt !== undefined) ace.expiresAt = entry.expiresAt;
+                if (entry.customStart !== null && entry.customStart !== undefined) ace.customStart = entry.customStart;
+                if (entry.customEnd !== null && entry.customEnd !== undefined) ace.customEnd = entry.customEnd;
+                if (entry.duration) ace.duration = entry.duration;
+            } else {
+                // create new ACE - push plain object; mongoose will cast it to subdoc
+                const newAce = {
+                    principal: pid,
+                    model: entry.model || 'User',
+                    access: entry.access || 'view',
+                    canDownload: typeof entry.canDownload === 'boolean' ? entry.canDownload : false,
+                    expiresAt: entry.expiresAt || null,
+                    customStart: entry.customStart || null,
+                    customEnd: entry.customEnd || null,
+                    duration: entry.duration || 'lifetime'
+                };
+                folder.permissions.push(newAce);
+            }
+
+            processedPrincipals.push(String(pid));
+        }
+
+        folder.updatedBy = updatedBy;
+        await folder.save();
+
+        // Return updated ACEs for processed principals (or all if none matched)
+        const updatedPermissions = processedPrincipals.length
+            ? folder.permissions.filter(p => processedPrincipals.includes(String(p.principal)))
+            : folder.permissions;
+
+        return res.json({
+            message: 'Permission(s) updated successfully',
+            permissions: updatedPermissions,
+            folderStatus: folder.status
+        });
+    } catch (err) {
+        console.error('updateFolderPermission error:', err);
+        return res.status(500).json({ message: 'Server error', error: err.message });
+    }
+};
 export const getFolderAccess = async (req, res) => {
     try {
         const { folderId } = req.params;
@@ -1544,7 +1701,7 @@ export const requestFolderAccess = async (req, res) => {
         const logData = {
             folder: folder._id,
             owner: owner._id,
-            user: { username: user.name, email: user.email },
+            user: { username: user.name, email: user.email, _id: user._id },
             access: "none",
             isExternal: !isInternal,
             requestStatus: "pending"
@@ -1559,7 +1716,7 @@ export const requestFolderAccess = async (req, res) => {
         //Only send email if user is external
         if (!isInternal) {
             const baseUrl = API_CONFIG.baseUrl || "http://localhost:5000";
-            const manageLink = `${baseUrl}/admin/folders/${folderId}/manage-access?userEmail=${user.email}`;
+            const manageLink = `${baseUrl}/admin/folders/permission`;
 
             await sendEmail({
                 to: owner.email,
