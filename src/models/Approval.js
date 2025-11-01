@@ -22,6 +22,10 @@ const approvalSchema = new mongoose.Schema({
         enum: ["Pending", "Approved", "Rejected", "In Review"],
         default: "Pending"
     },
+    isApproved: {
+        type: Boolean,
+        default: false
+    },
     remark: {
         type: String,
         trim: true,

@@ -23,6 +23,40 @@ export const showNotificationsPage = (req, res) => {
 
 //API Controllers
 
+export const addNotification = async ({
+    recipient,
+    sender = null,
+    type,
+    title,
+    message,
+    relatedDocument = null,
+    relatedProject = null,
+    priority = "medium",
+    actionUrl = null
+}) => {
+    try {
+        const data = {
+            recipient,
+            sender,
+            type,
+            title,
+            message,
+            relatedDocument,
+            relatedProject,
+            priority,
+            actionUrl
+        };
+
+        const notification = await Notification.create(data);
+        return notification;
+    } catch (error) {
+        console.error("Error creating notification:", error);
+        throw error; // rethrow so the parent function can handle it
+    }
+};
+
+
+
 // ------------------- Create Notification -------------------
 export const createNotification = async (req, res) => {
     try {

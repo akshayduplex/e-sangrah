@@ -224,6 +224,7 @@
 <script> window.baseUrl = "<%= BASE_URL %>";</script>
 <script src="/js/todo.js"></script>
 <script src="/js/toast.js"></script>
+<script defer src="/js/components/header.js"></script>
 <script src="/js/components/formatDate.js"></script>
 <script src="/js/theme-colorpicker.js"></script>
 <script src="/js/script.js"></script>
@@ -879,6 +880,166 @@
     // })();
 </script>
 
+<script>
+    (function ($) {
+        "use strict";
+
+        // Debounce utility
+        function debounce(func, delay) {
+            let timeout;
+            return function () {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(this, arguments), delay);
+            };
+        }
+
+        // Check if on documents list page
+        function isOnDocumentsPage() {
+            return window.location.pathname === '/documents/list' ||
+                window.location.pathname.startsWith('/documents/list?');
+        }
+
+        // Get current status (from URL or default)
+        function getCurrentStatus() {
+            const params = new URLSearchParams(window.location.search);
+            return params.get('status') || 'all';
+        }
+
+        // Update URL without reload
+        function updateUrl(params) {
+            const url = new URL(window.location);
+            Object.keys(params).forEach(key => {
+                if (params[key]) {
+                    url.searchParams.set(key, params[key]);
+                } else {
+                    url.searchParams.delete(key);
+                }
+            });
+            window.history.pushState({}, '', url);
+        }
+
+        // Redirect to documents with search
+        function redirectToDocuments(searchTerm = '', status = 'all') {
+            const params = new URLSearchParams();
+            if (searchTerm) params.append('q', searchTerm);
+            if (status && status !== 'all') params.append('status', status);
+            window.location.href = `/documents/list?${params.toString()}`;
+        }
+
+        // Reload DataTable and sync URL
+        function reloadTableWithSearch(searchTerm = '') {
+            if (typeof table !== 'undefined' && table.ajax?.reload) {
+                $('#searchInput').val(searchTerm);
+                table.ajax.reload(null, false); // false = preserve paging
+
+                updateUrl({ q: searchTerm || null });
+            }
+        }
+
+        // Initialize search from URL
+        function initSearchFromUrl() {
+            const params = new URLSearchParams(window.location.search);
+            const q = params.get('q') || '';
+
+            $('#globalSearchInput').val(q);
+            if (isOnDocumentsPage() && $('#searchInput').length) {
+                $('#searchInput').val(q);
+            }
+
+            toggleClearButtons();
+        }
+
+        // Toggle clear buttons visibility
+        function toggleClearButtons() {
+            $('.clear-search-global').toggle(!!$('#globalSearchInput').val().trim());
+            $('.clear-search-page').toggle(!!$('#searchInput').val().trim());
+        }
+
+        // Clear search (both inputs + table + URL)
+        function clearSearch() {
+            $('#globalSearchInput, #searchInput').val('');
+            toggleClearButtons();
+
+            if (isOnDocumentsPage()) {
+                updateUrl({ q: null });
+                if (typeof table !== 'undefined') {
+                    table.ajax.reload(null, false);
+                }
+            }
+        }
+
+        // === EVENT LISTENERS ===
+
+        $(document).ready(function () {
+            // Add clear button to page search input (if exists)
+            if ($('#searchInput').length && $('#searchInput').closest('.position-relative').length === 0) {
+                $('#searchInput').wrap('<div class="position-relative"></div>');
+                $('#searchInput').parent().append(`
+                    <button type="button" class="btn btn-sm btn-icon clear-search-page position-absolute end-0 top-50 translate-middle-y me-2"
+                        style="display: none; z-index: 10;">
+                        <i class="ti ti-x"></i>
+                    </button>
+                `);
+            }
+
+            initSearchFromUrl();
+
+            // Global search form submit
+            $('#globalSearchForm').on('submit', function (e) {
+                e.preventDefault();
+                const term = $('#globalSearchInput').val().trim();
+                const status = getCurrentStatus();
+
+                if (isOnDocumentsPage()) {
+                    reloadTableWithSearch(term);
+                } else {
+                    redirectToDocuments(term, status);
+                }
+            });
+
+            // Enter key in global input
+            $('#globalSearchInput').on('keypress', function (e) {
+                if (e.which === 13) {
+                    $('#globalSearchForm').trigger('submit');
+                }
+            });
+
+            // Live search on documents page (debounced)
+            $('#searchInput').on('input', debounce(function () {
+                if (isOnDocumentsPage()) {
+                    const term = $(this).val().trim();
+                    reloadTableWithSearch(term);
+                }
+            }, 500));
+
+            // Clear button clicks
+            $(document).on('click', '.clear-search-global', function () {
+                clearSearch();
+                $('#globalSearchForm').trigger('submit');
+            });
+
+            $(document).on('click', '.clear-search-page', function () {
+                clearSearch();
+                if (isOnDocumentsPage()) {
+                    reloadTableWithSearch('');
+                }
+            });
+
+            // Update clear buttons on input
+            $('#globalSearchInput, #searchInput').on('input', toggleClearButtons);
+
+            // Sync global input with page input on documents page
+            $('#globalSearchInput').on('input', function () {
+                if (isOnDocumentsPage()) {
+                    const val = $(this).val();
+                    $('#searchInput').val(val);
+                    toggleClearButtons();
+                }
+            });
+        });
+
+    })(jQuery);
+</script>
 <script>$(document).ready(function () {
         $('#sharedoc-modal').on('shown.bs.modal', function () {
             flatpickr('#flatpickr-range', {

@@ -21,7 +21,10 @@ const notificationSchema = new mongoose.Schema({
             "document_updated",
             "document_rejected",
             "document_commented",
-            "approval_requested",
+            "approval_request",
+            "approval_update",
+            "project_assigned",
+            "project_updated",
             "mention",
             "system_alert",
             "storage_warning"

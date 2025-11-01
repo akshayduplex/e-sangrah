@@ -336,7 +336,7 @@ router.get("/files/file-status", authenticate, FilesController.showFileStatusPag
    NOTIFICATIONS ROUTE
    ========================================= */
 // Notifications page
-router.get("/notifications", authenticate, checkPermissions, NotificationController.showNotificationsPage);
+router.get("/all/notifications", authenticate, NotificationController.showNotificationsPage);
 
 
 /* =========================================

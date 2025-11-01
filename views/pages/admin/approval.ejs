@@ -176,22 +176,22 @@
         <script>
             document.addEventListener("DOMContentLoaded", function () {
                 const baseUrl = window.location.origin;
+                let currentDocumentId = null;
 
-                // Approve / Decline Button Toggle
+                // Approve / Decline toggle
                 function setupApproveDeclineButtons() {
                     const approveBtn = document.getElementById("approveBtn");
                     const declineBtn = document.getElementById("declineBtn");
+                    if (!approveBtn || !declineBtn) return;
 
-                    if (approveBtn && declineBtn) {
-                        approveBtn.onclick = () => {
-                            approveBtn.classList.add("active");
-                            declineBtn.classList.remove("active");
-                        };
-                        declineBtn.onclick = () => {
-                            declineBtn.classList.add("active");
-                            approveBtn.classList.remove("active");
-                        };
-                    }
+                    approveBtn.onclick = () => {
+                        approveBtn.classList.add("active");
+                        declineBtn.classList.remove("active");
+                    };
+                    declineBtn.onclick = () => {
+                        declineBtn.classList.add("active");
+                        approveBtn.classList.remove("active");
+                    };
                 }
 
                 // Initialize Select2
@@ -207,7 +207,10 @@
                             processResults: data => ({
                                 results: [
                                     { id: '', text: 'Select Department' },
-                                    ...data.data.map(item => ({ id: item._id, text: item[textKey] }))
+                                    ...(data.data || []).map(item => ({
+                                        id: item._id,
+                                        text: item[textKey]
+                                    }))
                                 ]
                             })
                         }
@@ -220,7 +223,7 @@
 
                 initSelect2('#department', `${baseUrl}/api/departments/search`, 'name');
 
-                // Format File Size
+                // Helper utilities
                 function formatFileSize(bytes) {
                     if (!bytes) return '0 Bytes';
                     const k = 1024;
@@ -229,23 +232,19 @@
                     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
                 }
 
-                // Format Date
                 function formatDate(dateString) {
-                    if (!dateString) return 'Unknown date';
+                    if (!dateString) return 'Unknown';
                     return new Date(dateString).toLocaleDateString('en-US', {
-                        year: 'numeric', month: 'long', day: 'numeric'
+                        year: 'numeric', month: 'short', day: 'numeric'
                     });
                 }
 
-                // Strip HTML
                 function stripHtmlTags(html) {
-                    if (!html) return 'No description provided';
                     const div = document.createElement('div');
-                    div.innerHTML = html;
+                    div.innerHTML = html || '';
                     return div.textContent || div.innerText || 'No description provided';
                 }
 
-                // Get File Icon
                 function getFileIcon(fileType) {
                     const map = {
                         'pdf': '/img/icons/pdf.png',
@@ -261,7 +260,7 @@
                     return '/img/icons/fn1.png';
                 }
 
-                // Show Error in Modal
+                // Modal helpers
                 function showModalError(msg) {
                     const content = document.getElementById('modalContent');
                     const loading = document.getElementById('modalLoading');
@@ -270,117 +269,101 @@
                     content.innerHTML = `<p class="text-danger text-center p-3">${msg}</p>`;
                 }
 
-                // Populate Modal with Data
                 function populateModalData(data) {
                     const { document: doc } = data;
                     const primaryFile = doc.files?.find(f => f.isPrimary) || doc.files?.[0];
 
-                    // Show content, hide loading
                     document.getElementById('modalLoading').style.display = 'none';
                     document.getElementById('modalContent').style.display = 'block';
 
-                    // Owner
                     document.getElementById('ownerName').textContent = doc.owner?.name || 'Unknown';
 
-                    // File Info
                     if (primaryFile) {
                         const version = doc.versioning?.currentVersion?.$numberDecimal || '1.0';
-                        document.getElementById('fileName').innerHTML = `${primaryFile.originalName} <span class="text-success">v${version}</span>`;
+                        document.getElementById('fileName').innerHTML =
+                            `${primaryFile.originalName} <span class="text-success">v${version}</span>`;
                         document.getElementById('fileSize').textContent = formatFileSize(primaryFile.fileSize);
                         document.getElementById('fileIcon').src = getFileIcon(primaryFile.fileType);
+
                         const link = document.getElementById('viewFileLink');
-                        link.href = primaryFile.s3Url;
+                        link.href = `/folders/view/${primaryFile._id}`; // 👈 Redirect to /folders/view/:fileId
                         link.target = '_blank';
                     }
 
-                    // Dates
                     document.getElementById('requestDate').textContent = formatDate(doc.createdAt);
-                    document.getElementById('expiryDate').textContent = doc.compliance?.expiryDate ? formatDate(doc.compliance.expiryDate) : 'Not set';
-                    document.getElementById('complianceText').textContent = doc.compliance?.isCompliance ? 'Yes' : 'No';
-
-                    // Description
+                    document.getElementById('expiryDate').textContent = doc.compliance?.expiryDate
+                        ? formatDate(doc.compliance.expiryDate)
+                        : 'Not set';
+                    document.getElementById('complianceText').textContent =
+                        doc.compliance?.isCompliance ? 'Yes' : 'No';
                     document.getElementById('descriptionText').textContent = stripHtmlTags(doc.description);
+                    document.getElementById('notifyText').textContent =
+                        `${doc.owner?.name || 'User'} and other approver members will be notified`;
 
-                    // Notify Text
-                    document.getElementById('notifyText').textContent = `${doc.owner?.name || 'User'} and other approver members will be notified`;
-
-                    // Reset comment
                     document.getElementById('commentInput').value = '';
-
-                    // Reset buttons
                     setupApproveDeclineButtons();
                 }
 
-                // Fetch and Populate Modal
-                window.populateApprovalModal = async function (documentId) {
+                async function populateApprovalModal(documentId) {
                     try {
                         const res = await fetch(`/api/documents/${documentId}/approval/track`);
                         const data = await res.json();
-
-                        if (res.ok) {
-                            populateModalData(data);
-                        } else {
-                            showModalError('Failed to load approval details.');
-                        }
+                        if (res.ok) populateModalData(data);
+                        else showModalError('Failed to load approval details.');
                     } catch (err) {
                         console.error(err);
                         showModalError('Error loading data. Please try again.');
                     }
-                };
+                }
 
-                // Click Handler for Approve Buttons
+
                 $(document).on('click', '.openApprovalModal', function () {
-                    const documentId = this.getAttribute('data-id');
-                    if (documentId) {
-                        // Reset modal
-                        document.getElementById('modalLoading').style.display = 'block';
-                        document.getElementById('modalContent').style.display = 'none';
-                        populateApprovalModal(documentId);
-                    }
+                    currentDocumentId = this.getAttribute('data-id');
+                    console.log('Opening modal for document:', currentDocumentId);
+
+                    // Reset modal
+                    document.getElementById('modalLoading').style.display = 'block';
+                    document.getElementById('modalContent').style.display = 'none';
+
+                    // Load data
+                    populateApprovalModal(currentDocumentId);
+
+                    // Show modal
+                    const modal = new bootstrap.Modal(document.getElementById('approvalModal'));
+                    modal.show();
                 });
 
-                // Submit Approval
+                // Submit Approval Handler
                 document.getElementById('submitApproval').addEventListener('click', async () => {
-                    const isApprove = document.getElementById('approveBtn').classList.contains('active');
+                    if (!currentDocumentId) return showToast('Document ID not found.', 'info');
+
+                    const approved = document.getElementById('approveBtn').classList.contains('active');
                     const comment = document.getElementById('commentInput').value.trim();
 
                     try {
-                        const res = await fetch('/api/approvals/submit', {
-                            method: 'POST',
+                        console.log('Submitting approval:', { approved, comment });
+                        const res = await fetch(`/api/documents/${currentDocumentId}/approval`, {
+                            method: 'PATCH',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ approved: isApprove, comment })
+                            body: JSON.stringify({ approved, comment })
                         });
 
+                        const data = await res.json();
                         if (res.ok) {
                             bootstrap.Modal.getInstance(document.getElementById('approvalModal')).hide();
-                            location.reload();
+                            $('#approvalsTable').DataTable().ajax.reload(null, false); // refresh table
+                            showToast('Approval updated successfully', 'success');
                         } else {
-                            alert('Failed to submit approval.');
+                            showToast(data.error || 'Failed to update approval', 'error');
                         }
                     } catch (err) {
-                        alert('Error submitting approval.');
+                        console.error(err);
+                        showToast('Error submitting approval', 'error');
                     }
                 });
-                // Add this inside DOMContentLoaded
-                $(document).on('click', '.openApprovalModal', function () {
-                    const documentId = this.getAttribute('data-id');
-                    console.log('Opening modal for ID:', documentId); // Debug
 
-                    if (documentId) {
-                        // Reset modal state
-                        document.getElementById('modalLoading').style.display = 'block';
-                        document.getElementById('modalContent').style.display = 'none';
-
-                        // Populate data
-                        populateApprovalModal(documentId);
-
-                        // Manually open Bootstrap modal
-                        const modal = new bootstrap.Modal(document.getElementById('approvalModal'));
-                        modal.show();
-                    }
-                });
                 // Initialize DataTable
-                let table = $('#approvalsTable').DataTable({
+                const table = $('#approvalsTable').DataTable({
                     processing: true,
                     serverSide: true,
                     ajax: function (data, callback) {
@@ -406,11 +389,15 @@
                             url: `/api/my-approvals`,
                             type: "GET",
                             data: {
-                                page, limit,
+                                page,
+                                limit,
                                 status: $('.filterbtn.active').text() === "All" ? "" : $('.filterbtn.active').text(),
                                 department: $('#department').val() || "",
-                                createdAt: $('.datetimepicker').val() ? new Date($('.datetimepicker').val()).toISOString().split('T')[0] : "",
-                                sortField, sortOrder
+                                createdAt: $('.datetimepicker').val()
+                                    ? new Date($('.datetimepicker').val()).toISOString().split('T')[0]
+                                    : "",
+                                sortField,
+                                sortOrder
                             },
                             success: function (res) {
                                 callback({
@@ -423,26 +410,27 @@
                     },
                     columns: [
                         {
-                            data: null, render: () => `
-                <div class="btn-group" role="group">
-                    <button type="button" class="btn border-0" data-bs-toggle="dropdown">
-                        <i class="ti ti-settings"></i>
-                    </button>
-                    <ul class="dropdown-menu">
-                        <li><a class="dropdown-item" href="#"><i class="ti ti-eye"></i> View</a></li>
-                        <li><a class="dropdown-item" href="#"><i class="ti ti-pencil-minus"></i> Edit</a></li>
-                        <li><a class="dropdown-item" href="#"><i class="ti ti-share"></i> Share</a></li>
-                        <li><a class="dropdown-item" href="#"><i class="ti ti-history"></i> Version History</a></li>
-                        <li><a class="dropdown-item" href="#"><i class="ti ti-download"></i> Download</a></li>
-                        <li><a class="dropdown-item" href="#"><i class="ti ti-trash"></i> Move to Trash</a></li>
-                        <li><a class="dropdown-item" href="#"><i class="ti ti-archive"></i> Move to Archive</a></li>
-                    </ul>
-                </div>`
+                            data: null,
+                            render: () => `
+                    <div class="btn-group" role="group">
+                        <button type="button" class="btn border-0" data-bs-toggle="dropdown">
+                            <i class="ti ti-settings"></i>
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="#"><i class="ti ti-eye"></i> View</a></li>
+                            <li><a class="dropdown-item" href="#"><i class="ti ti-pencil-minus"></i> Edit</a></li>
+                            <li><a class="dropdown-item" href="#"><i class="ti ti-share"></i> Share</a></li>
+                            <li><a class="dropdown-item" href="#"><i class="ti ti-history"></i> Version History</a></li>
+                            <li><a class="dropdown-item" href="#"><i class="ti ti-download"></i> Download</a></li>
+                            <li><a class="dropdown-item" href="#"><i class="ti ti-trash"></i> Move to Trash</a></li>
+                            <li><a class="dropdown-item" href="#"><i class="ti ti-archive"></i> Move to Archive</a></li>
+                        </ul>
+                    </div>`
                         },
                         {
                             data: "metadata.fileName",
                             render: (data, type, row) => {
-                                const file = row.files[0];
+                                const file = row.files?.[0];
                                 const size = file ? (file.fileSize / 1024).toFixed(1) + " KB" : "-";
                                 return `
                         <div class="flxtblleft">
@@ -450,7 +438,9 @@
                                 <img src="/img/icons/fn1.png" alt="icon">
                             </span>
                             <div class="flxtbltxt">
-                                <p class="fs-14 mb-1 fw-normal text-neutral">${data} <span class="text-success">v${row.versioning.currentVersion.$numberDecimal}</span></p>
+                                <p class="fs-14 mb-1 fw-normal text-neutral">${data}
+                                    <span class="text-success">v${row.versioning?.currentVersion?.$numberDecimal || '1.0'}</span>
+                                </p>
                                 <span class="fs-11 fw-light text-black">${size}</span>
                             </div>
                         </div>`;
@@ -458,7 +448,7 @@
                         },
                         {
                             data: "createdAt",
-                            render: function (data) {
+                            render: data => {
                                 const d = new Date(data);
                                 return `<p class="tbl_date">${d.toLocaleDateString()} &nbsp;&nbsp; ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>`;
                             }
@@ -467,7 +457,7 @@
                         { data: "department.name" },
                         {
                             data: "status",
-                            render: function (data) {
+                            render: data => {
                                 let cls = "status-badge bg-soft-info";
                                 if (data === "Approved") cls = "status-badge bg-soft-success";
                                 else if (data === "Rejected") cls = "status-badge bg-soft-danger";
@@ -478,24 +468,22 @@
                         {
                             data: "status",
                             render: (data, type, row) => {
-                                if (data === "Pending") {
-                                    return `<button class="adminapprv_btn openApprovalModal" data-id="${row._id}">
-                        Approve
-                    </button>`;
-                                } else if (data === "Draft") {
-                                    return `<button class="adminapprv_btn bg-primary openApprovalModal" data-id="${row._id}">
-                         Edit
-                    </button>`;
-                                } else {
+                                if (data === "Pending")
+                                    return `<button class="adminapprv_btn openApprovalModal" data-id="${row._id}">Approve</button>`;
+                                else if (data === "Draft")
+                                    return `<button class="adminapprv_btn bg-primary openApprovalModal" data-id="${row._id}">Edit</button>`;
+                                else
                                     return `<button class="btn btn-light">View</button>`;
-                                }
                             }
                         },
                         {
                             data: "_id",
                             render: data => `<a href="/document/${data}/approval/track" class="site-btnmd">Track</a>`
                         },
-                        { data: "comment", render: data => `<p>${data || '-'}</p>` }
+                        {
+                            data: "comment",
+                            render: data => `<p>${data || '-'}</p>`
+                        }
                     ]
                 });
 

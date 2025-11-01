@@ -24,6 +24,7 @@ import { inviteUserTemplate } from "../emailTemplates/inviteUserTemplate.js";
 import { API_CONFIG } from "../config/ApiEndpoints.js";
 import PermissionLogs from "../models/PermissionLogs.js";
 import Project from "../models/Project.js";
+import { addNotification } from "./NotificationController.js";
 
 //Page Controllers
 
@@ -31,6 +32,8 @@ import Project from "../models/Project.js";
 export const showDocumentListPage = async (req, res) => {
     try {
         const status = req.query.status;
+        //    const status = req.query.status || 'all';
+        const searchQuery = req.query.q || '';
         const designations = await Designation.find({ status: "Active" })
             .sort({ name: 1 })
             .lean();
@@ -39,6 +42,7 @@ export const showDocumentListPage = async (req, res) => {
             title: "E-Sangrah - Documents-List",
             designations,
             user: req.user,
+            searchQuery: searchQuery,
             status
         });
     } catch (err) {
@@ -2728,53 +2732,122 @@ const createDefaultApprovalWorkflow = async (documentId, document) => {
 
 export const updateApprovalStatus = async (req, res) => {
     try {
-        const { approver } = req.params;
-        const { status, remark } = req.body;
-        const userId = req.user.id;
-        const approval = await Approval.find(approver).populate('document');
+        const userId = req.user._id;
+        const { documentId } = req.params;
+        const { approved, comment } = req.body;
 
-        if (!approval) return res.status(404).json({ error: 'Approval not found' });
+        // Find this user's approval entry
+        const approval = await Approval.findOne({
+            document: documentId,
+            approver: userId
+        }).populate('document');
 
-        // Approver check
-        if (approval.approver.toString() !== userId)
-            return res.status(403).json({ error: 'Not authorized to approve this document' });
+        if (!approval) {
+            return res.status(404).json({ error: 'Approval not found for this user' });
+        }
 
-        // Previous approvals check
-        const previousApprovals = await Approval.find({
-            document: approval.document._id,
-            level: { $lt: approval.level }
-        });
-        const pendingPrevious = previousApprovals.some(a => a.status === 'Pending');
-        if (pendingPrevious) return res.status(400).json({ error: 'Previous approvals are still pending' });
-
-        // Update approval
-        approval.status = status;
-        approval.remark = remark || '';
-        approval.approvedOn = status === 'Approved' ? new Date() : null;
+        // Update approval details
+        approval.status = approved ? 'Approved' : 'Rejected';
+        approval.isApproved = approved;
+        approval.remark = comment || '';
+        approval.approvedOn = approved ? new Date() : null;
         await approval.save();
 
-        // Update document status
-        const allApprovals = await Approval.find({ document: approval.document._id });
-        const allApproved = allApprovals.every(a => a.status === 'Approved');
-        const anyRejected = allApprovals.some(a => a.status === 'Rejected');
+        // --- DOCUMENT STATUS LOGIC ---
+        const maxLevel = await Approval.findOne({ document: documentId })
+            .sort({ level: -1 })
+            .select('level');
 
-        let documentStatus = 'Pending';
-        if (allApproved) documentStatus = 'Approved';
-        else if (anyRejected) documentStatus = 'Rejected';
+        if (approved && approval.level === maxLevel.level) {
+            // Top-level approval → approve all
+            await Approval.updateMany(
+                { document: documentId },
+                {
+                    $set: {
+                        status: 'Approved',
+                        isApproved: true,
+                        approvedOn: new Date()
+                    }
+                }
+            );
+            await Document.findByIdAndUpdate(documentId, { status: 'Approved' });
+        } else {
+            // Recalculate document status
+            const allApprovals = await Approval.find({ document: documentId });
+            const allApproved = allApprovals.every(a => a.status === 'Approved');
+            const anyRejected = allApprovals.some(a => a.status === 'Rejected');
 
-        await Document.findByIdAndUpdate(approval.document._id, { status: documentStatus });
+            let documentStatus = 'Pending';
+            if (allApproved) documentStatus = 'Approved';
+            else if (anyRejected) documentStatus = 'Rejected';
 
-        const updatedApprovals = await Approval.find({ document: approval.document._id })
+            await Document.findByIdAndUpdate(documentId, { status: documentStatus });
+        }
+
+        // --- NOTIFICATION CREATION ---
+        const document = approval.document;
+
+        // Notify all other approvers (except current user)
+        const otherApprovals = await Approval.find({
+            document: documentId,
+            approver: { $ne: userId }
+        }).populate('approver', '_id name email');
+
+        for (const other of otherApprovals) {
+            await addNotification({
+                recipient: other.approver._id,
+                sender: userId,
+                type: 'approval_update',
+                title: `Document ${approved ? 'Approved' : 'Rejected'}`,
+                message: `${req.user.name} has ${approved ? 'approved' : 'rejected'} the document "${document.title}".`,
+                relatedDocument: documentId,
+                priority: approved ? 'low' : 'high'
+            });
+        }
+
+        // Notify the document owner (if not the current user)
+        if (String(document.owner) !== String(userId)) {
+            await addNotification({
+                recipient: document.owner,
+                sender: userId,
+                type: 'approval_update',
+                title: `Document ${approved ? 'Approved' : 'Rejected'}`,
+                message: `${req.user.name} has ${approved ? 'approved' : 'rejected'} your document "${document.title}".`,
+                relatedDocument: documentId,
+                priority: approved ? 'low' : 'high'
+            });
+        }
+
+        // Notify next approver (if applicable)
+        if (approved) {
+            const nextApproval = await Approval.findOne({
+                document: documentId,
+                level: approval.level + 1
+            }).populate('approver');
+
+            if (nextApproval) {
+                await addNotification({
+                    recipient: nextApproval.approver._id,
+                    sender: userId,
+                    type: 'approval_request',
+                    title: 'Document Pending Approval',
+                    message: `${req.user.name} has approved "${document.title}". It's now your turn to review.`,
+                    relatedDocument: documentId,
+                    priority: 'medium'
+                });
+            }
+        }
+
+        // --- RETURN RESPONSE ---
+        const updatedApprovals = await Approval.find({ document: documentId })
             .populate('approver', 'name designation email')
             .sort({ level: 1 });
 
         res.json({
             message: 'Approval updated successfully',
-            approval: updatedApprovals.find(a => a._id.toString() === approver),
-            documentStatus
+            approval,
+            approvals: updatedApprovals
         });
-
-
     } catch (error) {
         console.error('Error updating approval:', error);
         res.status(500).json({ error: error.message });

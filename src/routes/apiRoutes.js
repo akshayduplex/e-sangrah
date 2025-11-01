@@ -261,7 +261,7 @@ router.post('/documents/:documentId/add', authenticate, DocumentController.creat
 router.get('/documents/:documentId/approval/track', authenticate, DocumentController.getApprovals);
 
 // Update approval status for a document
-router.patch('/documents/:documentId/approvals/:approver', authenticate, DocumentController.updateApprovalStatus);
+router.patch('/documents/:documentId/approval', authenticate, DocumentController.updateApprovalStatus);
 
 
 // ---------------------------
