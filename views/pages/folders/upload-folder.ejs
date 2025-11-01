@@ -653,7 +653,7 @@
 
 					xhr.onload = function () {
 						if (xhr.status === 200) {
-							console.log("Folder uploaded successfully!");
+							showToast("Folder uploaded successfully!", 'success');
 						} else {
 							console.error("Upload failed!");
 						}

@@ -78,75 +78,155 @@ export const getDashboardStats = async (req, res) => {
 
 export const getFileStatus = async (req, res) => {
     try {
-        const { limit = 4 } = req.query;
-        const files = await File.find()
-            .populate("uploadedBy", "name email") // optional: show who uploaded
-            .sort({ updatedAt: -1 })
-            .limit(limit)
-            .lean();
+        const user = req.user;
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 4;
+        const skip = (page - 1) * limit;
 
-        // Helper function to format file size
+        // Build base query
+        let query = {};
+        if (user.profile_type !== "superadmin") {
+            query = { uploadedBy: user._id };
+        }
+
+        // Build aggregation pipeline to:
+        // 1. Match base query
+        // 2. Filter out files where latest activity was by current user
+        // 3. Sort, skip, limit
+        const pipeline = [
+            { $match: query },
+            {
+                $lookup: {
+                    from: "users",
+                    localField: "uploadedBy",
+                    foreignField: "_id",
+                    as: "uploadedBy"
+                }
+            },
+            { $unwind: { path: "$uploadedBy", preserveNullAndEmptyArrays: true } },
+            {
+                $addFields: {
+                    latestActivity: { $arrayElemAt: ["$activityLog", -1] }
+                }
+            },
+            {
+                $match: {
+                    latestActivity: { $ne: null },
+                    "latestActivity.performedBy": { $ne: user._id }
+                }
+            },
+            {
+                $lookup: {
+                    from: "users",
+                    localField: "latestActivity.performedBy",
+                    foreignField: "_id",
+                    as: "latestActivity.performedBy"
+                }
+            },
+            {
+                $unwind: {
+                    path: "$latestActivity.performedBy",
+                    preserveNullAndEmptyArrays: true
+                }
+            },
+            { $sort: { "latestActivity.timestamp": -1, updatedAt: -1 } },
+            { $skip: skip },
+            { $limit: limit },
+            {
+                $project: {
+                    _id: 1,
+                    originalName: 1,
+                    fileSize: 1,
+                    fileType: 1,
+                    createdAt: 1,
+                    updatedAt: 1,
+                    uploadedBy: {
+                        _id: "$uploadedBy._id",
+                        name: "$uploadedBy.name",
+                        email: "$uploadedBy.email"
+                    },
+                    latestActivity: 1
+                }
+            }
+        ];
+
+        // Run aggregation
+        const files = await File.aggregate(pipeline).option({ allowDiskUse: true });
+
+        // Count total filtered documents
+        const countPipeline = pipeline.slice(0, -3); // Remove sort, skip, limit
+        countPipeline.push({ $count: "total" });
+        const countResult = await File.aggregate(countPipeline);
+        const totalCount = countResult[0]?.total || 0;
+
+        // Helper: file size formatting
         const formatFileSize = (bytes) => {
             if (!bytes) return "0 Bytes";
             const k = 1024;
-            const sizes = ["Bytes", "KB", "MB", "GB"];
+            const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
             const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+            return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
         };
 
-        // Map data to the format needed for the front-end
-        const formattedFiles = files.map((file) => {
-            const latestActivity =
-                file.activityLog?.length > 0
-                    ? file.activityLog[file.activityLog.length - 1]
-                    : null;
+        // Status mapping
+        const statusTextMap = {
+            opened: "Opened the file",
+            modified: "Modified the file",
+            downloaded: "Downloaded the file",
+            shared: "Shared the file",
+            closed: "Closed the file",
+            uploaded: "Uploaded the file",
+        };
 
-            // Determine readable status text
-            let statusText = "No activity yet";
-            switch (latestActivity?.action) {
-                case "opened":
-                    statusText = "Opened the file";
-                    break;
-                case "modified":
-                    statusText = "Modified the file";
-                    break;
-                case "downloaded":
-                    statusText = "Downloaded the file";
-                    break;
-                case "shared":
-                    statusText = "Shared the file";
-                    break;
-                case "closed":
-                    statusText = "Closed the file";
-                    break;
-                case "uploaded":
-                    statusText = "Uploaded the file";
-                    break;
-            }
-
+        // Map final response
+        const formattedFiles = files.map(file => {
+            const activity = file.latestActivity;
             return {
                 _id: file._id,
                 name: file.originalName,
                 fileSize: formatFileSize(file.fileSize),
-                status: statusText,
-                icon: getFileIcon(file.fileType), // helper defined below
-                lastActionTime: latestActivity?.timestamp || file.createdAt,
+                status: activity?.action
+                    ? statusTextMap[activity.action] || activity.action
+                    : "No activity yet",
+                icon: getFileIcon(file.fileType),
+                lastActionTime: activity?.timestamp || file.createdAt,
+                performedBy: activity?.performedBy
+                    ? {
+                        name: activity.performedBy.name,
+                        email: activity.performedBy.email,
+                    }
+                    : file.uploadedBy
+                        ? {
+                            name: file.uploadedBy.name,
+                            email: file.uploadedBy.email,
+                        }
+                        : null,
             };
         });
 
+        // Send correct pagination
         res.status(200).json({
             success: true,
             count: formattedFiles.length,
+            total: totalCount,
+            totalPages: Math.ceil(totalCount / limit) || 1,
+            currentPage: page,
+            hasNextPage: page < Math.ceil(totalCount / limit),
+            hasPrevPage: page > 1,
             files: formattedFiles,
         });
+
     } catch (error) {
         console.error("Error fetching file activity list:", error);
         res.status(500).json({
             success: false,
             message: "Failed to fetch file activity list",
+            error: process.env.NODE_ENV === "development" ? error.message : undefined,
         });
     }
 };
+
+
 
 /** Get Recent Activities */
 export const getRecentActivities = async (req, res) => {
@@ -155,59 +235,83 @@ export const getRecentActivities = async (req, res) => {
         const userId = req.user?._id;
         const profile_type = req.user?.profile_type;
 
-
-        const matchStage = {
-            isDeleted: false,
-            isArchived: false
-        };
+        const matchDoc = { isDeleted: false, isArchived: false };
+        const matchFile = { status: "active" };
 
         if (profile_type !== "superadmin") {
-            matchStage.$or = [
-                { owner: userId },
-                { sharedWithUsers: userId }
+            matchDoc.$or = [{ owner: userId }, { sharedWithUsers: userId }];
+            matchFile.$or = [
+                { uploadedBy: userId },
+                { sharedWithUsers: userId }, // optional if sharing tracked on file
             ];
         }
 
-        const recentActivities = await Document.aggregate([
-
-            { $match: matchStage },
-
-
+        // --- Fetch document version activities ---
+        const docActivities = await Document.aggregate([
+            { $match: matchDoc },
             { $unwind: "$versionHistory" },
-
-
             { $sort: { "versionHistory.timestamp": -1 } },
-
-
             { $limit: Number(limit) },
-
             {
                 $lookup: {
                     from: "users",
                     localField: "versionHistory.changedBy",
                     foreignField: "_id",
-                    as: "changedByUser"
-                }
+                    as: "user",
+                },
             },
-
-            { $unwind: { path: "$changedByUser", preserveNullAndEmptyArrays: true } },
-
-
+            { $unwind: { path: "$user", preserveNullAndEmptyArrays: true } },
             {
                 $project: {
                     _id: 0,
+                    type: { $literal: "document" },
                     documentId: "$_id",
                     documentName: "$metadata.fileName",
                     activity: "$versionHistory.changes",
                     timestamp: "$versionHistory.timestamp",
-                    userName: "$changedByUser.name",
-                    userId: "$changedByUser._id",
-                    version: "$versionHistory.version"
-                }
-            }
+                    userName: "$user.name",
+                    userId: "$user._id",
+                    version: "$versionHistory.version",
+                },
+            },
         ]);
 
-        res.status(200).json({ recentActivities });
+        // --- Fetch file activity logs ---
+        const fileActivities = await File.aggregate([
+            { $match: matchFile },
+            { $unwind: "$activityLog" },
+            { $sort: { "activityLog.timestamp": -1 } },
+            { $limit: Number(limit) },
+            {
+                $lookup: {
+                    from: "users",
+                    localField: "activityLog.performedBy",
+                    foreignField: "_id",
+                    as: "user",
+                },
+            },
+            { $unwind: { path: "$user", preserveNullAndEmptyArrays: true } },
+            {
+                $project: {
+                    _id: 0,
+                    type: { $literal: "file" },
+                    fileId: "$_id",
+                    fileName: "$originalName",
+                    activity: "$activityLog.action",
+                    details: "$activityLog.details",
+                    timestamp: "$activityLog.timestamp",
+                    userName: "$user.name",
+                    userId: "$user._id",
+                },
+            },
+        ]);
+
+        // --- Merge and sort both types by timestamp ---
+        const allActivities = [...docActivities, ...fileActivities].sort(
+            (a, b) => new Date(b.timestamp) - new Date(a.timestamp)
+        );
+
+        res.status(200).json({ recentActivities: allActivities.slice(0, limit) });
     } catch (error) {
         console.error("Error fetching recent activities:", error);
         res.status(500).json({ message: "Server error", error: error.message });
@@ -341,14 +445,14 @@ export const getDocumentsStatusSummary = async (req, res) => {
     try {
         const { period = "month", department, projectId, docType } = req.query;
 
-        // ✅ Validate period
+        //Validate period
         if (!FILTER_PERIODS.includes(period)) {
             return failResponse(res, "Invalid period. Must be today, week, month, or year", 400);
         }
 
         const startDate = calculateStartDate(period);
 
-        // ✅ Base match query
+        // Base match query
         const match = {
             createdAt: { $gte: startDate },
             isDeleted: false,
@@ -358,7 +462,7 @@ export const getDocumentsStatusSummary = async (req, res) => {
         if (projectId) match.project = new mongoose.Types.ObjectId(projectId);
         if (docType) match.docType = docType;
 
-        // ✅ Group by date and department for aggregation
+        //Group by date and department for aggregation
         let dateGroup = null;
         let categories = [];
         let periodFormat = "";
@@ -424,8 +528,7 @@ export const getDocumentsStatusSummary = async (req, res) => {
         ];
 
         const results = await Document.aggregate(pipeline);
-
-        // ✅ Build series by status for charts
+        // Build series by status for charts
         const statuses = ["Draft", "Pending", "Approved", "Rejected"];
         const series = statuses.map(status => ({
             name: status,
@@ -445,7 +548,7 @@ export const getDocumentsStatusSummary = async (req, res) => {
             {
                 categories,
                 series,
-                results, // raw data also returned if needed
+                // results,
             },
             "Department document uploads summary fetched successfully"
         );

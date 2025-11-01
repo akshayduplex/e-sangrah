@@ -97,7 +97,6 @@ function debounce(fn, delay) {
 
 function showToast(message, type = 'info') {
     // Simple toast implementation - replace with your actual toast system
-    console.log(`${type.toUpperCase()}: ${message}`);
     alert(`${type.toUpperCase()}: ${message}`); // Temporary - replace with proper toast
 }
 

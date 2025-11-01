@@ -52,14 +52,23 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             // Ensure permissions are updated when menu checkbox changes
+            // Ensure permissions are updated when menu checkbox changes
             if (menuCb) {
                 menuCb.addEventListener('change', () => {
-                    if (!menuCb.checked) {
-                        // If menu is unchecked, uncheck all permissions
+                    if (menuCb.checked) {
+                        // If menu is checked → auto-check Read
+                        if (readCb) readCb.checked = true;
+                    } else {
+                        // If unchecked → uncheck all permissions
                         if (readCb) readCb.checked = false;
                         if (writeCb) writeCb.checked = false;
                         if (deleteCb) deleteCb.checked = false;
                         if (allCb) allCb.checked = false;
+                    }
+
+                    // Keep "All" synced
+                    if (readCb && writeCb && deleteCb && allCb) {
+                        allCb.checked = readCb.checked && writeCb.checked && deleteCb.checked;
                     }
                 });
             }

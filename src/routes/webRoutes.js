@@ -18,7 +18,8 @@ import * as PermissionController from "../controllers/PermisssionsController.js"
 import * as FolderController from "../controllers/FolderController.js";
 import * as NotificationController from "../controllers/NotificationController.js";
 import * as DashboardController from "../controllers/DashboardController.js";
-import * as ReportsController from "../controllers/ReportsController.js"
+import * as ReportsController from "../controllers/ReportsController.js";
+import * as FilesController from "../controllers/FileController.js";
 
 // ===== Validators =====
 
@@ -121,7 +122,7 @@ router.get("/departments/:id", authenticate, checkPermissions, DepartmentControl
    ========================================= */
 router.get("/admin/dashboard", authenticate, checkPermissions, AdminController.showAdminDashboardPage);
 router.get("/admin/approval", authenticate, checkPermissions, AdminController.showAdminApprovalPage);
-router.get("/document/:id/admin/approval/track", authenticate, checkPermissions, AdminController.showApprovalTrackPage);
+router.get("/document/:id/approval/track", authenticate, AdminController.showApprovalTrackPage);
 router.get("/documents/admin/recyclebin", authenticate, checkPermissions, AdminController.showRecycleBinPage);
 router.get("/admin/folders/:folderId/manage-access", authenticate, AdminController.showManageAccessPage);
 router.get("/admin/permissionslogs", authenticate, AdminController.showPermissionLogsPage);
@@ -165,7 +166,7 @@ router.get("/designations/list", authenticate, checkPermissions, DesignationCont
 router.get("/documents/list", authenticate, checkPermissions, DocumentController.showDocumentListPage);
 
 // View Document page
-router.get("/documents/:id/versions/view", authenticate, checkPermissions, DocumentController.showViewDocumentPage);
+router.get("/documents/:id/versions/view", authenticate, authorize('admin', 'superadmin', 'user'), DocumentController.showViewDocumentPage);
 router.get("/documents/archived", authenticate, checkPermissions, DocumentController.showArchivedDocumentPage);
 
 
@@ -187,7 +188,7 @@ router.get("/projects/list", authenticate, ProjectController.showProjectListPage
 router.get("/projects/details", authenticate, checkPermissions, ProjectController.showNewProjectDetails);
 
 // Project details (existing)
-router.get("/projects/:id/details", authenticate, checkPermissions, ProjectController.showExistingProjectDetails);
+router.get("/projects/:id/details", authenticate, ProjectController.showExistingProjectDetails);
 
 // Main Projects page
 router.get("/projects", authenticate, checkPermissions, ProjectController.showMainProjectsPage);
@@ -324,11 +325,19 @@ router.get("/folders/recyclebin", authenticate, checkPermissions, FolderControll
 router.get("/folders", authenticate, FolderController.showMainFoldersPage);
 router.get('/folders/view/:fileId', authenticate, FolderController.viewFile)
 router.get("/folders/:accesslevel/:folderId", authenticate, FolderController.showviewFoldersPage);
+
+/* =========================================
+   File ROUTE
+   ========================================= */
+// File page
+router.get("/files/file-status", authenticate, FilesController.showFileStatusPage);
+
 /* =========================================
    NOTIFICATIONS ROUTE
    ========================================= */
 // Notifications page
 router.get("/notifications", authenticate, checkPermissions, NotificationController.showNotificationsPage);
+
 
 /* =========================================
    MY PROFILE ROUTE

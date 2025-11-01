@@ -9,6 +9,24 @@ import mongoose from "mongoose";
 import logger from "../utils/logger.js";
 
 
+export const showFileStatusPage = async (req, res) => {
+    try {
+        const projectId = req.query.projectId || null;
+        res.render("pages/files/fileStatusListings", {
+            title: "File Status",
+            user: req.user,
+            projectId,
+        });
+
+    } catch (err) {
+        logger.error("File Status render error:", err);
+        res.status(500).render("pages/error", {
+            user: req.user,
+            message: "Unable to load manage access page"
+        });
+    }
+};
+
 // Upload temporary file
 export const uploadFile = async (req, res, folder) => {
     try {
@@ -186,8 +204,6 @@ export const handleFolderUpload = async (req, res, parentFolder) => {
                 fileName,
                 s3Url: location,
             });
-
-            console.log(`File "${fileName}" saved in subfolder "${subfolder.name}"`);
         }
 
         // Update parent folder size
@@ -249,7 +265,7 @@ export const deleteFile = async (req, res) => {
         const file = await TempFile.findById(fileId);
 
         if (!file) return res.status(404).json({ error: "File not found" });
-        if (file.status !== "temp") return res.status(400).json({ error: "Cannot delete non-temporary file" });
+        // if (file.status !== "temp") return res.status(400).json({ error: "Cannot delete non-temporary file" });
 
         // Delete from S3
         try {

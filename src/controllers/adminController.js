@@ -7,6 +7,7 @@ import PermissionLogs from "../models/PermissionLogs.js";
 import User from "../models/User.js";
 import SharedWith from "../models/SharedWith.js";
 import { sendEmail } from "../services/emailService.js";
+import Approval from "../models/Approval.js";
 
 //Page controllers
 
@@ -165,15 +166,33 @@ export const getMyApprovals = async (req, res) => {
             sortOrder = "desc"
         } = req.query;
 
+        const pageNum = Math.max(1, parseInt(page));
+        const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
+        const skip = (pageNum - 1) * limitNum;
+
+        // ---------------------------------------------
+        // STEP 1: Find all Approval IDs for this user
+        // ---------------------------------------------
+        const approvalIds = await Approval.find({ approver: userId })
+            .select("_id")
+            .lean();
+
+        const approvalIdArray = approvalIds.map(a => a._id);
+
+        // ---------------------------------------------
+        // STEP 2: Build base filter
+        // ---------------------------------------------
         const filter = {
             isDeleted: { $ne: true },
             isArchived: { $ne: true },
+            approvalHistory: { $in: approvalIdArray }  // 👈 core condition
         };
 
+        // Restrict visibility (if not superadmin)
         if (profileType !== "superadmin") {
             const accessConditions = [
                 { owner: userId },
-                { sharedWithUsers: userId }
+                { approvalHistory: { $in: approvalIdArray } }
             ];
             if (userDepartment) accessConditions.push({ department: userDepartment });
             filter.$or = accessConditions;
@@ -196,10 +215,9 @@ export const getMyApprovals = async (req, res) => {
             }
         }
 
-        const pageNum = Math.max(1, parseInt(page));
-        const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
-        const skip = (pageNum - 1) * limitNum;
-
+        // ---------------------------------------------
+        // STEP 3: Sort and fetch documents
+        // ---------------------------------------------
         const allowedFields = [
             "metadata.fileName",
             "createdAt",
@@ -217,6 +235,14 @@ export const getMyApprovals = async (req, res) => {
                 .populate("department", "name")
                 .populate("documentDonor", "name")
                 .populate("files")
+                .populate({
+                    path: "approvalHistory",
+                    select: "approver status date comment",
+                    populate: {
+                        path: "approver",
+                        select: "name email profile_type"
+                    }
+                })
                 .sort(sortObj)
                 .skip(skip)
                 .limit(limitNum)

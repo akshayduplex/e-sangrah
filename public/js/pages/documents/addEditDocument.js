@@ -887,8 +887,6 @@ $(document).ready(function () {
     function initializeEditData() {
         if (!window.isEdit || !window.documentData) return;
 
-        console.log('Initializing edit data:', window.documentData);
-
         // Initialize folders if exists
         if (window.documentData.folderId) {
             window.selectedFolders = [{

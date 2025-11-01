@@ -20,7 +20,7 @@ import * as ProjectController from "../controllers/ProjectController.js";
 import * as PermissionController from "../controllers/PermisssionsController.js";
 import * as FolderController from "../controllers/FolderController.js";
 import * as NotificationController from "../controllers/NotificationController.js";
-import * as TempController from "../controllers/TempFileController.js";
+import * as TempController from "../controllers/FileController.js";
 import * as CommonController from "../controllers/CommonController.js"
 
 // ---------------------------
@@ -367,23 +367,23 @@ router.route('/projects/:id/status')
     .patch(authorize('superadmin', 'admin', 'manager'), ProjectController.updateProjectStatus);
 // Filtered project routes
 router.route('/projects/status/:projectStatus')
-    .get(authorize('superadmin', 'admin', 'manager', 'employee', 'viewer'), ProjectController.getProjectsByStatus);
+    .get(authorize('superadmin', 'admin', 'manager', 'user', 'viewer'), ProjectController.getProjectsByStatus);
 
 router.route('/projects/department/:departmentId')
-    .get(authorize('superadmin', 'admin', 'manager', 'employee', 'viewer'), ProjectController.getProjectsByDepartment);
+    .get(authorize('superadmin', 'admin', 'manager', 'user', 'viewer'), ProjectController.getProjectsByDepartment);
 
 router.route('/projects/manager/:managerId')
-    .get(authorize('superadmin', 'admin', 'manager', 'employee', 'viewer'), ProjectController.getProjectsByManager);
+    .get(authorize('superadmin', 'admin', 'manager', 'user', 'viewer'), ProjectController.getProjectsByManager);
 
 router.route('/projects/overdue')
     .get(authorize('superadmin', 'admin', 'manager'), ProjectController.getOverdueProjects);
 
 router.route('/projects/upcoming-deadlines')
-    .get(authorize('superadmin', 'admin', 'manager', 'employee'), ProjectController.getUpcomingDeadlines);
+    .get(authorize('superadmin', 'admin', 'manager', 'user'), ProjectController.getUpcomingDeadlines);
 
 // Search route
 router.route('/projects/search')
-    .get(authorize('superadmin', 'admin', 'manager', 'employee', 'viewer'), searchProjectsValidator, ProjectController.searchProjects);
+    .get(searchProjectsValidator, ProjectController.searchProjects);
 
 // Bulk operations
 router.route('/projects/bulk/update')
@@ -395,7 +395,7 @@ router.route('/projects/export')
 
 // Project timeline
 router.route('/projects/:id/timeline')
-    .get(authorize('superadmin', 'admin', 'manager', 'employee', 'viewer'), ProjectController.getProjectTimeline);
+    .get(authorize('superadmin', 'admin', 'manager', 'user', 'viewer'), ProjectController.getProjectTimeline);
 
 // Donor management routes
 router.route('/projects/:id/donors')

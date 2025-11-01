@@ -48,7 +48,7 @@
 								<th>Designation</th>
 								<th>Name</th>
 								<th>Approved On</th>
-								<th>Status</th>
+								<th>Request Status</th>
 								<th>Remark</th>
 							</tr>
 						</thead>
@@ -116,7 +116,7 @@
 						const file = doc.files[0]; // first file
 						const fileId = file._id;
 						const documentId = doc._id;
-						document.getElementById('doc-link').href = `/documents/view/${documentId}/${fileId}`;
+						document.getElementById('doc-link').href = `/folders/view/${fileId}`;
 					}
 
 					if (doc.files?.length) {
@@ -144,7 +144,9 @@
                 <div class="role-icon ${appr.status === 'Approved' ? 'done' : 'pending'}">
                     <i class="ti ${appr.status === 'Approved' ? 'ti-circle-check' : 'ti-hourglass-low'}"></i>
                 </div>
-                <span class="ms-2">${appr.approver?.userDetails?.designation?.name || '-'}</span>
+                <span class="ms-2" style="text-transform: capitalize;">
+                     ${appr.approver?.userDetails?.designation?.name || '-'}
+                </span>
             </td>
             <td>${appr.approver?.name || '-'}</td>
             <td>${appr.approvedOn ? new Date(appr.approvedOn).toDateString() : 'In Review'}</td>

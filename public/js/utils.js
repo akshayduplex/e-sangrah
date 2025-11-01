@@ -65,3 +65,24 @@ function formatDate(dateStr) {
     const year = date.getFullYear();
     return `${day}-${month}-${year}`;
 }
+
+function formatDateTime(dateInput, { showDate = true, showTime = true, locale = 'en-GB' } = {}) {
+    if (!dateInput) return '';
+
+    const date = new Date(dateInput);
+    if (isNaN(date)) return '';
+
+    const options = {};
+    if (showDate) {
+        options.day = '2-digit';
+        options.month = '2-digit';
+        options.year = 'numeric';
+    }
+    if (showTime) {
+        options.hour = '2-digit';
+        options.minute = '2-digit'; // only up to minutes
+        options.hour12 = false; // 24-hour format (set true for 12-hour)
+    }
+
+    return date.toLocaleString(locale, options);
+}

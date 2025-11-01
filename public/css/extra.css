@@ -1,0 +1,49 @@
+/* adminDashboard */
+
+.flxtblhdr,
+.flxtblrow {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.tbl-col {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+}
+
+/* Optional: set column widths so headers & rows align perfectly */
+.file-name {
+    flex: 2;
+}
+
+/* more space for long names */
+.user-name {
+    flex: 1;
+    text-align: left;
+}
+
+.time {
+    flex: 2;
+    text-align: left;
+    padding-left: 18px;
+}
+
+.file-status {
+    flex: 1;
+    text-align: left;
+}
+
+/* minor UI improvements */
+.flxtblhdr {
+    background: #f5f6f8;
+    padding: 10px 40px;
+    border-radius: 6px 6px 0 0;
+}
+
+/* .flxtblrow {
+    padding: 10px 15px;
+    border-bottom: 1px solid #eee;
+} */

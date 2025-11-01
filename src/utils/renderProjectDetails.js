@@ -23,7 +23,6 @@ export async function renderProjectDetails(res, projectId = null, userDetails) {
                 .populate("projectType", "name")
                 .lean()
             : null;
-
         if (project) {
             project.projectStartDateFormatted = formatDateDDMMYYYY(project.projectStartDate);
             project.projectEndDateFormatted = formatDateDDMMYYYY(project.projectEndDate);

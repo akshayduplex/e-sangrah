@@ -83,7 +83,7 @@
 											<label class="form-label">Select Date</label>
 											<div class="input-icon-end position-relative">
 												<input type="text" name="documentDate"
-													class="form-control datetimepicker" placeholder="dd/mm/yyyy"
+													class="form-control datetimepicker" placeholder="Select Date"
 													value="<%= isEdit && document.documentDate ? new Date(document.documentDate).toLocaleDateString('en-GB') : '' %>"
 													required>
 												<span class="input-icon-addon"><i
@@ -466,12 +466,6 @@
 		window.isEdit = <%= isEdit ? 'true' : 'false' %>;
 		window.documentId = "<%= isEdit && document ? document._id : '' %>";
 		window.documentData = <%= isEdit && document ? JSON.stringify(document) : 'null' %>;
-
-		console.log('Page Configuration:', {
-			isEdit: window.isEdit,
-			documentId: window.documentId,
-			hasDocumentData: !!window.documentData
-		});
 	</script>
 	<!-- Success Modal -->
 	<div id="data-success-modal" class="modal fade" tabindex="-1" role="dialog" aria-hidden="true">

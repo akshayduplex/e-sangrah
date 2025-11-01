@@ -4,7 +4,7 @@ $(document).ready(function () {
     // Check if the #department element exists
     if ($('#department').length > 0) {
         // API URL
-        const apiUrl = "http://localhost:5000/api/dashboard/uploads?projectId=68ca6408c800c22c9a8f485a&period=month";
+        const apiUrl = "/api/dashboard/uploads?projectId=68ca6408c800c22c9a8f485a&period=month";
 
         // Fetch data using jQuery AJAX
         $.ajax({

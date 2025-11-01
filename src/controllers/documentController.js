@@ -23,6 +23,7 @@ import { accessExpiredTemplate, alertRedirectTemplate } from "../emailTemplates/
 import { inviteUserTemplate } from "../emailTemplates/inviteUserTemplate.js";
 import { API_CONFIG } from "../config/ApiEndpoints.js";
 import PermissionLogs from "../models/PermissionLogs.js";
+import Project from "../models/Project.js";
 
 //Page Controllers
 
@@ -747,70 +748,70 @@ export const createDocument = async (req, res) => {
             fileIds
         } = req.body;
 
-        // ------------------- Validate folder -------------------
-        const validFolderId = folderId && mongoose.Types.ObjectId.isValid(folderId) ? folderId : null;
+        // ------------------- Parse and Validate Inputs -------------------
+        const validFolderId =
+            folderId && mongoose.Types.ObjectId.isValid(folderId) ? folderId : null;
 
-        // ------------------- Parse metadata -------------------
+        const parsedTags =
+            tags && typeof tags === "string"
+                ? tags.split(",").map((t) => t.trim())
+                : Array.isArray(tags)
+                    ? tags
+                    : [];
+
         let parsedMetadata = {};
         if (metadata) {
             try {
-                parsedMetadata = typeof metadata === "string" ? JSON.parse(metadata) : metadata;
+                parsedMetadata =
+                    typeof metadata === "string" ? JSON.parse(metadata) : metadata;
             } catch (err) {
                 logger.error("Error parsing metadata:", err);
             }
         }
 
-        // ------------------- Parse tags -------------------
-        const parsedTags = tags ? (typeof tags === "string" ? tags.split(",").map(t => t.trim()) : tags) : [];
-
-        // ------------------- Parse fileIds -------------------
-        let parsedFileIds = [];
-        if (fileIds) {
-            if (typeof fileIds === "string") {
-                try {
-                    parsedFileIds = JSON.parse(fileIds);
-                    if (!Array.isArray(parsedFileIds)) parsedFileIds = [parsedFileIds];
-                } catch {
-                    parsedFileIds = [fileIds];
-                }
-            } else if (Array.isArray(fileIds)) {
-                parsedFileIds = fileIds;
-            }
-        }
-        parsedFileIds = [...new Set(parsedFileIds)]
-            .filter(id => mongoose.Types.ObjectId.isValid(id))
-            .map(id => new mongoose.Types.ObjectId(id));
-        // ------------------- Parse compliance -------------------
+        // Parse compliance and expiry
         const isCompliance = compliance === "yes";
         let parsedExpiryDate = null;
         if (isCompliance && expiryDate) {
-            if (expiryDate.includes("-")) {
-                const [day, month, year] = expiryDate.split("-");
-                parsedExpiryDate = new Date(`${year}-${month}-${day}`);
-            } else {
-                parsedExpiryDate = new Date(expiryDate);
-            }
+            const parts = expiryDate.split("-");
+            parsedExpiryDate =
+                parts.length === 3
+                    ? new Date(`${parts[2]}-${parts[1]}-${parts[0]}`)
+                    : new Date(expiryDate);
             if (isNaN(parsedExpiryDate.getTime())) {
                 return failResponse(res, "Invalid expiry date format", 400);
             }
         }
 
-        // ------------------- Parse document date -------------------
+        // Parse document date
         let parsedDocumentDate = new Date();
         if (documentDate) {
-            if (documentDate.includes("-")) {
-                const [day, month, year] = documentDate.split("-");
-                parsedDocumentDate = new Date(`${year}-${month}-${day}`);
-            } else {
-                parsedDocumentDate = new Date(documentDate);
-            }
+            const parts = documentDate.split("-");
+            parsedDocumentDate =
+                parts.length === 3
+                    ? new Date(`${parts[2]}-${parts[1]}-${parts[0]}`)
+                    : new Date(documentDate);
             if (isNaN(parsedDocumentDate.getTime())) {
                 return failResponse(res, "Invalid document date format", 400);
             }
         }
 
-        // ------------------- Create Document -------------------
-        const document = new Document({
+        // Parse file IDs
+        let parsedFileIds = [];
+        if (fileIds) {
+            try {
+                parsedFileIds =
+                    typeof fileIds === "string" ? JSON.parse(fileIds) : fileIds;
+            } catch {
+                parsedFileIds = [fileIds];
+            }
+        }
+        parsedFileIds = [...new Set(parsedFileIds)]
+            .filter((id) => mongoose.Types.ObjectId.isValid(id))
+            .map((id) => new mongoose.Types.ObjectId(id));
+
+        // ------------------- Create Document (single write) -------------------
+        const document = await Document.create({
             project: project || null,
             department,
             projectManager: projectManager || null,
@@ -824,8 +825,6 @@ export const createDocument = async (req, res) => {
             metadata: parsedMetadata,
             description,
             compliance: { isCompliance, expiryDate: parsedExpiryDate },
-            files: [],
-            signature: {},
             link: link || null,
             comment: comment || null,
             versioning: {
@@ -845,54 +844,45 @@ export const createDocument = async (req, res) => {
             ],
         });
 
-        await document.save();
-        // ------------------- Process TempFiles and create Files -------------------
-        const fileDocs = [];
-        for (const tempFileId of parsedFileIds) {
-            try {
-                const tempFile = await TempFile.findById(tempFileId);
-                if (!tempFile || tempFile.status !== "temp") {
-                    continue;
-                }
+        // ------------------- Process Files in Parallel -------------------
+        let fileDocs = [];
+        if (parsedFileIds.length > 0) {
+            const tempFiles = await TempFile.find({
+                _id: { $in: parsedFileIds },
+                status: "temp",
+            });
 
-                // Create permanent File record
-                const newFile = await File.create({
-                    document: document._id,
-                    file: tempFile.s3Filename,
-                    s3Url: tempFile.s3Url,
-                    originalName: tempFile.originalName,
-                    fileType: tempFile.fileType,
-                    folder: tempFile.folder || folderId || null,
-                    projectId: document.project || null,
-                    departmentId: document.department || null,
-                    version: 1,
-                    uploadedBy: req.user._id,
-                    uploadedAt: new Date(),
-                    fileSize: tempFile.size,
-                    hash: tempFile.hash || null,
-                    isPrimary: fileDocs.length === 0,
-                    status: "active",
-                });
+            const fileCreatePromises = tempFiles.map((tempFile, index) => ({
+                document: document._id,
+                file: tempFile.s3Filename,
+                s3Url: tempFile.s3Url,
+                originalName: tempFile.originalName,
+                fileType: tempFile.fileType,
+                folder: tempFile.folder || folderId || null,
+                projectId: document.project || null,
+                departmentId: document.department || null,
+                version: 1,
+                uploadedBy: req.user._id,
+                uploadedAt: new Date(),
+                fileSize: tempFile.size,
+                hash: tempFile.hash || null,
+                isPrimary: index === 0,
+                status: "active",
+            }));
 
-                // Update TempFile status
-                tempFile.status = "permanent";
-                await tempFile.save();
+            // Bulk insert all files
+            fileDocs = await File.insertMany(fileCreatePromises);
 
-                fileDocs.push(newFile._id);
+            // Update temp files in parallel (no blocking)
+            TempFile.updateMany(
+                { _id: { $in: tempFiles.map((t) => t._id) } },
+                { $set: { status: "permanent" } }
+            ).catch((e) => logger.warn("Temp file update skipped:", e));
 
-            } catch (err) {
-                console.error(`Error processing temp file ${tempFileId}:`, err);
-            }
+            document.files = fileDocs.map((f) => f._id);
         }
 
-        if (fileDocs.length > 0) {
-            document.files = fileDocs;
-            await document.save();
-        } else {
-            console.log("No files were added to document");
-        }
-
-        // ------------------- Handle Signature -------------------
+        // ------------------- Handle Signature (optional, async) -------------------
         if (req.files?.signatureFile?.[0]) {
             const file = req.files.signatureFile[0];
             if (!file.mimetype.startsWith("image/")) {
@@ -902,40 +892,80 @@ export const createDocument = async (req, res) => {
                 fileName: file.originalname,
                 fileUrl: file.path || file.filename,
             };
-            await document.save();
-        } else if (req.body.signature) {
-            const base64Data = req.body.signature;
-            if (!base64Data.startsWith("data:image/")) {
-                return failResponse(res, "Invalid signature format", 400);
-            }
-            const uploaded = await cloudinary.uploader.upload(base64Data, {
-                folder: "signatures",
-                public_id: `signature-${Date.now()}`,
-                overwrite: true
-            });
-            document.signature = {
-                fileName: uploaded.original_filename,
-                fileUrl: uploaded.secure_url
-            };
-            await document.save();
+        } else if (req.body.signature?.startsWith("data:image/")) {
+            // Run upload in background, don't block response
+            cloudinary.uploader
+                .upload(req.body.signature, {
+                    folder: "signatures",
+                    public_id: `signature-${Date.now()}`,
+                    overwrite: true,
+                })
+                .then((uploaded) => {
+                    Document.findByIdAndUpdate(document._id, {
+                        $set: {
+                            signature: {
+                                fileName: uploaded.original_filename,
+                                fileUrl: uploaded.secure_url,
+                            },
+                        },
+                    }).catch((err) => logger.error("Signature update failed:", err));
+                })
+                .catch((err) => logger.error("Signature upload error:", err));
         }
 
-        // ------------------- Populate and return -------------------
+        // ------------------- Create Approvals (in parallel) -------------------
+        if (document.project) {
+            const projectData = await Project.findById(document.project).select(
+                "projectCollaborationTeam projectManager"
+            );
+
+            if (projectData) {
+                let collaborators = [
+                    ...(projectData.projectCollaborationTeam || []),
+                    projectData.projectManager,
+                ];
+
+                collaborators = [...new Set(collaborators.map((id) => id.toString()))]
+                    .filter((id) => mongoose.Types.ObjectId.isValid(id))
+                    .map((id) => new mongoose.Types.ObjectId(id));
+
+                if (collaborators.length > 0) {
+                    const approvalsToInsert = collaborators.map((collabId, i) => ({
+                        document: document._id,
+                        approver: collabId,
+                        level: i + 1,
+                        status: "Pending",
+                    }));
+
+                    const approvals = await Approval.insertMany(approvalsToInsert);
+                    document.approvalHistory = approvals.map((a) => a._id);
+                    document.status = "Pending";
+                }
+            }
+        }
+
+        // Save all final document data at once
+        await document.save();
+
+        // ------------------- Populate and Respond -------------------
         await document.populate([
             { path: "department", select: "name" },
             { path: "project", select: "projectName" },
             { path: "owner", select: "name email" },
-            { path: "files", select: "originalName fileType s3Url" }
+            { path: "files", select: "originalName fileType s3Url" },
+            {
+                path: "approvalHistory",
+                populate: { path: "approver", select: "name email" },
+            },
         ]);
 
         return successResponse(res, { document }, "Document created successfully", 201);
-
     } catch (error) {
+        logger.error("Document creation error:", error);
         if (error.name === "ValidationError") {
-            const errors = Object.values(error.errors).map(err => err.message);
+            const errors = Object.values(error.errors).map((err) => err.message);
             return failResponse(res, "Validation failed", 400, errors);
         }
-        logger.error("Document creation error:", error);
         return errorResponse(res, error, "Failed to create document");
     }
 };
@@ -1029,7 +1059,6 @@ export const updateDocument = async (req, res) => {
                                     hasChanges = true;
                                     changeReason = "Expiry date updated";
                                     changedFields.push("compliance");
-                                    console.log('Expiry date updated to:', newExpiry);
                                 }
                             } else {
                                 console.warn("Invalid expiry date, skipping:", value);
@@ -2755,7 +2784,6 @@ export const updateApprovalStatus = async (req, res) => {
 export const getApprovals = async (req, res) => {
     try {
         const { documentId } = req.params;
-
         const approvals = await Approval.find({ document: documentId })
             .populate({
                 path: "approver",
@@ -2780,7 +2808,8 @@ export const getApprovals = async (req, res) => {
         }
 
         const document = await Document.findById(documentId)
-            .populate("project department folderId projectManager documentDonor documentVendor owner files")
+            .select('owner files description createdAt updatedAt slug isDeleted status isArchived compliance files approvalHistory comment versioning approvals')
+            .populate("owner files")
             .populate({
                 path: "approvalHistory",
                 populate: {

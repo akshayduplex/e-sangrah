@@ -1,7 +1,7 @@
 $(document).ready(function () {
     const baseUrl = window.baseUrl;
     let currentProjectId = '';
-    let currentPeriod = 'today';
+    let currentPeriod = 'month';
 
     // ==============================
     // Load current project from session
@@ -15,7 +15,6 @@ $(document).ready(function () {
 
             if (data.selectedProject) {
                 currentProjectId = data.selectedProject;
-                console.log("Loaded project from session:", currentProjectId);
 
                 // Update the header display
                 $('#currentProjectName').text(data.selectedProjectName || 'No project selected');
@@ -89,7 +88,7 @@ $(document).ready(function () {
 
                 if (projectId) {
                     $('#currentProjectName').text(projectName);
-                    console.log("Project selected:", projectId);
+
 
                     // Reload all charts with new project
                     loadDepartmentUploads(projectId, currentPeriod);
@@ -161,33 +160,41 @@ $(document).ready(function () {
             fileList.innerHTML = '';
 
             data.files.forEach(file => {
+                const formattedDate = formatDateTime(file.lastActionTime);
+
                 const fileItem = document.createElement('div');
-                fileItem.classList.add('dflexbtwn', 'mb-2');
+                fileItem.classList.add('dflexbtwn', 'flxtblrow', 'align-items-center', 'py-2');
 
                 fileItem.innerHTML = `
-                    <div class="flxtblleft">
-                        <span class="avatar rounded bg-light mb-2">
-                            <img src="${file.icon}" alt="icon" data-id="${file._id}" class="file-icon">
-                        </span>
-                        <div class="flxtbltxt">
+                <div class="tbl-col file-name">
+                    <span class="avatar rounded bg-light me-2">
+                        <img src="${file.icon}" alt="icon" data-id="${file._id}" class="file-icon" style="width:24px; height:24px;">
+                    </span>
+                    <div class="flxtbltxt">
                             <p class="fs-14 mb-1 fw-normal">${file.name}</p>
                             <span class="fs-11 fw-light text-black">${file.fileSize}</span>
                         </div>
-                    </div>
-                    <div class="flxtblright">
-                        <p class="fs-12 fw-light text-black">${file.status}</p>
-                    </div>
-                `;
+                </div>
+                <div class="tbl-col user-name fs-14 fw-light text-black">
+                    ${file.performedBy?.name || 'N/A'}
+                </div>
+                <div class="tbl-col time fs-14 fw-light text-black">
+                    ${formattedDate || '—'}
+                </div>
+                <div class="tbl-col file-status fs-14 fw-light text-black">
+                    ${file.status}
+                </div>
+            `;
 
                 fileList.appendChild(fileItem);
             });
 
+            // Double-click to open file
             document.querySelectorAll('.file-icon').forEach(img => {
                 img.addEventListener('dblclick', (e) => {
                     const fileId = e.target.getAttribute('data-id');
                     if (fileId) {
-                        const url = `/folders/view/${fileId}`;
-                        window.open(url, '_blank');
+                        window.open(`/folders/view/${fileId}`, '_blank');
                     }
                 });
             });
@@ -195,6 +202,7 @@ $(document).ready(function () {
             console.error('Error fetching file data:', error);
         }
     }
+
 
     // ==============================
     // Load Recent Activities
@@ -208,37 +216,75 @@ $(document).ready(function () {
             const response = await fetch(url);
             const result = await response.json();
 
-            if (!result.recentActivities || !Array.isArray(result.recentActivities)) {
-                console.error('No recent activities found');
-                return;
-            }
-
             const container = $('#recentActivityContainer');
             container.empty();
 
+            if (!result.recentActivities || !Array.isArray(result.recentActivities) || result.recentActivities.length === 0) {
+                container.append(`
+                <div class="text-center text-muted mt-3">
+                    <p>No recent activity found</p>
+                </div>
+            `);
+                return;
+            }
+
             result.recentActivities.forEach(activity => {
                 const user = activity.userName || 'Unknown User';
-                const docName = activity.documentName || 'Unnamed Document';
-                const action = activity.activity || 'updated';
-                const version = activity.version?.$numberDecimal ? `(v${activity.version.$numberDecimal})` : '';
+                const action = activity.activity || 'performed an action';
+
+                let itemType = '';
+                let itemName = '';
+                let icon = '/img/icons/usrround.png';
+                let version = activity.version?.$numberDecimal ? `(v${activity.version.$numberDecimal})` : '';
+
+                if (activity.type === 'document') {
+                    itemType = 'document';
+                    itemName = activity.documentName || 'Unnamed Document';
+                } else if (activity.type === 'file') {
+                    itemType = 'file';
+                    itemName = activity.fileName || 'Unnamed File';
+                }
+
+                // Format timestamp
+                const dateObj = new Date(activity.timestamp);
+                const formattedDate = dateObj.toLocaleDateString(undefined, {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric'
+                });
+                const formattedTime = dateObj.toLocaleTimeString(undefined, {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
 
                 const cardItem = `
-                    <div class="dflexbtwn mb-2" style="display: flex; justify-content: space-between; align-items: center;">
-                        <div class="flxtblleft gap-0" style="display: flex; align-items: center;">
-                            <img src="/img/icons/usrround.png" alt="User" style="width: 32px; height: 32px;">
-                            <div class="flxtbltxt ms-3">
-                                <p class="fs-16 mb-1 fw-normal">
-                                    ${user} has ${action.toLowerCase()} the document ${docName} ${version}
-                                </p>
-                            </div>
+                <div class="dflexbtwn mb-2 align-items-start" style="display: flex; justify-content: space-between;">
+                    <div class="flxtblleft d-flex align-items-start">
+                        <span class="mb-2">
+                            <img src="${icon}" alt="${itemType}">
+                        </span>
+                        <div class="flxtbltxt ms-3">
+                            <p class="fs-16 mb-1 fw-normal">
+                                ${user} ${action.toLowerCase()} the ${itemType} ${itemName} ${version}
+                            </p>
                         </div>
                     </div>
-                `;
+                    <div class="text-end text-muted fs-13" style="white-space: nowrap;">
+                        ${formattedDate} ${formattedTime}
+                    </div>
+                </div>
+            `;
+
                 container.append(cardItem);
             });
 
         } catch (err) {
             console.error('Error loading recent activities:', err);
+            $('#recentActivityContainer').html(`
+            <div class="text-center text-danger mt-3">
+                <p>Failed to load recent activity</p>
+            </div>
+        `);
         }
     }
 
@@ -272,7 +318,6 @@ $(document).ready(function () {
 
         $("#uploadDepartment").on('change', function () {
             const departmentId = $(this).val();
-            console.log("Selected Upload Department ID:", departmentId);
             // Reload charts with department filter if needed
             loadDepartmentUploads(currentProjectId, currentPeriod, departmentId);
         });
@@ -400,14 +445,10 @@ $(document).ready(function () {
     function loadDepartmentUploads(projectId = '', period = 'today', departmentId = '') {
         if (!$('#department').length) return;
 
-        // Destroy existing chart if it exists
         const chartCanvas = document.getElementById('department');
         const existingChart = Chart.getChart(chartCanvas);
-        if (existingChart) {
-            existingChart.destroy();
-        }
+        if (existingChart) existingChart.destroy();
 
-        // Build query parameters
         const params = new URLSearchParams();
         if (projectId) params.append('projectId', projectId);
         if (period) params.append('period', period);
@@ -420,15 +461,10 @@ $(document).ready(function () {
             method: "GET",
             dataType: "json",
             success: function (result) {
-                if (result.success && result.data && result.data.departmentUploads) {
+                if (result.success && result.data && result.data.departmentUploads?.length) {
                     const departments = result.data.departmentUploads;
                     const labels = departments.map(dep => dep.departmentName);
                     const dataValues = departments.map(dep => dep.percentage);
-
-                    const backgroundColors = [
-                        '#10A37F', '#33A3D2', '#F15C44', '#2B1871',
-                        '#8A38F5', '#8A4167', '#E8B730', '#24A19C'
-                    ];
 
                     const ctx = chartCanvas.getContext('2d');
                     new Chart(ctx, {
@@ -452,10 +488,25 @@ $(document).ready(function () {
                             plugins: {
                                 legend: { display: false },
                                 tooltip: {
+                                    usePointStyle: true,
                                     callbacks: {
+                                        title: function (context) {
+                                            const department = departments[context[0].dataIndex];
+                                            return department.departmentName;
+                                        },
                                         label: function (context) {
                                             const department = departments[context.dataIndex];
-                                            return ` ${department.documentCount} documents`;
+                                            return [
+                                                `Documents: ${department.documentCount}`,
+                                                `Percentage: ${department.percentage}%`
+                                            ];
+                                        },
+                                        labelPointStyle: function (context) {
+                                            return {
+                                                pointStyle: 'rectRounded',
+                                                rotation: 0,
+                                                backgroundColor: backgroundColors[context.dataIndex]
+                                            };
                                         }
                                     }
                                 }
@@ -463,11 +514,8 @@ $(document).ready(function () {
                         }
                     });
 
-                    // Update center text if needed
                     updateChartCenterText(departments);
                 } else {
-                    console.warn("Unexpected API response", result);
-                    // Create empty chart
                     createEmptyChart();
                 }
             },
@@ -483,9 +531,9 @@ $(document).ready(function () {
         if (centerElement && departments.length > 0) {
             const topDepartment = departments[0];
             centerElement.innerHTML = `
-                <p class="fs-13 mb-1">${topDepartment.departmentName}</p>
-                <h3>${topDepartment.percentage}%</h3>
-            `;
+            <p class="fs-13 mb-1">${topDepartment.departmentName}</p>
+            <h3>${topDepartment.percentage}%</h3>
+        `;
         }
     }
 
@@ -505,9 +553,25 @@ $(document).ready(function () {
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                plugins: { legend: { display: false } }
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { enabled: false },
+                    title: {
+                        display: true,
+                        text: 'No Data',
+                        position: 'center'
+                    }
+                }
             }
         });
+
+        // Also show text in the center div if it exists
+        const centerElement = document.querySelector('.attendance-canvas');
+        if (centerElement) {
+            centerElement.innerHTML = `
+            <p class="fs-13 mb-1 text-muted">No Data</p>
+        `;
+        }
     }
 
     // ==============================
@@ -522,9 +586,6 @@ $(document).ready(function () {
 
         // Update label in dropdown button
         $('#currentPeriodLabel').text(selectedLabel);
-
-        console.log('Selected Period:', selectedPeriod);
-        console.log('Current Project ID:', currentProjectId);
 
         // Reload chart with current project and new period
         loadDepartmentUploads(currentProjectId, selectedPeriod);

@@ -4,8 +4,33 @@ document.addEventListener('DOMContentLoaded', function () {
     const menuReadCheckboxes = document.querySelectorAll('.menu-read');
     const menuWriteCheckboxes = document.querySelectorAll('.menu-write');
     const menuDeleteCheckboxes = document.querySelectorAll('.menu-delete');
+    const moduleCheckboxes = document.querySelectorAll('.menu-checkbox'); // <-- main module checkboxes
 
-    // Menu "All" checkbox controls all permissions for that menu
+    // --- MODULE (menu) checkbox logic ---
+    moduleCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', function () {
+            const menuId = this.value; // uses the value attribute which holds menu._id
+            const readCheck = document.querySelector(`.menu-read[data-menu-id="${menuId}"]`);
+            const writeCheck = document.querySelector(`.menu-write[data-menu-id="${menuId}"]`);
+            const deleteCheck = document.querySelector(`.menu-delete[data-menu-id="${menuId}"]`);
+            const allCheck = document.querySelector(`.menu-all[data-menu-id="${menuId}"]`);
+
+            if (this.checked) {
+                // If module is checked, at least enable Read
+                readCheck.checked = true;
+            } else {
+                // If module is unchecked, remove all permissions
+                readCheck.checked = false;
+                writeCheck.checked = false;
+                deleteCheck.checked = false;
+                allCheck.checked = false;
+            }
+
+            updateAllCheckbox(menuId);
+        });
+    });
+
+    // --- "All" checkbox controls all permissions for that menu ---
     menuAllCheckboxes.forEach(checkbox => {
         checkbox.addEventListener('change', function () {
             const menuId = this.dataset.menuId;
@@ -22,6 +47,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 writeCheck.checked = false;
                 deleteCheck.checked = false;
             }
+            updateAllCheckbox(menuId);
         });
     });
 

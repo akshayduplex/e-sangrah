@@ -78,8 +78,7 @@ export const getApprovalRequests = async (req, res) => {
 
         if (profileType !== "superadmin") {
             const accessConditions = [
-                { owner: userId },
-                { sharedWithUsers: userId }
+                { owner: userId }
             ];
             if (userDepartment) accessConditions.push({ department: userDepartment });
             filter.$or = accessConditions;

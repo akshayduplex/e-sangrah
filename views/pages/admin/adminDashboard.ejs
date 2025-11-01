@@ -125,7 +125,7 @@
                             <div class="seprate_crdhdr">
                                 <div class="dflexbtwn">
                                     <h3 class="fs-20 fw-normal">File Status</h3>
-                                    <a href="#" class="fs-16 fw-normal text-primary">View All</a>
+                                    <a href="/files/file-status" class="fs-16 fw-normal text-primary">View All</a>
                                 </div>
                             </div>
                             <div class="card flex-fill">
@@ -133,6 +133,8 @@
                                     <div class="flextable">
                                         <div class="flxtblhdr dflexbtwn">
                                             <h4 class="fs-16 fw-normal">File Name</h4>
+                                            <h4 class="fs-16 fw-normal">User</h4>
+                                            <h4 class="fs-16 fw-normal">Time</h4>
                                             <h4 class="fs-16 fw-normal">File Status</h4>
                                         </div>
 
@@ -313,89 +315,6 @@
     </div>
     <!-- /Page Wrapper -->
     <%- include('../../partials/footer') %>
-
-        <!-- <script>
-            document.addEventListener("DOMContentLoaded", function () {
-                let myDonutChart; // global chart instance
-
-                async function loadDepartmentChart(period = 'monthly') {
-                    try {
-                        const response = await fetch(`http://localhost:5000/api/dashboard/uploads?period=${period}`);
-                        const result = await response.json();
-
-                        if (result.success && result.data) {
-                            const chartData = result.data.chartData;
-                            const ctx = document.getElementById('department').getContext('2d');
-
-                            // Destroy previous chart to avoid duplicates
-                            if (myDonutChart) myDonutChart.destroy();
-
-                            // Create new donut chart
-                            myDonutChart = new Chart(ctx, {
-                                type: 'doughnut',
-                                data: {
-                                    labels: chartData.labels,
-                                    datasets: [{
-                                        label: 'Donut',
-                                        data: chartData.datasets[0].data,
-                                        backgroundColor: chartData.datasets[0].backgroundColor,
-                                        borderWidth: 5,
-                                        borderRadius: 10,
-                                        borderColor: '#fff',
-                                        hoverBorderWidth: 0,
-                                        cutout: '63%',
-                                    }]
-                                },
-                                options: {
-                                    responsive: true,
-                                    maintainAspectRatio: false,
-                                    plugins: {
-                                        legend: {
-                                            display: false
-                                        },
-                                        tooltip: {
-                                            callbacks: {
-                                                label: function (context) {
-                                                    const idx = context.dataIndex;
-                                                    const count = chartData.datasets[0].counts[idx];
-                                                    const percent = chartData.datasets[0].data[idx];
-                                                    return `${context.label}: ${count} documents (${percent}%)`;
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            });
-
-                            // Update center total text
-                            const total = chartData.total;
-                            document.querySelector('.attendance-canvas h3').textContent = `${total}%`;
-                        }
-                    } catch (err) {
-                        console.error("Error loading chart data:", err);
-                    }
-                }
-
-                // Bind chart dropdown
-                const chartDropdownItems = document.querySelectorAll('.col-md-5 .dropdown-menu a.dropdown-item');
-                chartDropdownItems.forEach(item => {
-                    item.addEventListener('click', function (e) {
-                        e.preventDefault();
-                        const text = this.textContent.trim().toLowerCase();
-                        let period = 'monthly';
-                        if (text === 'today') period = 'daily';
-                        else if (text === 'this week') period = 'weekly';
-                        else if (text === 'this month') period = 'monthly';
-
-                        this.closest('.dropdown').querySelector('a.btn').textContent = this.textContent + ' ';
-                        loadDepartmentChart(period);
-                    });
-                });
-
-                // Initial load
-                loadDepartmentChart('monthly');
-            });
-        </script> -->
         <script>// Dashboard card click handlers
             document.addEventListener('DOMContentLoaded', function () {
                 const dashboardCards = document.querySelectorAll('.dashboard-card');

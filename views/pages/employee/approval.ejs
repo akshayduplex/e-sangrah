@@ -127,6 +127,8 @@
                 const table = $('#approvalTable').DataTable({
                     ajax: {
                         url: '/api/approval-requests',
+                        Credentials: 'include',
+                        type: 'GET',
                         data: function (d) {
                             // send filters with every request
                             d.status = $('.status-tab.btn-primary').text() || 'All';
@@ -213,29 +215,26 @@
                 // Filters
                 // -------------------------
 
-                // 1️⃣ Status filter
+                // Status filter
                 $('.status-tab').on('click', function () {
                     $('.status-tab').removeClass('btn-primary').addClass('btn-outline-primary');
                     $(this).removeClass('btn-outline-primary').addClass('btn-primary');
                     table.ajax.reload(); // reload with new filter
                 });
 
-                // 2️⃣ Department filter
+                // Department filter
                 $('#department').on('change', function () {
                     table.ajax.reload();
                 });
 
-                // 3️⃣ Date filter
+                // Date filter
                 $('.datetimepicker').on('change', function () {
                     table.ajax.reload();
                 });
 
-                // -------------------------
-                // Initialize Select2 for Department
-                // -------------------------
                 function initSelect2(selector, url, textKey) {
                     $(selector).select2({
-                        placeholder: `-- Select ${textKey} --`,
+                        placeholder: '-- Select Department --',
                         allowClear: true,
                         ajax: {
                             url,
@@ -243,8 +242,19 @@
                             delay: 250,
                             data: params => ({ search: params.term }),
                             processResults: data => {
-                                return { results: data.data.map(item => ({ id: item._id, text: item[textKey] })) };
+                                const results = [
+                                    { id: '', text: 'Select Department' }, // Option to clear selection
+                                    ...data.data.map(item => ({ id: item._id, text: item[textKey] }))
+                                ];
+                                return { results };
                             }
+                        }
+                    });
+
+                    // When "Select Department" is clicked, clear selection
+                    $(selector).on('select2:select', function (e) {
+                        if (e.params.data.id === '') {
+                            $(this).val(null).trigger('change');
                         }
                     });
                 }

@@ -953,9 +953,6 @@ export const archiveFolder = async (req, res) => {
         if (typeof isArchived === 'string') {
             isArchived = isArchived === 'true';
         }
-
-        console.log("ArchiveFolder called with id:", id, "isArchived:", isArchived);
-
         const folder = await Folder.findOne({ _id: id, owner: ownerId, deletedAt: null });
         if (!folder) {
             return res.status(404).json({ success: false, message: "Folder not found" });
@@ -986,7 +983,10 @@ export const archiveFolder = async (req, res) => {
 
 export const getRecycleBinFolders = async (req, res) => {
     try {
-        const ownerId = req.user._id;
+        const user = req.user;
+        const ownerId = user._id;
+        const profileType = user.profile_type;
+
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 10;
         const search = req.query.search || "";
@@ -994,14 +994,18 @@ export const getRecycleBinFolders = async (req, res) => {
         const sortOrder = req.query.sortOrder === "asc" ? 1 : -1;
         const departmentFilter = req.query.department || "all";
 
-        // Build filter
+        // Base filter
         const filter = {
-            owner: ownerId,
             isDeleted: true,
             ...(departmentFilter !== "all" ? { departmentId: departmentFilter } : {})
         };
 
-        // Search
+        // Apply owner restriction for non-superadmins
+        if (profileType !== "superadmin") {
+            filter.owner = ownerId;
+        }
+
+        // Search filter
         if (search) {
             filter.$or = [
                 { name: { $regex: search, $options: "i" } },
@@ -1037,7 +1041,10 @@ export const getRecycleBinFolders = async (req, res) => {
 
 export const getArchivedFolders = async (req, res) => {
     try {
-        const ownerId = req.user._id;
+        const user = req.user;
+        const ownerId = user._id;
+        const profileType = user.profile_type;
+
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 10;
         const search = req.query.search || "";
@@ -1045,13 +1052,17 @@ export const getArchivedFolders = async (req, res) => {
         const sortOrder = req.query.sortOrder === "asc" ? 1 : -1;
         const departmentFilter = req.query.department || "all";
 
-        // Build filter
+        // Base filter
         const filter = {
-            owner: ownerId,
             isArchived: true,
             deletedAt: null,
             ...(departmentFilter !== "all" ? { departmentId: departmentFilter } : {})
         };
+
+        // Restrict by owner for non-superadmins
+        if (profileType !== "superadmin") {
+            filter.owner = ownerId;
+        }
 
         // Search
         if (search) {
@@ -1067,11 +1078,11 @@ export const getArchivedFolders = async (req, res) => {
             .sort({ [sortBy]: sortOrder })
             .skip((page - 1) * limit)
             .limit(limit)
-            .populate('departmentId', 'name')
-            .populate('owner', 'name email')
-            .populate('projectId', 'projectName')
-            .populate('createdBy', 'name')
-            .populate('updatedBy', 'name')
+            .populate("departmentId", "name")
+            .populate("owner", "name email")
+            .populate("projectId", "projectName")
+            .populate("createdBy", "name")
+            .populate("updatedBy", "name")
             .lean();
 
         res.json({
@@ -1079,11 +1090,14 @@ export const getArchivedFolders = async (req, res) => {
             folders,
             total,
             page,
-            totalPages: Math.ceil(total / limit)
+            totalPages: Math.ceil(total / limit),
         });
     } catch (err) {
         console.error("Error fetching archived folders:", err);
-        res.status(500).json({ success: false, message: "Server error while fetching archived folders" });
+        res.status(500).json({
+            success: false,
+            message: "Server error while fetching archived folders",
+        });
     }
 };
 
@@ -1392,11 +1406,6 @@ export const accessViaToken = async (req, res) => {
 
 export const updateFolderLogPermission = async (req, res) => {
     try {
-        console.log("🔍 [DEBUG] Incoming request to updateFolderLogPermission");
-        console.log("🧾 Params:", req.params);
-        console.log("📦 Body:", req.body);
-        console.log("👤 User:", req.user?._id);
-
         const { logId } = req.params;
         const { requestStatus, access, duration, customEnd } = req.body;
         const updatedBy = req.user?._id || null;
@@ -1404,36 +1413,27 @@ export const updateFolderLogPermission = async (req, res) => {
         debugger; // <-- sets a breakpoint for step-by-step debugging if using a debugger tool
 
         const log = await FolderPermissionLogs.findById(logId);
-        console.log("📘 Found Log:", log);
-
         if (!log) {
-            console.warn("⚠️ Log not found");
             return res.status(404).json({ message: "Log not found" });
         }
 
         const folder = await Folder.findById(log.folder);
-        console.log("📁 Found Folder:", folder);
 
         if (!folder) {
-            console.warn("⚠️ Folder not found");
             return res.status(404).json({ message: "Folder not found" });
         }
 
         const isExternal = log.isExternal;
         const principalId = log.user._id;
-        console.log("👥 isExternal:", isExternal, "| principalId:", principalId);
 
         // --- Handle Rejection ---
         if (requestStatus === "rejected") {
-            console.log("❌ Rejecting request for log:", logId);
-
             log.requestStatus = "rejected";
             log.rejectedBy = updatedBy;
             log.rejectedAt = new Date();
             log.expiresAt = null;
 
             await log.save();
-            console.log("✅ Log rejection saved.");
 
             return res.json({
                 message: "Permission request rejected successfully",
@@ -1442,9 +1442,7 @@ export const updateFolderLogPermission = async (req, res) => {
         }
 
         // --- Handle Approvals ---
-        console.log("✅ Approving permission update...");
         const expiresAt = calculateExpiration(duration, customEnd);
-        console.log("🕒 Calculated expiration:", expiresAt);
 
         log.requestStatus = "approved";
         log.approvedBy = updatedBy;
@@ -1453,20 +1451,17 @@ export const updateFolderLogPermission = async (req, res) => {
         log.duration = duration;
         log.expiresAt = expiresAt;
 
-        // ✅ Update folder permissions only if INTERNAL user
+        // Update folder permissions only if INTERNAL user
         if (!isExternal) {
-            console.log("🔧 Updating internal user permissions...");
             let existingPermission = folder.permissions.find(
                 item => item.principal.equals(principalId)
             );
 
             if (existingPermission) {
-                console.log("♻️ Existing permission found, updating...");
                 if (access) existingPermission.access = access;
                 existingPermission.expiresAt = expiresAt;
                 existingPermission.duration = duration;
             } else {
-                console.log("➕ Adding new permission entry...");
                 folder.permissions.push({
                     principal: principalId,
                     model: "User",
@@ -1479,13 +1474,11 @@ export const updateFolderLogPermission = async (req, res) => {
 
             folder.updatedBy = updatedBy;
             await folder.save();
-            console.log("📁 Folder permissions updated successfully.");
         } else {
-            console.log("🌐 External user — skipping folder permission update.");
+            console.log("External user — skipping folder permission update.");
         }
 
         await log.save();
-        console.log("📝 Log updated successfully.");
 
         return res.json({
             message: "Permission updated successfully",
@@ -1498,7 +1491,6 @@ export const updateFolderLogPermission = async (req, res) => {
         });
 
     } catch (err) {
-        console.error("💥 [ERROR] updateFolderLogPermission failed:", err);
         return res.status(500).json({
             message: "Server Error",
             error: err.message,

@@ -317,7 +317,6 @@ const checkPermissions = async (req, res, next) => {
         const hasPermission = !!(perms.designation[requiredPermission] || perms.user[requiredPermission]);
 
         if (hasPermission) {
-            console.log('--- CHECK PERMISSIONS END (Allowed) ---');
             return next();
         }
 
