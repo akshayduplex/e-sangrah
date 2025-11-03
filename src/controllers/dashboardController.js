@@ -5,6 +5,7 @@ import { calculateStartDate } from "../utils/calculateStartDate.js";
 import File from "../models/File.js";
 import { getFileIcon } from "../helper/getFileIcon.js";
 import { FILTER_PERIODS } from "../constant/Constant.js";
+import Project, { ProjectType } from "../models/Project.js";
 
 //Page controllers
 
@@ -318,7 +319,77 @@ export const getRecentActivities = async (req, res) => {
     }
 };
 
-// More efficient version with fewer stages
+
+/**
+ * Get Donor & Vendor Project Summary
+ * @route GET /api/dashboard/donor-vendor-projects
+ * @query donorId, vendorId, period (today|week|month|year)
+ */
+export const getDonorVendorProjects = async (req, res) => {
+    try {
+        const { donorId, vendorId, period } = req.query;
+
+        // ---------- DATE FILTER ----------
+        const dateFilter = {};
+        const now = new Date();
+
+        if (period === "today") {
+            dateFilter.projectStartDate = {
+                $gte: new Date(now.setHours(0, 0, 0, 0)),
+                $lte: new Date(now.setHours(23, 59, 59, 999)),
+            };
+        } else if (period === "week") {
+            const startOfWeek = new Date(now);
+            startOfWeek.setDate(now.getDate() - now.getDay());
+            dateFilter.projectStartDate = { $gte: startOfWeek };
+        } else if (period === "month") {
+            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+            dateFilter.projectStartDate = { $gte: startOfMonth };
+        }
+
+        // ---------- BASE QUERY ----------
+        const baseQuery = { isActive: true, ...dateFilter };
+        if (donorId) baseQuery.donor = donorId;
+        if (vendorId) baseQuery.vendor = vendorId;
+
+        // ---------- FETCH ALL PROJECT TYPES ----------
+        const projectTypes = await ProjectType.find({ isActive: true }).select("name");
+
+        // ---------- AGGREGATE PROJECT COUNTS ----------
+        const results = await Promise.all(
+            projectTypes.map(async (type) => {
+                // find all projects of this type
+                const projects = await Project.find({
+                    ...baseQuery,
+                    projectType: type._id,
+                }).select("donor vendor");
+
+                // count unique donors & vendors across projects
+                const donorsSet = new Set();
+                const vendorsSet = new Set();
+
+                projects.forEach((p) => {
+                    p.donor?.forEach((d) => donorsSet.add(d.toString()));
+                    p.vendor?.forEach((v) => vendorsSet.add(v.toString()));
+                });
+
+                return {
+                    projectType: type.name,
+                    totalProjects: projects.length,
+                    donorCount: donorsSet.size,
+                    vendorCount: vendorsSet.size,
+                };
+            })
+        );
+
+        res.json({ success: true, data: results });
+    } catch (error) {
+        console.error("Error fetching donor/vendor data:", error);
+        res.status(500).json({ success: false, message: "Server error" });
+    }
+};
+
+
 export const getDepartmentDocumentUploads = async (req, res) => {
     try {
         const { period = "month", projectId } = req.query;
@@ -439,6 +510,157 @@ export const getDepartmentDocumentUploads = async (req, res) => {
         return errorResponse(res, err);
     }
 };
+
+export const getDocumentsTypeUploads = async (req, res) => {
+    try {
+        const { period = "month", projectId, departmentId, uploadedBy } = req.query;
+
+        if (!FILTER_PERIODS.includes(period)) {
+            return failResponse(res, "Invalid period. Must be today, week, month, or year", 400);
+        }
+
+        const startDate = calculateStartDate(period);
+
+        // Base match filter
+        const matchStage = {
+            uploadedAt: { $gte: startDate },
+            status: "active",
+        };
+
+        if (projectId && mongoose.Types.ObjectId.isValid(projectId)) {
+            matchStage.projectId = new mongoose.Types.ObjectId(projectId);
+        }
+        if (departmentId && mongoose.Types.ObjectId.isValid(departmentId)) {
+            matchStage.departmentId = new mongoose.Types.ObjectId(departmentId);
+        }
+        if (uploadedBy && mongoose.Types.ObjectId.isValid(uploadedBy)) {
+            matchStage.uploadedBy = new mongoose.Types.ObjectId(uploadedBy);
+        }
+
+        const pipeline = [
+            { $match: matchStage },
+
+            // Merge fileType + originalName for flexible matching
+            { $addFields: { checkString: { $concat: ["$fileType", " ", "$originalName"] } } },
+
+            // Categorize
+            {
+                $addFields: {
+                    category: {
+                        $switch: {
+                            branches: [
+                                { case: { $regexMatch: { input: "$checkString", regex: /pdf/i } }, then: "PDF" },
+                                { case: { $regexMatch: { input: "$checkString", regex: /xls|xlsx|excel/i } }, then: "Excel" },
+                                { case: { $regexMatch: { input: "$checkString", regex: /doc|docx|word/i } }, then: "Word" },
+                                { case: { $regexMatch: { input: "$checkString", regex: /jpg|jpeg|png|image/i } }, then: "Image" },
+                                { case: { $regexMatch: { input: "$checkString", regex: /ppt|powerpoint/i } }, then: "PowerPoint" },
+                                { case: { $regexMatch: { input: "$checkString", regex: /csv|txt|text/i } }, then: "Text/CSV" }
+                            ],
+                            default: "Other"
+                        }
+                    }
+                }
+            },
+
+            // Group by category
+            {
+                $group: {
+                    _id: "$category",
+                    count: { $sum: 1 },
+                    totalSize: { $sum: "$fileSize" } // total bytes
+                }
+            },
+
+            // Compute total
+            {
+                $group: {
+                    _id: null,
+                    totalFiles: { $sum: "$count" },
+                    totalSize: { $sum: "$totalSize" },
+                    types: {
+                        $push: {
+                            type: "$_id",
+                            count: "$count",
+                            totalSize: "$totalSize"
+                        }
+                    }
+                }
+            },
+            { $unwind: "$types" },
+
+            // Calculate %
+            {
+                $addFields: {
+                    "types.percentage": {
+                        $cond: [
+                            { $gt: ["$totalFiles", 0] },
+                            {
+                                $round: [
+                                    {
+                                        $multiply: [
+                                            { $divide: ["$types.count", "$totalFiles"] },
+                                            100
+                                        ]
+                                    },
+                                    2
+                                ]
+                            },
+                            0
+                        ]
+                    },
+                    "types.sizePercentage": {
+                        $cond: [
+                            { $gt: ["$totalSize", 0] },
+                            {
+                                $round: [
+                                    {
+                                        $multiply: [
+                                            { $divide: ["$types.totalSize", "$totalSize"] },
+                                            100
+                                        ]
+                                    },
+                                    2
+                                ]
+                            },
+                            0
+                        ]
+                    }
+                }
+            },
+
+            {
+                $project: {
+                    _id: 0,
+                    totalFiles: 1,
+                    type: "$types.type",
+                    count: "$types.count",
+                    percentage: "$types.percentage",
+                    totalSizeMB: { $round: [{ $divide: ["$types.totalSize", 1048576] }, 2] }, // MB
+                    sizePercentage: "$types.sizePercentage"
+                }
+            },
+
+            { $sort: { count: -1 } }
+        ];
+
+        const result = await File.aggregate(pipeline);
+
+        return successResponse(res, {
+            period,
+            startDate,
+            projectId: projectId || null,
+            departmentId: departmentId || null,
+            uploadedBy: uploadedBy || null,
+            fileTypeBreakdown: result,
+        }, "Project file type uploads fetched successfully");
+
+    } catch (err) {
+        console.error("Error in getDocumentsTypeUploads:", err);
+        return errorResponse(res, err);
+    }
+};
+
+
 
 // ------------------- Documents Summary -------------------
 export const getDocumentsStatusSummary = async (req, res) => {

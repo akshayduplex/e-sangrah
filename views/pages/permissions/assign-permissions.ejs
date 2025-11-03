@@ -36,8 +36,8 @@
 						</div>
 
 						<div class="input-icon-end position-relative">
-							<input type="text" class="form-control datetimepicker" placeholder="dd/mm/yyyy"
-								value="02-05-2024">
+							<input type="text" id="createdDate" class="form-control datetimepicker"
+								placeholder="Select Date" autocomplete="off" />
 							<span class="input-icon-addon">
 								<i class="ti ti-calendar text-gray-7"></i>
 							</span>
@@ -76,30 +76,42 @@
 	</div>
 
 	<%- include('../../partials/footer') %>
-		<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css" />
-		<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 		<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+		<script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
 		<script>$(document).ready(function () {
 				// Default role = "user"
 				let selectedRole = "user";
-				$("#roleFilter").val(selectedRole); // preselect dropdown
+				$("#roleFilter").val(selectedRole);
 
 				const table = $('#usersTable').DataTable({
 					processing: true,
-					serverSide: false,
+					serverSide: true,
 					ajax: {
-						url: `${baseUrl}/api/user?profile_type=${selectedRole}`,
+						url: `${baseUrl}/api/user`,
+						type: "GET",
 						xhrFields: { withCredentials: true },
+						data: function (d) {
+							return {
+								page: (d.start / d.length) + 1,
+								limit: d.length,
+								search: d.search.value,
+								sortBy: d.columns[d.order[0].column].data,
+								sortOrder: d.order[0].dir,
+								profile_type: $("#roleFilter").val() || "user",
+								createdDate: $("#createdDate").val() || ""
+							};
+						},
 						dataSrc: function (json) {
-							return json.users || [];
+							json.recordsTotal = json.total;
+							json.recordsFiltered = json.total;
+							return json.users;
 						}
 					},
 					columns: [
 						{
 							data: "_id",
 							orderable: false,
-							render: function (id) {
-								return `
+							render: id => `
                     <div class="btn-group" role="group">
                         <button type="button" class="btn border-0" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="ti ti-settings"></i>
@@ -108,42 +120,32 @@
                             <li><a class="dropdown-item" href="/users/view/${id}"><i class="ti ti-eye"></i> View</a></li>
                             <li><a class="dropdown-item" href="/users/edit/${id}"><i class="ti ti-pencil-minus"></i> Edit</a></li>
                         </ul>
-                    </div>`;
-							}
+                    </div>`
 						},
-						{ data: "name", defaultContent: "-" },
-						{ data: "email", defaultContent: "-" },
-						{
-							data: "userDetails",
-							render: function (ud) {
-								return ud && ud.department ? ud.department.name : "-";
-							}
-						},
+						{ data: "name" },
+						{ data: "email" },
+						{ data: "userDetails", render: ud => ud?.department?.name || "-" },
 						{
 							data: "createdAt",
-							render: function (data) {
-								if (!data) return "-";
-								const d = new Date(data);
-								return `${d.toLocaleDateString("en-GB")} &nbsp; ${d.toLocaleTimeString("en-GB", {
-									hour: "2-digit",
-									minute: "2-digit"
-								})}`;
-							}
+							render: data => data ? new Date(data).toLocaleString("en-GB") : "-"
 						},
 						{
 							data: "_id",
 							orderable: false,
-							render: function (id) {
-								return `<a href="/user-permissions/${id}" class="btn btn-sm btn-primary">Assign</a>`;
-							}
+							render: id => `<a href="/user-permissions/${id}" class="btn btn-sm btn-primary">Assign</a>`
 						}
 					]
 				});
 
 				// Role filter change event
 				$("#roleFilter").on("change", function () {
-					selectedRole = $(this).val() || "user";
-					table.ajax.url(`${baseUrl}/api/user?profile_type=${selectedRole}`).load();
+					table.ajax.reload();
+				});
+
+				//Date picker initialization
+
+				$("#createdDate").on("change", function () {
+					table.ajax.reload();
 				});
 			});
 		</script>

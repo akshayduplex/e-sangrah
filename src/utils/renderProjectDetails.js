@@ -1,7 +1,7 @@
 import Department from "../models/Departments.js";
 import Project, { ProjectType } from "../models/Project.js";
 import User from "../models/User.js";
-import { formatDateDDMMYYYY, formatDateISO } from "./formatDate.js";
+import { formatDateDDMMYYYY } from "./formatDate.js";
 import logger from "./logger.js";
 
 /**
@@ -26,8 +26,8 @@ export async function renderProjectDetails(res, projectId = null, userDetails) {
         if (project) {
             project.projectStartDateFormatted = formatDateDDMMYYYY(project.projectStartDate);
             project.projectEndDateFormatted = formatDateDDMMYYYY(project.projectEndDate);
-            project.projectStartDateISO = formatDateISO(project.projectStartDate);
-            project.projectEndDateISO = formatDateISO(project.projectEndDate);
+            project.projectStartDateISO = formatDateDDMMYYYY(project.projectStartDate);
+            project.projectEndDateISO = formatDateDDMMYYYY(project.projectEndDate);
         }
 
         const [users, departments, donors, vendors, projectTypes] = await Promise.all([

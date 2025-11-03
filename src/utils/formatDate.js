@@ -1,6 +1,8 @@
 
+// utils/formatDate.js
+
 export function formatDateDDMMYYYY(date) {
-    if (!date) return null;
+    if (!date) return "";
     const d = new Date(date);
     const day = String(d.getDate()).padStart(2, "0");
     const month = String(d.getMonth() + 1).padStart(2, "0");
@@ -9,43 +11,43 @@ export function formatDateDDMMYYYY(date) {
 }
 
 
-/**
- * formatDateISO
- * Converts a Date object to ISO format (YYYY-MM-DD) for input fields.
- * @param {Date} date 
- * @returns {string|null}
- */
-export function formatDateISO(date) {
-    if (!date) return null;
-    return new Date(date).toISOString().split("T")[0];
-}
+
 
 /**
  * parseDateDDMMYYYY
- * Converts a dd/mm/yyyy string into a Date object.
- * @param {string} dateStr - date in dd/mm/yyyy format
+ * Converts dd/mm/yyyy OR yyyy-mm-dd strings into a Date object.
+ * @param {string} dateStr
  * @returns {Date|null}
  */
 export function parseDateDDMMYYYY(dateStr) {
     if (!dateStr) return null;
 
-    const parts = dateStr.split(/[\/\-]/); // allow both "/" and "-"
+    const parts = dateStr.split(/[\/\-]/); // supports "/" or "-"
     if (parts.length !== 3) return null;
 
-    const day = parseInt(parts[0], 10);
-    const month = parseInt(parts[1], 10) - 1; // JS months are 0-based
-    const year = parseInt(parts[2], 10);
+    let day, month, year;
 
-    const date = new Date(year, month, day);
+    // Detect if format is yyyy-mm-dd or dd/mm/yyyy
+    if (parseInt(parts[0], 10) > 31) {
+        // likely yyyy-mm-dd
+        [year, month, day] = parts.map(p => parseInt(p, 10));
+    } else if (parseInt(parts[2], 10) < 100) {
+        // malformed year like 25 -> fail fast
+        return null;
+    } else {
+        // default dd/mm/yyyy
+        [day, month, year] = parts.map(p => parseInt(p, 10));
+    }
 
-    // validate (e.g., reject 31/02/2025)
+    const date = new Date(year, month - 1, day);
     if (
         date.getFullYear() !== year ||
-        date.getMonth() !== month ||
+        date.getMonth() !== month - 1 ||
         date.getDate() !== day
     ) {
-        return null;
+        return null; // invalid day/month combo
     }
 
     return date;
 }
+

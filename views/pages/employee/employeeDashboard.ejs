@@ -158,30 +158,37 @@
                                 <div
                                     class="card-header border-0 pb-2 d-flex align-items-center justify-content-between flex-wrap">
                                     <h5 class="fs-20 mb-2 mxw-70">Document Type Uploads</h5>
+
                                     <div class="dropdown mb-2">
-                                        <a href="javascript:void(0);"
-                                            class="btn btn-white border btn-sm d-inline-flex align-items-center"
+                                        <a href="javascript:void(0);" id="typePeriodBtn"
+                                            class="btn btn-white border d-inline-flex align-items-center"
                                             data-bs-toggle="dropdown">
-                                            <i class="ti ti-calendar me-1"></i>Today
+                                            <i class="ti ti-calendar me-1"></i>
+                                            <span id="typePeriodLabel">Today</span>
                                         </a>
                                         <ul class="dropdown-menu dropdown-menu-end p-3">
                                             <li>
-                                                <a href="javascript:void(0);" class="dropdown-item rounded-1">This
-                                                    Month</a>
+                                                <a href="javascript:void(0);" class="dropdown-item period-option-type"
+                                                    data-period="month">This Month</a>
                                             </li>
                                             <li>
-                                                <a href="javascript:void(0);" class="dropdown-item rounded-1">This
-                                                    Week</a>
+                                                <a href="javascript:void(0);" class="dropdown-item period-option-type"
+                                                    data-period="week">This Week</a>
                                             </li>
                                             <li>
-                                                <a href="javascript:void(0);" class="dropdown-item rounded-1">Today</a>
+                                                <a href="javascript:void(0);" class="dropdown-item period-option-type"
+                                                    data-period="today">Today</a>
                                             </li>
                                         </ul>
                                     </div>
+                                    <!-- ==== END NEW DROPDOWN ==== -->
                                 </div>
+
                                 <div class="card-body">
                                     <div class="chartjs-wrapper-demo position-relative mb-4">
                                         <canvas id="documentUploads" height="400"></canvas>
+
+                                        <!-- Center text – will be updated by JS -->
                                         <div class="position-absolute text-center attendance-canvas">
                                             <p class="fs-13 mb-1">Top Document Upload</p>
                                             <h3>PDF 40%</h3>

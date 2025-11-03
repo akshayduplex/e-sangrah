@@ -214,6 +214,13 @@
 										<label class="form-label">Select Folder</label>
 										<div id="folderContainer" class="d-flex flex-wrap gap-2">
 											<!-- Folder buttons will be injected here -->
+											<!-- Loader (hidden by default) -->
+											<div id="folderLoader"
+												class="position-absolute top-50 start-50 translate-middle d-none">
+												<div class="spinner-border text-primary" role="status">
+													<span class="visually-hidden">Loading folders...</span>
+												</div>
+											</div>
 										</div>
 										<input type="hidden" name="folderId" id="selectedFolderId">
 									</div>
@@ -495,8 +502,8 @@
 			</div>
 		</div>
 	</div>
+	<script src="/js/pages/documents/addEditDocument.js"></script>
 	<%- include('../../partials/footer') %>
-		<script src="/js/pages/documents/addEditDocument.js"></script>
 		<!-- CHANGE THIS: Use separated script files instead of addEditDocument.js
 	
 		<!-- <% if (isEdit) { %>

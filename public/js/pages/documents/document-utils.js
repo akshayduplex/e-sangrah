@@ -72,7 +72,7 @@ function initializeMetadataModal() {
 function initializeProjectSelect2() {
     $("#projectName").select2({
         placeholder: "-- Select Project Name --",
-        allowClear: false,
+        allowClear: true,
         ajax: {
             delay: 300,
             transport: function (params, success, failure) {
@@ -103,7 +103,7 @@ function initializeProjectSelect2() {
 function initializeDepartmentSelect2() {
     $("#department").select2({
         placeholder: "-- Select Department --",
-        allowClear: false,
+        allowClear: true,
         ajax: {
             url: '/api/departments/search',
             dataType: 'json',
@@ -125,7 +125,7 @@ function initializeDepartmentSelect2() {
 function initializeProjectManagerSelect2() {
     $('#projectManager').select2({
         placeholder: '-- Select Project Manager --',
-        allowClear: false,
+        allowClear: true,
         ajax: {
             url: '/api/user/search',
             dataType: 'json',
@@ -148,7 +148,7 @@ function initializeProjectManagerSelect2() {
 function initializeDonorSelect2() {
     $('#documentDonor').select2({
         placeholder: '-- Select Donor Name --',
-        allowClear: false,
+        allowClear: true,
         ajax: {
             url: '/api/user/search',
             dataType: 'json',
@@ -178,7 +178,7 @@ function initializeDonorSelect2() {
 function initializeVendorSelect2() {
     $('#documentVendor').select2({
         placeholder: '-- Select Vendor Name --',
-        allowClear: false,
+        allowClear: true,
         ajax: {
             url: '/api/user/search',
             dataType: 'json',

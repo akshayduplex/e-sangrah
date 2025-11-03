@@ -120,8 +120,7 @@
                             <% } else { %>
                                 <div class="position-relative mb-0">
                                     <input type="text" name="projectStartDate" class="form-control datetimepicker"
-                                        placeholder="<%= todayDate %>"
-                                        value="<%= project?.projectStartDateISO || todayDate %>">
+                                        value="<%= project?.projectStartDateISO || '' %>" required>
                                     <span class="input-icon-addon">
                                         <i class="ti ti-calendar text-gray-7"></i>
                                     </span>
@@ -138,8 +137,7 @@
                             <% } else { %>
                                 <div class="position-relative mb-0">
                                     <input type="text" name="projectEndDate" class="form-control datetimepicker"
-                                        placeholder="<%= todayDate %>"
-                                        value="<%= project?.projectEndDateISO || todayDate %>">
+                                        value="<%= project?.projectEndDateISO || '' %>" required>
                                     <span class="input-icon-addon">
                                         <i class="ti ti-calendar text-gray-7"></i>
                                     </span>

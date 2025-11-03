@@ -1105,9 +1105,12 @@
         align-items: center;
     }
 
+    /* for select2 clear */
 
-    /* chnages i do in style 17264*/
-    /* .sidebar .slimScrollDiv {
-  top: 90px;
-  padding:10px 16px
-} */
+    .select2-selection__arrow {
+        display: none !important;
+    }
+
+    .select2-container .select2-selection--single .select2-selection__clear span {
+        line-height: 37px !important;
+    }

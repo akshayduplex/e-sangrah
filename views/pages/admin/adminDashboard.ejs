@@ -191,6 +191,64 @@
                     </div>
                 </div>
             </div>
+            <div class="row">
+                <!-- Donor & Vendor Projects -->
+                <div class="col-xl-12">
+                    <div class="card flex-fill">
+                        <div class="card-header pb-2 border-0">
+                            <!-- 1st Row: Heading (Left) | Filters (Right) -->
+                            <div class="d-flex justify-content-between align-items-center flex-wrap">
+                                <h5 class="mb-0">Donor & Vendor Projects</h5>
+                                <div class="d-flex align-items-center flex-wrap">
+                                    <div class="me-2">
+                                        <select id="dashboardVendor" name="dashboardVendor"
+                                            class="form-select form-select-sm select2">
+                                            <option value="">-- Select Vendor Name --</option>
+                                        </select>
+                                    </div>
+                                    <div class="me-2">
+                                        <select id="dashboardDonor" name="dashboardDonor"
+                                            class="form-select form-select-sm select2">
+                                            <option value="">-- Select Donor Name --</option>
+                                        </select>
+                                    </div>
+                                    <div class="dropdown">
+                                        <a href="javascript:void(0);" id="periodDropdown"
+                                            class="btn btn-white border text-black" data-bs-toggle="dropdown">
+                                            <i class="ti ti-calendar me-1"></i><span
+                                                id="currentPeriodLabel">Today</span>
+                                        </a>
+                                        <ul class="dropdown-menu dropdown-menu-end p-3">
+                                            <li><a href="javascript:void(0);" class="dropdown-item period-option"
+                                                    data-period="month">This Month</a></li>
+                                            <li><a href="javascript:void(0);" class="dropdown-item period-option"
+                                                    data-period="week">This Week</a></li>
+                                            <li><a href="javascript:void(0);" class="dropdown-item period-option"
+                                                    data-period="today">Today</a></li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 2nd Row: Legend (Right) -->
+                            <div class="d-flex justify-content-end align-items-center mt-2">
+                                <p class="fs-13 me-3 mb-0">
+                                    <i class="ti ti-square-filled text-lblue me-2"></i>Donor
+                                </p>
+                                <p class="fs-13 me-3 mb-0">
+                                    <i class="ti ti-square-filled text-lred me-2"></i>Vendor
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Chart Container -->
+                        <div class="card-body pb-0">
+                            <div id="donorvendorprojects" style="height: 400px;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
 
             <div class="row">
                 <!-- Sales Overview -->
@@ -315,6 +373,68 @@
     </div>
     <!-- /Page Wrapper -->
     <%- include('../../partials/footer') %>
+        <script>
+            async function loadDonorVendorProjects() {
+                const donorId = document.getElementById("dashboardDonor").value;
+                const vendorId = document.getElementById("dashboardVendor").value;
+                const period = document.getElementById("currentPeriodLabel").dataset.period || "month";
+
+                const response = await fetch(`/api/dashboard/donorVendorProjects?donorId=${donorId}&vendorId=${vendorId}&period=${period}`);
+                const result = await response.json();
+
+                if (!result.success) return;
+
+                const data = result.data;
+
+                const categories = data.map(item => item.projectType);
+                const donorSeries = data.map(item => item.donorCount);
+                const vendorSeries = data.map(item => item.vendorCount);
+
+                const options = {
+                    series: [
+                        { name: "Donor", data: donorSeries },
+                        { name: "Vendor", data: vendorSeries }
+                    ],
+                    chart: { type: 'bar', height: 400 },
+                    plotOptions: {
+                        bar: {
+                            horizontal: false,
+                            columnWidth: '55%',
+                            borderRadius: 5,
+                            borderRadiusApplication: 'end'
+                        },
+                    },
+                    dataLabels: { enabled: false },
+                    xaxis: { categories },
+                    yaxis: { title: { text: "Number of Projects" } },
+                    colors: ['#008FFB', '#FF4560']
+                };
+
+                const chartEl = document.querySelector("#donorvendorprojects");
+                chartEl.innerHTML = ""; // Clear previous chart
+
+                const chart = new ApexCharts(chartEl, options);
+                chart.render();
+            }
+
+            // Load on page load
+            document.addEventListener("DOMContentLoaded", loadDonorVendorProjects);
+
+            // Reload chart when filters change
+            document.getElementById("dashboardVendor").addEventListener("change", loadDonorVendorProjects);
+            document.getElementById("dashboardDonor").addEventListener("change", loadDonorVendorProjects);
+
+            // Dropdown period event
+            document.querySelectorAll(".period-option").forEach(el => {
+                el.addEventListener("click", e => {
+                    const period = e.target.dataset.period;
+                    document.getElementById("currentPeriodLabel").textContent = e.target.textContent;
+                    document.getElementById("currentPeriodLabel").dataset.period = period;
+                    loadDonorVendorProjects();
+                });
+            });
+        </script>
+
         <script>// Dashboard card click handlers
             document.addEventListener('DOMContentLoaded', function () {
                 const dashboardCards = document.querySelectorAll('.dashboard-card');
@@ -341,4 +461,76 @@
                 // Redirect to documents list page
                 window.location.href = url;
             }</script>
+        <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+        <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+        <script>
+            const ctx = document.getElementById('donorvendorprojects').getContext('2d');
+
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: [
+                        'Healthcare',
+                        'Education',
+                        'Infrastructure',
+                        'NHAI',
+                        'Training',
+                        'DMS',
+                        'TMS',
+                        'KVP',
+                        'VMS'
+                    ],
+                    datasets: [
+                        {
+                            label: 'Donor',
+                            backgroundColor: '#007bff',
+                            borderColor: '#007bff',
+                            borderWidth: 1,
+                            data: [25, 10, 17, 5, 4, 8, 20, 11, 10],
+                        },
+                        {
+                            label: 'Vendor',
+                            backgroundColor: '#dc3545',
+                            borderColor: '#dc3545',
+                            borderWidth: 1,
+                            data: [18, 7, 12, 4, 16, 10, 2, 12, 25],
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Number of Projects'
+                            },
+                            ticks: {
+                                stepSize: 5
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: ''
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                boxWidth: 15,
+                                padding: 10
+                            }
+                        },
+                        title: {
+                            display: false
+                        }
+                    }
+                }
+            });
+        </script>
         <script src="/js/pages/dashboard/adminDashboard.js"></script>

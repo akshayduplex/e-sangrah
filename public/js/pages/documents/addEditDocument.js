@@ -986,13 +986,16 @@ $(document).ready(function () {
             const data = await res.json();
             if (!data.success) return;
 
-            const folders = data.tree || [];
-            const container = $('#folderContainer').empty(); // Clear old children
+            // When rootId is null, render `data.tree` (top-level folders)
+            const foldersToRender = rootId
+                ? (data.tree[0]?.children || [])
+                : (data.tree || []);
 
-            // If editing and we have a selected folder, find and select it
+            const container = $('#folderContainer').empty();
+
             let foundSelectedFolder = false;
 
-            folders.forEach((folder, index) => {
+            foldersToRender.forEach((folder, index) => {
                 const subCount = folder.children?.length || 0;
                 const folderCard = $(`
                 <div class="folder-card" style="width:80px;">
@@ -1004,7 +1007,7 @@ $(document).ready(function () {
 
                 folderCard.data('folder', folder);
 
-                // Check if this is the selected folder in edit mode
+                // Auto-select if in edit mode and this is the selected folder
                 const isSelectedFolder = window.isEdit &&
                     window.documentData &&
                     window.documentData.folderId &&
@@ -1022,23 +1025,22 @@ $(document).ready(function () {
                     $('.folder-card').removeClass('active border-primary').addClass('border');
                     folderCard.addClass('active border-primary');
 
-                    // Replace selectedFolders with new path up to this folder
                     window.selectedFolders = [...parentPath, { id: folder._id, name: folder.name }];
                     $('#selectedFolderId').val(folder._id);
                     updateDirectoryPath();
                 });
 
-                // Double click: open folder
+                // Double click: open subfolder
                 if (subCount > 0) {
                     folderCard.on('dblclick', async function () {
                         const newPath = [...parentPath, { id: folder._id, name: folder.name }];
-                        await loadFolders(folder._id, newPath); // pass new path
+                        await loadFolders(folder._id, newPath);
                     });
                 }
 
                 container.append(folderCard);
 
-                // Auto-select first folder at root if no folder selected and not in edit mode
+                // Auto-select first folder at root if no selection
                 if (index === 0 && !rootId && !window.isEdit && !foundSelectedFolder) {
                     folderCard.trigger('click');
                 }
@@ -1329,7 +1331,7 @@ $(document).ready(function () {
     // --------------------------
     $("#projectName").select2({
         placeholder: "-- Select Project Name --",
-        allowClear: false,
+        allowClear: true,
         ajax: {
             delay: 300,
             transport: function (params, success, failure) {
@@ -1372,7 +1374,7 @@ $(document).ready(function () {
     // --------------------------
     $("#department").select2({
         placeholder: "-- Select Department --",
-        allowClear: false,
+        allowClear: true,
         ajax: {
             url: '/api/departments/search',
             dataType: 'json',
@@ -1406,7 +1408,7 @@ $(document).ready(function () {
     // --------------------------
     $('#projectManager').select2({
         placeholder: '-- Select Project Manager --',
-        allowClear: false,
+        allowClear: true,
         ajax: {
             url: '/api/user/search',
             dataType: 'json',
@@ -1447,7 +1449,7 @@ $(document).ready(function () {
     function initializeDonorSelect2() {
         $('#documentDonor').select2({
             placeholder: '-- Select Donor Name --',
-            allowClear: false,
+            allowClear: true,
             ajax: {
                 url: '/api/user/search',
                 dataType: 'json',
@@ -1490,7 +1492,7 @@ $(document).ready(function () {
     function initializeVendorSelect2() {
         $('#documentVendor').select2({
             placeholder: '-- Select Vendor Name --',
-            allowClear: false,
+            allowClear: true,
             ajax: {
                 url: '/api/user/search',
                 dataType: 'json',

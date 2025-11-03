@@ -113,6 +113,17 @@ const userSchema = new mongoose.Schema(
     { timestamps: true } // still keeps createdAt and updatedAt
 );
 
+// Compound & individual indexes
+userSchema.index({ profile_type: 1, createdAt: -1 });
+userSchema.index({ email: 1 }, { unique: true });
+userSchema.index({ name: 1 });
+userSchema.index({ phone_number: 1 });
+userSchema.index({ addedBy: 1 });
+userSchema.index({ status: 1 });
+userSchema.index({ "userDetails.department": 1 });
+userSchema.index({ "userDetails.designation": 1 });
+
+
 // Middleware to hash password
 userSchema.pre("save", async function (next) {
     if (!this.isModified("raw_password")) return next();

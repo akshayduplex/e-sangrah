@@ -8,6 +8,7 @@ import Designation from "../models/Designation.js";
 import Project from "../models/Project.js";
 import UserPermission from "../models/UserPermission.js";
 import Menu from "../models/Menu.js";
+import { parseDateDDMMYYYY } from "../utils/formatDate.js";
 
 
 //page routes controllers
@@ -166,79 +167,89 @@ export const registerUser = async (req, res) => {
     }
 };
 
-// Get all users with profile type 'user'
 export const getAllUsers = async (req, res) => {
     try {
         const loggedInUser = req.user;
-        const { profile_type, page = 1, limit = 10, search = "", sortBy = "createdAt", sortOrder = "desc" } = req.query;
+        const {
+            profile_type,
+            page = 1,
+            limit = 10,
+            search = "",
+            sortBy = "createdAt",
+            sortOrder = "desc",
+            createdDate
+        } = req.query;
 
-        let filter = {};
+        const filter = {};
 
+        // Role-based filtering
         if (loggedInUser.profile_type !== "superadmin") {
             filter.addedBy = loggedInUser._id;
-
-            if (profile_type) filter.profile_type = profile_type;
-        } else {
-
-            if (profile_type) filter.profile_type = profile_type;
         }
 
+        // Single Date Filter
+        if (createdDate) {
+            const parsedDate = parseDateDDMMYYYY(createdDate);
+            if (!parsedDate || isNaN(parsedDate)) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Invalid date format. Use YYYY-MM-DD or DD-MM-YYYY.",
+                });
+            }
 
-        filter.$or = [
-            { name: { $regex: search, $options: "i" } },
-            { email: { $regex: search, $options: "i" } },
-        ];
+            const start = new Date(parsedDate);
+            const end = new Date(parsedDate);
+            end.setHours(23, 59, 59, 999);
 
+            filter.createdAt = { $gte: start, $lte: end };
+        }
+
+        if (profile_type) filter.profile_type = profile_type;
+
+        // Text search
         if (search) {
-            filter.$or.push({
-                $expr: {
-                    $regexMatch: {
-                        input: { $toString: "$phone_number" },
-                        regex: search,
-                        options: "i",
-                    },
-                },
-            });
+            filter.$or = [
+                { name: { $regex: search, $options: "i" } },
+                { email: { $regex: search, $options: "i" } },
+                {
+                    $expr: {
+                        $regexMatch: {
+                            input: { $toString: "$phone_number" },
+                            regex: search,
+                            options: "i"
+                        }
+                    }
+                }
+            ];
         }
 
-        const total = await User.countDocuments(filter);
-
-        const users = await User.find(filter)
-            .populate("userDetails.department", "name")
-            .populate("userDetails.designation", "name")
-            .select("-password -raw_password")
-            .sort({ [sortBy]: sortOrder === "asc" ? 1 : -1 })
-            .skip((page - 1) * limit)
-            .limit(parseInt(limit))
-            .lean();
-
-        const mappedUsers = users.map(user => ({
-            _id: user._id,
-            name: user.name || "-",
-            email: user.email || "-",
-            phone_number: user.phone_number || "-",
-            profile_type: user.profile_type,
-            status: user.status || "-",
-            userDetails: {
-                department: user.userDetails?.department || null,
-                designation: user.userDetails?.designation || null,
-            },
-            lastLogin: user.lastLogin || null,
-            createdAt: user.createdAt
-        }));
+        // Query execution
+        const [total, users] = await Promise.all([
+            User.countDocuments(filter),
+            User.find(filter)
+                .populate("userDetails.department", "name")
+                .populate("userDetails.designation", "name")
+                .select("name email profile_type createdAt userDetails status")
+                .sort({ [sortBy]: sortOrder === "asc" ? 1 : -1 })
+                .skip((page - 1) * limit)
+                .limit(Number(limit))
+                .lean()
+        ]);
 
         res.json({
             success: true,
-            users: mappedUsers,
+            users,
             total,
-            page: parseInt(page),
-            totalPages: Math.ceil(total / limit),
+            page: Number(page),
+            totalPages: Math.ceil(total / limit)
         });
+
     } catch (error) {
         console.error("getAllUsers error:", error);
         res.status(500).json({ success: false, message: "Internal server error" });
     }
 };
+
 
 
 export const searchUsers = async (req, res) => {

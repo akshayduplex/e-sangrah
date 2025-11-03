@@ -202,7 +202,7 @@
 				initSelect2('#department', `${baseUrl}/api/departments/search`, 'name');
 				$('#docTypeSelect').select2({
 					placeholder: "Select Doc type",
-					allowClear: false,              // no "x" button
+					allowClear: true,
 					width: '100%',
 					minimumResultsForSearch: 0,
 					sorter: function (data) {

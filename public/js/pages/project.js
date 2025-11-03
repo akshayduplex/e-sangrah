@@ -91,18 +91,30 @@ document.addEventListener("DOMContentLoaded", () => {
             timeout = setTimeout(() => func.apply(this, args), delay);
         };
     }
-
     const handleSearch = debounce(() => {
         currentQuery = searchInput.value.trim();
+
+        // When input is empty → reload all projects
+        if (currentQuery.length === 0) {
+            projectsContainer.innerHTML = '';
+            currentPage = 1;
+            totalPages = 1;
+            fetchProjects(currentPage, '', false);
+            return;
+        }
+
+        //When input has 1 character → show "type at least 2 chars"
         if (currentQuery.length < 2) {
             projectsContainer.innerHTML = '<p>Type at least 2 characters to search.</p>';
             return;
         }
 
+        //Normal search
         currentPage = 1;
         totalPages = 1;
         fetchProjects(currentPage, currentQuery, false);
     }, 400);
+
 
     searchInput.addEventListener("input", handleSearch);
 

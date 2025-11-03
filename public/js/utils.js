@@ -1,4 +1,3 @@
-
 // Global API Fetch Utility
 async function apiFetch(url, options = {}) {
     try {
@@ -23,10 +22,8 @@ async function apiFetch(url, options = {}) {
     }
 }
 
-
 // Success Notification
 function showSuccess(message) {
-    // Example with Toastify.js (production UI)
     Toastify({
         text: message,
         duration: 4000,
@@ -49,6 +46,7 @@ function showError(message) {
     }).showToast();
 }
 
+// Debounce Utility
 function debounce(func, wait) {
     let timeout;
     return function (...args) {
@@ -57,6 +55,7 @@ function debounce(func, wait) {
     };
 }
 
+// Format Date
 function formatDate(dateStr) {
     if (!dateStr) return '-';
     const date = new Date(dateStr);
@@ -66,27 +65,53 @@ function formatDate(dateStr) {
     return `${day}-${month}-${year}`;
 }
 
-function formatDateTime(dateInput, { showDate = true, showTime = true, locale = 'en-GB' } = {}) {
-    if (!dateInput) return '';
+// Format Date and Time
+// function formatDateTime(dateInput, { showDate = true, showTime = true, locale = 'en-GB' } = {}) {
+//     if (!dateInput) return '';
+//     const date = new Date(dateInput);
+//     if (isNaN(date)) return '';
 
+//     const options = {};
+//     if (showDate) {
+//         options.day = '2-digit';
+//         options.month = '2-digit';
+//         options.year = 'numeric';
+//     }
+//     if (showTime) {
+//         options.hour = '2-digit';
+//         options.minute = '2-digit';
+//         options.hour12 = true;
+//     }
+
+//     return date.toLocaleString(locale, options);
+// }
+
+/**
+ * Formats a date into a readable format (e.g. "Nov 3, 2025 08:45 PM")
+ * @param {string|Date|number} dateInput - A date string, timestamp, or Date object
+ * @returns {string} Formatted date and time
+ */
+function formatDateTime(dateInput) {
     const date = new Date(dateInput);
-    if (isNaN(date)) return '';
+    if (isNaN(date)) return 'Invalid date';
 
-    const options = {};
-    if (showDate) {
-        options.day = '2-digit';
-        options.month = '2-digit';
-        options.year = 'numeric';
-    }
-    if (showTime) {
-        options.hour = '2-digit';
-        options.minute = '2-digit'; // only up to minutes
-        options.hour12 = false; // 24-hour format (set true for 12-hour)
-    }
+    const formattedDate = date.toLocaleDateString(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+    });
 
-    return date.toLocaleString(locale, options);
+    const formattedTime = date.toLocaleTimeString(undefined, {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+    });
+
+    return `${formattedDate} ${formattedTime}`;
 }
 
+
+// File Icons Map
 // const fileIcons = {
 //     ppt: "/img/icons/fn1.png",
 //     pptx: "/img/icons/fn1.png",
@@ -98,11 +123,12 @@ function formatDateTime(dateInput, { showDate = true, showTime = true, locale = 
 //     default: "/img/icons/fn1.png"
 // };
 
+// Status Class Map
 const statusClass = {
-    'draft': 'bg-soft-info',
-    'pending': 'bg-soft-warning',
-    'approved': 'bg-soft-success',
-    'rejected': 'bg-soft-danger',
-    'underreview': 'bg-soft-warning',
-    'archived': 'bg-soft-secondary'
-}
+    draft: 'bg-soft-info',
+    pending: 'bg-soft-warning',
+    approved: 'bg-soft-success',
+    rejected: 'bg-soft-danger',
+    underreview: 'bg-soft-warning',
+    archived: 'bg-soft-secondary'
+};

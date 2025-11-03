@@ -4,7 +4,6 @@ import jwt from "jsonwebtoken";
 import Document from "../models/Document.js";
 import { errorResponse, successResponse, failResponse } from "../utils/responseHandler.js";
 import TempFile from "../models/TempFile.js";
-import { cloudinary } from "../middlewares/fileUploads.js";
 import logger from "../utils/logger.js";
 import { sendEmail } from "../services/emailService.js";
 import User from "../models/User.js";
@@ -2008,8 +2007,8 @@ export const getSharedUsers = async (req, res) => {
             inviteStatus: "accepted"
         };
 
-        // If NOT superadmin, only show shares added by this user
-        if (profileType !== "superadmin") {
+        // If NOT superadmin and NOT owner, only show shares added by this user
+        if (profileType !== "superadmin" && document.owner._id.toString() !== userId.toString()) {
             query.addedby = userId;
         }
 
