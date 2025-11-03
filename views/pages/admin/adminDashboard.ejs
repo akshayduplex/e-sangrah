@@ -341,46 +341,4 @@
                 // Redirect to documents list page
                 window.location.href = url;
             }</script>
-        <script>function loadDocumentChart(department) {
-                $.ajax({
-                    url: "/api/documents/status-summary?period=monthly" + (department ? "&department=" + department : ""),
-                    method: "GET",
-                    success: function (res) {
-                        var sColStacked = {
-                            chart: {
-                                height: 290,
-                                type: 'bar',
-                                stacked: true,
-                                toolbar: { show: false }
-                            },
-                            colors: ['#197BF7', '#F15C44', '#2BB68D'],
-                            plotOptions: { bar: { borderRadius: 5, borderRadiusWhenStacked: 'all', horizontal: false, endingShape: 'rounded' } },
-                            series: res.data.series,
-                            xaxis: {
-                                categories: res.data.categories.map(m => ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][m - 1]),
-                                labels: { style: { colors: '#6B7280', fontSize: '13px' } }
-                            },
-                            yaxis: { labels: { offsetX: -15, style: { colors: '#6B7280', fontSize: '13px' } } },
-                            grid: { borderColor: '#E5E7EB', strokeDashArray: 5, padding: { left: -8 } },
-                            legend: { show: false },
-                            dataLabels: { enabled: false },
-                            fill: { opacity: 1 },
-                        };
-
-                        if (window.documentChart) window.documentChart.destroy();
-                        window.documentChart = new ApexCharts(document.querySelector("#sales-income"), sColStacked);
-                        window.documentChart.render();
-                    }
-                });
-            }
-
-            // On department change
-            $('#uploadDepartment').on('change', function () {
-                const dept = $(this).val();
-                loadDocumentChart(dept);
-            });
-
-            // Initial load
-            loadDocumentChart();
-        </script>
         <script src="/js/pages/dashboard/adminDashboard.js"></script>

@@ -86,3 +86,23 @@ function formatDateTime(dateInput, { showDate = true, showTime = true, locale = 
 
     return date.toLocaleString(locale, options);
 }
+
+// const fileIcons = {
+//     ppt: "/img/icons/fn1.png",
+//     pptx: "/img/icons/fn1.png",
+//     doc: "/img/icons/fn2.png",
+//     docx: "/img/icons/fn2.png",
+//     xls: "/img/icons/fn3.png",
+//     xlsx: "/img/icons/fn3.png",
+//     pdf: "/img/icons/fn4.png",
+//     default: "/img/icons/fn1.png"
+// };
+
+const statusClass = {
+    'draft': 'bg-soft-info',
+    'pending': 'bg-soft-warning',
+    'approved': 'bg-soft-success',
+    'rejected': 'bg-soft-danger',
+    'underreview': 'bg-soft-warning',
+    'archived': 'bg-soft-secondary'
+}

@@ -175,11 +175,11 @@ router.patch(
     DocumentController.updateDocument
 );
 
+// Hard delete (permanent removal)
+router.delete("/documents/permanent", DocumentController.deleteDocument);
 // Soft delete (move to recycle bin)
 router.delete("/documents/:id", DocumentController.softDeleteDocument);
 
-// Hard delete (permanent removal)
-router.delete("/documents/permanent", DocumentController.deleteDocument);
 
 // Update document status (hard delete or other status updates)
 router.patch("/documents/:id/status", DocumentController.updateDocumentStatus);
