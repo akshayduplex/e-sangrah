@@ -134,6 +134,7 @@
                                     <th>Remark</th>
                                     <th>Signature</th>
                                     <th>Status</th>
+                                    <th>Approvers</th>
                                 </tr>
                             </thead>
                             <tbody id="documents_table_body"></tbody>
@@ -153,362 +154,363 @@
     </div>
     </div>
     <!-- /Page Wrapper -->
+    <%- include('../../modals/addApprovers') %>
+        <%- include('../../partials/footer') %>
+            <!-- <link href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" rel="stylesheet"> -->
+            <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+            <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+            <script>
 
-    <%- include('../../partials/footer') %>
-        <!-- <link href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" rel="stylesheet"> -->
-        <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
-        <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
-        <script>
+                (function ($) {
+                    "use strict";
 
-            (function ($) {
-                "use strict";
+                    // Get initial status from server-side variable
+                    const initialStatus = "<%= status %>";
+                    let currentDocId = null;
+                    let customFlatpickr = null;
+                    let isModalInitializing = false;
+                    const baseUrl = window.location.origin;
+                    const fileIcons = {
+                        ppt: "/img/icons/fn1.png",
+                        pptx: "/img/icons/fn1.png",
+                        doc: "/img/icons/fn2.png",
+                        docx: "/img/icons/fn2.png",
+                        xls: "/img/icons/fn3.png",
+                        xlsx: "/img/icons/fn3.png",
+                        pdf: "/img/icons/fn4.png",
+                        default: "/img/icons/fn1.png"
+                    };
 
-                // Get initial status from server-side variable
-                const initialStatus = "<%= status %>";
-                let currentDocId = null;
-                let customFlatpickr = null;
-                let isModalInitializing = false;
-                const baseUrl = window.location.origin;
-                const fileIcons = {
-                    ppt: "/img/icons/fn1.png",
-                    pptx: "/img/icons/fn1.png",
-                    doc: "/img/icons/fn2.png",
-                    docx: "/img/icons/fn2.png",
-                    xls: "/img/icons/fn3.png",
-                    xlsx: "/img/icons/fn3.png",
-                    pdf: "/img/icons/fn4.png",
-                    default: "/img/icons/fn1.png"
-                };
+                    // Initialize status tabs based on query parameter
+                    // Initialize status tabs based on query parameter
+                    function initializeStatusTabs() {
 
-                // Initialize status tabs based on query parameter
-                // Initialize status tabs based on query parameter
-                function initializeStatusTabs() {
+                        // Remove active class from all tabs first
+                        $('.status-tab').removeClass('btn-primary').addClass('btn-outline-primary');
 
-                    // Remove active class from all tabs first
-                    $('.status-tab').removeClass('btn-primary').addClass('btn-outline-primary');
-
-                    if (initialStatus === "all" || !initialStatus) {
-                        // Set "All" as active
-                        $('.status-tab').each(function () {
-                            if ($(this).text().trim() === 'All') {
-                                $(this).removeClass('btn-outline-primary').addClass('btn-primary');
-                                return false;
-                            }
-                        });
-                    } else {
-                        // Find and activate the matching tab
-                        let found = false;
-                        $('.status-tab').each(function () {
-                            const tabText = $(this).text().trim();
-                            const statusText = initialStatus;
-
-                            // Handle special case for "Compliance and Retention"
-                            if (statusText === 'Compliance and Retention' && tabText.includes('Compliance')) {
-                                $(this).removeClass('btn-outline-primary').addClass('btn-primary');
-                                found = true;
-                                return false;
-                            }
-                            // Exact match for other statuses
-                            else if (tabText === statusText) {
-                                $(this).removeClass('btn-outline-primary').addClass('btn-primary');
-                                found = true;
-                                return false;
-                            }
-                        });
-
-                        // If no exact match found, default to "All"
-                        if (!found) {
+                        if (initialStatus === "all" || !initialStatus) {
+                            // Set "All" as active
                             $('.status-tab').each(function () {
                                 if ($(this).text().trim() === 'All') {
                                     $(this).removeClass('btn-outline-primary').addClass('btn-primary');
                                     return false;
                                 }
                             });
-                        }
-                    }
-                }
-                // Get current active status for API calls
-                let currentStatus = initialStatus || 'all';
+                        } else {
+                            // Find and activate the matching tab
+                            let found = false;
+                            $('.status-tab').each(function () {
+                                const tabText = $(this).text().trim();
+                                const statusText = initialStatus;
 
-                function getCurrentStatus() {
-                    const statusForApi = currentStatus === 'All' || currentStatus === 'all' ? '' : currentStatus;
-                    return statusForApi;
-                }
-
-
-                // Initialize when document is ready
-                $(document).ready(function () {
-                    initializeStatusTabs();
-                });
-
-                document.getElementById("columnFilterBtn").addEventListener("click", function () {
-                    const dropdown = document.querySelector(".filter-dropdown");
-                    dropdown.classList.toggle("d-none");
-                });
-
-                document.addEventListener("click", function (event) {
-                    const dropdown = document.querySelector(".filter-dropdown");
-                    const button = document.getElementById("columnFilterBtn");
-
-                    if (!dropdown.contains(event.target) && !button.contains(event.target)) {
-                        dropdown.classList.add("d-none");
-                    }
-                });
-
-                // -------------------------
-                // Initialize Select2 with Clear Option
-                // -------------------------
-                function initSelect2(selector, url, placeholder, textKey) {
-                    $(selector).select2({
-                        placeholder: placeholder,
-                        allowClear: true,
-                        ajax: {
-                            url,
-                            dataType: 'json',
-                            delay: 250,
-                            data: params => ({ search: params.term }),
-                            processResults: data => {
-                                const results = data.data.map(item => ({
-                                    id: item._id,
-                                    text: item[textKey]
-                                }));
-                                return { results };
-                            }
-                        }
-                    });
-
-                    // Reset selection when clearing
-                    $(selector).on('select2:select', function (e) {
-                        if (!e.params.data.id) {
-                            $(this).val(null).trigger('change');
-                        }
-                    });
-                }
-
-                // Initialize Select2
-                initSelect2('#department', `${baseUrl}/api/departments/search`, 'Select Department', 'name');
-                initSelect2('#projectName', `${baseUrl}/api/projects`, 'Select Project', 'projectName');
-
-                // -------------------------
-                // Initialize DataTable
-                // -------------------------
-                const table = $('#documents_table').DataTable({
-                    serverSide: true,
-                    processing: true,
-                    ajax: {
-                        url: `${baseUrl}/api/documents`,
-                        type: 'GET',
-                        data: function (d) {
-                            const filterColumns = [];
-
-                            $('.filter-dropdown .form-check-input:checked').each(function () {
-                                filterColumns.push($(this).val());
+                                // Handle special case for "Compliance and Retention"
+                                if (statusText === 'Compliance and Retention' && tabText.includes('Compliance')) {
+                                    $(this).removeClass('btn-outline-primary').addClass('btn-primary');
+                                    found = true;
+                                    return false;
+                                }
+                                // Exact match for other statuses
+                                else if (tabText === statusText) {
+                                    $(this).removeClass('btn-outline-primary').addClass('btn-primary');
+                                    found = true;
+                                    return false;
+                                }
                             });
 
-                            const searchValue = $('#searchInput').val()?.trim() || '';
-                            const selectedDate = $('.datetimepicker').val();
-
-                            // Column sorting info
-                            const orderColumn = d.order[0]?.column;
-                            const orderDir = d.order[0]?.dir || 'desc';
-
-                            return {
-                                page: (d.start / d.length) + 1,
-                                limit: d.length,
-                                status: getCurrentStatus(), // Use the current active status
-                                department: $('#department').val(),
-                                project: $('#projectName').val(),
-                                date: selectedDate,
-                                search: searchValue,
-                                orderColumn,
-                                filterColumns,
-                                orderDir
-                            };
-                        },
-                        dataSrc: function (json) {
-                            $('.totalDoc').text(json.data.pagination.totalDocuments || 0);
-                            json.recordsTotal = json.data.pagination.totalDocuments || 0;
-                            json.recordsFiltered = json.data.pagination.totalDocuments || 0;
-                            return (json.data.documents || []).map(doc => renderRow(doc));
+                            // If no exact match found, default to "All"
+                            if (!found) {
+                                $('.status-tab').each(function () {
+                                    if ($(this).text().trim() === 'All') {
+                                        $(this).removeClass('btn-outline-primary').addClass('btn-primary');
+                                        return false;
+                                    }
+                                });
+                            }
                         }
-                    },
-                    columns: [
-                        { title: '', orderable: false },
-                        { title: 'File Name', orderable: true },
-                        { title: 'Last Modified on', orderable: true },
-                        { title: 'Owner', orderable: true },
-                        { title: 'Department', orderable: true },
-                        { title: 'Project Name', orderable: true },
-                        { title: 'Shared With', orderable: false },
-                        { title: 'Donor', orderable: true },
-                        { title: 'Vendor', orderable: true },
-                        { title: 'Tags', orderable: true },
-                        { title: 'Metadata', orderable: true },
-                        { title: 'Description', orderable: false },
-                        { title: 'Remark', orderable: false },
-                        { title: 'Signature', orderable: false },
-                        { title: 'Status', orderable: true }
-                    ],
-                    searching: false,
-                    lengthChange: true,
-                    pageLength: 10,
-                    lengthMenu: [10, 25, 50, 100],
-                    order: [[2, 'desc']],
-                    deferRender: true,
-                    stateSave: true,
-                    dom: "<'row'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6'f>>" +
-                        "<'row'<'col-sm-12'tr>>" +
-                        "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
-                    drawCallback: function () {
-                        $('#documents_table_wrapper .dataTables_paginate').addClass('float-end mt-2');
-                        $('#documents_table_wrapper .dataTables_info').addClass('text-start mt-2');
                     }
-                });
+                    // Get current active status for API calls
+                    let currentStatus = initialStatus || 'all';
 
-                // Enable Bootstrap tooltips on table redraw
-                $('#documents_table').on('draw.dt', function () {
-                    const tooltipTriggerList = [].slice.call(document.querySelectorAll('#documents_table [title]'));
-                    tooltipTriggerList.map(function (tooltipTriggerEl) {
-                        return new bootstrap.Tooltip(tooltipTriggerEl);
+                    function getCurrentStatus() {
+                        const statusForApi = currentStatus === 'All' || currentStatus === 'all' ? '' : currentStatus;
+                        return statusForApi;
+                    }
+
+
+                    // Initialize when document is ready
+                    $(document).ready(function () {
+                        initializeStatusTabs();
                     });
-                });
 
-                // -------------------------
-                // Status Tab Handling with URL Update
-                // -------------------------
-                $('.status-tab').on('click', function () {
-                    $('.status-tab').removeClass('btn-primary').addClass('btn-outline-primary');
-                    $(this).removeClass('btn-outline-primary').addClass('btn-primary');
+                    document.getElementById("columnFilterBtn").addEventListener("click", function () {
+                        const dropdown = document.querySelector(".filter-dropdown");
+                        dropdown.classList.toggle("d-none");
+                    });
 
-                    // Get the selected status
-                    const selectedStatus = $(this).text().trim();
-                    const statusParam = selectedStatus === 'All' ? 'all' : selectedStatus;
+                    document.addEventListener("click", function (event) {
+                        const dropdown = document.querySelector(".filter-dropdown");
+                        const button = document.getElementById("columnFilterBtn");
 
-                    // Update the global variable
-                    currentStatus = selectedStatus;
+                        if (!dropdown.contains(event.target) && !button.contains(event.target)) {
+                            dropdown.classList.add("d-none");
+                        }
+                    });
 
-                    // Update URL without page reload
-                    updateUrlParameter('status', statusParam);
+                    // -------------------------
+                    // Initialize Select2 with Clear Option
+                    // -------------------------
+                    function initSelect2(selector, url, placeholder, textKey) {
+                        $(selector).select2({
+                            placeholder: placeholder,
+                            allowClear: true,
+                            ajax: {
+                                url,
+                                dataType: 'json',
+                                delay: 250,
+                                data: params => ({ search: params.term }),
+                                processResults: data => {
+                                    const results = data.data.map(item => ({
+                                        id: item._id,
+                                        text: item[textKey]
+                                    }));
+                                    return { results };
+                                }
+                            }
+                        });
 
-                    // Reload table with new status filter
-                    table.ajax.reload();
-                });
-
-
-                // Helper function to update URL parameters
-                function updateUrlParameter(key, value) {
-                    const url = new URL(window.location);
-                    if (value === 'all' || value === '') {
-                        url.searchParams.delete(key);
-                    } else {
-                        url.searchParams.set(key, value);
+                        // Reset selection when clearing
+                        $(selector).on('select2:select', function (e) {
+                            if (!e.params.data.id) {
+                                $(this).val(null).trigger('change');
+                            }
+                        });
                     }
-                    window.history.pushState({}, '', url);
-                }
 
-                // Handle browser back/forward buttons
-                window.addEventListener('popstate', function () {
-                    const urlParams = new URLSearchParams(window.location.search);
-                    const statusFromUrl = urlParams.get('status') || 'all';
+                    // Initialize Select2
+                    initSelect2('#department', `${baseUrl}/api/departments/search`, 'Select Department', 'name');
+                    initSelect2('#projectName', `${baseUrl}/api/projects`, 'Select Project', 'projectName');
 
-                    currentStatus = statusFromUrl; //update global variable
-                    initializeStatusTabs();
-                    table.ajax.reload();
-                });
+                    // -------------------------
+                    // Initialize DataTable
+                    // -------------------------
+                    const table = $('#documents_table').DataTable({
+                        serverSide: true,
+                        processing: true,
+                        ajax: {
+                            url: `${baseUrl}/api/documents`,
+                            type: 'GET',
+                            data: function (d) {
+                                const filterColumns = [];
 
+                                $('.filter-dropdown .form-check-input:checked').each(function () {
+                                    filterColumns.push($(this).val());
+                                });
 
-                // -------------------------
-                // Other Event Handlers
-                // -------------------------
-                $("#applyFilter").on("click", function () {
-                    $(".filter-dropdown").addClass("d-none");
-                    table.ajax.reload();
-                });
+                                const searchValue = $('#searchInput').val()?.trim() || '';
+                                const selectedDate = $('.datetimepicker').val();
 
-                $("#clearFilter").on("click", function () {
-                    $('.filter-dropdown .form-check-input').prop("checked", false);
-                    $(".filter-dropdown").addClass("d-none");
-                    table.ajax.reload();
-                });
+                                // Column sorting info
+                                const orderColumn = d.order[0]?.column;
+                                const orderDir = d.order[0]?.dir || 'desc';
 
-                $('#department, #projectName').on('change', function () {
-                    table.ajax.reload();
-                });
+                                return {
+                                    page: (d.start / d.length) + 1,
+                                    limit: d.length,
+                                    status: getCurrentStatus(), // Use the current active status
+                                    department: $('#department').val(),
+                                    project: $('#projectName').val(),
+                                    date: selectedDate,
+                                    search: searchValue,
+                                    orderColumn,
+                                    filterColumns,
+                                    orderDir
+                                };
+                            },
+                            dataSrc: function (json) {
+                                $('.totalDoc').text(json.data.pagination.totalDocuments || 0);
+                                json.recordsTotal = json.data.pagination.totalDocuments || 0;
+                                json.recordsFiltered = json.data.pagination.totalDocuments || 0;
+                                return (json.data.documents || []).map(doc => renderRow(doc));
+                            }
+                        },
+                        columns: [
+                            { title: '', orderable: false },
+                            { title: 'File Name', orderable: true },
+                            { title: 'Last Modified on', orderable: true },
+                            { title: 'Owner', orderable: true },
+                            { title: 'Department', orderable: true },
+                            { title: 'Project Name', orderable: true },
+                            { title: 'Shared With', orderable: false },
+                            { title: 'Donor', orderable: true },
+                            { title: 'Vendor', orderable: true },
+                            { title: 'Tags', orderable: true },
+                            { title: 'Metadata', orderable: true },
+                            { title: 'Description', orderable: false },
+                            { title: 'Remark', orderable: false },
+                            { title: 'Signature', orderable: false },
+                            { title: 'Status', orderable: true },
+                            { title: 'Approvers', orderable: false }
+                        ],
+                        searching: false,
+                        lengthChange: true,
+                        pageLength: 10,
+                        lengthMenu: [10, 25, 50, 100],
+                        order: [[2, 'desc']],
+                        deferRender: true,
+                        stateSave: true,
+                        dom: "<'row'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6'f>>" +
+                            "<'row'<'col-sm-12'tr>>" +
+                            "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
+                        drawCallback: function () {
+                            $('#documents_table_wrapper .dataTables_paginate').addClass('float-end mt-2');
+                            $('#documents_table_wrapper .dataTables_info').addClass('text-start mt-2');
+                        }
+                    });
 
-                $('#searchInput').on('input', debounce(() => {
-                    table.ajax.reload();
-                }, 500));
+                    // Enable Bootstrap tooltips on table redraw
+                    $('#documents_table').on('draw.dt', function () {
+                        const tooltipTriggerList = [].slice.call(document.querySelectorAll('#documents_table [title]'));
+                        tooltipTriggerList.map(function (tooltipTriggerEl) {
+                            return new bootstrap.Tooltip(tooltipTriggerEl);
+                        });
+                    });
 
-                $('#searchInput').on('keypress', function (e) {
-                    if (e.which === 13) {
+                    // -------------------------
+                    // Status Tab Handling with URL Update
+                    // -------------------------
+                    $('.status-tab').on('click', function () {
+                        $('.status-tab').removeClass('btn-primary').addClass('btn-outline-primary');
+                        $(this).removeClass('btn-outline-primary').addClass('btn-primary');
+
+                        // Get the selected status
+                        const selectedStatus = $(this).text().trim();
+                        const statusParam = selectedStatus === 'All' ? 'all' : selectedStatus;
+
+                        // Update the global variable
+                        currentStatus = selectedStatus;
+
+                        // Update URL without page reload
+                        updateUrlParameter('status', statusParam);
+
+                        // Reload table with new status filter
                         table.ajax.reload();
+                    });
+
+
+                    // Helper function to update URL parameters
+                    function updateUrlParameter(key, value) {
+                        const url = new URL(window.location);
+                        if (value === 'all' || value === '') {
+                            url.searchParams.delete(key);
+                        } else {
+                            url.searchParams.set(key, value);
+                        }
+                        window.history.pushState({}, '', url);
                     }
-                });
 
-                function debounce(fn, delay = 500) {
-                    let timer;
-                    return function (...args) {
-                        clearTimeout(timer);
-                        timer = setTimeout(() => fn.apply(this, args), delay);
-                    };
-                }
+                    // Handle browser back/forward buttons
+                    window.addEventListener('popstate', function () {
+                        const urlParams = new URLSearchParams(window.location.search);
+                        const statusFromUrl = urlParams.get('status') || 'all';
 
-                // -------------------------
-                // Render each row
-                // -------------------------
-                function renderRow(doc) {
-                    var fileSizeKB = doc.files[0]?.fileSize ? (doc.files[0].fileSize / 1024).toFixed(2) + ' KB' : '-';
-                    const lastModified = new Date(doc.updatedAt).toLocaleString();
-                    const owner = doc.owner
-                        ? (() => {
-                            const imgSrc = doc.owner.profile_image || '/img/users/user-08.jpg';
-                            return `
+                        currentStatus = statusFromUrl; //update global variable
+                        initializeStatusTabs();
+                        table.ajax.reload();
+                    });
+
+
+                    // -------------------------
+                    // Other Event Handlers
+                    // -------------------------
+                    $("#applyFilter").on("click", function () {
+                        $(".filter-dropdown").addClass("d-none");
+                        table.ajax.reload();
+                    });
+
+                    $("#clearFilter").on("click", function () {
+                        $('.filter-dropdown .form-check-input').prop("checked", false);
+                        $(".filter-dropdown").addClass("d-none");
+                        table.ajax.reload();
+                    });
+
+                    $('#department, #projectName').on('change', function () {
+                        table.ajax.reload();
+                    });
+
+                    $('#searchInput').on('input', debounce(() => {
+                        table.ajax.reload();
+                    }, 500));
+
+                    $('#searchInput').on('keypress', function (e) {
+                        if (e.which === 13) {
+                            table.ajax.reload();
+                        }
+                    });
+
+                    function debounce(fn, delay = 500) {
+                        let timer;
+                        return function (...args) {
+                            clearTimeout(timer);
+                            timer = setTimeout(() => fn.apply(this, args), delay);
+                        };
+                    }
+
+                    // -------------------------
+                    // Render each row
+                    // -------------------------
+                    function renderRow(doc) {
+                        var fileSizeKB = doc.files[0]?.fileSize ? (doc.files[0].fileSize / 1024).toFixed(2) + ' KB' : '-';
+                        const lastModified = new Date(doc.updatedAt).toLocaleString();
+                        const owner = doc.owner
+                            ? (() => {
+                                const imgSrc = doc.owner.profile_image || '/img/users/user-08.jpg';
+                                return `
         <div class="avatar-group">
           <img src="${imgSrc}" class="avatar" data-name="${doc.owner.name}" title="${doc.owner.name}" />
         </div>
       `;
-                        })()
-                        : '-';
-                    const departmentName = doc.department?.name || '-';
-                    const projectName = doc.project?.projectName || '-';
-                    const tags = doc.tags?.length ? doc.tags.join(', ') : '-';
-                    const description = doc.description
-                        ? (() => {
-                            const text = doc.description.replace(/<\/?[^>]+(>|$)/g, '');
-                            return text.length > 100 ? text.substring(0, 30) + '....' : text;
-                        })()
-                        : '-';
-                    const metadata = doc.metadata ? `${doc.metadata.fileName || '-'}, ${doc.metadata.fileDescription || '-'}` : '-';
-                    const sharedWith = doc.sharedWithUsers?.length
-                        ? (() => {
-                            const users = doc.sharedWithUsers.slice(0, 3);
-                            const remaining = doc.sharedWithUsers.length - users.length;
+                            })()
+                            : '-';
+                        const departmentName = doc.department?.name || '-';
+                        const projectName = doc.project?.projectName || '-';
+                        const tags = doc.tags?.length ? doc.tags.join(', ') : '-';
+                        const description = doc.description
+                            ? (() => {
+                                const text = doc.description.replace(/<\/?[^>]+(>|$)/g, '');
+                                return text.length > 100 ? text.substring(0, 30) + '....' : text;
+                            })()
+                            : '-';
+                        const metadata = doc.metadata ? `${doc.metadata.fileName || '-'}, ${doc.metadata.fileDescription || '-'}` : '-';
+                        const sharedWith = doc.sharedWithUsers?.length
+                            ? (() => {
+                                const users = doc.sharedWithUsers.slice(0, 3);
+                                const remaining = doc.sharedWithUsers.length - users.length;
 
-                            const avatars = users.map(u => {
-                                const imgSrc = u.profile_image || '/img/users/user-01.jpg';
-                                return `<img src="${imgSrc}" class="avatar" data-name="${u.name}" title="${u.name}" />`;
-                            }).join('');
+                                const avatars = users.map(u => {
+                                    const imgSrc = u.profile_image || '/img/users/user-01.jpg';
+                                    return `<img src="${imgSrc}" class="avatar" data-name="${u.name}" title="${u.name}" />`;
+                                }).join('');
 
-                            const more = remaining > 0
-                                ? `<div class="avatar avatar-more">+${remaining}</div>`
-                                : '';
+                                const more = remaining > 0
+                                    ? `<div class="avatar avatar-more">+${remaining}</div>`
+                                    : '';
 
-                            return `<div class="avatar-group">${avatars}${more}</div>`;
-                        })()
-                        : '-';
-                    const donor = doc.documentDonor?.name || '-';
-                    const vendor = doc.documentVendor?.name || '-';
-                    const statusClass = {
-                        'draft': 'bg-soft-info',
-                        'pending': 'bg-soft-warning',
-                        'approved': 'bg-soft-success',
-                        'rejected': 'bg-soft-danger',
-                        'underreview': 'bg-soft-warning',
-                        'archived': 'bg-soft-secondary'
-                    }[(doc.status || '').toLowerCase().replace(/\s+/g, '')] || 'bg-soft-secondary';
+                                return `<div class="avatar-group">${avatars}${more}</div>`;
+                            })()
+                            : '-';
+                        const donor = doc.documentDonor?.name || '-';
+                        const vendor = doc.documentVendor?.name || '-';
+                        const statusClass = {
+                            'draft': 'bg-soft-info',
+                            'pending': 'bg-soft-warning',
+                            'approved': 'bg-soft-success',
+                            'rejected': 'bg-soft-danger',
+                            'underreview': 'bg-soft-warning',
+                            'archived': 'bg-soft-secondary'
+                        }[(doc.status || '').toLowerCase().replace(/\s+/g, '')] || 'bg-soft-secondary';
 
-                    const filesInfo = doc.files?.[0]
-                        ? `<div class="d-flex align-items-center">
+                        const filesInfo = doc.files?.[0]
+                            ? `<div class="d-flex align-items-center">
                     <span class="avatar rounded bg-light me-2">
                         <img src="${fileIcons[doc.files[0].originalName.split('.').pop().toLowerCase()] || fileIcons.default}" style="height:30px;">
                     </span>
@@ -517,9 +519,9 @@
                         <small class="text-muted">${fileSizeKB}</small>
                     </div>
                 </div>`
-                        : '-';
+                            : '-';
 
-                    const dropdown = `
+                        const dropdown = `
             <div class="btn-group" role="group">
                 <button type="button" class="btn border-0" data-bs-toggle="dropdown"><i class="ti ti-settings"></i></button>
                 <ul class="dropdown-menu">
@@ -538,191 +540,192 @@
             </div>
         `;
 
-                    return [
-                        dropdown,
-                        filesInfo,
-                        lastModified,
-                        owner,
-                        departmentName,
-                        projectName,
-                        sharedWith,
-                        donor,
-                        vendor,
-                        tags,
-                        metadata,
-                        description,
-                        doc.comment || '-',
-                        doc.signature?.fileUrl ? `<img src="${doc.signature.fileUrl}" style="height:40px;">` : '-',
-                        `<span class="badge ${statusClass}">${doc.status}</span>`
-                    ];
-                }
-                $("#applyFilter").on("click", function () {
-                    $(".filter-dropdown").addClass("d-none");
-                    table.ajax.reload();
-                });
-
-                $("#clearFilter").on("click", function () {
-                    $('.filter-dropdown .form-check-input').prop("checked", false);
-                    $(".filter-dropdown").addClass("d-none");
-                    table.ajax.reload();
-                });
-
-                // -------------------------
-                // Filters & Tabs
-                // ------------------------
-
-                $('#department, #projectName').on('change', function () {
-                    table.ajax.reload();
-                });
-
-                $('#searchInput').on('input', debounce(() => {
-                    table.ajax.reload();
-                }, 500));
-
-                $('#searchInput').on('keypress', function (e) {
-                    if (e.which === 13) {
+                        return [
+                            dropdown,
+                            filesInfo,
+                            lastModified,
+                            owner,
+                            departmentName,
+                            projectName,
+                            sharedWith,
+                            donor,
+                            vendor,
+                            tags,
+                            metadata,
+                            description,
+                            doc.comment || '-',
+                            doc.signature?.fileUrl ? `<img src="${doc.signature.fileUrl}" style="height:40px;">` : '-',
+                            `<span class="badge ${statusClass}">${doc.status}</span>`,
+                            `<button class="btn btn-sm btn-primary add-approver-btn" data-bs-toggle="modal" data-bs-target="#addMemberModal" data-id="${doc.id}"> Add Approver </button>`
+                        ];
+                    }
+                    $("#applyFilter").on("click", function () {
+                        $(".filter-dropdown").addClass("d-none");
                         table.ajax.reload();
-                    }
-                });
-
-                function debounce(fn, delay = 500) {
-                    let timer;
-                    return function (...args) {
-                        clearTimeout(timer);
-                        timer = setTimeout(() => fn.apply(this, args), delay);
-                    };
-                }
-
-                // -------------------------
-                // Delete document
-                // -------------------------
-                $(document).on('click', '.btn-delete', function (e) {
-                    e.preventDefault();
-                    const docId = $(this).data('id');
-                    $('#trashdoc-modal').modal('show');
-
-                    $('#confirm-trash-folder').off('click').on('click', function () {
-                        $.ajax({
-                            url: `${baseUrl}/api/documents/${docId}`,
-                            type: 'DELETE',
-                            success: function (response) {
-                                $('#trashdoc-modal').modal('hide');
-                                table.ajax.reload();
-                                // show server message if available
-                                showToast(response.message || 'Document moved to trash!', 'success');
-                            },
-                            error: function (xhr) {
-                                let msg = 'Error moving document to trash.';
-                                if (xhr.responseJSON && xhr.responseJSON.message) {
-                                    msg = xhr.responseJSON.message; // display actual server message
-                                }
-                                showToast(msg, 'error');
-                            }
-                        });
                     });
-                });
 
-                // -------------------------
-                // Archive Document
-                // -------------------------
-                $(document).on('click', '.archive-document', function (e) {
-                    e.preventDefault();
-
-                    const docId = $(this).data('id');
-                    const docName = $(this).closest('tr').find('td:nth-child(2) p').text().trim() || 'this document';
-                    const isArchived = true;
-
-                    // Update modal text before showing
-                    $('#archivedoc-modal .modal-body').text(`Are you sure you want to archive ${docName}?`);
-                    $('#archivedoc-modal .modal-title').html(`<img src="/img/icons/archvbin.png"> <br>Move to Archive`);
-
-                    // Show modal
-                    $('#archivedoc-modal').modal('show');
-
-                    // Confirm action on "Yes, Move"
-                    $('#archivedoc-modal .btn-primary').off('click').on('click', function () {
-                        $.ajax({
-                            url: `${baseUrl}/api/documents/${docId}/archive?isArchived=${isArchived}`,
-                            type: 'PATCH',
-                            success: function (response) {
-                                $('#archivedoc-modal').modal('hide');
-                                table.ajax.reload(null, false);
-                                showToast(response.message || 'Document moved to archive successfully!', 'success');
-                            },
-                            error: function (xhr) {
-                                let msg = 'Error moving document to archive.';
-                                if (xhr.responseJSON && xhr.responseJSON.message) {
-                                    msg = xhr.responseJSON.message;
-                                }
-                                showToast(msg, 'error');
-                            }
-                        });
+                    $("#clearFilter").on("click", function () {
+                        $('.filter-dropdown .form-check-input').prop("checked", false);
+                        $(".filter-dropdown").addClass("d-none");
+                        table.ajax.reload();
                     });
-                });
 
-                // -------------------------
-                // Share document modal
-                // -------------------------
-                $('#sharedoc-modal').on('show.bs.modal', function (event) {
-                    const button = $(event.relatedTarget);
-                    currentDocId = button.data('doc-id');
-                    const fileId = button.data('file-id');
-                    const modal = $(this);
+                    // -------------------------
+                    // Filters & Tabs
+                    // ------------------------
 
-                    // Reset form
-                    modal.find('#userInviteSelect').val('');
-                    modal.find('#accessLevelSelect').val('view');
-                    modal.find('input[name="time"]').prop('checked', false);
-                    modal.find('#customDateWrapper').hide();
-                    modal.find('#startDate').val('');
-                    modal.find('#endDate').val('');
+                    $('#department, #projectName').on('change', function () {
+                        table.ajax.reload();
+                    });
 
-                    // Clear previous dynamic rows
-                    const container = modal.find('#usersWithAccessContainer');
-                    container.empty();
+                    $('#searchInput').on('input', debounce(() => {
+                        table.ajax.reload();
+                    }, 500));
 
-                    // Validate inputs
-                    if (!currentDocId || !fileId) {
-                        showToast('Invalid document or file ID', 'error');
-                        return;
-                    }
-
-                    // Fetch share link
-                    $.ajax({
-                        url: `${baseUrl}/api/documents/${currentDocId}/${fileId}/share-link`,
-                        method: 'GET',
-                        success: function (res) {
-                            modal.find('#accessType').val('anyone');
-                            modal.find('#roleType').val('viewer');
-                            if (res.success && res.link) {
-                                modal.find('#sharelink').val(res.link);
-                            } else {
-                                modal.find('#sharelink').val('');
-                                showToast('Failed to load share link', 'warning');
-                            }
-                        },
-                        error: function (err) {
-                            console.error('Failed to load share link:', err);
-                            showToast('Failed to load share link', 'error');
+                    $('#searchInput').on('keypress', function (e) {
+                        if (e.which === 13) {
+                            table.ajax.reload();
                         }
                     });
 
-                    // Load shared users
-                    $.ajax({
-                        url: `${baseUrl}/api/documents/${currentDocId}/shared-users`,
-                        method: 'GET',
-                        success: function (res) {
-                            if (!res.success || !res.data || !Array.isArray(res.data)) {
-                                container.append('<div class="text-muted">No users found.</div>');
-                                return;
-                            }
+                    function debounce(fn, delay = 500) {
+                        let timer;
+                        return function (...args) {
+                            clearTimeout(timer);
+                            timer = setTimeout(() => fn.apply(this, args), delay);
+                        };
+                    }
 
-                            // Build HTML for all rows at once
-                            let rows = '';
-                            res.data.forEach(user => {
-                                const checkboxId = `download-${user.userId}`;
-                                const isOwner = user.accessLevel === 'owner';
-                                rows += `
+                    // -------------------------
+                    // Delete document
+                    // -------------------------
+                    $(document).on('click', '.btn-delete', function (e) {
+                        e.preventDefault();
+                        const docId = $(this).data('id');
+                        $('#trashdoc-modal').modal('show');
+
+                        $('#confirm-trash-folder').off('click').on('click', function () {
+                            $.ajax({
+                                url: `${baseUrl}/api/documents/${docId}`,
+                                type: 'DELETE',
+                                success: function (response) {
+                                    $('#trashdoc-modal').modal('hide');
+                                    table.ajax.reload();
+                                    // show server message if available
+                                    showToast(response.message || 'Document moved to trash!', 'success');
+                                },
+                                error: function (xhr) {
+                                    let msg = 'Error moving document to trash.';
+                                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                                        msg = xhr.responseJSON.message; // display actual server message
+                                    }
+                                    showToast(msg, 'error');
+                                }
+                            });
+                        });
+                    });
+
+                    // -------------------------
+                    // Archive Document
+                    // -------------------------
+                    $(document).on('click', '.archive-document', function (e) {
+                        e.preventDefault();
+
+                        const docId = $(this).data('id');
+                        const docName = $(this).closest('tr').find('td:nth-child(2) p').text().trim() || 'this document';
+                        const isArchived = true;
+
+                        // Update modal text before showing
+                        $('#archivedoc-modal .modal-body').text(`Are you sure you want to archive ${docName}?`);
+                        $('#archivedoc-modal .modal-title').html(`<img src="/img/icons/archvbin.png"> <br>Move to Archive`);
+
+                        // Show modal
+                        $('#archivedoc-modal').modal('show');
+
+                        // Confirm action on "Yes, Move"
+                        $('#archivedoc-modal .btn-primary').off('click').on('click', function () {
+                            $.ajax({
+                                url: `${baseUrl}/api/documents/${docId}/archive?isArchived=${isArchived}`,
+                                type: 'PATCH',
+                                success: function (response) {
+                                    $('#archivedoc-modal').modal('hide');
+                                    table.ajax.reload(null, false);
+                                    showToast(response.message || 'Document moved to archive successfully!', 'success');
+                                },
+                                error: function (xhr) {
+                                    let msg = 'Error moving document to archive.';
+                                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                                        msg = xhr.responseJSON.message;
+                                    }
+                                    showToast(msg, 'error');
+                                }
+                            });
+                        });
+                    });
+
+                    // -------------------------
+                    // Share document modal
+                    // -------------------------
+                    $('#sharedoc-modal').on('show.bs.modal', function (event) {
+                        const button = $(event.relatedTarget);
+                        currentDocId = button.data('doc-id');
+                        const fileId = button.data('file-id');
+                        const modal = $(this);
+
+                        // Reset form
+                        modal.find('#userInviteSelect').val('');
+                        modal.find('#accessLevelSelect').val('view');
+                        modal.find('input[name="time"]').prop('checked', false);
+                        modal.find('#customDateWrapper').hide();
+                        modal.find('#startDate').val('');
+                        modal.find('#endDate').val('');
+
+                        // Clear previous dynamic rows
+                        const container = modal.find('#usersWithAccessContainer');
+                        container.empty();
+
+                        // Validate inputs
+                        if (!currentDocId || !fileId) {
+                            showToast('Invalid document or file ID', 'error');
+                            return;
+                        }
+
+                        // Fetch share link
+                        $.ajax({
+                            url: `${baseUrl}/api/documents/${currentDocId}/${fileId}/share-link`,
+                            method: 'GET',
+                            success: function (res) {
+                                modal.find('#accessType').val('anyone');
+                                modal.find('#roleType').val('viewer');
+                                if (res.success && res.link) {
+                                    modal.find('#sharelink').val(res.link);
+                                } else {
+                                    modal.find('#sharelink').val('');
+                                    showToast('Failed to load share link', 'warning');
+                                }
+                            },
+                            error: function (err) {
+                                console.error('Failed to load share link:', err);
+                                showToast('Failed to load share link', 'error');
+                            }
+                        });
+
+                        // Load shared users
+                        $.ajax({
+                            url: `${baseUrl}/api/documents/${currentDocId}/shared-users`,
+                            method: 'GET',
+                            success: function (res) {
+                                if (!res.success || !res.data || !Array.isArray(res.data)) {
+                                    container.append('<div class="text-muted">No users found.</div>');
+                                    return;
+                                }
+
+                                // Build HTML for all rows at once
+                                let rows = '';
+                                res.data.forEach(user => {
+                                    const checkboxId = `download-${user.userId}`;
+                                    const isOwner = user.accessLevel === 'owner';
+                                    rows += `
                     <div class="user-accssrow dynamic d-flex justify-content-between align-items-center mb-2 p-2">
                         <div class="empname_eml flex-grow-1">
                             <div class="fw-normal">${user.name}</div>
@@ -747,275 +750,275 @@
                         </div>
                     </div>
                 `;
-                            });
-                            container.html(rows); // Append all rows at once
-                        },
-                        error: function (err) {
-                            console.error('Failed to load shared users:', err);
-                            container.append('<div class="text-danger">Failed to load shared users.</div>');
-                            showToast('Failed to load shared users', 'error');
-                        }
+                                });
+                                container.html(rows); // Append all rows at once
+                            },
+                            error: function (err) {
+                                console.error('Failed to load shared users:', err);
+                                container.append('<div class="text-danger">Failed to load shared users.</div>');
+                                showToast('Failed to load shared users', 'error');
+                            }
+                        });
+
+                        // Load users for invite dropdown
+                        loadUsersForInvite();
                     });
 
-                    // Load users for invite dropdown
-                    loadUsersForInvite();
-                });
 
+                    // Time duration radio buttons
+                    // Initialize Flatpickr when "Custom" is selected
+                    $('#sharedoc-modal input[name="time"]').on('change', function () {
+                        if ($(this).attr('id') === 'custom') {
+                            $('#customDateWrapper').show();
 
-                // Time duration radio buttons
-                // Initialize Flatpickr when "Custom" is selected
-                $('#sharedoc-modal input[name="time"]').on('change', function () {
-                    if ($(this).attr('id') === 'custom') {
-                        $('#customDateWrapper').show();
+                            if (!customFlatpickr) {
+                                customFlatpickr = flatpickr("#flatpickr-range", {
+                                    mode: "range",
+                                    dateFormat: "Y-m-d"
+                                });
+                            }
 
-                        if (!customFlatpickr) {
-                            customFlatpickr = flatpickr("#flatpickr-range", {
-                                mode: "range",
-                                dateFormat: "Y-m-d"
-                            });
-                        }
-
-                    } else {
-                        $('#customDateWrapper').hide();
-                    }
-                });
-
-                // Access type change handler
-                $('#sharedoc-modal #accessType').on('change', function () {
-                    const accessType = $(this).val();
-                    const infoText = $('#infoText');
-
-                    if (accessType === 'anyone') {
-                        infoText.text('Anyone on the internet with the link can view');
-                        $('#roleType').prop('disabled', false);
-                    } else {
-                        infoText.text('Only people with access can view');
-                        $('#roleType').prop('disabled', false);
-                    }
-                });
-
-                // Role type change handler
-                $('#sharedoc-modal #roleType').on('change', function () {
-                    const roleType = $(this).val();
-                    const infoText = $('#infoText');
-                    const accessType = $('#accessType').val();
-
-                    if (accessType === 'anyone') {
-                        if (roleType === 'viewer') {
-                            infoText.text('Anyone on the internet with the link can view');
                         } else {
-                            infoText.text('Anyone on the internet with the link can edit');
-                        }
-                    }
-                });
-
-                // Invite user button
-                $('#sharedoc-modal').on('click', '#inviteUserBtn', function () {
-                    const $btn = $(this);
-                    $btn.prop('disabled', true).addClass('btn-light').removeClass('btn-primary');
-
-                    const userEmail = $('#userInviteSelect').val();
-                    const accessLevel = $('#accessLevelSelect').val();
-                    const duration = $('input[name="time"]:checked').attr('id');
-
-                    let customStart = null;
-                    let customEnd = null;
-
-                    // Read dates from Flatpickr range if "Custom" is selected
-                    if (duration === 'custom' && customFlatpickr?.selectedDates.length === 2) {
-                        customStart = customFlatpickr.selectedDates[0].toISOString();
-                        customEnd = customFlatpickr.selectedDates[1].toISOString();
-                    }
-
-                    if (!currentDocId) {
-                        showToast('No document selected', 'info');
-                        resetBtn();
-                        return;
-                    }
-
-                    if (!userEmail) {
-                        showToast('Please enter user email', 'info');
-                        resetBtn();
-                        return;
-                    }
-
-                    if (!$('input[name="time"]:checked').length) {
-                        showToast('Please select a time duration', 'info');
-                        resetBtn();
-                        return;
-                    }
-
-                    if (duration === 'custom' && (!customStart || !customEnd)) {
-                        showToast('Please select a start and end date for custom duration', 'info');
-                        resetBtn();
-                        return;
-                    }
-
-                    const inviteData = {
-                        userEmail: userEmail,
-                        accessLevel: accessLevel,
-                        duration: duration
-                    };
-
-                    if (duration === 'custom') {
-                        inviteData.customStart = customStart;
-                        inviteData.customEnd = customEnd;
-                    }
-
-                    $.ajax({
-                        url: `${baseUrl}/api/documents/${currentDocId}/invite`,
-                        method: 'POST',
-                        contentType: 'application/json',
-                        data: JSON.stringify(inviteData),
-                        success: function (response) {
-                            showToast('Invitation sent successfully!', 'success');
-                            $('#userInviteSelect').val(''); // Clear the input
-                            $('#sharedoc-modal').modal('hide');
-                        },
-                        error: function (err) {
-                            const errorMsg = err.responseJSON?.message || 'Failed to send invitation';
-                            showToast(errorMsg, 'error');
-                        },
-                        complete: function () {
-                            resetBtn();
+                            $('#customDateWrapper').hide();
                         }
                     });
 
-                    function resetBtn() {
-                        $btn.prop('disabled', false).removeClass('btn-light').addClass('btn-primary');
-                    }
-                });                // Remove user access using custom confirmation modal
-                $('#sharedoc-modal').on('click', '.remove-user', function () {
-                    const userId = $(this).data('user-id');
-                    const userRow = $(this).closest('.user-accssrow');
+                    // Access type change handler
+                    $('#sharedoc-modal #accessType').on('change', function () {
+                        const accessType = $(this).val();
+                        const infoText = $('#infoText');
 
-                    if (!currentDocId || !userId) {
-                        userRow.remove();
-                        return;
-                    }
+                        if (accessType === 'anyone') {
+                            infoText.text('Anyone on the internet with the link can view');
+                            $('#roleType').prop('disabled', false);
+                        } else {
+                            infoText.text('Only people with access can view');
+                            $('#roleType').prop('disabled', false);
+                        }
+                    });
 
-                    // Update modal content dynamically for removing user access
-                    $('#trashdocLabel').html(`
+                    // Role type change handler
+                    $('#sharedoc-modal #roleType').on('change', function () {
+                        const roleType = $(this).val();
+                        const infoText = $('#infoText');
+                        const accessType = $('#accessType').val();
+
+                        if (accessType === 'anyone') {
+                            if (roleType === 'viewer') {
+                                infoText.text('Anyone on the internet with the link can view');
+                            } else {
+                                infoText.text('Anyone on the internet with the link can edit');
+                            }
+                        }
+                    });
+
+                    // Invite user button
+                    $('#sharedoc-modal').on('click', '#inviteUserBtn', function () {
+                        const $btn = $(this);
+                        $btn.prop('disabled', true).addClass('btn-light').removeClass('btn-primary');
+
+                        const userEmail = $('#userInviteSelect').val();
+                        const accessLevel = $('#accessLevelSelect').val();
+                        const duration = $('input[name="time"]:checked').attr('id');
+
+                        let customStart = null;
+                        let customEnd = null;
+
+                        // Read dates from Flatpickr range if "Custom" is selected
+                        if (duration === 'custom' && customFlatpickr?.selectedDates.length === 2) {
+                            customStart = customFlatpickr.selectedDates[0].toISOString();
+                            customEnd = customFlatpickr.selectedDates[1].toISOString();
+                        }
+
+                        if (!currentDocId) {
+                            showToast('No document selected', 'info');
+                            resetBtn();
+                            return;
+                        }
+
+                        if (!userEmail) {
+                            showToast('Please enter user email', 'info');
+                            resetBtn();
+                            return;
+                        }
+
+                        if (!$('input[name="time"]:checked').length) {
+                            showToast('Please select a time duration', 'info');
+                            resetBtn();
+                            return;
+                        }
+
+                        if (duration === 'custom' && (!customStart || !customEnd)) {
+                            showToast('Please select a start and end date for custom duration', 'info');
+                            resetBtn();
+                            return;
+                        }
+
+                        const inviteData = {
+                            userEmail: userEmail,
+                            accessLevel: accessLevel,
+                            duration: duration
+                        };
+
+                        if (duration === 'custom') {
+                            inviteData.customStart = customStart;
+                            inviteData.customEnd = customEnd;
+                        }
+
+                        $.ajax({
+                            url: `${baseUrl}/api/documents/${currentDocId}/invite`,
+                            method: 'POST',
+                            contentType: 'application/json',
+                            data: JSON.stringify(inviteData),
+                            success: function (response) {
+                                showToast('Invitation sent successfully!', 'success');
+                                $('#userInviteSelect').val(''); // Clear the input
+                                $('#sharedoc-modal').modal('hide');
+                            },
+                            error: function (err) {
+                                const errorMsg = err.responseJSON?.message || 'Failed to send invitation';
+                                showToast(errorMsg, 'error');
+                            },
+                            complete: function () {
+                                resetBtn();
+                            }
+                        });
+
+                        function resetBtn() {
+                            $btn.prop('disabled', false).removeClass('btn-light').addClass('btn-primary');
+                        }
+                    });                // Remove user access using custom confirmation modal
+                    $('#sharedoc-modal').on('click', '.remove-user', function () {
+                        const userId = $(this).data('user-id');
+                        const userRow = $(this).closest('.user-accssrow');
+
+                        if (!currentDocId || !userId) {
+                            userRow.remove();
+                            return;
+                        }
+
+                        // Update modal content dynamically for removing user access
+                        $('#trashdocLabel').html(`
         <img src="/img/icons/bin.png" alt="Remove User" width="40" class="mb-2"><br>
         Remove User Access
     `);
-                    $('#trashdoc-modal .modal-body').text(
-                        'Are you sure you want to remove this user’s access to the document? This action cannot be undone.'
-                    );
-                    $('#confirm-trash-folder').text('Yes, Remove');
+                        $('#trashdoc-modal .modal-body').text(
+                            'Are you sure you want to remove this user’s access to the document? This action cannot be undone.'
+                        );
+                        $('#confirm-trash-folder').text('Yes, Remove');
 
-                    // Show confirmation modal
-                    $('#trashdoc-modal').modal('show');
+                        // Show confirmation modal
+                        $('#trashdoc-modal').modal('show');
 
-                    // Ensure previous click handler is removed before reattaching
-                    $('#confirm-trash-folder').off('click').on('click', function () {
+                        // Ensure previous click handler is removed before reattaching
+                        $('#confirm-trash-folder').off('click').on('click', function () {
+                            $.ajax({
+                                url: `${baseUrl}/api/documents/share/${currentDocId}`,
+                                method: 'DELETE',
+                                contentType: 'application/json',
+                                data: JSON.stringify({ userId: userId }),
+                                success: function () {
+                                    userRow.remove();
+                                    $('#trashdoc-modal').modal('hide'); // Hide modal after success
+                                    showToast('User access removed successfully!', 'success');
+                                },
+                                error: function (err) {
+                                    $('#trashdoc-modal').modal('hide');
+                                    showToast(
+                                        err.responseJSON?.message || 'Failed to remove user access',
+                                        'error'
+                                    );
+                                }
+                            });
+                        });
+                    });
+                    // Share button in footer
+                    $('#sharedoc-modal .modal-footer .site-btnmd').on('click', function () {
+                        if (!currentDocId) {
+                            showToast('No document selected', 'info');
+                            return;
+                        }
+
+                        // Collect all users with access from modal
+                        const users = $('#usersWithAccessContainer .user-accssrow').map(function () {
+                            const userId = $(this).find('.access-level').data('user-id');
+                            const accessLevel = $(this).find('.access-level').val();
+                            const canDownload = $(this).find('.download-access').is(':checked');
+                            return { userId, accessLevel, canDownload };
+                        }).get(); // convert to plain array
+
+                        if (users.length === 0) {
+                            showToast('Please add at least one user to share with', 'info');
+                            return;
+                        }
+
+                        // Prepare general access info
+                        const accessType = $('#accessType').val();
+                        const roleType = $('#roleType').val();
+                        const generalAccess = accessType === 'anyone';
+                        const generalRole = roleType; // 'viewer' or 'editor'
+
+                        const data = {
+                            users,
+                            generalAccess,
+                            generalRole
+                        };
+
                         $.ajax({
-                            url: `${baseUrl}/api/documents/share/${currentDocId}`,
-                            method: 'DELETE',
+                            url: `${baseUrl}/api/documents/${currentDocId}/permissions`,
+                            method: 'PATCH',
                             contentType: 'application/json',
-                            data: JSON.stringify({ userId: userId }),
-                            success: function () {
-                                userRow.remove();
-                                $('#trashdoc-modal').modal('hide'); // Hide modal after success
-                                showToast('User access removed successfully!', 'success');
+                            data: JSON.stringify(data),
+                            success: function (res) {
+                                showToast(res.message || 'Permissions updated successfully!', 'success');
+                                $('#sharedoc-modal').modal('hide');
+
+                                if (typeof table !== 'undefined' && table.ajax?.reload) {
+                                    table.ajax.reload(null, false); // reload table without resetting pagination
+                                }
                             },
                             error: function (err) {
-                                $('#trashdoc-modal').modal('hide');
-                                showToast(
-                                    err.responseJSON?.message || 'Failed to remove user access',
-                                    'error'
-                                );
+                                showToast(err.responseJSON?.message || 'Failed to update permissions', 'error');
                             }
                         });
                     });
-                });
-                // Share button in footer
-                $('#sharedoc-modal .modal-footer .site-btnmd').on('click', function () {
-                    if (!currentDocId) {
-                        showToast('No document selected', 'info');
-                        return;
-                    }
-
-                    // Collect all users with access from modal
-                    const users = $('#usersWithAccessContainer .user-accssrow').map(function () {
-                        const userId = $(this).find('.access-level').data('user-id');
-                        const accessLevel = $(this).find('.access-level').val();
-                        const canDownload = $(this).find('.download-access').is(':checked');
-                        return { userId, accessLevel, canDownload };
-                    }).get(); // convert to plain array
-
-                    if (users.length === 0) {
-                        showToast('Please add at least one user to share with', 'info');
-                        return;
-                    }
-
-                    // Prepare general access info
-                    const accessType = $('#accessType').val();
-                    const roleType = $('#roleType').val();
-                    const generalAccess = accessType === 'anyone';
-                    const generalRole = roleType; // 'viewer' or 'editor'
-
-                    const data = {
-                        users,
-                        generalAccess,
-                        generalRole
-                    };
-
-                    $.ajax({
-                        url: `${baseUrl}/api/documents/${currentDocId}/permissions`,
-                        method: 'PATCH',
-                        contentType: 'application/json',
-                        data: JSON.stringify(data),
-                        success: function (res) {
-                            showToast(res.message || 'Permissions updated successfully!', 'success');
-                            $('#sharedoc-modal').modal('hide');
-
-                            if (typeof table !== 'undefined' && table.ajax?.reload) {
-                                table.ajax.reload(null, false); // reload table without resetting pagination
-                            }
-                        },
-                        error: function (err) {
-                            showToast(err.responseJSON?.message || 'Failed to update permissions', 'error');
-                        }
-                    });
-                });
 
 
-                // -------------------------
-                // Load version history into modal
-                // -------------------------
-                $('#versionhistory-modal').on('show.bs.modal', function (event) {
-                    const button = $(event.relatedTarget);
-                    const docId = button.closest('tr').find('.btn-delete').data('id');
-                    if (!docId) return;
+                    // -------------------------
+                    // Load version history into modal
+                    // -------------------------
+                    $('#versionhistory-modal').on('show.bs.modal', function (event) {
+                        const button = $(event.relatedTarget);
+                        const docId = button.closest('tr').find('.btn-delete').data('id');
+                        if (!docId) return;
 
-                    currentDocId = docId;
-                    const versionList = $(this).find('.version-list');
-                    versionList.html('<p class="text-center">Loading...</p>');
+                        currentDocId = docId;
+                        const versionList = $(this).find('.version-list');
+                        versionList.html('<p class="text-center">Loading...</p>');
 
-                    $.ajax({
-                        url: `${baseUrl}/api/documents/${docId}/versions/history`,
-                        method: 'GET',
-                        success: function (res) {
-                            if (!res.success || !res.data) {
-                                versionList.html('<p class="text-danger">No version history found.</p>');
-                                return;
-                            }
+                        $.ajax({
+                            url: `${baseUrl}/api/documents/${docId}/versions/history`,
+                            method: 'GET',
+                            success: function (res) {
+                                if (!res.success || !res.data) {
+                                    versionList.html('<p class="text-danger">No version history found.</p>');
+                                    return;
+                                }
 
-                            versionList.empty();
-                            res.data.versionHistory.forEach(item => {
-                                const modifiedDate = new Date(item.timestamp).toLocaleString();
+                                versionList.empty();
+                                res.data.versionHistory.forEach(item => {
+                                    const modifiedDate = new Date(item.timestamp).toLocaleString();
 
-                                // Only show restore button if not version 1.0
-                                const restoreButton = item.version !== "1.0"
-                                    ? `<button class="btn btn-outline-light rounded-pill btn-restore-version" 
+                                    // Only show restore button if not version 1.0
+                                    const restoreButton = item.version !== "1.0"
+                                        ? `<button class="btn btn-outline-light rounded-pill btn-restore-version" 
         data-version="${item.version}" 
         data-previous-version="${item.previousVersion}">
         Restore to v${item.previousVersion}
     </button>`
-                                    : '';
+                                        : '';
 
-                                const html = `
+                                    const html = `
         <div class="version-item border-bottom pb-3 mb-3">
             <div class="dflexbtwn align-items-start">
                 <div class="flxtblleft">
@@ -1045,105 +1048,248 @@
             </div>
         </div>
     `;
-                                versionList.append(html);
-                            });
-                        },
-                        error: function () {
-                            versionList.html('<p class="text-danger">Failed to load version history.</p>');
-                        }
+                                    versionList.append(html);
+                                });
+                            },
+                            error: function () {
+                                versionList.html('<p class="text-danger">Failed to load version history.</p>');
+                            }
+                        });
                     });
-                });
-                // -------------------------
-                // Handle View & Restore buttons
-                // -------------------------
-                $(document).on('click', '.btn-view-version', function () {
-                    const version = $(this).data('version');
-                    if (!currentDocId || !version) return;
+                    // -------------------------
+                    // Handle View & Restore buttons
+                    // -------------------------
+                    $(document).on('click', '.btn-view-version', function () {
+                        const version = $(this).data('version');
+                        if (!currentDocId || !version) return;
 
-                    // Open the version view page
-                    window.location.href = `/documents/${currentDocId}/versions/view?version=${version}`;
-                });
+                        // Open the version view page
+                        window.location.href = `/documents/${currentDocId}/versions/view?version=${version}`;
+                    });
 
-                let restoreTarget = {}; // Temporarily store doc ID and version
+                    let restoreTarget = {}; // Temporarily store doc ID and version
 
-                $(document).on('click', '.btn-restore-version', function () {
-                    const version = $(this).data('version');
-                    const previousVersion = $(this).data('previous-version');
-                    if (!currentDocId || !previousVersion) return;
+                    $(document).on('click', '.btn-restore-version', function () {
+                        const version = $(this).data('version');
+                        const previousVersion = $(this).data('previous-version');
+                        if (!currentDocId || !previousVersion) return;
 
-                    restoreTarget = { docId: currentDocId, version: previousVersion };
+                        restoreTarget = { docId: currentDocId, version: previousVersion };
 
-                    // Update modal title and body dynamically
-                    $('#restore-folder-modal .modal-title').html(`
+                        // Update modal title and body dynamically
+                        $('#restore-folder-modal .modal-title').html(`
         <img src="/img/icons/restore.png" alt="Restore Icon" width="32" class="me-2">
         Restore Version
     `);
 
-                    $('#restore-folder-modal .modal-body').text(
-                        `Are you sure you want to restore this document to version ${previousVersion}?`
-                    );
+                        $('#restore-folder-modal .modal-body').text(
+                            `Are you sure you want to restore this document to version ${previousVersion}?`
+                        );
 
-                    // Show the modal
-                    $('#restore-folder-modal').modal('show');
-                });
-                $('#confirm-restore-folder').on('click', function () {
-                    if (!restoreTarget.docId || !restoreTarget.version) return;
-
-                    $.ajax({
-                        url: `${baseUrl}/api/documents/${restoreTarget.docId}/versions/${restoreTarget.version}/restore`,
-                        method: 'PATCH',
-                        success: function (res) {
-                            showToast(res.message || `Restored to version ${restoreTarget.version}`, 'success');
-                            $('#restore-folder-modal').modal('hide');
-                            table.ajax.reload(); // reload table so status/files update
-                        },
-                        error: function (err) {
-                            showToast(err.responseJSON?.message || 'Failed to restore version', 'error');
-                        }
+                        // Show the modal
+                        $('#restore-folder-modal').modal('show');
                     });
-                });
+                    $('#confirm-restore-folder').on('click', function () {
+                        if (!restoreTarget.docId || !restoreTarget.version) return;
 
-                // Copy share link to clipboard
-                $('#sharedoc-modal').on('click', '#copyLinkBtn', function () {
-                    const linkInput = $('#sharelink');
-                    if (!linkInput.val()) {
-                        showToast('No link available to copy', 'info');
-                        return;
-                    }
-
-                    // Select the text
-                    linkInput.select();
-                    linkInput[0].setSelectionRange(0, 99999); // For mobile devices
-
-                    // Copy to clipboard
-                    navigator.clipboard.writeText(linkInput.val())
-                        .then(() => {
-                            showToast('Link copied to clipboard!', 'success');
-                        })
-                        .catch(() => {
-                            showToast('Failed to copy link', 'error');
+                        $.ajax({
+                            url: `${baseUrl}/api/documents/${restoreTarget.docId}/versions/${restoreTarget.version}/restore`,
+                            method: 'PATCH',
+                            success: function (res) {
+                                showToast(res.message || `Restored to version ${restoreTarget.version}`, 'success');
+                                $('#restore-folder-modal').modal('hide');
+                                table.ajax.reload(); // reload table so status/files update
+                            },
+                            error: function (err) {
+                                showToast(err.responseJSON?.message || 'Failed to restore version', 'error');
+                            }
                         });
-                });
+                    });
 
-                // Function to load users for invite dropdown
-                function loadUsersForInvite() {
-                    $.ajax({
-                        url: `${baseUrl}/api/user`, // Make sure this endpoint exists
-                        method: 'GET',
-                        success: function (response) {
-                            const select = $('#userInviteSelect');
-                            select.empty();
+                    // Copy share link to clipboard
+                    $('#sharedoc-modal').on('click', '#copyLinkBtn', function () {
+                        const linkInput = $('#sharelink');
+                        if (!linkInput.val()) {
+                            showToast('No link available to copy', 'info');
+                            return;
+                        }
 
-                            if (response.data && response.data.length) {
-                                response.data.forEach(user => {
-                                    select.append(`<option value="${user.email}">${user.name} (${user.email})</option>`);
+                        // Select the text
+                        linkInput.select();
+                        linkInput[0].setSelectionRange(0, 99999); // For mobile devices
+
+                        // Copy to clipboard
+                        navigator.clipboard.writeText(linkInput.val())
+                            .then(() => {
+                                showToast('Link copied to clipboard!', 'success');
+                            })
+                            .catch(() => {
+                                showToast('Failed to copy link', 'error');
+                            });
+                    });
+
+                    // Function to load users for invite dropdown
+                    function loadUsersForInvite() {
+                        $.ajax({
+                            url: `${baseUrl}/api/user`, // Make sure this endpoint exists
+                            method: 'GET',
+                            success: function (response) {
+                                const select = $('#userInviteSelect');
+                                select.empty();
+
+                                if (response.data && response.data.length) {
+                                    response.data.forEach(user => {
+                                        select.append(`<option value="${user.email}">${user.name} (${user.email})</option>`);
+                                    });
+                                }
+                            },
+                            error: function (err) {
+                                console.error('Failed to load users:', err);
+                            }
+                        });
+                    }
+                })(jQuery);
+            </script>
+
+            <script>
+                document.addEventListener('DOMContentLoaded', () => {
+                    const tableBody = document.querySelector('#approverTable tbody');
+                    const form = document.getElementById('addMemberForm');
+                    const modal = new bootstrap.Modal('#addMemberModal');
+                    const memberSelect = document.getElementById('approverSelect');
+
+                    /* ----------------------------------------
+                       1️⃣ Initialize select2 for Approver Name
+                       ---------------------------------------- */
+                    $('#approverSelect').select2({
+                        placeholder: "Select Approver",
+                        allowClear: true,
+                        width: 'resolve',
+                        dropdownParent: $('#addMemberModal'),
+                        ajax: {
+                            url: `/api/user/search`,
+                            dataType: 'json',
+                            delay: 250,
+                            data: params => ({ search: params.term }),
+                            processResults: data => ({
+                                results: (data.users || []).map(u => ({
+                                    id: u.email,
+                                    text: u.name,
+                                    isNew: false
+                                }))
+                            })
+                        },
+                        tags: true,
+                        createTag: function (params) {
+                            const email = params.term.trim();
+                            if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                                return { id: email, text: email, isNew: true };
+                            }
+                            return null;
+                        },
+                        minimumInputLength: 0
+                    });
+
+                    /* ----------------------------------------
+                       2️⃣ Initialize select2 for Role dropdown
+                       ---------------------------------------- */
+                    $('#roleSelect').select2({
+                        placeholder: "Select Role",
+                        allowClear: true,
+                        width: 'resolve',
+                        dropdownParent: $('#addMemberModal'),
+                        ajax: {
+                            url: "http://localhost:5000/api/designations/search",
+                            dataType: 'json',
+                            delay: 250,
+                            processResults: data => ({
+                                results: (data.data || []).map(role => ({
+                                    id: role._id,
+                                    // Capitalize first letter of role name
+                                    text: role.name.charAt(0).toUpperCase() + role.name.slice(1)
+                                }))
+                            })
+                        },
+                        minimumInputLength: 0
+                    });
+
+                    /* ----------------------------------------
+                       3️⃣ When modal opens, fill selected name
+                       ---------------------------------------- */
+                    document.getElementById('addMemberModal').addEventListener('show.bs.modal', () => {
+                        const selectedOption = memberSelect.options[memberSelect.selectedIndex];
+                        const name = selectedOption.textContent.trim();
+                        const id = selectedOption.value;
+
+                        document.getElementById('selectedMemberName').textContent = name;
+                        document.getElementById('memberId').value = id;
+                    });
+
+                    /* ----------------------------------------
+                       4️⃣ Add a new row to table
+                       ---------------------------------------- */
+                    form.addEventListener('submit', (e) => {
+                        e.preventDefault();
+
+                        const name = document.getElementById('selectedMemberName').textContent.trim();
+                        const roleData = $('#roleSelect').select2('data')[0];
+                        const roleName = roleData ? roleData.text : '';
+                        const memberId = document.getElementById('memberId').value.trim();
+                        const priority = parseInt(form.querySelector('input[name="priority"]').value, 10);
+
+                        if (!name || !roleName || isNaN(priority)) {
+                            alert('Please fill all fields correctly.');
+                            return;
+                        }
+
+                        const newSno = tableBody.rows.length + 1;
+                        const newRow = document.createElement('tr');
+                        newRow.dataset.id = memberId;
+
+                        newRow.innerHTML = `
+            <td>${newSno}</td>
+            <td>${name}<br><small class="text-muted">${roleName}</small></td>
+            <td><input type="number" class="form-control form-control-sm" value="${priority}" readonly></td>
+            <td>-</td>
+            <td>N/A</td>
+            <td>
+                <button class="btn btn-sm btn-success send-mail">Send Mail</button>
+                <button class="btn btn-sm btn-danger remove-row">X</button>
+            </td>
+        `;
+
+                        tableBody.appendChild(newRow);
+
+                        // Reset form and dropdowns
+                        form.reset();
+                        $('#approverSelect').val('').trigger('change');
+                        $('#roleSelect').val('').trigger('change');
+                        modal.hide();
+                    });
+
+                    /* ----------------------------------------
+                       5️⃣ Remove row
+                       ---------------------------------------- */
+                    tableBody.addEventListener('click', (e) => {
+                        if (e.target.matches('.remove-row')) {
+                            if (confirm('Remove this approver?')) {
+                                e.target.closest('tr').remove();
+                                tableBody.querySelectorAll('tr').forEach((tr, idx) => {
+                                    tr.cells[0].textContent = idx + 1;
                                 });
                             }
-                        },
-                        error: function (err) {
-                            console.error('Failed to load users:', err);
                         }
                     });
-                }
-            })(jQuery);
-        </script>
+
+                    /* ----------------------------------------
+                       6️⃣ Send Mail placeholder
+                       ---------------------------------------- */
+                    tableBody.addEventListener('click', (e) => {
+                        if (e.target.matches('.send-mail')) {
+                            const row = e.target.closest('tr');
+                            const member = row.cells[1].textContent.trim().split('\n')[0];
+                            alert(`Sending mail to ${member} …`);
+                        }
+                    });
+                });
+            </script>

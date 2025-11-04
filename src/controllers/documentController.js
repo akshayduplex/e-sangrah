@@ -317,7 +317,7 @@ export const getDocuments = async (req, res) => {
         if (profile_type !== "superadmin") {
             filter.$or = [
                 { owner: userId },
-                { sharedWithUsers: userId }
+                // { sharedWithUsers: userId }
             ];
         }
 

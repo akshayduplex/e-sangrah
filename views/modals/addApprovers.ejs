@@ -1,0 +1,131 @@
+<!-- ======================  MODAL  ====================== -->
+<div class="modal fade" id="addMemberModal" tabindex="-1" aria-labelledby="addMemberModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg"> <!-- modal-lg makes the table fit -->
+        <div class="modal-content">
+            <form id="addMemberForm" action="/add-member" method="POST">
+                <div class="modal-header btn-light text-white">
+                    <h5 class="modal-title" id="addMemberModalLabel">Add Approver</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                        aria-label="Close"></button>
+                </div>
+
+                <div class="modal-body">
+                    <!-- ==== ADD NEW APPROVER ==== -->
+                    <div class="row g-3 mb-4">
+                        <!-- Approver Name -->
+                        <div class="col-md-4">
+                            <label class="form-label">Approver Name</label>
+                            <select id="approverSelect" class="form-select select2" name="name" required>
+                                <option value="">Select Approver</option>
+                                <option value="john_doe">John Doe</option>
+                                <option value="jane_smith">Jane Smith</option>
+                                <option value="michael_lee">Michael Lee</option>
+                            </select>
+                        </div>
+
+                        <!-- Role -->
+                        <div class="col-md-4">
+                            <label class="form-label">Role</label>
+                            <select id="roleSelect" class="form-select select2" name="role" required>
+                                <option value="">Select Role</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Priority</label>
+                            <input type="number" class="form-control" name="priority" required>
+                        </div>
+                        <div class="col-md-2 d-flex align-items-end">
+                            <button type="submit" class="btn btn-success w-100">Add</button>
+                        </div>
+                    </div>
+                    <!-- Selected member (filled from dropdown) -->
+                    <p class="mb-3">
+                        <strong>Added Member:</strong>
+                        <span id="selectedMemberName" class="text-primary"></span>
+                    </p>
+                    <input type="hidden" name="memberId" id="memberId">
+                    <!-- ==== STATIC APPROVER LIST ==== -->
+                    <div class="table-responsive">
+                        <table class="table table-bordered align-middle" id="approverTable">
+                            <thead class="table-primary">
+                                <tr>
+                                    <th>Sno.</th>
+                                    <th>Approver Member</th>
+                                    <th>Priority</th>
+                                    <th>Status</th>
+                                    <th>Add Date</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- static rows -->
+                                <tr data-id="1">
+                                    <td>1</td>
+                                    <td>Abhilasha Tiwari<br><small class="text-muted">Manager - HR</small></td>
+                                    <td><input type="number" class="form-control form-control-sm" value="1" readonly>
+                                    </td>
+                                    <td>-</td>
+                                    <td>N/A</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-success send-mail">Send Mail</button>
+                                        <button class="btn btn-sm btn-danger remove-row">X</button>
+                                    </td>
+                                </tr>
+                                <tr data-id="2">
+                                    <td>2</td>
+                                    <td>Mahendra Pancholi<br><small class="text-muted">Project Lead - HIV</small></td>
+                                    <td><input type="number" class="form-control form-control-sm" value="2" readonly>
+                                    </td>
+                                    <td>-</td>
+                                    <td>N/A</td>
+                                    <td><span class="text-muted">No Actions Available</span>
+                                        <button class="btn btn-sm btn-danger remove-row">X</button>
+                                    </td>
+                                </tr>
+                                <tr data-id="3">
+                                    <td>3</td>
+                                    <td>Sangita Pandey<br><small class="text-muted">Project Director</small></td>
+                                    <td><input type="number" class="form-control form-control-sm" value="3" readonly>
+                                    </td>
+                                    <td>-</td>
+                                    <td>N/A</td>
+                                    <td><span class="text-muted">No Actions Available</span>
+                                        <button class="btn btn-sm btn-danger remove-row">X</button>
+                                    </td>
+                                </tr>
+                                <tr data-id="4">
+                                    <td>4</td>
+                                    <td>Ajay Kumar Jha<br><small class="text-muted">Associate National Lead - Finance &
+                                            Accounts</small></td>
+                                    <td><input type="number" class="form-control form-control-sm" value="4" readonly>
+                                    </td>
+                                    <td>-</td>
+                                    <td>N/A</td>
+                                    <td><span class="text-muted">No Actions Available</span>
+                                        <button class="btn btn-sm btn-danger remove-row">X</button>
+                                    </td>
+                                </tr>
+                                <tr data-id="5">
+                                    <td>5</td>
+                                    <td>Chaturanand Thakur</td>
+                                    <td><input type="number" class="form-control form-control-sm" value="5" readonly>
+                                    </td>
+                                    <td>-</td>
+                                    <td>N/A</td>
+                                    <td><span class="text-muted">No Actions Available</span>
+                                        <button class="btn btn-sm btn-danger remove-row">X</button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

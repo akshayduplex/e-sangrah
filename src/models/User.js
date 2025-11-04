@@ -115,7 +115,6 @@ const userSchema = new mongoose.Schema(
 
 // Compound & individual indexes
 userSchema.index({ profile_type: 1, createdAt: -1 });
-userSchema.index({ email: 1 }, { unique: true });
 userSchema.index({ name: 1 });
 userSchema.index({ phone_number: 1 });
 userSchema.index({ addedBy: 1 });
