@@ -43,7 +43,8 @@
     border-radius: 6px 6px 0 0;
 }
 
-/* .flxtblrow {
-    padding: 10px 15px;
-    border-bottom: 1px solid #eee;
-} */
+/* for arrow hidden in mini-sidebar */
+.mini-sidebar .arrow-icon,
+.collapsed .arrow-icon {
+    display: none !important;
+}

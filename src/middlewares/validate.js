@@ -1,13 +1,19 @@
 // middlewares/validate.js
 import { validationResult } from "express-validator";
 
-export function validate(req, res, next) {
+export const validators = (req, res, next) => {
     const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-        return res.status(400).json({
-            success: false,
-            errors: errors.array().map(err => err.msg)
-        });
-    }
-    next();
-}
+    if (errors.isEmpty()) return next();
+
+    // map to field: message format (production friendly)
+    const extractedErrors = errors.array().map((err) => ({
+        field: err.param,
+        message: err.msg,
+    }));
+
+    return res.status(422).json({
+        status: "error",
+        errors: extractedErrors,
+    });
+};
+

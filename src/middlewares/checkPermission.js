@@ -246,6 +246,7 @@ import UserPermission from "../models/UserPermission.js";
 
 // Normalize URL helper
 const normalizeUrl = (url) => {
+
     url = url.split('?')[0];
     if (url.startsWith('/api')) url = url.substring(4);
     if (!url.startsWith('/')) url = '/' + url;
@@ -254,10 +255,8 @@ const normalizeUrl = (url) => {
     return url;
 };
 
-// HTTP method → permission mapping
 const methodMap = { GET: 'read', POST: 'write', PUT: 'write', PATCH: 'write', DELETE: 'delete' };
 
-// Fetch permissions directly from DB (no caching)
 const fetchUserPermissions = async (userId, designationId, menuId) => {
     const [designationPermission, userPermission] = await Promise.all([
         MenuAssignment.findOne({ designation_id: designationId, menu_id: menuId }).lean(),
@@ -270,10 +269,8 @@ const fetchUserPermissions = async (userId, designationId, menuId) => {
     };
 };
 
-// Main RBAC middleware — no caching
 const checkPermissions = async (req, res, next) => {
     try {
-
         const user = req.user || req.session.user;
         const isApi = req.originalUrl.startsWith('/api') || req.headers.accept?.includes('application/json');
 
@@ -288,43 +285,39 @@ const checkPermissions = async (req, res, next) => {
         }
 
         const userId = user._id.toString();
-        const designationId = user.userDetails.designation?.toString();
-
-        // Normalize URL
+        const designationId = user.userDetails?.designation?.toString();
         const url = normalizeUrl(req.originalUrl);
 
-        // Load menu directly from DB (no caching)
         const menu = await Menu.findOne({
             is_show: true,
             $or: [
                 { url },
-                { url: url.replace(/\/:id/g, '/:id') } // Fallback match
+                { url: url.replace(/\/:id/g, '/:id') }
             ]
         }).lean();
 
         if (!menu) {
+            console.warn('[Menu] Not found for URL:', url);
             if (isApi) return res.status(404).json({ error: 'Menu not found or inactive', requestedUrl: url });
             return res.status(404).render('error', { title: 'Menu Not Found', message: 'Menu not found or inactive' });
         }
-
         const menuId = menu._id.toString();
         const requiredPermission = methodMap[req.method] || 'read';
 
-        // Fetch permissions directly from DB
         const perms = await fetchUserPermissions(userId, designationId, menuId);
 
-        // Allow if either designation OR user override has permission
-        const hasPermission = !!(perms.designation[requiredPermission] || perms.user[requiredPermission]);
+        const hasPermission = !!(perms.designation[requiredPermission] && perms.user[requiredPermission]);
 
         if (hasPermission) {
             return next();
         }
 
-        // Permission denied
+        console.warn('[Access Denied] User lacks', requiredPermission, 'permission for', url);
         if (isApi) return res.status(403).json({ error: 'Forbidden', required: requiredPermission });
         return res.status(403).render('no-permission', { title: '403 - Forbidden', message: 'You do not have permission.' });
 
     } catch (error) {
+        console.error('[RBAC Error]', error);
         if (req.originalUrl.startsWith('/api') || req.headers.accept?.includes('application/json')) {
             return res.status(500).json({ error: 'Internal Server Error', details: error.message });
         }

@@ -478,10 +478,31 @@ $(document).ready(function () {
                 const createdDate = new Date(doc.createdAt).toLocaleString();
                 const updatedDate = new Date(doc.updatedAt).toLocaleString();
                 const tags = doc.tags.join(', ') || '-';
-                const sharedWith = doc.sharedWithUsers.map(u => u.name).join(', ') || '-';
+                const sharedWith = doc.sharedWithUsers?.length
+                    ? (() => {
+                        const users = doc.sharedWithUsers.slice(0, 3);
+                        const remaining = doc.sharedWithUsers.length - users.length;
+
+                        const avatars = users.map(u => {
+                            const imgSrc = u.profile_image || '/img/users/user-01.jpg';
+                            return `<img src="${imgSrc}" class="avatar" data-name="${u.name}" title="${u.name}" />`;
+                        }).join('');
+
+                        const more = remaining > 0
+                            ? `<div class="avatar avatar-more">+${remaining}</div>`
+                            : '';
+
+                        return `<div class="avatar-group">${avatars}${more}</div>`;
+                    })()
+                    : '-';
                 const statusKey = doc.status?.toLowerCase() || 'draft';
                 const statusClassName = statusClass[statusKey] || 'bg-soft-secondary';
-
+                const description = doc.description
+                    ? (() => {
+                        const text = doc.description.replace(/<\/?[^>]+(>|$)/g, '');
+                        return text.length > 100 ? text.substring(0, 30) + '....' : text;
+                    })()
+                    : '-';
                 const firstFile = doc.files?.[0];
                 const fileIcon = firstFile
                     ? fileIcons[firstFile.originalName.split('.').pop().toLowerCase()] || fileIcons.default
@@ -527,7 +548,7 @@ $(document).ready(function () {
                     <td><p>${tags}</p></td>
                     <td><p>${doc.metadata?.mainHeading || '-'}</p></td>
                     <td><p class="tbl_date">${createdDate}</p></td>
-                    <td><p>${(doc.description || '').replace(/(<([^>]+)>)/gi, '') || '-'}</p></td>
+                    <td><p>${description}</p></td>
                     <td><p>${doc.comment || '-'}</p></td>
                     <td><span class="badge badge-md ${statusClassName}">${doc.status || '-'}</span></td>
                 </tr>

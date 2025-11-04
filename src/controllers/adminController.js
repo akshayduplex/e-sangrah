@@ -314,8 +314,7 @@ export const getPermissionLogs = async (req, res) => {
 };
 
 export const updateRequestStatus = async (req, res) => {
-    const { logId, requestStatus } = req.body;
-    console.log(logId, requestStatus);
+    const { logId, requestStatus } = req.body;;
     if (!["approved", "pending", "rejected"].includes(requestStatus)) {
         return res.status(400).json({ success: false, message: "Invalid request status" });
     }

@@ -177,6 +177,17 @@
             document.addEventListener("DOMContentLoaded", function () {
                 const baseUrl = window.location.origin;
                 let currentDocumentId = null;
+                // File type → icon map
+                const fileIcons = {
+                    ppt: "/img/icons/fn1.png",
+                    pptx: "/img/icons/fn1.png",
+                    doc: "/img/icons/fn2.png",
+                    docx: "/img/icons/fn2.png",
+                    xls: "/img/icons/fn3.png",
+                    xlsx: "/img/icons/fn3.png",
+                    pdf: "/img/icons/fn4.png",
+                    default: "/img/icons/fn1.png"
+                };
 
                 // Approve / Decline toggle
                 function setupApproveDeclineButtons() {
@@ -245,19 +256,9 @@
                     return div.textContent || div.innerText || 'No description provided';
                 }
 
-                function getFileIcon(fileType) {
-                    const map = {
-                        'pdf': '/img/icons/pdf.png',
-                        'msword': '/img/icons/doc.png',
-                        'vnd.openxmlformats-officedocument.wordprocessingml.document': '/img/icons/doc.png',
-                        'ms-excel': '/img/icons/xls.png',
-                        'vnd.openxmlformats-officedocument.spreadsheetml.sheet': '/img/icons/xls.png',
-                        'image/': '/img/icons/img.png'
-                    };
-                    for (const [key, val] of Object.entries(map)) {
-                        if (fileType.includes(key)) return val;
-                    }
-                    return '/img/icons/fn1.png';
+                function getFileIcon(fileName = "") {
+                    const ext = fileName.split('.').pop().toLowerCase();
+                    return fileIcons[ext] || fileIcons.default;
                 }
 
                 // Modal helpers
@@ -283,10 +284,10 @@
                         document.getElementById('fileName').innerHTML =
                             `${primaryFile.originalName} <span class="text-success">v${version}</span>`;
                         document.getElementById('fileSize').textContent = formatFileSize(primaryFile.fileSize);
-                        document.getElementById('fileIcon').src = getFileIcon(primaryFile.fileType);
+                        document.getElementById('fileIcon').src = getFileIcon(primaryFile.originalName);
 
                         const link = document.getElementById('viewFileLink');
-                        link.href = `/folders/view/${primaryFile._id}`; // 👈 Redirect to /folders/view/:fileId
+                        link.href = `/folders/view/${primaryFile._id}`;
                         link.target = '_blank';
                     }
 
@@ -435,7 +436,7 @@
                                 return `
                         <div class="flxtblleft">
                             <span class="avatar rounded bg-light mb-2">
-                                <img src="/img/icons/fn1.png" alt="icon">
+                              <img src="${getFileIcon(data)}" alt="icon">
                             </span>
                             <div class="flxtbltxt">
                                 <p class="fs-14 mb-1 fw-normal text-neutral">${data}

@@ -2736,7 +2736,6 @@ export const updateApprovalStatus = async (req, res) => {
         const { documentId } = req.params;
         const { approved, comment } = req.body;
 
-        // Find this user's approval entry
         const approval = await Approval.findOne({
             document: documentId,
             approver: userId
@@ -2746,48 +2745,42 @@ export const updateApprovalStatus = async (req, res) => {
             return res.status(404).json({ error: 'Approval not found for this user' });
         }
 
-        // Update approval details
+        // Update current user's approval
         approval.status = approved ? 'Approved' : 'Rejected';
         approval.isApproved = approved;
         approval.remark = comment || '';
         approval.approvedOn = approved ? new Date() : null;
         await approval.save();
 
-        // --- DOCUMENT STATUS LOGIC ---
-        const maxLevel = await Approval.findOne({ document: documentId })
-            .sort({ level: -1 })
-            .select('level');
+        // Fetch all approvals for this document
+        const allApprovals = await Approval.find({ document: documentId });
+        const highestLevel = Math.max(...allApprovals.map(a => a.level));
+        const lowestLevel = Math.min(...allApprovals.map(a => a.level));
 
-        if (approved && approval.level === maxLevel.level) {
-            // Top-level approval → approve all
-            await Approval.updateMany(
-                { document: documentId },
-                {
-                    $set: {
-                        status: 'Approved',
-                        isApproved: true,
-                        approvedOn: new Date()
-                    }
-                }
-            );
-            await Document.findByIdAndUpdate(documentId, { status: 'Approved' });
-        } else {
-            // Recalculate document status
-            const allApprovals = await Approval.find({ document: documentId });
-            const allApproved = allApprovals.every(a => a.status === 'Approved');
-            const anyRejected = allApprovals.some(a => a.status === 'Rejected');
+        // Recalculate document status logic
+        const anyRejected = allApprovals.some(a => a.status === 'Rejected');
+        const allApproved = allApprovals.every(a => a.status === 'Approved');
 
-            let documentStatus = 'Pending';
-            if (allApproved) documentStatus = 'Approved';
-            else if (anyRejected) documentStatus = 'Rejected';
+        let documentStatus = 'Pending';
 
-            await Document.findByIdAndUpdate(documentId, { status: documentStatus });
+        // If any rejection → document is Rejected
+        if (anyRejected) {
+            documentStatus = 'Rejected';
+        }
+        // If all approvals are approved → document is Approved
+        else if (allApproved) {
+            documentStatus = 'Approved';
+        }
+        // Else, still waiting on next approvers
+        else {
+            documentStatus = 'Pending';
         }
 
-        // --- NOTIFICATION CREATION ---
-        const document = approval.document;
+        // Only update document if we have final outcome
+        await Document.findByIdAndUpdate(documentId, { status: documentStatus });
 
-        // Notify all other approvers (except current user)
+        // Notify others
+        const document = approval.document;
         const otherApprovals = await Approval.find({
             document: documentId,
             approver: { $ne: userId }
@@ -2805,7 +2798,7 @@ export const updateApprovalStatus = async (req, res) => {
             });
         }
 
-        // Notify the document owner (if not the current user)
+        // Notify owner if not same as current user
         if (String(document.owner) !== String(userId)) {
             await addNotification({
                 recipient: document.owner,
@@ -2818,8 +2811,8 @@ export const updateApprovalStatus = async (req, res) => {
             });
         }
 
-        // Notify next approver (if applicable)
-        if (approved) {
+        // Notify next approver (only if current approval approved)
+        if (approved && approval.level < highestLevel && documentStatus === 'Pending') {
             const nextApproval = await Approval.findOne({
                 document: documentId,
                 level: approval.level + 1
@@ -2838,7 +2831,6 @@ export const updateApprovalStatus = async (req, res) => {
             }
         }
 
-        // --- RETURN RESPONSE ---
         const updatedApprovals = await Approval.find({ document: documentId })
             .populate('approver', 'name designation email')
             .sort({ level: 1 });
@@ -2848,11 +2840,14 @@ export const updateApprovalStatus = async (req, res) => {
             approval,
             approvals: updatedApprovals
         });
+
     } catch (error) {
         console.error('Error updating approval:', error);
         res.status(500).json({ error: error.message });
     }
 };
+
+
 
 export const getApprovals = async (req, res) => {
     try {

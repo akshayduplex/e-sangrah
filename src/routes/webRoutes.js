@@ -21,15 +21,6 @@ import * as DashboardController from "../controllers/DashboardController.js";
 import * as ReportsController from "../controllers/ReportsController.js";
 import * as FilesController from "../controllers/FileController.js";
 
-// ===== Validators =====
-
-import {
-    assignMenusValidator,
-    getAssignedMenusValidator,
-    getMenuListValidator,
-    menuIdParamValidator,
-} from "../middlewares/validation/permissionValidator.js";
-
 // ===== Controllers =====
 import {
     assignMenusToDesignation,
@@ -129,10 +120,10 @@ router.get("/admin/folders/permission", authenticate, AdminController.showFolder
 /* =========================================
    EMPLOYEE ROUTE
    ========================================= */
-router.get("/employee/approval", authenticate, EmployeeController.showEmployeeApprovalPage);
-router.get("/employee/dashboard", authenticate, EmployeeController.showEmployeeDashboardPage);
+router.get("/employee/approval", authenticate, checkPermissions, EmployeeController.showEmployeeApprovalPage);
+router.get("/employee/dashboard", authenticate, checkPermissions, EmployeeController.showEmployeeDashboardPage);
 router.get("/documents/employee/recyclebin", authenticate, EmployeeController.showEmployeeRecycleBinPage);
-
+router.get("/employee/anaytics", authenticate, EmployeeController.showEmployeeAnayticsPage);
 
 //Approvals
 // Render approval page
@@ -218,8 +209,8 @@ router.get("/permissions/assign", authenticate, checkPermissions, async (req, re
 
 // Assign menus to designation
 router.get("/permissions/assign-menu", authenticate, checkPermissions, PermissionController.getAssignMenuPage);
-router.get("/permissions/assign-menu/designation/:designation_id/menus", authenticate, getAssignedMenusValidator, PermissionController.getAssignedMenus);
-router.post("/permissions/assign-menu/assign", authenticate, assignMenusValidator, PermissionController.assignMenusToDesignation);
+router.get("/permissions/assign-menu/designation/:designation_id/menus", authenticate, PermissionController.getAssignedMenus);
+router.post("/permissions/assign-menu/assign", authenticate, PermissionController.assignMenusToDesignation);
 
 // User Permissions page
 router.get("/permissions/user/:id", authenticate, checkPermissions, async (req, res) => {
@@ -263,9 +254,9 @@ router.get("/permissions/roles", authenticate, checkPermissions, (req, res) => {
 });
 
 // Menu Management
-router.get("/permissions/menu/list", authenticate, checkPermissions, getMenuListValidator, PermissionController.getMenuList);
+router.get("/permissions/menu/list", authenticate, checkPermissions, PermissionController.getMenuList);
 router.get("/permissions/menu/add", authenticate, checkPermissions, PermissionController.getAddMenu);
-router.get("/permissions/menu/add/:id", authenticate, checkPermissions, menuIdParamValidator, PermissionController.getEditMenu);
+router.get("/permissions/menu/add/:id", authenticate, checkPermissions, PermissionController.getEditMenu);
 
 // Save user permissions
 router.post("/permissions/user/save", authenticate, checkPermissions, async (req, res) => {

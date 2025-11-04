@@ -393,6 +393,9 @@ export const getDonorVendorProjects = async (req, res) => {
 export const getDepartmentDocumentUploads = async (req, res) => {
     try {
         const { period = "month", projectId } = req.query;
+        const user = req.user;
+        const userId = user?._id;
+
         // Validate period
         if (!FILTER_PERIODS.includes(period)) {
             return failResponse(res, "Invalid period. Must be today, week, month, or year", 400);
@@ -400,14 +403,19 @@ export const getDepartmentDocumentUploads = async (req, res) => {
 
         const startDate = calculateStartDate(period);
 
-        // Prepare the initial $match filter
+        // Base match filter
         const matchStage = {
             createdAt: { $gte: startDate },
             isDeleted: false,
-            department: { $exists: true, $ne: null }
+            department: { $exists: true, $ne: null },
         };
 
-        // If projectId is provided, filter by it
+        // Restrict visibility: only owner for non-superadmins
+        if (user.profile_type !== "superadmin") {
+            matchStage.owner = new mongoose.Types.ObjectId(userId);
+        }
+
+        // Optional project filter
         if (projectId && mongoose.Types.ObjectId.isValid(projectId)) {
             matchStage.project = new mongoose.Types.ObjectId(projectId);
         }
@@ -415,7 +423,7 @@ export const getDepartmentDocumentUploads = async (req, res) => {
         const pipeline = [
             { $match: matchStage },
 
-            // Lookup department name only
+            // Lookup department name
             {
                 $lookup: {
                     from: "departments",
@@ -439,7 +447,7 @@ export const getDepartmentDocumentUploads = async (req, res) => {
                 }
             },
 
-            // Compute total across all departments
+            // Compute total and percentage
             {
                 $group: {
                     _id: null,
@@ -456,7 +464,6 @@ export const getDepartmentDocumentUploads = async (req, res) => {
 
             { $unwind: "$departments" },
 
-            // Calculate percentage
             {
                 $addFields: {
                     percentage: {
@@ -479,7 +486,6 @@ export const getDepartmentDocumentUploads = async (req, res) => {
                 }
             },
 
-            // Format output
             {
                 $project: {
                     _id: 0,
@@ -491,59 +497,75 @@ export const getDepartmentDocumentUploads = async (req, res) => {
             },
 
             { $sort: { documentCount: -1 } },
-
-            // Limit to top 10 for visualization
             { $limit: 10 }
         ];
 
         const result = await Document.aggregate(pipeline);
 
-        return successResponse(res, {
-            period,
-            startDate,
-            projectId: projectId || null,
-            departmentUploads: result,
-        }, "Department document uploads fetched successfully");
-
+        return successResponse(
+            res,
+            {
+                period,
+                startDate,
+                projectId: projectId || null,
+                departmentUploads: result,
+            },
+            "Department document uploads fetched successfully"
+        );
     } catch (err) {
         console.error("Error in getDepartmentDocumentUploads:", err);
         return errorResponse(res, err);
     }
 };
 
+
 export const getDocumentsTypeUploads = async (req, res) => {
     try {
         const { period = "month", projectId, departmentId, uploadedBy } = req.query;
+        const user = req.user; // assuming auth middleware sets req.user
+        const userId = user?._id;
 
+        // Validate period
         if (!FILTER_PERIODS.includes(period)) {
             return failResponse(res, "Invalid period. Must be today, week, month, or year", 400);
         }
 
         const startDate = calculateStartDate(period);
 
-        // Base match filter
+        // Base filter
         const matchStage = {
             uploadedAt: { $gte: startDate },
             status: "active",
         };
 
+        // 🔒 Restrict visibility: only own uploads for non-superadmins
+        if (user.profile_type !== "superadmin") {
+            matchStage.uploadedBy = new mongoose.Types.ObjectId(userId);
+        }
+
+        // Optional filters
         if (projectId && mongoose.Types.ObjectId.isValid(projectId)) {
             matchStage.projectId = new mongoose.Types.ObjectId(projectId);
         }
         if (departmentId && mongoose.Types.ObjectId.isValid(departmentId)) {
             matchStage.departmentId = new mongoose.Types.ObjectId(departmentId);
         }
-        if (uploadedBy && mongoose.Types.ObjectId.isValid(uploadedBy)) {
+        // Allow filtering by uploadedBy ONLY if superadmin (so users can’t view others)
+        if (
+            uploadedBy &&
+            mongoose.Types.ObjectId.isValid(uploadedBy) &&
+            user.profile_type === "superadmin"
+        ) {
             matchStage.uploadedBy = new mongoose.Types.ObjectId(uploadedBy);
         }
 
         const pipeline = [
             { $match: matchStage },
 
-            // Merge fileType + originalName for flexible matching
+            // Combine fileType + originalName for detection
             { $addFields: { checkString: { $concat: ["$fileType", " ", "$originalName"] } } },
 
-            // Categorize
+            // Categorize file type
             {
                 $addFields: {
                     category: {
@@ -562,16 +584,16 @@ export const getDocumentsTypeUploads = async (req, res) => {
                 }
             },
 
-            // Group by category
+            // Group by file category
             {
                 $group: {
                     _id: "$category",
                     count: { $sum: 1 },
-                    totalSize: { $sum: "$fileSize" } // total bytes
+                    totalSize: { $sum: "$fileSize" }
                 }
             },
 
-            // Compute total
+            // Compute totals and percentages
             {
                 $group: {
                     _id: null,
@@ -586,9 +608,9 @@ export const getDocumentsTypeUploads = async (req, res) => {
                     }
                 }
             },
+
             { $unwind: "$types" },
 
-            // Calculate %
             {
                 $addFields: {
                     "types.percentage": {
@@ -635,7 +657,7 @@ export const getDocumentsTypeUploads = async (req, res) => {
                     type: "$types.type",
                     count: "$types.count",
                     percentage: "$types.percentage",
-                    totalSizeMB: { $round: [{ $divide: ["$types.totalSize", 1048576] }, 2] }, // MB
+                    totalSizeMB: { $round: [{ $divide: ["$types.totalSize", 1048576] }, 2] },
                     sizePercentage: "$types.sizePercentage"
                 }
             },
@@ -645,22 +667,24 @@ export const getDocumentsTypeUploads = async (req, res) => {
 
         const result = await File.aggregate(pipeline);
 
-        return successResponse(res, {
-            period,
-            startDate,
-            projectId: projectId || null,
-            departmentId: departmentId || null,
-            uploadedBy: uploadedBy || null,
-            fileTypeBreakdown: result,
-        }, "Project file type uploads fetched successfully");
+        return successResponse(
+            res,
+            {
+                period,
+                startDate,
+                projectId: projectId || null,
+                departmentId: departmentId || null,
+                uploadedBy: uploadedBy || null,
+                fileTypeBreakdown: result,
+            },
+            "Project file type uploads fetched successfully"
+        );
 
     } catch (err) {
         console.error("Error in getDocumentsTypeUploads:", err);
         return errorResponse(res, err);
     }
 };
-
-
 
 // ------------------- Documents Summary -------------------
 export const getDocumentsStatusSummary = async (req, res) => {

@@ -29,19 +29,16 @@ import * as CommonController from "../controllers/CommonController.js"
 import { authenticate, authorize } from "../middlewares/authMiddleware.js";
 import checkPermissions from '../middlewares/checkPermission.js';
 import upload from "../middlewares/fileUploads.js";
-import { validate } from "../middlewares/validate.js";
 
 // Validation middlewares
-import {
-    registerValidator,
-    loginValidator,
-    sendOtpValidator,
-    verifyOtpValidator,
-    resetPasswordValidator
-} from "../middlewares/validation/authValidators.js";
-import { createProjectValidator, donorValidator, projectIdValidator, searchProjectsValidator, vendorValidator } from '../middlewares/validation/projectValidator.js';
-import { registerVendor, registerVendorOrDonor } from "../middlewares/validation/venderDonorValidation.js";
-import { assignMenusValidator, getAssignedMenusValidator, unAssignMenusValidator } from "../middlewares/validation/permissionValidator.js";
+import * as AuthValidators from "../validation/AuthValidators.js";
+import * as PermissionLogsValidators from "../validation/PermissionLogsValidators.js";
+import * as DocumentValidators from "../validation/DocumentValidators.js";
+
+
+import { createProjectValidator, donorValidator, projectIdValidator, searchProjectsValidator, vendorValidator } from '../validation/projectValidator.js';
+import { registerVendor, registerVendorOrDonor } from "../validation/venderDonorValidation.js";
+import { assignMenusValidator, getAssignedMenusValidator, unAssignMenusValidator } from "../validation/permissionValidator.js";
 
 // ---------------------------
 // Model imports
@@ -60,24 +57,23 @@ import UserFolderHistory from "../models/UserFolderHistory.js";
 
 import { createS3Uploader, s3uploadfolder } from "../middlewares/multer-s3.js";
 import { ParentFolderName } from "../middlewares/parentFolderName.js";
+import { validators } from "../middlewares/validate.js";
 
 const router = express.Router();
 // ---------------------------
 // Auth routes
 // ---------------------------
-router.post("/auth/register", registerValidator, AuthController.register);
 
-router.post("/auth/login", AuthController.login);
-router.post("/auth/verify/token", AuthController.verifyTokenOtp);
+router.post("/auth/register", AuthValidators.registerValidator, validators, AuthController.register);
+router.post("/auth/login", AuthValidators.loginValidator, validators, AuthController.login);
 
-router.post("/auth/send-otp", sendOtpValidator, validate, AuthController.sendOtp);
+router.post("/auth/send-otp", AuthValidators.sendOtpValidator, validators, AuthController.sendOtp);
+router.post("/auth/verify-otp", AuthValidators.verifyOtpValidator, validators, AuthController.verifyOtp);
+router.post("/auth/verify/token", AuthValidators.verifyTokenValidator, validators, AuthController.verifyTokenOtp);
 
-router.post("/auth/verify-otp", verifyOtpValidator, validate, AuthController.verifyOtp);
-
-router.post("/auth/reset-password", resetPasswordValidator, validate, AuthController.resetPassword);
-// In your routes file
-router.post('/auth/send-reset-link', AuthController.sendResetLink);
-router.get('/auth/verify-reset/:token', AuthController.verifyResetLink);
+router.post("/auth/reset-password", AuthValidators.resetPasswordValidator, validators, AuthController.resetPassword);
+router.post("/auth/send-reset-link", AuthValidators.sendResetLinkValidator, validators, AuthController.sendResetLink);
+router.get("/auth/verify-reset/:token", AuthValidators.verifyResetTokenValidator, validators, AuthController.verifyResetLink);
 
 
 // Apply authentication to all routes
@@ -127,7 +123,6 @@ router.get('/export/formats', authenticate, CommonController.getExportFormats);
 // ---------------------------
 // Admin routes
 // ---------------------------
-router.get("/my-approvals", AdminController.getMyApprovals);
 router.get("/dashboard/stats", AdminDashboard.getDashboardStats);
 router.get("/dashboard/file-status", AdminDashboard.getFileStatus);
 router.get("/dashboard/recent-activity", AdminDashboard.getRecentActivities);
@@ -136,9 +131,10 @@ router.get("/dashboard/uploads", AdminDashboard.getDepartmentDocumentUploads);
 router.get("/dashboard/documentsTypeUploads", AdminDashboard.getDocumentsTypeUploads);
 router.get("/dashboard/summary", AdminDashboard.getDocumentsStatusSummary);
 // Permission Logs
+router.get("/my-approvals", AdminController.getMyApprovals);
 router.get("/permission-logs", authorize('admin', 'superadmin'), AdminController.getPermissionLogs);
-router.patch("/permission-logs/requestStatus", authorize('admin', 'superadmin'), AdminController.updateRequestStatus);
-router.post("/permission-logs/grant-access", authorize('admin', 'superadmin'), AdminController.grantAccess)
+router.patch("/permission-logs/requestStatus", authorize('admin', 'superadmin'), PermissionLogsValidators.updateRequestStatusValidator, validators, AdminController.updateRequestStatus);
+router.post("/permission-logs/grant-access", authorize('admin', 'superadmin'), PermissionLogsValidators.grantAccessValidator, validators, AdminController.grantAccess)
 
 // ---------------------------
 // Employee routes
@@ -164,32 +160,24 @@ router.get("/documents/folder/:folderId", authenticate, DocumentController.getDo
 router.get("/documents/search", DocumentController.searchDocuments);
 
 // Create a new document (only accepts signature file)
-router.post(
-    "/documents",
-    upload.fields([{ name: "signatureFile", maxCount: 1 }]),
-    DocumentController.createDocument
-);
+router.post("/documents", upload.fields([{ name: "signatureFile", maxCount: 1 }]), DocumentValidators.createDocumentValidator, validators, DocumentController.createDocument);
 
 // Update a document (with optional signature update)
-router.patch(
-    "/documents/:id",
-    upload.fields([{ name: "signature", maxCount: 1 }]),
-    DocumentController.updateDocument
-);
+router.patch("/documents/:id", upload.fields([{ name: "signature", maxCount: 1 }]), DocumentValidators.updateDocumentValidator, validators, DocumentController.updateDocument);
 
 // Hard delete (permanent removal)
-router.delete("/documents/permanent", DocumentController.deleteDocument);
+router.delete("/documents/permanent", DocumentValidators.deleteDocumentValidator, validators, DocumentController.deleteDocument);
 // Soft delete (move to recycle bin)
-router.delete("/documents/:id", DocumentController.softDeleteDocument);
+router.delete("/documents/:id", DocumentValidators.softDeleteDocumentValidator, validators, DocumentController.softDeleteDocument);
 
 
 // Update document status (hard delete or other status updates)
-router.patch("/documents/:id/status", DocumentController.updateDocumentStatus);
+router.patch("/documents/:id/status", DocumentValidators.updateDocumentStatusValidator, validators, DocumentController.updateDocumentStatus);
 
 // Archive and restore documents
-router.patch("/documents/:id/archive", DocumentController.archiveDocuments);
+router.patch("/documents/:id/archive", DocumentValidators.archiveDocumentValidator, validators, DocumentController.archiveDocuments);
 router.get("/documents/archive", DocumentController.getArchivedDocuments);
-router.patch("/documents/:id/restore", DocumentController.restoreDocument);
+router.patch("/documents/:id/restore", DocumentValidators.restoreDocumentValidator, validators, DocumentController.restoreDocument);
 
 // Recycle bin
 router.get("/documents/recyclebin", DocumentController.getRecycleBinDocuments);
@@ -199,31 +187,31 @@ router.get("/documents/recyclebin", DocumentController.getRecycleBinDocuments);
  * Document Sharing & Permissions
  */
 // Share a document
-router.patch("/documents/:id/share", authorize('admin', 'superadmin'), DocumentController.shareDocument);
+router.patch("/documents/:id/share", authorize('admin', 'superadmin'), DocumentValidators.shareDocumentValidator, validators, DocumentController.shareDocument);
 
 // List all users a document is shared with
 router.get("/documents/:documentId/shared-users", DocumentController.getSharedUsers);
 
 // Done for updating the permission of all people with access
-router.patch("/documents/:documentId/permissions", authorize('admin', 'superadmin'), DocumentController.bulkPermissionUpdate);
+router.patch("/documents/:documentId/permissions", authorize('admin', 'superadmin'), DocumentValidators.bulkPermissionUpdateValidator, validators, DocumentController.bulkPermissionUpdate);
 
 // Update user access level for a shared document
-router.put("/documents/share/:documentId", authorize('admin', 'superadmin'), DocumentController.updateSharedUser);
+router.put("/documents/share/:documentId", authorize('admin', 'superadmin'), DocumentValidators.updateSharedUserValidator, validators, DocumentController.updateSharedUser);
 
 // Remove user from shared list
-router.delete("/documents/share/:documentId", authorize('admin', 'superadmin'), DocumentController.removeSharedUser);
+router.delete("/documents/share/:documentId", authorize('admin', 'superadmin'), DocumentValidators.removeSharedUserValidator, validators, DocumentController.removeSharedUser);
 
 // Invite a user to a document (sends email)
-router.post("/documents/:documentId/invite", DocumentController.inviteUser);
+router.post("/documents/:documentId/invite", DocumentValidators.inviteUserValidator, validators, DocumentController.inviteUser);
 
 // Accept or reject an invite automatically
 router.get("/documents/:documentId/invite/:userId/auto-accept", DocumentController.autoAcceptInvite);
 
 // Request access again
-router.post("/documents/:documentId/request-access", DocumentController.requestAccessAgain);
+router.post("/documents/:documentId/request-access", DocumentValidators.requestAccessValidator, validators, DocumentController.requestAccessAgain);
 
 // Grant access via token
-router.post("/documents/grant-access/:token", authorize('admin', 'superadmin'), DocumentController.grantAccessViaToken);
+router.post("/documents/grant-access/:token", authorize('admin', 'superadmin'), DocumentValidators.grantAccessViaTokenValidator, validators, DocumentController.grantAccessViaToken);
 
 // Generate shareable link for a document file
 router.get('/documents/:documentId/:fileId/share-link', DocumentController.generateShareableLink)
@@ -250,20 +238,20 @@ router.get('/documents/:id/versions/view', DocumentController.viewDocumentVersio
 router.get('/documents/:id/versions/:version/view', DocumentController.viewVersion);
 
 // Restore a previous version
-router.patch('/documents/:id/versions/:version/restore', DocumentController.restoreVersion);
+router.patch('/documents/:id/versions/:version/restore', DocumentValidators.restoreVersionValidator, validators, DocumentController.restoreVersion);
 
 
 /**
  * Document Approval Workflow
  */
 // Create an approval request
-router.post('/documents/:documentId/add', authenticate, DocumentController.createApprovalRequest);
+router.post('/documents/:documentId/add', authenticate, DocumentValidators.createApprovalRequestValidator, validators, DocumentController.createApprovalRequest);
 
 // Track approvals
 router.get('/documents/:documentId/approval/track', authenticate, DocumentController.getApprovals);
 
 // Update approval status for a document
-router.patch('/documents/:documentId/approval', authenticate, DocumentController.updateApprovalStatus);
+router.patch('/documents/:documentId/approval', authenticate, DocumentValidators.updateApprovalStatusValidator, validators, DocumentController.updateApprovalStatus);
 
 
 // ---------------------------
@@ -306,29 +294,41 @@ router.delete('/designations/:id', authenticate, authorize('admin', 'superadmin'
 
 // Save selected project to session
 router.post("/session/project", authenticate, async (req, res) => {
-    const { projectId } = req.body;
-
-    if (!projectId) return res.status(400).json({ error: "Project ID is required" });
+    const { projectId, selectedYear } = req.body;
 
     try {
-        // Fetch project name from DB
-        const project = await Project.findById(projectId).select("projectName");
-        if (!project) return res.status(404).json({ error: "Project not found" });
+        if (projectId) {
+            // Fetch project name only if projectId is provided
+            const project = await Project.findById(projectId).select("projectName");
 
-        // Save both ID and name in session
-        req.session.selectedProject = projectId,
-            req.session.selectedProjectName = project.projectName
+            if (!project) {
+                return res.status(404).json({ error: "Project not found" });
+            }
+
+            req.session.selectedProject = projectId;
+            req.session.selectedProjectName = project.projectName;
+        }
+
+        if (selectedYear) {
+            req.session.selectedYear = selectedYear;
+        }
 
         req.session.save(err => {
             if (err) return res.status(500).json({ error: "Failed to save session" });
-            res.json({ success: true, selectedProject: req.session.selectedProject });
+
+            res.json({
+                success: true,
+                selectedProject: req.session.selectedProject || null,
+                selectedProjectName: req.session.selectedProjectName || null,
+                selectedYear: req.session.selectedYear || null
+            });
         });
+
     } catch (err) {
-        console.error(err);
+        console.error("Error saving session project:", err);
         res.status(500).json({ error: "Server error" });
     }
 });
-
 // Get selected project from session
 router.get("/session/project", async (req, res) => {
     try {
@@ -336,21 +336,24 @@ router.get("/session/project", async (req, res) => {
             return res.status(401).json({
                 error: "Not logged in",
                 selectedProject: null,
-                selectedProjectName: null
+                selectedProjectName: null,
+                selectedYear: null
             });
         }
 
         // Respond with session project data
         res.json({
             selectedProject: req.session.selectedProject || null,
-            selectedProjectName: req.session.selectedProjectName || null
+            selectedProjectName: req.session.selectedProjectName || null,
+            selectedYear: req.session.selectedYear || null
         });
     } catch (err) {
         console.error("Error in /session/project:", err);
         res.status(500).json({
             error: "Server error",
             selectedProject: null,
-            selectedProjectName: null
+            selectedProjectName: null,
+            selectedYear: null
         });
     }
 });

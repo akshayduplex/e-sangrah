@@ -767,7 +767,6 @@
         max-width: 55px;
     }
 
-
     .anlytc_linkbx {
         margin-bottom: 16px;
         border-radius: 20px;
@@ -834,6 +833,13 @@
         color: #E54F4F !important;
     }
 
+    #chartLineDocument {
+        height: 300px;
+    }
+
+    #storageChart {
+        height: 200px;
+    }
 
 
     /* AddedbyAkshay */
