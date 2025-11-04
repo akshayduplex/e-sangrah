@@ -362,11 +362,10 @@ router.route('/projects')
         ProjectController.getAllProjects
     )
     .post(
-        createProjectValidator,
-        authorize('superadmin', 'admin', 'manager'), upload.single('projectLogo'), ProjectController.createProject);
+        createProjectValidator, upload.single('projectLogo'), ProjectController.createProject);
 
 router.route('/projects/:id/status')
-    .patch(authorize('superadmin', 'admin', 'manager'), ProjectController.updateProjectStatus);
+    .patch(ProjectController.updateProjectStatus);
 // Filtered project routes
 router.route('/projects/status/:projectStatus')
     .get(authorize('superadmin', 'admin', 'manager', 'user', 'viewer'), ProjectController.getProjectsByStatus);
@@ -424,8 +423,8 @@ router.route('/projects/:id/archive')
 
 // Single project operations
 router.route('/projects/:id')
-    .get(authorize('superadmin', 'admin', 'manager', 'employee', 'viewer'), ProjectController.getProject)
-    .patch(authorize('superadmin', 'admin', 'manager'), upload.single('projectLogo'), ProjectController.updateProject)
+    .get(authorize('superadmin', 'admin', 'manager', 'user', 'viewer'), ProjectController.getProject)
+    .patch(authorize('superadmin', 'admin', 'manager', 'user'), upload.single('projectLogo'), ProjectController.updateProject)
     .delete(projectIdValidator, authorize('superadmin', 'admin'), ProjectController.deleteProject);
 router.route('/projects/:id/restore')
     .patch(authorize('superadmin', 'admin'), ProjectController.restoreProject);

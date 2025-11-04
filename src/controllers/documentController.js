@@ -24,6 +24,7 @@ import { API_CONFIG } from "../config/ApiEndpoints.js";
 import PermissionLogs from "../models/PermissionLogs.js";
 import Project from "../models/Project.js";
 import { addNotification } from "./NotificationController.js";
+import { cloudinary } from "../middlewares/fileUploads.js";
 
 //Page Controllers
 

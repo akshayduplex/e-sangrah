@@ -82,7 +82,6 @@ router.get(
     "/users/register",
     authenticate,
     // authorize('admin', 'superadmin'),
-    checkPermissions,
     UserController.showRegisterForm
 );
 
