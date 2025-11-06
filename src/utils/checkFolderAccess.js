@@ -8,25 +8,46 @@ export default async function checkFolderAccess(folder, req) {
         canRequestAccess: false,
         folderExpired: false,
         isExternal: false,
+        canDownload: false,
         reason: "none"
     };
 
     try {
-        // Owner bypass
-        if (req.user && String(folder.owner) === String(req.user._id)) {
-            return { ...result, canView: true, reason: "owner" };
+        // SUPERADMIN BYPASS (no restrictions)
+        if (req.user && req.user.role === "superadmin") {
+            return {
+                ...result,
+                canView: true,
+                canDownload: true,
+                reason: "superadmin"
+            };
         }
 
-        // Token-based access
+        // OWNER BYPASS
+        if (req.user && String(folder.owner) === String(req.user._id)) {
+            return {
+                ...result,
+                canView: true,
+                canDownload: true,
+                reason: "owner"
+            };
+        }
+
+        // TOKEN-BASED ACCESS
         const token = req.query?.token || req.body?.token;
         if (token) {
             const link = folder.metadata?.shareLinks?.find(l => l.token === token);
             if (link && (!link.expiresAt || new Date(link.expiresAt) > now)) {
-                return { ...result, canView: true, reason: "token" };
+                return {
+                    ...result,
+                    canView: true,
+                    canDownload: !!link.canDownload, // respect link’s download flag
+                    reason: "token"
+                };
             }
         }
 
-        // Internal user access
+        // INTERNAL USER ACCESS (based on folder.permissions)
         if (req.user) {
             const permission = folder.permissions?.find(
                 p => String(p.principal) === String(req.user._id)
@@ -38,12 +59,17 @@ export default async function checkFolderAccess(folder, req) {
                     (!permission.customEnd || new Date(permission.customEnd) > now);
 
                 if (valid) {
-                    return { ...result, canView: true, reason: "internal_permission" };
+                    return {
+                        ...result,
+                        canView: true,
+                        canDownload: !!permission.canDownload,
+                        reason: "internal_permission"
+                    };
                 }
             }
         }
 
-        // External user access
+        // EXTERNAL USER ACCESS (FolderPermissionLogs)
         if (req.user?.email) {
             const log = await FolderPermissionLogs.findOne({
                 "user.email": req.user.email,
@@ -55,23 +81,36 @@ export default async function checkFolderAccess(folder, req) {
             if (log) {
                 const valid = !log.expiresAt || new Date(log.expiresAt) > now;
                 if (valid) {
-                    return { ...result, canView: true, isExternal: true, reason: "external_permission" };
+                    return {
+                        ...result,
+                        canView: true,
+                        isExternal: true,
+                        canDownload: !!log.canDownload,
+                        reason: "external_permission"
+                    };
                 } else {
-                    return { ...result, folderExpired: true, isExternal: true, reason: "external_expired" };
+                    return {
+                        ...result,
+                        folderExpired: true,
+                        isExternal: true,
+                        reason: "external_expired"
+                    };
                 }
             }
         }
 
-        // Folder expired
+        // FOLDER EXPIRATION CHECK
         const folderExpired = folder.expiresAt && new Date(folder.expiresAt) <= now;
         if (folderExpired) {
             return { ...result, folderExpired: true, reason: "folder_expired" };
         }
 
-        // Default: can request
+        // DEFAULT: can request access
         return { ...result, canRequestAccess: true, reason: "request_access" };
 
     } catch (err) {
+        console.error("Error in checkFolderAccess:", err);
         return result;
     }
 }
+

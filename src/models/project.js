@@ -81,6 +81,48 @@ const projectSchema = new mongoose.Schema(
         projectCollaborationTeam: [
             { type: mongoose.Schema.Types.ObjectId, ref: "User" },
         ], // multiple select
+        approvalAuthority: [
+            {
+                userId: {
+                    type: mongoose.Schema.Types.ObjectId,
+                    ref: "User",
+                    required: true,
+                },
+                designation: {
+                    type: mongoose.Schema.Types.ObjectId,
+                    ref: "Designation",
+                    required: true,
+                },
+                priority: {
+                    type: Number, // smaller number = higher priority (e.g., 1, 2, 3)
+                    required: true,
+                },
+                isMailSent: {
+                    type: Boolean,
+                    default: false
+                },
+                status: {
+                    type: String,
+                    enum: ["Pending", "Approved", "Rejected"],
+                    default: "Pending"
+                },
+                isApproved: {
+                    type: Boolean,
+                    default: false
+                },
+                remark: {
+                    type: String,
+                    trim: true,
+                    maxlength: 500
+                },
+                approvedOn: {
+                    type: Date
+                },
+                addDate: {
+                    type: Date
+                }
+            },
+        ],
         donor: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }], // multiple select
         vendor: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }], // multiple select
         projectLogo: { type: String }, // URL or file path

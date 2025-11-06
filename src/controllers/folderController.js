@@ -100,8 +100,10 @@ export const showviewFoldersPage = async (req, res) => {
             canRequestAccess: false,
             folderExpired: false,
             isExternal: false,
+            canDownload: false,
             reason: "none"
         };
+
 
         res.render("pages/folders/viewFolders", {
             folder,

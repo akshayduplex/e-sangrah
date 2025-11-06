@@ -41,6 +41,7 @@ const documentSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: "Approval"
     }],
+    wantApprovers: { type: Boolean, default: false },
     // Flattened sharedWith for safe indexing
     sharedWithUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     comment: { type: String, trim: true, maxlength: 1000 },

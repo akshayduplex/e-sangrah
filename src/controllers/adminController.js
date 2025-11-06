@@ -171,21 +171,22 @@ export const getMyApprovals = async (req, res) => {
         const skip = (pageNum - 1) * limitNum;
 
         // ---------------------------------------------
-        // STEP 1: Find all Approval IDs for this user
+        // STEP 1: Find all Approval IDs for this user where mail is sent
         // ---------------------------------------------
-        const approvalIds = await Approval.find({ approver: userId })
-            .select("_id")
-            .lean();
+        const approvals = await Approval.find({
+            approver: userId,
+            isMailSent: true
+        }).select("_id").lean();
 
-        const approvalIdArray = approvalIds.map(a => a._id);
+        const approvalIdArray = approvals.map(a => a._id);
 
         // ---------------------------------------------
-        // STEP 2: Build base filter
+        // STEP 2: Build base document filter
         // ---------------------------------------------
         const filter = {
             isDeleted: { $ne: true },
             isArchived: { $ne: true },
-            approvalHistory: { $in: approvalIdArray }  // 👈 core condition
+            approvalHistory: { $in: approvalIdArray }
         };
 
         // Restrict visibility (if not superadmin)
@@ -237,7 +238,8 @@ export const getMyApprovals = async (req, res) => {
                 .populate("files")
                 .populate({
                     path: "approvalHistory",
-                    select: "approver status date comment",
+                    match: { isMailSent: true },  // 👈 only populate approvals where mail sent
+                    select: "approver status date comment isMailSent",
                     populate: {
                         path: "approver",
                         select: "name email profile_type"

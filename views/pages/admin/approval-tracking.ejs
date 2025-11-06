@@ -73,6 +73,16 @@
 
 		<script>
 			document.addEventListener('DOMContentLoaded', async () => {
+				const fileIcons = {
+					ppt: "/img/icons/fn1.png",
+					pptx: "/img/icons/fn1.png",
+					doc: "/img/icons/fn2.png",
+					docx: "/img/icons/fn2.png",
+					xls: "/img/icons/fn3.png",
+					xlsx: "/img/icons/fn3.png",
+					pdf: "/img/icons/fn4.png",
+					default: "/img/icons/fn1.png"
+				};
 				const pathParts = window.location.pathname.split('/');
 				const documentIndex = pathParts.indexOf('document');
 				const documentId = documentIndex !== -1 ? pathParts[documentIndex + 1] : null;
@@ -81,91 +91,82 @@
 					showToast("Document ID not found in URL", 'error');
 					return;
 				}
-				//Fetch the API dynamically
+
 				try {
 					const response = await fetch(`/api/documents/${documentId}/approval/track`);
 					if (!response.ok) throw new Error(`HTTP ${response.status}`);
 					const data = await response.json();
 
-					const doc = data.document;
-					const approvals = data.approvals || [];
+					// Access data inside 'data' object
+					const doc = data.data.document;
+					const approvals = data.data.approvals || [];
 
 					// Fill Document Info
+					const docNameEl = document.getElementById('doc-name');
+					const docSizeEl = document.getElementById('doc-size');
+					const docLinkEl = document.getElementById('doc-link');
+					const docIconEl = document.getElementById('doc-icon');
+
 					if (doc.files?.length > 0) {
 						const file = doc.files[0];
-						document.getElementById('doc-name').innerText = file.originalName || "-";
-						document.getElementById('doc-size').innerText = file.fileSize ? `${(file.fileSize / 1024).toFixed(2)} KB` : "-";
-						document.getElementById('doc-link').href = file.s3Url || "#";
+						docNameEl.innerText = file.originalName || "-";
+						docSizeEl.innerText = file.fileSize ? `${(file.fileSize / 1024).toFixed(2)} KB` : "-";
+						docLinkEl.href = file.s3Url || "#";
 
-						const fileType = file.file.split('.').pop().toLowerCase();
-						const docIcon = document.getElementById('doc-icon');
-						if (fileType === 'ppt' || fileType === 'pptx') docIcon.src = '/img/icons/ppt.png';
-						else if (fileType === 'pdf') docIcon.src = '/img/icons/pdf.png';
-						else docIcon.src = '/img/icons/fn1.png';
+						// Set icon based on file extension
+						// Set icon based on file extension using fileIcons mapping
+						const ext = file.file.split('.').pop().toLowerCase();
+						docIconEl.src = fileIcons[ext] || fileIcons.default;
 					} else {
-						document.getElementById('doc-name').innerText = "-";
-						document.getElementById('doc-size').innerText = "-";
+						docNameEl.innerText = "-";
+						docSizeEl.innerText = "-";
+						docLinkEl.href = "#";
+						docIconEl.src = "/img/icons/fn1.png";
 					}
+
 					document.getElementById('doc-submitted').innerText = `Submitted on: ${new Date(doc.createdAt).toDateString()}`;
-					document.getElementById('doc-link').href = doc.files?.[0]?.s3Url || doc.link || "#";
 
-					//Set Document Icon
-					const docIcon = document.getElementById('doc-icon');
-					// Set "View File" link dynamically
-					if (doc.files?.length) {
-						const file = doc.files[0]; // first file
-						const fileId = file._id;
-						const documentId = doc._id;
-						document.getElementById('doc-link').href = `/folders/view/${fileId}`;
-					}
-
-					if (doc.files?.length) {
-						const fileType = doc.files[0].file.split('.').pop().toLowerCase();
-						if (fileType === 'ppt' || fileType === 'pptx') docIcon.src = '/img/icons/ppt.png';
-						else if (fileType === 'pdf') docIcon.src = '/img/icons/pdf.png';
-						else docIcon.src = '/img/icons/fn1.png';
-					}
-
-					// Populate Approvals Table
 					// Populate Approvals Table
 					const tbody = document.getElementById('approval-table');
 					if (approvals.length === 0) {
 						tbody.innerHTML = `<tr><td colspan="5" class="text-center">No approvals yet</td></tr>`;
 					} else {
-						// Sort approvals: Approved first, Pending next, others (if any) last
+						// Sort approvals: Approved first, Pending next
 						approvals.sort((a, b) => {
 							const statusPriority = { 'Approved': 1, 'Pending': 2 };
 							return (statusPriority[a.status] || 99) - (statusPriority[b.status] || 99);
 						});
 
 						tbody.innerHTML = approvals.map(appr => `
-        <tr>
-            <td class="d-flex align-items-center">
-                <div class="role-icon ${appr.status === 'Approved' ? 'done' : 'pending'}">
+                <tr>
+                    <td class="d-flex align-items-center">
+                    <div class="role-icon ${appr.status === 'Approved' ? 'done' : 'pending'}">
                     <i class="ti ${appr.status === 'Approved' ? 'ti-circle-check' : 'ti-hourglass-low'}"></i>
-                </div>
-                <span class="ms-2" style="text-transform: capitalize;">
-                     ${appr.approver?.userDetails?.designation?.name || '-'}
-                </span>
-            </td>
-            <td>${appr.approver?.name || '-'}</td>
-            <td>${appr.approvedOn ? new Date(appr.approvedOn).toDateString() : 'In Review'}</td>
-            <td><span class="status-badge status-${appr.status.toLowerCase()}">${appr.status}</span></td>
-            <td>${appr.remark || '-'}</td>
-        </tr>
-    `).join('');
+                    </div>
+                    <span class="ms-2" style="text-transform: capitalize;">
+                           ${appr.designation?.name || '-'}
+                    </span>
+                    </td>
+                    <td>${appr.userId?.name || '-'}</td>
+                    <td>${appr.approvedOn ? new Date(appr.approvedOn).toDateString() : 'In Review'}</td>
+                    <td><span class="status-badge status-${appr.status.toLowerCase()}">${appr.status}</span></td>
+                    <td>-</td>
+                </tr>
+            `).join('');
 					}
+
 					// Render Approval Progress Chart
 					const approvedCount = approvals.filter(a => a.status === 'Approved').length;
+					const pendingCount = approvals.filter(a => a.status === 'Pending').length;
 					const totalCount = approvals.length;
 					const ctx = document.getElementById('chartprogress').getContext('2d');
 
 					new Chart(ctx, {
 						type: 'doughnut',
 						data: {
-							// labels: ['Approved', 'Pending'],
+							labels: ['Approved', 'Pending'],
 							datasets: [{
-								data: [approvedCount, totalCount - approvedCount],
+								data: [approvedCount, pendingCount],
 								backgroundColor: ['#28a745', '#ffc107'],
 							}]
 						},
@@ -176,6 +177,7 @@
 					});
 
 				} catch (error) {
+					console.error(error);
 					showToast("Failed to load approval tracking data", 'error');
 				}
 			});

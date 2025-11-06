@@ -68,8 +68,6 @@ export const createProject = async (req, res) => {
     try {
         const body = req.body;
         const user = req.user;
-
-        // Validate required fields
         const requiredFields = [
             "projectName",
             "projectCode",
@@ -78,16 +76,20 @@ export const createProject = async (req, res) => {
             "projectEndDate",
             "projectType"
         ];
+
+        // Normalize arrays
         body.donor = normalizeToArray(body.donor);
         body.vendor = normalizeToArray(body.vendor);
         body.projectCollaborationTeam = normalizeToArray(body.projectCollaborationTeam);
+
+        // Check required fields
         for (const field of requiredFields) {
             if (!body[field]) {
                 return failResponse(res, `Missing required field: ${field}`, 400);
             }
         }
 
-        // Validate ObjectId fields
+        // Validate single ObjectIds
         const objectIdFields = ["projectManager", "projectType"];
         for (const field of objectIdFields) {
             if (!isValidObjectId(body[field])) {
@@ -95,7 +97,6 @@ export const createProject = async (req, res) => {
             }
         }
 
-        // Validate optional array of ObjectIds
         const arrayFields = ["projectCollaborationTeam", "donor", "vendor"];
         for (const field of arrayFields) {
             if (body[field] && !validateObjectIdArray(body[field], field)) {
@@ -103,31 +104,54 @@ export const createProject = async (req, res) => {
             }
         }
 
-        // Convert dates
         const startDate = parseDateDDMMYYYY(body.projectStartDate);
         const endDate = parseDateDDMMYYYY(body.projectEndDate);
+        if (!startDate || !endDate) return failResponse(res, "Invalid date format", 400);
+        if (endDate <= startDate) return failResponse(res, "End date must be after start date", 400);
+        const existingProject = await Project.findOne({
+            projectCode: body.projectCode.trim().toUpperCase()
+        });
+        if (existingProject) return failResponse(res, "Project code already exists", 400);
+        let approvalAuthority = [];
 
-        if (!startDate || !endDate) {
-            return failResponse(res, "Invalid date format, expected dd/mm/yyyy", 400);
+        if (Array.isArray(body.approvalAuthority)) {
+            approvalAuthority = body.approvalAuthority
+                .map(a => ({
+                    userId: isValidObjectId(a.userId) ? new mongoose.Types.ObjectId(a.userId) : null,
+                    designation: isValidObjectId(a.designation) ? new mongoose.Types.ObjectId(a.designation) : null,
+                    priority: Number(a.priority) || 0,
+                    status: "Pending"
+                }))
+                .filter(a => a.userId && a.designation);
+        } else {
+            const aaEntries = Object.keys(body).filter(k => k.startsWith("approvalAuthority["));
+            if (aaEntries.length > 0) {
+                const aaMap = {};
+                aaEntries.forEach(key => {
+                    const match = key.match(/approvalAuthority\[(\d+)\]\[(\w+)\]/);
+                    if (match) {
+                        const [, index, field] = match;
+                        if (!aaMap[index]) aaMap[index] = {};
+                        aaMap[index][field] = body[key];
+                    }
+                });
+                approvalAuthority = Object.values(aaMap)
+                    .map(a => ({
+                        userId: isValidObjectId(a.userId) ? new mongoose.Types.ObjectId(a.userId) : null,
+                        designation: isValidObjectId(a.designation) ? new mongoose.Types.ObjectId(a.designation) : null,
+                        priority: Number(a.priority) || 0,
+                        status: "Pending"
+                    }))
+                    .filter(a => a.userId && a.designation);
+            }
         }
 
-        if (endDate <= startDate) {
-            return failResponse(res, "End date must be after start date", 400);
-        }
-
-        // Check if project code already exists
-        const existingProject = await Project.findOne({ projectCode: body.projectCode.trim().toUpperCase() });
-        if (existingProject) {
-            return failResponse(res, "Project code already exists", 400);
-        }
-
-        // Prepare project data
         const projectData = {
             projectName: body.projectName.trim(),
             projectCode: body.projectCode.trim().toUpperCase(),
             projectType: new mongoose.Types.ObjectId(body.projectType),
             projectDescription: body.projectDescription?.trim() || "",
-            projectManager: body.projectManager,
+            projectManager: new mongoose.Types.ObjectId(body.projectManager),
             projectCollaborationTeam: body.projectCollaborationTeam || [],
             donor: body.donor || [],
             vendor: body.vendor || [],
@@ -137,25 +161,24 @@ export const createProject = async (req, res) => {
             projectStatus: body.projectStatus || "Active",
             tags: body.tags?.map(tag => tag.trim().toLowerCase()) || [],
             isActive: body.isActive !== undefined ? body.isActive : true,
+            approvalAuthority,
             createdBy: user._id
-        }
-        // Handle project logo if uploaded
+        };
+
         if (req.file && req.file.path) {
             projectData.projectLogo = req.file.path;
-        } else {
-            delete body.projectLogo;
         }
 
+        // Save project
         const project = new Project(projectData);
         await project.save();
 
         return successResponse(res, project, "Project created successfully", 201);
-
     } catch (err) {
+        console.error("Error creating project:", err);
         return errorResponse(res, err);
     }
 };
-
 
 // Get all projects with search
 export const getAllProjects = async (req, res) => {
@@ -206,7 +229,6 @@ export const getProject = async (req, res) => {
     }
 };
 
-// Update a project by ID
 export const updateProject = async (req, res) => {
     try {
         const { id } = req.params;
@@ -215,7 +237,7 @@ export const updateProject = async (req, res) => {
         const project = await Project.findById(id);
         if (!project) return failResponse(res, "Project not found", 404);
 
-        //only admin/superadmin or projectManager can update
+        // only admin/superadmin or projectManager can update
         if (
             ["user"].includes(req.user.profile_type) &&
             !project.canManage(req.user._id)
@@ -223,6 +245,7 @@ export const updateProject = async (req, res) => {
             return failResponse(res, "Unauthorized to update this project", 403);
         }
 
+        // Convert dates
         if (body.projectStartDate) {
             const start = parseDateDDMMYYYY(body.projectStartDate);
             if (!start) return failResponse(res, "Invalid start date format", 400);
@@ -266,6 +289,35 @@ export const updateProject = async (req, res) => {
             }
             body[field] = body[field].map((val) => new mongoose.Types.ObjectId(val));
         }
+
+        // 🧩 Parse Approval Authority (handles FormData keys like approvalAuthority[0][userId])
+        let approvalAuthority = [];
+        const aaEntries = Object.keys(body).filter(k => k.startsWith("approvalAuthority["));
+        if (aaEntries.length > 0) {
+            const aaMap = {};
+            aaEntries.forEach(key => {
+                const match = key.match(/approvalAuthority\[(\d+)\]\[(\w+)\]/);
+                if (match) {
+                    const [, index, field] = match;
+                    if (!aaMap[index]) aaMap[index] = {};
+                    aaMap[index][field] = body[key];
+                }
+            });
+            approvalAuthority = Object.values(aaMap)
+                .map(a => ({
+                    userId: isValidObjectId(a.userId) ? new mongoose.Types.ObjectId(a.userId) : null,
+                    designation: isValidObjectId(a.designation) ? new mongoose.Types.ObjectId(a.designation) : null,
+                    priority: Number(a.priority) || 0,
+                    status: a.status || "Pending"
+                }))
+                .filter(a => a.userId && a.designation);
+        }
+
+        if (approvalAuthority.length) {
+            body.approvalAuthority = approvalAuthority;
+        }
+
+        // Handle file upload
         if (req.file && req.file.path) {
             body.projectLogo = req.file.path || body.projectLogo;
         } else {
@@ -273,8 +325,8 @@ export const updateProject = async (req, res) => {
         }
 
         Object.assign(project, body);
-
         await project.save();
+
         return successResponse(res, project, "Project updated successfully");
     } catch (err) {
         if (err.code === 11000 && err.keyPattern?.projectCode) {
@@ -283,6 +335,7 @@ export const updateProject = async (req, res) => {
         return errorResponse(res, err);
     }
 };
+
 
 // Delete a project by ID
 export const deleteProject = async (req, res) => {

@@ -170,6 +170,11 @@
                     let customFlatpickr = null;
                     let isModalInitializing = false;
                     const baseUrl = window.location.origin;
+                    const tableBody = document.querySelector('#approverTable tbody');
+                    const form = document.getElementById('addMemberForm');
+                    const modalEl = document.getElementById('addMemberModal');
+                    const modal = new bootstrap.Modal(modalEl);
+                    const memberSelect = document.getElementById('approverSelect');
                     const fileIcons = {
                         ppt: "/img/icons/fn1.png",
                         pptx: "/img/icons/fn1.png",
@@ -556,7 +561,9 @@
                             doc.comment || '-',
                             doc.signature?.fileUrl ? `<img src="${doc.signature.fileUrl}" style="height:40px;">` : '-',
                             `<span class="badge ${statusClass}">${doc.status}</span>`,
-                            `<button class="btn btn-sm btn-primary add-approver-btn" data-bs-toggle="modal" data-bs-target="#addMemberModal" data-id="${doc.id}"> Add Approver </button>`
+                            doc.wantApprovers
+                                ? `<button class="btn btn-sm btn-primary add-approver-btn" data-bs-toggle="modal" data-bs-target="#addMemberModal" data-id="${doc._id}">View</button>`
+                                : `<button class="btn btn-sm btn-secondary" disabled>No Action</button>`
                         ];
                     }
                     $("#applyFilter").on("click", function () {
@@ -1131,7 +1138,7 @@
                     // Function to load users for invite dropdown
                     function loadUsersForInvite() {
                         $.ajax({
-                            url: `${baseUrl}/api/user`, // Make sure this endpoint exists
+                            url: `${baseUrl}/api/user`,
                             method: 'GET',
                             success: function (response) {
                                 const select = $('#userInviteSelect');
@@ -1148,148 +1155,135 @@
                             }
                         });
                     }
+                    /* ----------------------------------------
+                       Initialize Approver Modal for View Only
+                    ---------------------------------------- */
+                    $(document).on('click', '.add-approver-btn', async function () {
+                        const documentId = $(this).data('id');
+                        await loadApprovers(documentId);
+                    });
+
+                    /* ----------------------------------------
+      Load Approvers (GET only)
+   ---------------------------------------- */
+                    async function loadApprovers(documentId) {
+                        const tableBody = document.querySelector('#approverTable tbody');
+                        tableBody.innerHTML = `<tr><td colspan="6" class="text-center text-muted">Loading...</td></tr>`;
+
+                        try {
+                            const res = await fetch(`/api/documents/${documentId}/approval/track`);
+                            const data = await res.json();
+
+                            if (!data.success) {
+                                tableBody.innerHTML = `<tr><td colspan="6" class="text-center text-muted">${data.message || 'No approvers found'}</td></tr>`;
+                                return;
+                            }
+
+                            const approvals = data.data?.approvals || [];
+                            const projectId = data.data?.document?.project?._id || '';
+                            tableBody.innerHTML = '';
+                            console.log('Approvals data:', approvals);
+                            if (approvals.length === 0) {
+                                tableBody.innerHTML = `<tr><td colspan="6" class="text-center text-muted">No approvers found.</td></tr>`;
+                                return;
+                            }
+
+                            const highestPriority = Math.min(...approvals.map(a => a.priority ?? Infinity));
+
+                            // Collect userIds for which mail needs to be sent
+                            const usersToSendMail = [];
+
+                            approvals.forEach((approval, index) => {
+                                const user = approval.userId || {};
+                                const userDetails = user.userDetails || {};
+                                const designation = approval.designation?.name || '-';
+                                const department = userDetails.department?.name || '-';
+                                const approverName = user.name || 'Unknown';
+                                const roleInfo = `${designation} – ${department}`;
+                                const priority = approval.priority ?? '-';
+                                const status = approval.status || 'Pending';
+                                const isMailSent = approval.isMailSent ?? false;
+
+                                // Collect userId if mail is not sent
+                                if (!isMailSent) {
+                                    usersToSendMail.push(user._id);
+                                }
+
+                                // ---- STATUS BADGE ----
+                                let statusBadge = `<span class="badge bg-secondary">${status}</span>`;
+                                if (status === 'Pending') statusBadge = `<span class="badge bg-warning text-dark">Pending</span>`;
+                                if (status === 'Approved') statusBadge = `<span class="badge bg-success">Approved</span>`;
+                                if (status === 'Rejected') statusBadge = `<span class="badge bg-danger">Rejected</span>`;
+
+                                // ---- ACTION BUTTONS ----
+                                let actionCellContent = '';
+                                if (approval.isApproved) {
+                                    // If already approved, show message
+                                    actionCellContent = `<span class="text-success small">Already Approved</span>`;
+                                } else if (!isMailSent && priority !== highestPriority) {
+                                    actionCellContent = `<span class="text-muted small">Mail not sent</span>`;
+                                } else {
+                                    actionCellContent = `<button class="btn btn-sm btn-success send-mail"
+                                      data-project-id="${projectId}"
+                                      data-approver-id="${user._id}">Send Mail</button>`;
+                                }
+                                actionCellContent += ` <button class="btn btn-sm btn-danger remove-row ms-1">X</button>`;
+
+                                const row = document.createElement('tr');
+                                row.innerHTML = `
+                <td>${index + 1}</td>
+                <td>${approverName}<br><small class="text-muted">${roleInfo}</small></td>
+                <td>${priority}</td>
+                <td>${statusBadge}</td>
+                <td>-</td>
+                <td>${actionCellContent}</td>
+            `;
+                                tableBody.appendChild(row);
+                            });
+
+                        } catch (err) {
+                            console.error('Error loading approvals:', err);
+                            tableBody.innerHTML = `<tr><td colspan="6" class="text-danger text-center">Error loading approvals.</td></tr>`;
+                        }
+                    }
+
+                    /* -----------------------------------------------------------------
+            2. SEND APPROVAL-MAIL – read IDs from button data-attributes
+         ----------------------------------------------------------------- */
+                    $(document).on('click', '.send-mail', async function () {
+                        const $btn = $(this);
+                        const $row = $btn.closest('tr');
+
+                        // ---- Prevent double-click ----
+                        if ($btn.prop('disabled')) return;
+                        $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span>');
+
+                        const projectId = $btn.data('project-id');
+                        const approverId = $btn.data('approver-id');
+                        try {
+                            const res = await fetch(`${baseUrl}/api/documents/${projectId}/approval/${approverId}/mail`, {
+                                method: 'GET',
+                                credentials: 'include'
+                            });
+
+                            const json = await res.json();
+
+                            if (res.ok && json.success) {
+                                showToast(json.message || 'Approval mail sent!', 'success');
+
+                                // Mark button as sent
+                                $btn.removeClass('btn-success')
+                                    .addClass('btn-outline-success')
+                                    .prop('disabled', true)
+                                    .html('<i class="ti ti-check"></i> Sent');
+                            } else {
+                                throw new Error(json.message || 'Failed to send');
+                            }
+                        } catch (err) {
+                            console.error(err);
+                            showToast(err.message || 'Network error', 'error');
+                            $btn.prop('disabled', false).html('Send Mail');
+                        }
+                    });
                 })(jQuery);
-            </script>
-
-            <script>
-                document.addEventListener('DOMContentLoaded', () => {
-                    const tableBody = document.querySelector('#approverTable tbody');
-                    const form = document.getElementById('addMemberForm');
-                    const modal = new bootstrap.Modal('#addMemberModal');
-                    const memberSelect = document.getElementById('approverSelect');
-
-                    /* ----------------------------------------
-                       1️⃣ Initialize select2 for Approver Name
-                       ---------------------------------------- */
-                    $('#approverSelect').select2({
-                        placeholder: "Select Approver",
-                        allowClear: true,
-                        width: 'resolve',
-                        dropdownParent: $('#addMemberModal'),
-                        ajax: {
-                            url: `/api/user/search`,
-                            dataType: 'json',
-                            delay: 250,
-                            data: params => ({ search: params.term }),
-                            processResults: data => ({
-                                results: (data.users || []).map(u => ({
-                                    id: u.email,
-                                    text: u.name,
-                                    isNew: false
-                                }))
-                            })
-                        },
-                        tags: true,
-                        createTag: function (params) {
-                            const email = params.term.trim();
-                            if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-                                return { id: email, text: email, isNew: true };
-                            }
-                            return null;
-                        },
-                        minimumInputLength: 0
-                    });
-
-                    /* ----------------------------------------
-                       2️⃣ Initialize select2 for Role dropdown
-                       ---------------------------------------- */
-                    $('#roleSelect').select2({
-                        placeholder: "Select Role",
-                        allowClear: true,
-                        width: 'resolve',
-                        dropdownParent: $('#addMemberModal'),
-                        ajax: {
-                            url: "http://localhost:5000/api/designations/search",
-                            dataType: 'json',
-                            delay: 250,
-                            processResults: data => ({
-                                results: (data.data || []).map(role => ({
-                                    id: role._id,
-                                    // Capitalize first letter of role name
-                                    text: role.name.charAt(0).toUpperCase() + role.name.slice(1)
-                                }))
-                            })
-                        },
-                        minimumInputLength: 0
-                    });
-
-                    /* ----------------------------------------
-                       3️⃣ When modal opens, fill selected name
-                       ---------------------------------------- */
-                    document.getElementById('addMemberModal').addEventListener('show.bs.modal', () => {
-                        const selectedOption = memberSelect.options[memberSelect.selectedIndex];
-                        const name = selectedOption.textContent.trim();
-                        const id = selectedOption.value;
-
-                        document.getElementById('selectedMemberName').textContent = name;
-                        document.getElementById('memberId').value = id;
-                    });
-
-                    /* ----------------------------------------
-                       4️⃣ Add a new row to table
-                       ---------------------------------------- */
-                    form.addEventListener('submit', (e) => {
-                        e.preventDefault();
-
-                        const name = document.getElementById('selectedMemberName').textContent.trim();
-                        const roleData = $('#roleSelect').select2('data')[0];
-                        const roleName = roleData ? roleData.text : '';
-                        const memberId = document.getElementById('memberId').value.trim();
-                        const priority = parseInt(form.querySelector('input[name="priority"]').value, 10);
-
-                        if (!name || !roleName || isNaN(priority)) {
-                            alert('Please fill all fields correctly.');
-                            return;
-                        }
-
-                        const newSno = tableBody.rows.length + 1;
-                        const newRow = document.createElement('tr');
-                        newRow.dataset.id = memberId;
-
-                        newRow.innerHTML = `
-            <td>${newSno}</td>
-            <td>${name}<br><small class="text-muted">${roleName}</small></td>
-            <td><input type="number" class="form-control form-control-sm" value="${priority}" readonly></td>
-            <td>-</td>
-            <td>N/A</td>
-            <td>
-                <button class="btn btn-sm btn-success send-mail">Send Mail</button>
-                <button class="btn btn-sm btn-danger remove-row">X</button>
-            </td>
-        `;
-
-                        tableBody.appendChild(newRow);
-
-                        // Reset form and dropdowns
-                        form.reset();
-                        $('#approverSelect').val('').trigger('change');
-                        $('#roleSelect').val('').trigger('change');
-                        modal.hide();
-                    });
-
-                    /* ----------------------------------------
-                       5️⃣ Remove row
-                       ---------------------------------------- */
-                    tableBody.addEventListener('click', (e) => {
-                        if (e.target.matches('.remove-row')) {
-                            if (confirm('Remove this approver?')) {
-                                e.target.closest('tr').remove();
-                                tableBody.querySelectorAll('tr').forEach((tr, idx) => {
-                                    tr.cells[0].textContent = idx + 1;
-                                });
-                            }
-                        }
-                    });
-
-                    /* ----------------------------------------
-                       6️⃣ Send Mail placeholder
-                       ---------------------------------------- */
-                    tableBody.addEventListener('click', (e) => {
-                        if (e.target.matches('.send-mail')) {
-                            const row = e.target.closest('tr');
-                            const member = row.cells[1].textContent.trim().split('\n')[0];
-                            alert(`Sending mail to ${member} …`);
-                        }
-                    });
-                });
             </script>

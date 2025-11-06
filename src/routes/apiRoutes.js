@@ -245,12 +245,17 @@ router.patch('/documents/:id/versions/:version/restore', DocumentValidators.rest
  * Document Approval Workflow
  */
 // Create an approval request
-router.post('/documents/:documentId/add', authenticate, DocumentValidators.createApprovalRequestValidator, validators, DocumentController.createApprovalRequest);
+router.post('/documents/:documentId/add', authenticate, DocumentValidators.createApprovalRequestValidator, validators, DocumentController.createOrUpdateApprovalRequest);
 
 // Track approvals
 router.get('/documents/:documentId/approval/track', authenticate, DocumentController.getApprovals);
 
-// Update approval status for a document
+// // Approval Mail
+router.get('/documents/:projectId/approval/:approverId/mail', authenticate, DocumentController.sentApprovalMail);
+
+router.get('/verify-approval/:token', authenticate, DocumentController.verifyApprovalMail);
+
+// Update approval for a document
 router.patch('/documents/:documentId/approval', authenticate, DocumentValidators.updateApprovalStatusValidator, validators, DocumentController.updateApprovalStatus);
 
 

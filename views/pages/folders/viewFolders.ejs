@@ -216,6 +216,7 @@
             const CAN_REQUEST_ACCESS = <%= canRequestAccess ? 'true' : 'false' %>;
             const FOLDER_EXPIRED = <%= folderExpired ? 'true' : 'false' %>;
             const CAN_VIEW = <%= canView ? 'true' : 'false' %>;
+            const CAN_DOWNLOAD = <%= canDownload ? 'true' : 'false' %>; // <-- add this
 
             const setLoading = (loading) => {
                 fileLoading.style.display = loading ? 'block' : 'none';
@@ -270,6 +271,13 @@
                         const colDiv = document.createElement("div");
                         colDiv.className = "file-grid-item";
 
+                        // Build dropdown HTML based on download permission
+                        const downloadOption = CAN_DOWNLOAD
+                            ? `<li><a class="dropdown-item download-file" href="#" data-file-id="${file._id}">
+                        <i class="ti ti-download"></i> Download
+                       </a></li>`
+                            : "";
+
                         colDiv.innerHTML = `
                     <div class="folderbox filebox d-flex align-items-center border rounded" data-id="${file._id}">
                         <div class="fldricon me-2 d-flex align-items-center">
@@ -284,8 +292,10 @@
                                 <i class="ti ti-dots"></i>
                             </button>
                             <ul class="dropdown-menu dropdown-menu-end">
-                                <li><a class="dropdown-item download-file" href="#" data-file-id="${file._id}"><i class="ti ti-download"></i> Download</a></li>
-                                <li><a class="dropdown-item view-file" href="#" data-file-id="${file._id}"><i class="ti ti-eye"></i> View</a></li>
+                                ${downloadOption}
+                                <li><a class="dropdown-item view-file" href="#" data-file-id="${file._id}">
+                                    <i class="ti ti-eye"></i> View
+                                </a></li>
                             </ul>
                         </div>
                     </div>
@@ -293,18 +303,23 @@
 
                         const handleFileAction = (e, action) => {
                             e.stopPropagation();
-                            const fileId = e.currentTarget.getAttribute('data-file-id') || e.currentTarget.closest('.folderbox').getAttribute('data-id');
+                            const fileId =
+                                e.currentTarget.getAttribute("data-file-id") ||
+                                e.currentTarget.closest(".folderbox").getAttribute("data-id");
+
                             if (fileId) {
-                                if (action === 'view') window.location.href = `/folders/view/${fileId}`;
-                                if (action === 'download') window.location.href = `/api/download/file/${fileId}`;
+                                if (action === "view") window.location.href = `/folders/view/${fileId}`;
+                                if (action === "download" && CAN_DOWNLOAD) window.location.href = `/api/download/file/${fileId}`;
                             } else {
                                 alert("File not found");
                             }
                         };
 
-                        colDiv.querySelector(".view-file").addEventListener("click", (e) => handleFileAction(e, 'view'));
-                        colDiv.querySelector(".download-file").addEventListener("click", (e) => handleFileAction(e, 'download'));
-                        colDiv.querySelector(".folderbox").addEventListener("dblclick", (e) => handleFileAction(e, 'view'));
+                        colDiv.querySelector(".view-file").addEventListener("click", (e) => handleFileAction(e, "view"));
+                        if (CAN_DOWNLOAD) {
+                            colDiv.querySelector(".download-file").addEventListener("click", (e) => handleFileAction(e, "download"));
+                        }
+                        colDiv.querySelector(".folderbox").addEventListener("dblclick", (e) => handleFileAction(e, "view"));
 
                         fileContainer.appendChild(colDiv);
                     });
@@ -322,24 +337,24 @@
 
                 requestAccessBtn.disabled = true;
                 requestAccessBtn.textContent = "Sending...";
-                requestAccessMsg.style.display = 'block';
+                requestAccessMsg.style.display = "block";
                 requestAccessMsg.textContent = "Sending request...";
 
                 try {
-                    const res = await fetch(`/api/folders/${folderId}/request-access`, { method: 'POST' });
+                    const res = await fetch(`/api/folders/${folderId}/request-access`, { method: "POST" });
                     const data = await res.json();
 
                     requestAccessMsg.textContent = data.success
                         ? "Access request sent to folder owner!"
                         : data.message || "Error sending request.";
 
-                    if (data.success) requestAccessBtn.style.display = 'none';
+                    if (data.success) requestAccessBtn.style.display = "none";
 
                 } catch (err) {
                     console.error(err);
                     requestAccessMsg.textContent = "Server error. Please try again.";
                 } finally {
-                    if (requestAccessBtn.style.display !== 'none') {
+                    if (requestAccessBtn.style.display !== "none") {
                         requestAccessBtn.disabled = false;
                         requestAccessBtn.textContent = "Request Access";
                     }

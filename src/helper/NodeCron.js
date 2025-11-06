@@ -62,7 +62,7 @@ export const startCleanupJob = () => {
     });
 
     // Permission logs: every day at midnight
-    cron.schedule("0 0 * * *", async () => {
+    cron.schedule("0 */2 * * *", async () => {
         console.log("Running permission log cleanup job...");
         await cleanupExpiredPermissionLogs();
     });

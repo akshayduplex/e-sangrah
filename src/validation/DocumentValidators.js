@@ -319,15 +319,15 @@ export const createApprovalRequestValidator = [
         .custom((val) => !val || isValidObjectId(val))
         .withMessage("Invalid designation"),
 
-    body("level")
+    body("priority")
         .notEmpty()
         .isInt({ min: 1 })
         .withMessage("level must be a positive integer"),
 
-    body("dueDate")
+    body("addDate")
         .optional()
         .isISO8601()
-        .withMessage("dueDate must be a valid date"),
+        .withMessage("addDate must be a valid date"),
 ];
 
 /* -------------------------------------------------------------------------- */

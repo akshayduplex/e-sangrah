@@ -171,7 +171,6 @@
 											</div>
 										</div>
 									</div>
-
 									<!-- Expiry Date (only show if compliance is enabled) -->
 									<div class="col-md-6" id="expiryDateContainer"
 										style="display: <%= isEdit && document.compliance?.isCompliance ? 'block' : 'none' %>;">
@@ -190,7 +189,26 @@
 											</div>
 										</div>
 									</div>
-
+									<!-- Approver Authority -->
+									<div class="col-md-12">
+										<div class="mb-3">
+											<div class="d-flex align-items-center gap-5">
+												<label class="form-label mb-0">Want Approver</label>
+												<div class="form-check">
+													<input class="form-check-input" type="radio" name="wantApprovers"
+														value="true" id="wantApproversYes" <%=isEdit &&
+														document.wantApprovers===true ? 'checked' : '' %>>
+													<label class="form-check-label" for="wantApproversYes">Yes</label>
+												</div>
+												<div class="form-check">
+													<input class="form-check-input" type="radio" name="wantApprovers"
+														value="false" id="wantApproversNo" <%=isEdit &&
+														document.wantApprovers===false ? 'checked' : '' %>>
+													<label class="form-check-label" for="wantApproversNo">No</label>
+												</div>
+											</div>
+										</div>
+									</div>
 
 									<!-- Comment -->
 									<div class="col-md-12">

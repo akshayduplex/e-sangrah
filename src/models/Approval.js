@@ -7,15 +7,19 @@ const approvalSchema = new mongoose.Schema({
         ref: "Document",
         required: true
     },
-    designation: { type: mongoose.Schema.Types.ObjectId, ref: "Designation" },
     approver: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
         required: true
     },
-    level: {
+    priority: {
         type: Number,
-        required: true
+        required: true,
+        min: 1
+    },
+    isMailSent: {
+        type: Boolean,
+        default: false
     },
     status: {
         type: String,
@@ -34,13 +38,13 @@ const approvalSchema = new mongoose.Schema({
     approvedOn: {
         type: Date
     },
-    dueDate: {
+    addDate: {
         type: Date
     }
 }, { timestamps: true });
 
 // Index for efficient queries
-approvalSchema.index({ document: 1, level: 1 });
+approvalSchema.index({ document: 1, priority: 1 });
 approvalSchema.index({ approver: 1, status: 1 });
 
 const Approval = mongoose.model("Approval", approvalSchema);
