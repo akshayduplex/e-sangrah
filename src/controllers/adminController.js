@@ -171,29 +171,23 @@ export const getMyApprovals = async (req, res) => {
         const skip = (pageNum - 1) * limitNum;
 
         // ---------------------------------------------
-        // STEP 1: Find all Approval IDs for this user where mail is sent
-        // ---------------------------------------------
-        const approvals = await Approval.find({
-            approver: userId,
-            isMailSent: true
-        }).select("_id").lean();
-
-        const approvalIdArray = approvals.map(a => a._id);
-
-        // ---------------------------------------------
-        // STEP 2: Build base document filter
+        // STEP 1: Build document filter
         // ---------------------------------------------
         const filter = {
             isDeleted: { $ne: true },
             isArchived: { $ne: true },
-            approvalHistory: { $in: approvalIdArray }
+            "documentApprovalAuthority": {
+                $elemMatch: {
+                    userId,
+                    isMailSent: true
+                }
+            }
         };
 
-        // Restrict visibility (if not superadmin)
         if (profileType !== "superadmin") {
             const accessConditions = [
                 { owner: userId },
-                { approvalHistory: { $in: approvalIdArray } }
+                { "documentApprovalAuthority.userId": userId }
             ];
             if (userDepartment) accessConditions.push({ department: userDepartment });
             filter.$or = accessConditions;
@@ -217,7 +211,7 @@ export const getMyApprovals = async (req, res) => {
         }
 
         // ---------------------------------------------
-        // STEP 3: Sort and fetch documents
+        // STEP 2: Sorting setup
         // ---------------------------------------------
         const allowedFields = [
             "metadata.fileName",
@@ -231,19 +225,17 @@ export const getMyApprovals = async (req, res) => {
         const sortOrderValidated = sortOrder === "asc" ? 1 : -1;
         const sortObj = { [sortFieldValidated]: sortOrderValidated };
 
+        // ---------------------------------------------
+        // STEP 3: Query documents
+        // ---------------------------------------------
         const [documents, total] = await Promise.all([
             Document.find(filter)
                 .populate("department", "name")
                 .populate("documentDonor", "name")
                 .populate("files")
                 .populate({
-                    path: "approvalHistory",
-                    match: { isMailSent: true },  // 👈 only populate approvals where mail sent
-                    select: "approver status date comment isMailSent",
-                    populate: {
-                        path: "approver",
-                        select: "name email profile_type"
-                    }
+                    path: "documentApprovalAuthority.userId",
+                    select: "name email profile_type"
                 })
                 .sort(sortObj)
                 .skip(skip)
@@ -252,9 +244,21 @@ export const getMyApprovals = async (req, res) => {
             Document.countDocuments(filter)
         ]);
 
+        // ---------------------------------------------
+        // STEP 4: Filter only approvals for this user where isMailSent = true
+        // ---------------------------------------------
+        const filteredDocuments = documents.map(doc => ({
+            ...doc,
+            documentApprovalAuthority: doc.documentApprovalAuthority?.filter(
+                auth =>
+                    auth.userId?._id?.toString() === userId.toString() &&
+                    auth.isMailSent === true
+            ) || []
+        }));
+
         res.status(200).json({
             success: true,
-            data: documents,
+            data: filteredDocuments,
             pagination: {
                 total,
                 page: pageNum,
@@ -267,6 +271,8 @@ export const getMyApprovals = async (req, res) => {
         res.status(500).json({ success: false, message: "Server Error" });
     }
 };
+
+
 
 export const getPermissionLogs = async (req, res) => {
     const ownerId = req.user._id;

@@ -740,7 +740,6 @@ export const createDocument = async (req, res) => {
             project,
             department,
             projectManager,
-            documentDate,
             documentDonor,
             documentVendor,
             tags,
@@ -776,34 +775,75 @@ export const createDocument = async (req, res) => {
             }
         }
 
-        // Parse compliance and expiry
-        const isCompliance = compliance === "yes";
+        // ------------------- Parse Compliance and Expiry -------------------
+        let isCompliance = false;
         let parsedExpiryDate = null;
-        if (isCompliance && expiryDate) {
+
+        // FIX: Handle "yes"/"no" strings and boolean values properly
+        if (typeof compliance === "string") {
+            isCompliance = compliance.toLowerCase() === "yes";
+        } else if (typeof compliance === "boolean") {
+            isCompliance = compliance;
+        } else {
+            // Handle null/undefined by defaulting to false
+            isCompliance = false;
+        }
+
+        //If compliance = "no" → ignore expiryDate safely
+        if (!isCompliance) {
+            parsedExpiryDate = null;
+        } else {
+            // Only process expiryDate when compliance = "yes"
+            if (!expiryDate || expiryDate.trim() === "") {
+                return failResponse(res, "Expiry date required when compliance is 'Yes'", 400);
+            }
+
+            // Validate date format (DD-MM-YYYY or YYYY-MM-DD)
             const parts = expiryDate.split("-");
-            parsedExpiryDate =
-                parts.length === 3
-                    ? new Date(`${parts[2]}-${parts[1]}-${parts[0]}`)
-                    : new Date(expiryDate);
+            if (parts.length === 3) {
+                if (parts[0].length === 2) {
+                    // DD-MM-YYYY
+                    parsedExpiryDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+                } else {
+                    // YYYY-MM-DD
+                    parsedExpiryDate = new Date(expiryDate);
+                }
+            } else {
+                return failResponse(res, "expiryDate must be DD-MM-YYYY or YYYY-MM-DD", 400);
+            }
+
             if (isNaN(parsedExpiryDate.getTime())) {
                 return failResponse(res, "Invalid expiry date format", 400);
             }
         }
 
-        // Parse document date
-        let parsedDocumentDate = new Date();
-        if (documentDate) {
-            const parts = documentDate.split("-");
-            parsedDocumentDate =
-                parts.length === 3
-                    ? new Date(`${parts[2]}-${parts[1]}-${parts[0]}`)
-                    : new Date(documentDate);
-            if (isNaN(parsedDocumentDate.getTime())) {
-                return failResponse(res, "Invalid document date format", 400);
+        // ------------------- Get Project Approval Authority if wantApprovers is true -------------------
+        let documentApprovalAuthority = [];
+        if (parsedWantApprovers && project && mongoose.Types.ObjectId.isValid(project)) {
+            try {
+                const projectData = await mongoose.model("Project").findById(project)
+                    .populate("approvalAuthority.userId", "name email")
+                    .select("approvalAuthority");
+
+                if (projectData && projectData.approvalAuthority) {
+                    documentApprovalAuthority = projectData.approvalAuthority.map(auth => ({
+                        approver: auth.userId,
+                        priority: auth.priority,
+                        designation: auth.designation,
+                        isMailSent: false,
+                        status: "Pending",
+                        isApproved: false,
+                        remark: "",
+                        approvedOn: null,
+                        addDate: new Date()
+                    }));
+                }
+            } catch (error) {
+                logger.error("Error fetching project approval authority:", error);
             }
         }
 
-        // Parse file IDs
+        // ------------------- Parse file IDs -------------------
         let parsedFileIds = [];
         if (fileIds) {
             try {
@@ -817,7 +857,7 @@ export const createDocument = async (req, res) => {
             .filter((id) => mongoose.Types.ObjectId.isValid(id))
             .map((id) => new mongoose.Types.ObjectId(id));
 
-        // ------------------- Create Document (single write) -------------------
+        // ------------------- Create Document -------------------
         const document = await Document.create({
             project: project || null,
             department,
@@ -826,15 +866,19 @@ export const createDocument = async (req, res) => {
             documentVendor: documentVendor || null,
             folderId: validFolderId,
             owner: req.user._id,
-            documentDate: parsedDocumentDate,
             status: "Draft",
             tags: parsedTags,
             metadata: parsedMetadata,
             description,
-            compliance: { isCompliance, expiryDate: parsedExpiryDate },
+            compliance: {
+                isCompliance,
+                expiryDate: parsedExpiryDate
+            },
             link: link || null,
             comment: comment || null,
             wantApprovers: parsedWantApprovers,
+            // FIX: Add approval authority if wantApprovers is true
+            documentApprovalAuthority: documentApprovalAuthority,
             versioning: {
                 currentVersion: mongoose.Types.Decimal128.fromString("1.0"),
                 previousVersion: null,
@@ -878,10 +922,8 @@ export const createDocument = async (req, res) => {
                 status: "active",
             }));
 
-            // Bulk insert all files
             fileDocs = await File.insertMany(fileCreatePromises);
 
-            // Update temp files in parallel (no blocking)
             TempFile.updateMany(
                 { _id: { $in: tempFiles.map((t) => t._id) } },
                 { $set: { status: "permanent" } }
@@ -890,7 +932,7 @@ export const createDocument = async (req, res) => {
             document.files = fileDocs.map((f) => f._id);
         }
 
-        // ------------------- Handle Signature (optional, async) -------------------
+        // ------------------- Handle Signature (optional) -------------------
         if (req.files?.signatureFile?.[0]) {
             const file = req.files.signatureFile[0];
             if (!file.mimetype.startsWith("image/")) {
@@ -901,7 +943,6 @@ export const createDocument = async (req, res) => {
                 fileUrl: file.path || file.filename,
             };
         } else if (req.body.signature?.startsWith("data:image/")) {
-            // Run upload in background, don't block response
             cloudinary.uploader
                 .upload(req.body.signature, {
                     folder: "signatures",
@@ -921,38 +962,7 @@ export const createDocument = async (req, res) => {
                 .catch((err) => logger.error("Signature upload error:", err));
         }
 
-        // ------------------- Create Approvals (in parallel) -------------------
-        if (document.project) {
-            const projectData = await Project.findById(document.project).select(
-                "projectCollaborationTeam projectManager"
-            );
-
-            if (projectData) {
-                let collaborators = [
-                    ...(projectData.projectCollaborationTeam || []),
-                    projectData.projectManager,
-                ];
-
-                collaborators = [...new Set(collaborators.map((id) => id.toString()))]
-                    .filter((id) => mongoose.Types.ObjectId.isValid(id))
-                    .map((id) => new mongoose.Types.ObjectId(id));
-
-                if (collaborators.length > 0) {
-                    const approvalsToInsert = collaborators.map((collabId, i) => ({
-                        document: document._id,
-                        approver: collabId,
-                        level: i + 1,
-                        status: "Pending",
-                    }));
-
-                    const approvals = await Approval.insertMany(approvalsToInsert);
-                    document.approvalHistory = approvals.map((a) => a._id);
-                    document.status = "Pending";
-                }
-            }
-        }
-
-        // Save all final document data at once
+        // ------------------- Save Document -------------------
         await document.save();
 
         // ------------------- Populate and Respond -------------------
@@ -962,8 +972,8 @@ export const createDocument = async (req, res) => {
             { path: "owner", select: "name email" },
             { path: "files", select: "originalName fileType s3Url" },
             {
-                path: "approvalHistory",
-                populate: { path: "approver", select: "name email" },
+                path: "documentApprovalAuthority.approver",
+                select: "name email"
             },
         ]);
 
@@ -2785,117 +2795,131 @@ export const createOrUpdateApprovalRequest = async (req, res) => {
     }
 };
 
-
-
 export const updateApprovalStatus = async (req, res) => {
     try {
         const userId = req.user._id;
         const { documentId } = req.params;
         const { approved, comment } = req.body;
 
-        const approval = await Approval.findOne({
-            document: documentId,
-            approver: userId
-        }).populate('document');
+        // Fetch the document with approvers and owner populated
+        const document = await Document.findById(documentId)
+            .populate('documentApprovalAuthority.userId', 'name email')
+            .populate('department', 'name')
+            .populate('owner', 'name email');
 
-        if (!approval) {
-            return res.status(404).json({ error: 'Approval not found for this user' });
+        if (!document) {
+            return res.status(404).json({ error: 'Document not found' });
         }
 
-        // Update current user's approval
-        approval.status = approved ? 'Approved' : 'Rejected';
-        approval.isApproved = approved;
-        approval.remark = comment || '';
-        approval.approvedOn = approved ? new Date() : null;
-        await approval.save();
+        // Find the approver record for this user
+        const approverRecord = document.documentApprovalAuthority.find(
+            a => String(a.userId?._id) === String(userId)
+        );
 
-        // Fetch all approvals for this document
-        const allApprovals = await Approval.find({ document: documentId });
-        const highestLevel = Math.max(...allApprovals.map(a => a.level));
-        const lowestLevel = Math.min(...allApprovals.map(a => a.level));
+        if (!approverRecord) {
+            return res.status(403).json({ error: 'You are not authorized to approve this document' });
+        }
 
-        // Recalculate document status logic
-        const anyRejected = allApprovals.some(a => a.status === 'Rejected');
-        const allApproved = allApprovals.every(a => a.status === 'Approved');
+        // Update this approver’s record
+        approverRecord.status = approved ? 'Approved' : 'Rejected';
+        approverRecord.isApproved = approved;
+        approverRecord.remark = comment || '';
+        approverRecord.approvedOn = new Date();
 
-        let documentStatus = 'Pending';
+        // Recalculate overall document status
+        const anyRejected = document.documentApprovalAuthority.some(a => a.status === 'Rejected');
+        const allApproved = document.documentApprovalAuthority.every(a => a.status === 'Approved');
 
-        // If any rejection → document is Rejected
         if (anyRejected) {
-            documentStatus = 'Rejected';
-        }
-        // If all approvals are approved → document is Approved
-        else if (allApproved) {
-            documentStatus = 'Approved';
-        }
-        // Else, still waiting on next approvers
-        else {
-            documentStatus = 'Pending';
+            document.status = 'Rejected';
+        } else if (allApproved) {
+            document.status = 'Approved';
+        } else {
+            document.status = 'Pending';
         }
 
-        // Only update document if we have final outcome
-        await Document.findByIdAndUpdate(documentId, { status: documentStatus });
+        await document.save();
 
-        // Notify others
-        const document = approval.document;
-        const otherApprovals = await Approval.find({
-            document: documentId,
-            approver: { $ne: userId }
-        }).populate('approver', '_id name email');
+        // Notify other approvers
+        const otherApprovers = document.documentApprovalAuthority
+            .filter(a => String(a.userId?._id) !== String(userId))
+            .map(a => a.userId)
+            .filter(Boolean);
 
-        for (const other of otherApprovals) {
+        for (const approver of otherApprovers) {
             await addNotification({
-                recipient: other.approver._id,
+                recipient: approver._id,
                 sender: userId,
                 type: 'approval_update',
                 title: `Document ${approved ? 'Approved' : 'Rejected'}`,
-                message: `${req.user.name} has ${approved ? 'approved' : 'rejected'} the document "${document.title}".`,
+                message: `${req.user.name} has ${approved ? 'approved' : 'rejected'} the document "${document.metadata?.fileName || document._id}".`,
                 relatedDocument: documentId,
                 priority: approved ? 'low' : 'high'
             });
         }
 
-        // Notify owner if not same as current user
-        if (String(document.owner) !== String(userId)) {
+        // Notify document owner (if not same as approver)
+        if (String(document.owner._id) !== String(userId)) {
             await addNotification({
-                recipient: document.owner,
+                recipient: document.owner._id,
                 sender: userId,
                 type: 'approval_update',
                 title: `Document ${approved ? 'Approved' : 'Rejected'}`,
-                message: `${req.user.name} has ${approved ? 'approved' : 'rejected'} your document "${document.title}".`,
+                message: `${req.user.name} has ${approved ? 'approved' : 'rejected'} your document "${document.metadata?.fileName || document._id}".`,
                 relatedDocument: documentId,
                 priority: approved ? 'low' : 'high'
             });
         }
 
-        // Notify next approver (only if current approval approved)
-        if (approved && approval.level < highestLevel && documentStatus === 'Pending') {
-            const nextApproval = await Approval.findOne({
-                document: documentId,
-                level: approval.level + 1
-            }).populate('approver');
+        /** AUTO EMAIL TO NEXT APPROVER **/
+        if (approved && document.status === 'Pending') {
+            const currentPriority = approverRecord.priority;
+            const nextApprover = document.documentApprovalAuthority.find(
+                a => a.priority === currentPriority + 1 && a.status === 'Pending'
+            );
 
-            if (nextApproval) {
+            if (nextApprover && nextApprover.userId) {
+                // Update mail sent status
+                nextApprover.isMailSent = true;
+                await document.save();
+
+                // Send notification (in-app)
                 await addNotification({
-                    recipient: nextApproval.approver._id,
+                    recipient: nextApprover.userId._id,
                     sender: userId,
                     type: 'approval_request',
                     title: 'Document Pending Approval',
-                    message: `${req.user.name} has approved "${document.title}". It's now your turn to review.`,
+                    message: `${req.user.name} has approved "${document.metadata?.fileName || document._id}". It's now your turn to review.`,
                     relatedDocument: documentId,
                     priority: 'medium'
+                });
+
+                // Send email using template
+                const verifyUrl = `${process.env.FRONTEND_URL}/document/${documentId}/review`;
+
+                const emailHtml = approvalRequestTemplate({
+                    approverName: nextApprover.userId.name,
+                    documentName: document.metadata?.fileName || "Untitled Document",
+                    description: document.description,
+                    departmentName: document.department?.name,
+                    requesterName: req.user.name,
+                    verifyUrl,
+                });
+
+                await sendEmail({
+                    to: nextApprover.userId.email,
+                    subject: `Document Approval Request - ${document.metadata?.fileName || "Document"}`,
+                    html: emailHtml,
+                    fromName: "DocuFlow System",
                 });
             }
         }
 
-        const updatedApprovals = await Approval.find({ document: documentId })
-            .populate('approver', 'name designation email')
-            .sort({ level: 1 });
-
         res.json({
             message: 'Approval updated successfully',
-            approval,
-            approvals: updatedApprovals
+            approval: approverRecord,
+            approvals: document.documentApprovalAuthority,
+            status: document.status
         });
 
     } catch (error) {
@@ -2905,196 +2929,193 @@ export const updateApprovalStatus = async (req, res) => {
 };
 
 /**
- * Send approval mail for a given document.
+ * Send approval mail for a given document approver.
  */
-export const sentApprovalMail = async (req, res) => {
+export const sendApprovalMail = async (req, res) => {
     try {
-        const { projectId, approverId } = req.params;
+        const { documentId, approverId } = req.params;
 
-        // Fetch project and populate approver
-        const project = await Project.findById(projectId)
-            .populate("approvalAuthority.userId", "name email")
-            .populate("projectManager", "name email");
+        // Fetch document and populate necessary fields
+        const document = await Document.findById(documentId)
+            .populate("project", "projectName")
+            .populate("owner", "name email")
+            .populate("department", "name")
+            .populate("documentApprovalAuthority.userId", "name email");
 
-        if (!project) {
-            return res.status(404).json({ message: "Project not found" });
+        if (!document) {
+            return res.status(404).json({ success: false, message: "Document not found" });
         }
 
-        // Find specific approver
-        const approver = project.approvalAuthority.find(a => a.userId._id.toString() === approverId);
-
-        if (!approver) {
-            return res.status(404).json({ message: "Approver not found in this project" });
-        }
-
-        if (approver.isMailSent) {
-            return res.status(400).json({ message: "Approval mail already sent to this user" });
-        }
-
-        const approverUser = approver.userId;
-        if (!approverUser?.email) {
-            return res.status(400).json({ message: "Approver does not have an email" });
-        }
-
-        // Generate secure token for verification
-        const token = jwt.sign(
-            { projectId: project._id, approverId: approverUser._id },
-            API_CONFIG.JWT_SECRET,
-            { expiresIn: "7d" }
+        // Find approver entry
+        const approverEntry = document.documentApprovalAuthority.find(
+            (a) => a.userId && a.userId._id.toString() === approverId
         );
 
-        const verifyUrl = `${API_CONFIG.baseUrl}/api/verify-approval/${token}`;
+        if (!approverEntry) {
+            return res.status(404).json({ success: false, message: "Approver not found in this document" });
+        }
 
-        // Prepare email content
+        // Check if mail already sent
+        if (approverEntry.isMailSent) {
+            return res.status(400).json({ success: false, message: "Approval mail already sent to this approver" });
+        }
+
+        const approverUser = approverEntry.userId;
+        if (!approverUser?.email) {
+            return res.status(400).json({ success: false, message: "Approver does not have an email address" });
+        }
+
+        // Construct verification / review URL
+        const verifyUrl = `${process.env.FRONTEND_URL}/document/${document._id}/review`;
+
+        // Prepare email body using template
         const html = approvalRequestTemplate({
             approverName: approverUser.name,
-            documentName: project.projectName,
-            description: project.projectDescription || "No description provided",
-            departmentName: project.projectType?.name || "N/A",
-            requesterName: project.projectManager?.name,
+            documentName: document.metadata?.fileName || "Untitled Document",
+            description: document.description || "No description provided",
+            departmentName: document.department?.name || "N/A",
+            requesterName: document.owner?.name || "System",
             verifyUrl,
         });
 
-        // Send email
+        // Send the email
         await sendEmail({
             to: approverUser.email,
-            subject: `Project Approval Request: ${project.projectName}`,
+            subject: `Document Approval Request - ${document.metadata?.fileName || "Document"}`,
             html,
             fromName: "DocuFlow System",
         });
 
         // Mark as mail sent
-        approver.isMailSent = true;
-        await project.save();
+        approverEntry.isMailSent = true;
+        await document.save();
 
         return res.status(200).json({
+            success: true,
             message: `Approval email sent successfully to ${approverUser.email}`,
         });
 
     } catch (error) {
         console.error("Error sending approval mail:", error);
-        res.status(500).json({ message: "Failed to send approval mail", error: error.message });
+        return res.status(500).json({
+            success: false,
+            message: "Failed to send approval mail",
+            error: error.message,
+        });
     }
 };
-
+/**
+ * Verify approval mail link and approve the document for current approver.
+ */
 export const verifyApprovalMail = async (req, res) => {
     try {
         const { token } = req.params;
         const decoded = jwt.verify(token, API_CONFIG.JWT_SECRET);
+        const { documentId, approverId } = decoded;
 
-        const { projectId, approverId } = decoded;
+        // Immediately redirect user to /admin/approval (non-blocking background task)
+        res.redirect(`${API_CONFIG.baseUrl}/admin/approval`);
 
-        // Find project and populate approvers
-        const project = await Project.findById(projectId)
-            .populate("approvalAuthority.userId", "name email")
-            .populate("projectManager", "name email");
+        // Perform all background operations asynchronously
+        (async () => {
+            const document = await Document.findById(documentId)
+                .populate("project", "projectName")
+                .populate("owner", "name email");
 
-        if (!project) return res.status(404).json({ message: "Project not found" });
+            if (!document) return console.warn("Document not found:", documentId);
 
-        // Find the current approver
-        const currentApprover = project.approvalAuthority.find(a => a.userId._id.toString() === approverId);
-        if (!currentApprover) return res.status(404).json({ message: "Approver not found" });
+            const currentApprover = document.documentApprovalAuthority.find(
+                (a) => a.approver._id.toString() === approverId
+            );
 
-        // Mark current approver as approved
-        currentApprover.status = "Approved";
-        currentApprover.isApproved = true;
-        currentApprover.approvedOn = new Date();
+            if (!currentApprover) return console.warn("Approver not found:", approverId);
 
-        // Find the next approver by priority (lower number = higher priority)
-        const remainingApprovers = project.approvalAuthority
-            .filter(a => !a.isApproved)
-            .sort((a, b) => a.priority - b.priority);
+            // Mark current approver as approved
+            currentApprover.status = "Approved";
+            currentApprover.isApproved = true;
+            currentApprover.approvedOn = new Date();
 
-        if (remainingApprovers.length > 0) {
-            const nextApprover = remainingApprovers[0];
-            const nextUser = nextApprover.userId;
+            // Find next pending approver
+            const remainingApprovers = document.documentApprovalAuthority
+                .filter((a) => !a.isApproved)
+                .sort((a, b) => a.priority - b.priority);
 
-            if (!nextUser?.email) {
-                console.warn("Next approver does not have an email.");
-            } else {
-                // Generate token for next approver
-                const nextToken = jwt.sign(
-                    { projectId: project._id, approverId: nextUser._id },
-                    API_CONFIG.JWT_SECRET,
-                    { expiresIn: "7d" }
-                );
+            if (remainingApprovers.length > 0) {
+                const nextApprover = remainingApprovers[0];
+                const nextUser = nextApprover.approver;
 
-                const verifyUrl = `${API_CONFIG.baseUrl}/api/verify-approval/${nextToken}`;
+                if (nextUser?.email) {
+                    const nextToken = jwt.sign(
+                        { documentId: document._id, approverId: nextUser._id },
+                        API_CONFIG.JWT_SECRET,
+                        { expiresIn: "7d" }
+                    );
 
-                // Prepare email content
-                const html = approvalRequestTemplate({
-                    approverName: nextUser.name,
-                    documentName: project.projectName,
-                    description: project.projectDescription || "No description provided",
-                    departmentName: project.projectType?.name || "N/A",
-                    requesterName: project.projectManager?.name,
-                    verifyUrl,
-                });
+                    const verifyUrl = `${API_CONFIG.baseUrl}/api/verify-approval/${nextToken}`;
 
-                // Send email
-                await sendEmail({
-                    to: nextUser.email,
-                    subject: `Project Approval Request: ${project.projectName}`,
-                    html,
-                    fromName: "DocuFlow System",
-                });
+                    const html = approvalRequestTemplate({
+                        approverName: nextUser.name,
+                        documentName: document.description.replace(/<[^>]+>/g, ""),
+                        description: document.comment || "No description provided",
+                        departmentName: nextUser.userDetails?.department?.name || "N/A",
+                        requesterName: document.owner?.name || "System",
+                        verifyUrl,
+                    });
 
-                // Mark mail as sent
-                nextApprover.isMailSent = true;
+                    await sendEmail({
+                        to: nextUser.email,
+                        subject: `Document Approval Request`,
+                        html,
+                        fromName: "DocuFlow System",
+                    });
+
+                    nextApprover.isMailSent = true;
+                }
             }
-        }
 
-        await project.save();
-
-        return res.status(200).json({
-            message: "Approval verified. Next approver notified if exists.",
-        });
+            await document.save();
+            console.log(`Approval processed successfully for document ${documentId}`);
+        })();
 
     } catch (error) {
-        console.error(error);
-        return res.status(400).json({ message: "Invalid or expired token." });
+        console.error("Error verifying approval:", error);
+        return res.redirect(`${API_CONFIG.clientBaseUrl}/admin/approval?error=invalid`);
     }
 };
+
 
 export const getApprovals = async (req, res) => {
     try {
         const { documentId } = req.params;
 
-        // Find the document and populate references
         const document = await Document.findById(documentId)
-            .select('owner files description createdAt updatedAt slug isDeleted status isArchived compliance files comment versioning approvals project')
+            .select('owner files description createdAt updatedAt documentApprovalAuthority slug isDeleted status isArchived compliance files comment versioning project')
             .populate("owner files")
             .populate({
                 path: "versionHistory.changedBy",
                 model: "User"
             })
             .populate({
-                path: "project",
-                model: "Project",
+                path: "documentApprovalAuthority.userId",
+                model: "User",
+                select: "name email phone_number profile_type userDetails",
                 populate: [
                     {
-                        path: "approvalAuthority.userId",
-                        model: "User",
-                        select: "name email phone_number profile_type userDetails",
-                        populate: [
-                            {
-                                path: "userDetails.designation",
-                                model: "Designation",
-                                select: "name"
-                            },
-                            {
-                                path: "userDetails.department",
-                                model: "Department",
-                                select: "name"
-                            }
-                        ]
-                    },
-                    {
-                        path: "approvalAuthority.designation",
+                        path: "userDetails.designation",
                         model: "Designation",
                         select: "name"
-                    }
+                    },
+                    {
+                        path: "userDetails.department",
+                        model: "Department",
+                        select: "name"
+                    },
                 ]
+            })
+            .populate({
+                path: "documentApprovalAuthority.designation",
+                model: "Designation",
+                select: "name"
             })
             .lean();
 
@@ -3102,17 +3123,17 @@ export const getApprovals = async (req, res) => {
             return failResponse(res, "Document not found", 404);
         }
 
-        const project = document.project;
-        if (!project || !project.approvalAuthority?.length) {
-            return failResponse(res, "No approval authorities found for this project", 404);
+        const approvals = document.documentApprovalAuthority || [];
+
+        if (!approvals.length) {
+            return failResponse(res, "No approval authorities found for this document", 404);
         }
 
-        // Sort approvals by priority (lower = higher priority)
-        const approvals = project.approvalAuthority.sort((a, b) => a.priority - b.priority);
+        approvals.sort((a, b) => a.priority - b.priority);
 
-        return successResponse(res, { document, approvals }, "Approvals fetched successfully from project");
+        return successResponse(res, { document, approvals }, "Approvals fetched successfully from document");
     } catch (error) {
-        console.error("Error fetching approvals from project:", error);
+        console.error("Error fetching approvals from document:", error);
         return failResponse(res, "Server Error", 500, error.message);
     }
 };

@@ -27,16 +27,6 @@ export const createDocumentValidator = [
         .custom((val) => !val || isValidObjectId(val))
         .withMessage("Invalid folderId"),
 
-    body("documentDate")
-        .optional()
-        .matches(/^(\d{2}-\d{2}-\d{4})$|^(\d{4}-\d{2}-\d{2})$/)
-        .withMessage("documentDate must be DD-MM-YYYY or YYYY-MM-DD"),
-
-    body("expiryDate")
-        .optional()
-        .matches(/^(\d{2}-\d{2}-\d{4})$|^(\d{4}-\d{2}-\d{2})$/)
-        .withMessage("expiryDate must be DD-MM-YYYY or YYYY-MM-DD"),
-
     body("fileIds")
         .optional()
         .custom((val) => {

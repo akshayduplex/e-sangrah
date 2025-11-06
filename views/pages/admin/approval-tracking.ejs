@@ -111,10 +111,8 @@
 						const file = doc.files[0];
 						docNameEl.innerText = file.originalName || "-";
 						docSizeEl.innerText = file.fileSize ? `${(file.fileSize / 1024).toFixed(2)} KB` : "-";
-						docLinkEl.href = file.s3Url || "#";
+						docLinkEl.href = file._id ? `/folders/view/${file._id}` : "#";
 
-						// Set icon based on file extension
-						// Set icon based on file extension using fileIcons mapping
 						const ext = file.file.split('.').pop().toLowerCase();
 						docIconEl.src = fileIcons[ext] || fileIcons.default;
 					} else {

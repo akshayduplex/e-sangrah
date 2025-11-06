@@ -127,7 +127,7 @@ router.get("/employee/anaytics", authenticate, EmployeeController.showEmployeeAn
 
 //Approvals
 // Render approval page
-router.get('/document/:id/approval/track', authenticate, DocumentController.getDocumentApprovalsPage);
+// router.get('/document/:id/approval/track', authenticate, DocumentController.getDocumentApprovalsPage);
 
 /* =========================================
    Reports ROUTES

@@ -30,16 +30,51 @@ const documentSchema = new mongoose.Schema({
     },
     files: [{ type: mongoose.Schema.Types.ObjectId, ref: "File", default: null }],
     // currentVersion: { type: Number, default: 1 },
-    documentDate: { type: Date, default: Date.now },
-
     signature: {
         fileName: { type: String, trim: true },
         fileUrl: { type: String, trim: true }
     },
     link: { type: String },
-    approvalHistory: [{
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Approval"
+    documentApprovalAuthority: [{
+        userId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User",
+            required: true
+        },
+        designation: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Desgination",
+            required: true
+        },
+        priority: {
+            type: Number,
+            required: true,
+            min: 1
+        },
+        isMailSent: {
+            type: Boolean,
+            default: false
+        },
+        status: {
+            type: String,
+            enum: ["Pending", "Approved", "Rejected"],
+            default: "Pending"
+        },
+        isApproved: {
+            type: Boolean,
+            default: false
+        },
+        remark: {
+            type: String,
+            trim: true,
+            maxlength: 500
+        },
+        approvedOn: {
+            type: Date
+        },
+        addDate: {
+            type: Date
+        }
     }],
     wantApprovers: { type: Boolean, default: false },
     // Flattened sharedWith for safe indexing

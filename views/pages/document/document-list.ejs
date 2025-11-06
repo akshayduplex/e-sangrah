@@ -1163,9 +1163,9 @@
                         await loadApprovers(documentId);
                     });
 
-                    /* ----------------------------------------
-      Load Approvers (GET only)
-   ---------------------------------------- */
+                    /* ---------------------------------------- 
+                       Load Approvers (GET only)
+                    ---------------------------------------- */
                     async function loadApprovers(documentId) {
                         const tableBody = document.querySelector('#approverTable tbody');
                         tableBody.innerHTML = `<tr><td colspan="6" class="text-center text-muted">Loading...</td></tr>`;
@@ -1180,9 +1180,11 @@
                             }
 
                             const approvals = data.data?.approvals || [];
-                            const projectId = data.data?.document?.project?._id || '';
+                            const documentData = data.data?.document || {};
+                            const projectId = documentData._id || '';
+
                             tableBody.innerHTML = '';
-                            console.log('Approvals data:', approvals);
+
                             if (approvals.length === 0) {
                                 tableBody.innerHTML = `<tr><td colspan="6" class="text-center text-muted">No approvers found.</td></tr>`;
                                 return;
@@ -1190,24 +1192,18 @@
 
                             const highestPriority = Math.min(...approvals.map(a => a.priority ?? Infinity));
 
-                            // Collect userIds for which mail needs to be sent
-                            const usersToSendMail = [];
-
                             approvals.forEach((approval, index) => {
-                                const user = approval.userId || {};
-                                const userDetails = user.userDetails || {};
-                                const designation = approval.designation?.name || '-';
+                                const approver = approval.userId || {};
+                                const userDetails = approver.userDetails || {};
                                 const department = userDetails.department?.name || '-';
-                                const approverName = user.name || 'Unknown';
-                                const roleInfo = `${designation} – ${department}`;
+                                const approverDesignation = approval.designation?.name || '-';
+
+                                const approverName = approver.name || 'Unknown';
+                                const roleInfo = `${approverDesignation} – ${department}`;
+
                                 const priority = approval.priority ?? '-';
                                 const status = approval.status || 'Pending';
                                 const isMailSent = approval.isMailSent ?? false;
-
-                                // Collect userId if mail is not sent
-                                if (!isMailSent) {
-                                    usersToSendMail.push(user._id);
-                                }
 
                                 // ---- STATUS BADGE ----
                                 let statusBadge = `<span class="badge bg-secondary">${status}</span>`;
@@ -1218,24 +1214,22 @@
                                 // ---- ACTION BUTTONS ----
                                 let actionCellContent = '';
                                 if (approval.isApproved) {
-                                    // If already approved, show message
                                     actionCellContent = `<span class="text-success small">Already Approved</span>`;
                                 } else if (!isMailSent && priority !== highestPriority) {
                                     actionCellContent = `<span class="text-muted small">Mail not sent</span>`;
                                 } else {
                                     actionCellContent = `<button class="btn btn-sm btn-success send-mail"
-                                      data-project-id="${projectId}"
-                                      data-approver-id="${user._id}">Send Mail</button>`;
+                    data-project-id="${projectId}"
+                    data-approver-id="${approver._id}">Send Mail</button>`;
                                 }
-                                actionCellContent += ` <button class="btn btn-sm btn-danger remove-row ms-1">X</button>`;
-
+                                // ---- Render Row ----
                                 const row = document.createElement('tr');
                                 row.innerHTML = `
                 <td>${index + 1}</td>
                 <td>${approverName}<br><small class="text-muted">${roleInfo}</small></td>
                 <td>${priority}</td>
                 <td>${statusBadge}</td>
-                <td>-</td>
+                <td>${approval.remark || '-'}</td>
                 <td>${actionCellContent}</td>
             `;
                                 tableBody.appendChild(row);
@@ -1246,6 +1240,7 @@
                             tableBody.innerHTML = `<tr><td colspan="6" class="text-danger text-center">Error loading approvals.</td></tr>`;
                         }
                     }
+
 
                     /* -----------------------------------------------------------------
             2. SEND APPROVAL-MAIL – read IDs from button data-attributes

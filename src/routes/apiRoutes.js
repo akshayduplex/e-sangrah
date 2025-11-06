@@ -68,8 +68,8 @@ router.post("/auth/register", AuthValidators.registerValidator, validators, Auth
 router.post("/auth/login", AuthValidators.loginValidator, validators, AuthController.login);
 
 router.post("/auth/send-otp", AuthValidators.sendOtpValidator, validators, AuthController.sendOtp);
-router.post("/auth/verify-otp", AuthValidators.verifyOtpValidator, validators, AuthController.verifyOtp);
-router.post("/auth/verify/token", AuthValidators.verifyTokenValidator, validators, AuthController.verifyTokenOtp);
+router.post("/auth/verify-otp", AuthController.verifyOtp);
+router.post("/auth/verify/token", AuthController.verifyTokenOtp);
 
 router.post("/auth/reset-password", AuthValidators.resetPasswordValidator, validators, AuthController.resetPassword);
 router.post("/auth/send-reset-link", AuthValidators.sendResetLinkValidator, validators, AuthController.sendResetLink);
@@ -251,7 +251,7 @@ router.post('/documents/:documentId/add', authenticate, DocumentValidators.creat
 router.get('/documents/:documentId/approval/track', authenticate, DocumentController.getApprovals);
 
 // // Approval Mail
-router.get('/documents/:projectId/approval/:approverId/mail', authenticate, DocumentController.sentApprovalMail);
+router.get('/documents/:documentId/approval/:approverId/mail', authenticate, DocumentController.sendApprovalMail);
 
 router.get('/verify-approval/:token', authenticate, DocumentController.verifyApprovalMail);
 

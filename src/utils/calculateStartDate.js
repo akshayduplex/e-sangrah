@@ -2,7 +2,7 @@ export function calculateStartDate(period) {
     const startDate = new Date();
     switch (period) {
         case "today":
-            // No change needed — same day
+            startDate.setHours(0, 0, 0, 0);
             break;
         case "week":
             startDate.setDate(startDate.getDate() - 7);
