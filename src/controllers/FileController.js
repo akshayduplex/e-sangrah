@@ -262,23 +262,47 @@ export const submitForm = async (req, res) => {
 export const deleteFile = async (req, res) => {
     try {
         const { fileId } = req.params;
-        const file = await TempFile.findById(fileId);
 
-        if (!file) return res.status(404).json({ error: "File not found" });
-        // if (file.status !== "temp") return res.status(400).json({ error: "Cannot delete non-temporary file" });
+        // Try to find file in both collections
+        let file = await TempFile.findById(fileId);
+        let isTemp = true;
+
+        if (!file) {
+            file = await File.findById(fileId);
+            isTemp = false;
+        }
+
+        if (!file) {
+            return res.status(404).json({ error: "File not found" });
+        }
+
+        // Determine S3 key (field name differs in models)
+        const s3Key = file.s3Filename || file.file;
+
+        if (!s3Key) {
+            logger.error("S3 key missing for file:", fileId);
+            return res.status(500).json({ error: "Invalid file record" });
+        }
 
         // Delete from S3
         try {
-            await deleteObject(file.s3Filename); // should throw on failure
+            await deleteObject(s3Key);
         } catch (s3Err) {
             logger.error("Failed to delete file from S3:", s3Err);
             return res.status(500).json({ error: "Failed to delete file from S3" });
         }
 
-        // Delete MongoDB record
-        await TempFile.deleteOne({ _id: file._id });
+        // Delete from MongoDB
+        if (isTemp) {
+            await TempFile.deleteOne({ _id: file._id });
+        } else {
+            await File.deleteOne({ _id: file._id });
+        }
 
-        res.status(200).json({ success: true, message: "File deleted successfully" });
+        res.status(200).json({
+            success: true,
+            message: `File deleted successfully from ${isTemp ? "TempFile" : "File"} collection.`,
+        });
     } catch (err) {
         logger.error("Delete file error:", err);
         res.status(500).json({ error: "File deletion failed" });

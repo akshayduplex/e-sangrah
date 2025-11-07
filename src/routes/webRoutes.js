@@ -146,7 +146,7 @@ router.get("/designations", authenticate, checkPermissions, DesignationControlle
 router.get("/designations/edit/:id", authenticate, checkPermissions, DesignationController.showEditDesignationPage);
 
 // Designation List page
-router.get("/designations/list", authenticate, checkPermissions, DesignationController.showDesignationListPage);
+router.get("/designations/list", authenticate, DesignationController.showDesignationListPage);
 
 
 /* =========================================
@@ -158,7 +158,7 @@ router.get("/documents/list", authenticate, checkPermissions, DocumentController
 
 // View Document page
 router.get("/documents/:id/versions/view", authenticate, authorize('admin', 'superadmin', 'user'), DocumentController.showViewDocumentPage);
-router.get("/documents/archived", authenticate, checkPermissions, DocumentController.showArchivedDocumentPage);
+router.get("/documents/archived", authenticate, DocumentController.showArchivedDocumentPage);
 
 
 // Add Document page
@@ -301,7 +301,7 @@ router.post("/permissions/user/save", authenticate, checkPermissions, async (req
    FOLDERS AND DOCUMENTS ROUTES
    ========================================= */
 // Folder list by ID
-router.get("/:folderId/list", authenticate, checkPermissions, FolderController.showFolderListById);
+router.get("/:folderId/list", authenticate, FolderController.showFolderListById);
 
 // Upload Folder page
 router.get("/upload-folder", authenticate, FolderController.showUploadFolderPage);
@@ -310,7 +310,7 @@ router.get("/upload-folder", authenticate, FolderController.showUploadFolderPage
 router.get("/archived", authenticate, checkPermissions, FolderController.showArchivedFoldersPage);
 
 // Recycle-bin Folders page
-router.get("/folders/recyclebin", authenticate, checkPermissions, FolderController.showRecycleBinPage);
+router.get("/folders/recyclebin", authenticate, FolderController.showRecycleBinPage);
 
 // Main Folders page
 router.get("/folders", authenticate, FolderController.showMainFoldersPage);

@@ -41,7 +41,6 @@ export async function renderProjectDetails(res, projectId = null, userDetails) {
             ProjectType.find({ status: "Active", isActive: true }, "name").lean(),
             Designation.find({ status: "Active" }, "name").lean(),
         ]);
-        console.log("designations:", designations);
         res.render("pages/projects/project-details", {
             title: project ? "Project Details" : "Add Project",
             project,

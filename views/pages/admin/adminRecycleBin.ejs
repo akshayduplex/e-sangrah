@@ -153,38 +153,43 @@
 				// Render each row
 				function renderRow(doc) {
 					const file = doc.files?.[0];
+					const fileName = file?.originalName || doc.metadata?.fileName || 'Unnamed';
 					const fileSizeKB = file ? (file.fileSize / 1024).toFixed(2) + ' KB' : '-';
-					const filesInfo = file ? `
-            <div class="flxtblleft mb-1">
-                <span class="avatar rounded bg-light mb-2">
-                    <img src="/img/icons/fn1.png">
-                </span>
-                <div class="flxtbltxt">
-                    <p class="fs-14 mb-1 fw-normal text-neutral">${file.originalName}</p>
-                    <span class="fs-11 fw-light text-black">${fileSizeKB}</span>
-                </div>
-            </div>` : '-';
+
+					const filesInfo = `
+    <div class="flxtblleft mb-1">
+      <span class="avatar rounded bg-light mb-2">
+        <img src="/img/icons/fn1.png">
+      </span>
+      <div class="flxtbltxt">
+        <p class="fs-14 mb-1 fw-normal text-neutral">${fileName}</p>
+        <span class="fs-11 fw-light text-black">${fileSizeKB}</span>
+      </div>
+    </div>
+  `;
 
 					const createdOn = new Date(doc.createdAt).toLocaleString();
 					const deletedOn = new Date(doc.deletedAt).toLocaleString();
 					const departmentName = doc.department?.name || '-';
 
 					const checkbox = `<div class="form-check form-check-md">
-            <input class="form-check-input select-document" type="checkbox" data-document-id="${doc._id}">
-        </div>`;
+    <input class="form-check-input select-document" type="checkbox" data-document-id="${doc._id}">
+  </div>`;
 
 					const actions = `
-            <div class="action-icon d-inline-flex">
-                <a href="#" data-document-id="${doc._id}" class="restore-btn me-2" data-bs-toggle="modal" data-bs-target="#restore-modal">
-                    <i class="ti ti-restore"></i>
-                </a>
-                <a href="#" class="delete-permanent-btn" data-document-id="${doc._id}" data-document-name="${file?.originalName || 'Document'}">
-                    <i class="ti ti-trash"></i>
-                </a>
-            </div>`;
+    <div class="action-icon d-inline-flex">
+      <a href="#" data-document-id="${doc._id}" class="restore-btn me-2" data-bs-toggle="modal" data-bs-target="#restore-modal">
+        <i class="ti ti-restore"></i>
+      </a>
+      <a href="#" class="delete-permanent-btn" data-document-id="${doc._id}" data-document-name="${fileName}">
+        <i class="ti ti-trash"></i>
+      </a>
+    </div>
+  `;
 
 					return [checkbox, filesInfo, createdOn, departmentName, deletedOn, actions];
 				}
+
 				// Debounced reload for search and filters
 				const reloadTable = debounce(() => table.ajax.reload(), 500);
 
@@ -192,26 +197,35 @@
 				$('#search_input').on('keyup', reloadTable);
 				$('#recyclinbindocuments_table_length select').on('change', reloadTable);
 				// Restore document
+				// Restore document
 				$(document).on('click', '.restore-btn', function () {
 					const row = $(this).closest('tr');
 					const documentId = $(this).data('document-id');
 					const modal = $('#restore-modal');
 
-					// Get file info from the table row
-					const fileInfoDiv = row.find('td').eq(1).find('.flxtblleft').clone();
+					// Extract file data from table row
+					const fileName = row.find('.flxtbltxt p').text().trim() || 'Unknown file';
+					const fileSize = row.find('.flxtbltxt span.fs-11').text().trim() || '0 KB';
+					const fileIcon = row.find('.avatar img').attr('src') || '/img/icons/fn1.png';
 
-					// Clear modal body and inject file info
-					modal.find('.modal-body').empty().append(fileInfoDiv);
+					// If there are multiple files, show +count
+					const filesCount = row.find('.flxtblleft').length;
+					const fileCountText = filesCount > 1 ? `+${filesCount - 1}` : '';
 
-					// Optional: update modal header
-					const fileName = fileInfoDiv.find('.flxtbltxt p').text();
-					modal.find('.modal-title').text(`Are you sure you want to restore "${fileName}"?`);
+					// Update modal fields dynamically (no HTML changes)
+					modal.find('#restore-file-name').text(fileName);
+					modal.find('#restore-file-size').text(fileSize);
+					modal.find('#restore-file-count').text(fileCountText);
+					modal.find('#restore-file-icon').attr('src', fileIcon);
+
+					// Update question text
+					modal.find('h5.mt-3').text(`Are you sure you want to restore "${fileName}"?`);
 
 					// Show modal
 					modal.modal('show');
 
-					// Restore confirmation
-					modal.find('button.btn-primary').off('click').on('click', function () {
+					// Confirm restore action
+					modal.find('#confirm-restore').off('click').on('click', function () {
 						$.ajax({
 							url: `/api/documents/${documentId}/restore`,
 							method: 'PATCH',
@@ -226,6 +240,7 @@
 						});
 					});
 				});
+
 				// Permanent delete
 				$(document).on('click', '.delete-permanent-btn', function () {
 					const row = $(this).closest('tr');

@@ -35,67 +35,68 @@ $(document).ready(function () {
     $('#registerForm').on('submit', async function (e) {
         e.preventDefault();
 
+        // Basic required field check
         let isValid = true;
-        const requiredFields = $(this).find('[required]');
-
-        requiredFields.each(function () {
-            if (!$(this).val()) {
-                isValid = false;
+        $(this).find('[required]').each(function () {
+            if (!$(this).val().trim()) {
                 $(this).addClass('is-invalid');
+                isValid = false;
             } else {
                 $(this).removeClass('is-invalid').addClass('is-valid');
             }
         });
 
-        // Email check
-        const emailInput = $('#email');
+        // Email format
+        const email = $('#email').val().trim();
         const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailPattern.test(emailInput.val())) {
+        if (!emailPattern.test(email)) {
+            $('#email').addClass('is-invalid');
             isValid = false;
-            emailInput.addClass('is-invalid');
         }
 
-        // Mobile check
-        const mobileInput = $('#phone_number');
-        const mobilePattern = /^\d{10}$/;
-        if (!mobilePattern.test(mobileInput.val())) {
+        // Phone: 10 digits
+        const phone = $('#phone_number').val();
+        if (!/^\d{10}$/.test(phone)) {
+            $('#phone_number').addClass('is-invalid');
             isValid = false;
-            mobileInput.addClass('is-invalid');
         }
 
         if (!isValid) {
-            if (typeof showToast === 'function') {
-                showToast('Please fill all required fields correctly.', 'info');
-            } else {
-                showToast('Please fill all required fields correctly.', 'info');
-            }
+            showToast('Please fill all fields correctly.', 'info');
             return;
         }
 
-        const form = this;
-        const formData = new FormData(form);
+        const formData = new FormData(this);
 
         try {
             const response = await fetch(`${baseUrl}/api/user/register`, {
                 method: 'POST',
-                body: new FormData(this)
+                body: formData
             });
 
             const result = await response.json();
 
             if (response.ok && result.success) {
+                // Success
                 const successModal = new bootstrap.Modal(document.getElementById('data-success-register'));
                 successModal.show();
 
                 this.reset();
-                preview.empty();
-                uploadIcon.show();
+                $('#preview').empty();
+                $('#uploadprofileBox .upload-icon').show();
                 $('.is-valid, .is-invalid').removeClass('is-valid is-invalid');
             } else {
-                showToast(result.error || 'Something went wrong!', 'error');
+                // Show exact server message in toast
+                const message = result.message || 'Registration failed!';
+                showToast(message, 'error');
+
+                // Optional: highlight email if duplicate
+                if (message.toLowerCase().includes('email')) {
+                    $('#email').addClass('is-invalid');
+                }
             }
         } catch (err) {
-            showToast(err.message || 'Internal server error', 'error');
+            showToast('Network error. Please try again.', 'error');
         }
     });
 });

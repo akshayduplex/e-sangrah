@@ -1,7 +1,9 @@
+import { API_CONFIG } from "../config/ApiEndpoints.js";
 import { generateRandomPassword } from "../helper/GenerateRandomPassword.js";
 import User from "../models/User.js";
 import { sendEmail } from "../services/emailService.js";
-
+import ejs from "ejs";
+import path from "path";
 //Page controller for Donor and Vendor Registration
 
 // GET /donors/register
@@ -167,24 +169,22 @@ export const registerDonorVendor = async (req, res, next) => {
 
         await newUser.save();
         // Prepare HTML email content
-        const htmlContent = `
-                    <p>Hello ${user_name},</p>
-                    <p>Your account has been created successfully.</p>
-                    <ul>
-                        <li><strong>Email:</strong> ${email_id}</li>
-                        <li><strong>Password:</strong> ${randomPassword}</li>
-                    </ul>
-                    <p>Please log in and change your password immediately.</p>
-                    <p>Thank you.</p>
-                `;
+        const templatePath = path.join(process.cwd(), "views", "emails", "welcomeTemplate.ejs");
 
-        // Send email using global helper
+        const htmlContent = await ejs.renderFile(templatePath, {
+            name: user_name,
+            email: email_id,
+            password: randomPassword,
+            BASE_URL: API_CONFIG.baseUrl
+        });
+
         await sendEmail({
             to: email_id,
-            subject: "Your Account Has Been Created",
+            subject: "Welcome to E-Sangrah",
             html: htmlContent,
-            fromName: "Support Team",
+            fromName: "E-Sangrah Team",
         });
+
         return res.status(201).json({ success: true, message: "Registration successful", data: newUser });
 
     } catch (error) {
@@ -310,24 +310,22 @@ export const registerVendor = async (req, res, next) => {
             }
         });
         // Prepare HTML email content
-        const htmlContent = `
-            <p>Hello ${vendor_name},</p>
-            <p>Your account has been created successfully.</p>
-            <ul>
-                <li><strong>Email:</strong> ${vendor_email}</li>
-                <li><strong>Password:</strong> ${randomPassword}</li>
-            </ul>
-            <p>Please log in and change your password immediately.</p>
-            <p>Thank you.</p>
-        `;
+        const templatePath = path.join(process.cwd(), "views", "emails", "welcomeTemplate.ejs");
 
-        // Send email using global helper
+        const htmlContent = await ejs.renderFile(templatePath, {
+            name: vendor_name,
+            email: vendor_email,
+            password: randomPassword,
+            BASE_URL: API_CONFIG.baseUrl
+        });
+
         await sendEmail({
             to: vendor_email,
-            subject: "Your Account Has Been Created",
+            subject: "Welcome to E-Sangrah",
             html: htmlContent,
-            fromName: "Support Team",
+            fromName: "E-Sangrah Team",
         });
+
         await user.save();
         return res.status(201).json({ success: true, message: "Registration successful", data: user });
     } catch (error) {

@@ -343,22 +343,24 @@
 				const loadFolders = async (parentFolderId = null, parentPath = [], projectId = window.selectedProjectId) => {
 					try {
 						showNoProject(false);
-
 						if (!projectId) {
 							elements.container.style.display = 'none';
 							setEmptyState(false);
 							showNoProject(true);
 							return;
 						}
-
 						setLoadingState(true);
 						const allFolders = await fetchFolders(projectId);
 						setLoadingState(false);
 
 						const subfolders = getSubfolders(allFolders, parentFolderId);
-						const currentFolderData = allFolders.find(f => f._id === parentFolderId) || {}; // to access files array
 
-						if (!subfolders.length && (!currentFolderData.files || !currentFolderData.files.length)) {
+						// **FIXED: Get current folder data AND collect ALL files recursively**
+						const currentFolderData = allFolders.find(f => f._id === parentFolderId) || {};
+						const allFilesInThisFolderAndSubfolders = collectAllFilesRecursively(allFolders, parentFolderId);
+
+						// Show empty state only if no subfolders AND no files
+						if (!subfolders.length && !allFilesInThisFolderAndSubfolders.length) {
 							setEmptyState(true);
 							elements.container.innerHTML = "";
 							folderState.currentFolderId = parentFolderId;
@@ -370,6 +372,7 @@
 						setEmptyState(false);
 						elements.container.innerHTML = "";
 
+						// Display subfolders (unchanged)
 						subfolders.forEach(folder => {
 							const div = document.createElement("div");
 							div.className = "folderbox";
@@ -390,45 +393,39 @@
                     </ul>
                 </div>
             `;
-
 							div.addEventListener("dblclick", () => {
 								loadFolders(folder._id, [...parentPath, { id: folder._id, name: folder.name }], projectId);
 							});
-
 							elements.container.appendChild(div);
 						});
-						if (currentFolderData.files && currentFolderData.files.length) {
-							currentFolderData.files.forEach(file => {
-								const ext = file.originalName.split('.').pop().toLowerCase();
-								const icon = fileIcons[ext] || fileIcons.default;
 
-								const fileDiv = document.createElement("div");
-								fileDiv.className = "folderbox filebox";
-								fileDiv.dataset.id = file._id;
-
-								fileDiv.innerHTML = `
-            <div class="fldricon me-2">
-                <img src="${icon}" alt="File" style="width:40px; height:40px;">
-            </div>
-            <div class="file-info" style="flex-grow:1;">
-                <p class="mb-1" style="font-size:0.85rem; margin:0;" title="${file.originalName}">${file.originalName}</p>
-                <p class="mb-0" style="font-size:0.75rem; color:#666;">${(file.size / 1024).toFixed(1)} KB</p>
-            </div>
-            <div class="folder_links ms-auto">
-                <button type="button" class="btn border-0" data-bs-toggle="dropdown">
-                    <i class="ti ti-dots"></i>
-                </button>
-                <ul class="dropdown-menu">
-                    <li><a class="dropdown-item" href="/api/download/file/${file._id}"><i class="ti ti-download"></i> Download</a></li>
-                    <li><a class="dropdown-item" href="/folders/view/${file._id}" target="_blank"><i class="ti ti-eye"></i> View</a></li>
-                </ul>
-            </div>
-        `;
-
-								elements.container.appendChild(fileDiv);
-							});
-						}
-
+						// **FIXED: Display ALL files from current folder + subfolders**
+						allFilesInThisFolderAndSubfolders.forEach(file => {
+							const ext = file.originalName.split('.').pop().toLowerCase();
+							const icon = fileIcons[ext] || fileIcons.default;
+							const fileDiv = document.createElement("div");
+							fileDiv.className = "folderbox filebox";
+							fileDiv.dataset.id = file._id;
+							fileDiv.innerHTML = `
+                <div class="fldricon me-2">
+                    <img src="${icon}" alt="File" style="width:40px; height:40px;">
+                </div>
+                <div class="file-info" style="flex-grow:1;">
+                    <p class="mb-1" style="font-size:0.85rem; margin:0;" title="${file.originalName}">${file.originalName}</p>
+                    <p class="mb-0" style="font-size:0.75rem; color:#666;">${(file.size / 1024).toFixed(1)} KB</p>
+                </div>
+                <div class="folder_links ms-auto">
+                    <button type="button" class="btn border-0" data-bs-toggle="dropdown">
+                        <i class="ti ti-dots"></i>
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="/api/download/file/${file._id}"><i class="ti ti-download"></i> Download</a></li>
+                        <li><a class="dropdown-item" href="/folders/view/${file._id}" target="_blank"><i class="ti ti-eye"></i> View</a></li>
+                    </ul>
+                </div>
+            `;
+							elements.container.appendChild(fileDiv);
+						});
 
 						folderState.currentFolderId = parentFolderId;
 						folderState.selectedFolders = parentPath;
@@ -440,6 +437,34 @@
 						showToast("Failed to load folders", "error");
 					}
 				};
+
+				// **NEW FUNCTION: Recursively collect ALL files from folder + subfolders**
+				const collectAllFilesRecursively = (allFolders, targetFolderId) => {
+					if (!targetFolderId) return []; // Root level - no files to collect
+
+					const files = [];
+
+					const findAndCollectFiles = (list) => {
+						for (const folder of list) {
+							// If this is our target folder, add its files
+							if (folder._id === targetFolderId) {
+								if (folder.files && folder.files.length > 0) {
+									files.push(...folder.files);
+								}
+								break; // Found target, no need to search further
+							}
+
+							// Recursively search in children
+							if (folder.children && folder.children.length > 0) {
+								findAndCollectFiles(folder.children);
+							}
+						}
+					};
+
+					findAndCollectFiles(allFolders);
+					return files;
+				};
+
 				const updateDirectoryPath = () => {
 					const folders = folderState.selectedFolders;
 					const pathElements = [];
@@ -681,7 +706,7 @@
 					const newStatus = textSpan.textContent.trim().toLowerCase() === "block" ? "inactive" : "active";
 
 					try {
-						const res = await fetch(`/api/folders/${folderId}/permissions`, {
+						const res = await fetch(`/api/update/folders/${folderId}/permissions`, {
 							method: "PATCH",
 							headers: { "Content-Type": "application/json" },
 							body: JSON.stringify({ status: newStatus })

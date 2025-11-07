@@ -170,10 +170,6 @@ export const bulkPermissionUpdateValidator = [
         .isArray({ min: 1 })
         .withMessage("users must be a non-empty array"),
 
-    body("users.*.userId")
-        .custom(isValidObjectId)
-        .withMessage("Invalid userId"),
-
     body("users.*.accessLevel")
         .optional()
         .isIn(["view", "edit"])

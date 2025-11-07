@@ -244,6 +244,7 @@
 									</div>
 
 									<!-- File Upload -->
+									<!-- File Upload -->
 									<div class="col-md-12">
 										<label class="form-label">File Uploads</label>
 										<div class="upload-box mb-3" id="uploadBox">
@@ -251,8 +252,9 @@
 											<p class="mb-1"><strong>Click to upload file</strong> or drag and drop</p>
 											<small class="text-muted">Max 10GB total storage. DOCX / PPTX / CSV /
 												PDF</small>
+											<!-- REMOVE required attribute here -->
 											<input type="file" class="form-control d-none" id="fileInput" name="files"
-												multiple <%=!isEdit ? 'required' : '' %>>
+												multiple>
 										</div>
 
 										<% if (!isEdit) { %>
@@ -260,76 +262,14 @@
 												<span class="pe-3">or</span>
 												<button type="button" class="btn btn-primary rounded-pill"
 													data-bs-toggle="modal" data-bs-target="#folder-modal"
-													id="createFolderBtn" disabled>Create
-													Folder</button>
+													id="createFolderBtn" disabled>Create Folder</button>
 											</div>
 											<% } %>
 
-												<!-- <div id="fileList">
-													<% if (isEdit && document.files && document.files.length) { %>
-														<% document.files.forEach(file=> { %>
-															<div class="file-item col-sm-5 mb-3 p-3 border rounded"
-																data-file-id="<%= file._id %>">
-																<div class="file-info d-flex align-items-center">
-																	<i class="fa-solid fa-file fa-2x me-3"></i>
-																	<div class="flex-grow-1">
-																		<h6 class="mb-0 text-truncate">
-																			<%= file.originalName %>
-																		</h6>
-																		<small class="text-muted">
-																			<%= (file.size / 1024 / 1024).toFixed(2) %>
-																				MB
-																		</small>
-																	</div>
-																</div>
-																<div class="file-progress mt-2">
-																	<div class="progress">
-																		<div class="progress-bar bg-success"
-																			role="progressbar" style="width: 100%">
-																			Uploaded</div>
-																	</div>
-																</div>
-																<a href="<%= file.url || '/uploads/' + file.filename %>"
-																	target="_blank"
-																	class="btn btn-sm btn-info mt-2 me-2">
-																	<i class="fa-solid fa-eye"></i> View
-																</a>
-																<button class="remove-btn btn btn-sm btn-danger mt-2"
-																	data-file-id="<%= file._id %>">
-																	<i class="fa-solid fa-xmark"></i> Remove
-																</button>
-															</div>
-															<% }) %>
-																<% } %>
-												</div> -->
 												<div id="fileList">
-													<% if (isEdit && document.files && document.files.length) { %>
-														<% document.files.forEach(file=> { %>
-															<div class="file-item col-sm-5 mb-3 p-3 border rounded"
-																data-file-id="<%= file._id %>">
-																<div class="file-info d-flex align-items-center">
-																	<i class="fa-solid fa-file fa-2x me-3"></i>
-																	<div class="flex-grow-1">
-																		<h6 class="mb-0 text-truncate">
-																			<%= file.originalName || "Unnamed file" %>
-																		</h6>
-																	</div>
-																</div>
-																<a href="<%= file.file %>" target="_blank"
-																	class="btn btn-sm btn-info mt-2 me-2">
-																	<i class="fa-solid fa-eye"></i> View
-																</a>
-																<button class="remove-btn btn btn-sm btn-danger mt-2"
-																	data-file-id="<%= file._id %>">
-																	<i class="fa-solid fa-xmark"></i> Remove
-																</button>
-															</div>
-															<% }) %>
-																<% } %>
+													<!-- existing file list code -->
 												</div>
-
 									</div>
-
 									<!-- Signature -->
 									<div class="col-md-12">
 										<label class="form-label">Add Your Signature</label>

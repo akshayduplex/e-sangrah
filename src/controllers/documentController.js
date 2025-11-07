@@ -649,12 +649,12 @@ export const getArchivedDocuments = async (req, res) => {
     try {
         const draw = parseInt(req.query.draw) || 1;
         const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 10;
+        const limit = Math.min(parseInt(req.query.limit) || 10, 500); // safety cap
         const skip = (page - 1) * limit;
 
-        const search = req.query.search || '';
-        const orderColumn = req.query.orderColumn || 'updatedAt';
-        const orderDir = req.query.orderDir === 'asc' ? 1 : -1;
+        const search = req.query.search?.trim() || "";
+        const orderColumn = req.query.orderColumn || "updatedAt";
+        const orderDir = req.query.orderDir === "asc" ? 1 : -1;
 
         const userId = req.user?._id;
         const profileType = req.user?.profile_type;
@@ -664,41 +664,75 @@ export const getArchivedDocuments = async (req, res) => {
             isDeleted: false,
         };
 
-        if (profileType !== 'superadmin') {
+        // Restrict data for non-superadmins
+        if (profileType !== "superadmin") {
             query.owner = userId;
         }
 
-        if (req.query.department && req.query.department !== 'all') {
-            query.department = req.query.department;
+        if (req.query.department && req.query.department !== "all") {
+            query.department = new mongoose.Types.ObjectId(req.query.department);
         }
 
+        // Efficient text or regex search
         if (search) {
-            query['files'] = {
-                $elemMatch: { originalName: { $regex: search, $options: 'i' } }
-            };
+            query.$or = [
+                { "metadata.fileDescription": { $regex: search, $options: "i" } },
+                { "metadata.mainHeading": { $regex: search, $options: "i" } },
+                { "tags": { $regex: search, $options: "i" } },
+                { "files.originalName": { $regex: search, $options: "i" } }
+            ];
         }
+
+        // === Aggregation pipeline for performance ===
+        const pipeline = [
+            { $match: query },
+            {
+                $lookup: {
+                    from: "departments",
+                    localField: "department",
+                    foreignField: "_id",
+                    as: "department"
+                }
+            },
+            { $unwind: { path: "$department", preserveNullAndEmptyArrays: true } },
+            {
+                $project: {
+                    _id: 1,
+                    createdAt: 1,
+                    updatedAt: 1,
+                    tags: 1,
+                    metadata: 1,
+                    department: { name: "$department.name" },
+                    files: {
+                        $filter: {
+                            input: "$files",
+                            as: "file",
+                            cond: { $eq: ["$$file.isPrimary", true] }
+                        }
+                    }
+                }
+            },
+            { $sort: { [orderColumn]: orderDir } },
+            { $skip: skip },
+            { $limit: limit }
+        ];
 
         const [documents, total] = await Promise.all([
-            Document.find(query)
-                .populate("department", "name")
-                .populate("files", "originalName version isPrimary fileSize")
-                .sort({ [orderColumn]: orderDir })
-                .skip(skip)
-                .limit(limit),
+            Document.aggregate(pipeline).allowDiskUse(true),
             Document.countDocuments(query)
         ]);
 
-        return res.json({
+        res.json({
             draw,
             recordsTotal: total,
             recordsFiltered: total,
             data: documents
         });
-
     } catch (err) {
-        console.error(err);
-        return res.status(500).json({ success: false, message: err.message });
+        console.error("Error fetching archived documents:", err);
+        res.status(500).json({ success: false, message: err.message });
     }
+
 };
 
 // Restore a soft-deleted document
@@ -827,7 +861,7 @@ export const createDocument = async (req, res) => {
 
                 if (projectData && projectData.approvalAuthority) {
                     documentApprovalAuthority = projectData.approvalAuthority.map(auth => ({
-                        approver: auth.userId,
+                        userId: auth.userId,
                         priority: auth.priority,
                         designation: auth.designation,
                         isMailSent: false,
@@ -866,7 +900,7 @@ export const createDocument = async (req, res) => {
             documentVendor: documentVendor || null,
             folderId: validFolderId,
             owner: req.user._id,
-            status: "Draft",
+            status: "Pending",
             tags: parsedTags,
             metadata: parsedMetadata,
             description,
@@ -972,7 +1006,7 @@ export const createDocument = async (req, res) => {
             { path: "owner", select: "name email" },
             { path: "files", select: "originalName fileType s3Url" },
             {
-                path: "documentApprovalAuthority.approver",
+                path: "documentApprovalAuthority.userId",
                 select: "name email"
             },
         ]);
@@ -2012,6 +2046,7 @@ export const getSharedUsers = async (req, res) => {
         const userId = req.user?._id;
         const profileType = req.user?.profile_type;
 
+        // --- Validate IDs and Auth ---
         if (!mongoose.Types.ObjectId.isValid(documentId)) {
             return res.status(400).json({ success: false, message: "Invalid document ID" });
         }
@@ -2026,14 +2061,33 @@ export const getSharedUsers = async (req, res) => {
             return res.status(404).json({ success: false, message: "Document not found" });
         }
 
-        // --- Build query for shared users ---
+        // --- Build base query ---
         const query = {
             document: documentId,
             inviteStatus: "accepted"
         };
 
-        // If NOT superadmin and NOT owner, only show shares added by this user
-        if (profileType !== "superadmin" && document.owner._id.toString() !== userId.toString()) {
+        // --- Access control ---
+        const isOwner = document.owner._id.toString() === userId.toString();
+        const isSuperAdmin = profileType === "superadmin";
+
+        // For non-owner and non-superadmin users:
+        if (!isOwner && !isSuperAdmin) {
+            // Ensure user has access to this document
+            const userHasAccess = await SharedWith.exists({
+                document: documentId,
+                user: userId,
+                inviteStatus: "accepted"
+            });
+
+            if (!userHasAccess) {
+                return res.status(403).json({
+                    success: false,
+                    message: "You do not have permission to view this document's shared users"
+                });
+            }
+
+            // Restrict visibility to only shares this user created
             query.addedby = userId;
         }
 
@@ -2704,15 +2758,6 @@ export const createOrUpdateApprovalRequest = async (req, res) => {
         const approverId = rawApproverId?.trim();
         const designation = rawDesignation?.trim();
 
-        console.log("createOrUpdateApprovalRequest called with:", {
-            documentId,
-            approverId,
-            priority,
-            remark,
-            designation,
-            isMailSent
-        });
-
         // --- Validate required fields ---
         if (!documentId || !approverId || priority == null) {
             return res.status(400).json({
@@ -2754,7 +2799,7 @@ export const createOrUpdateApprovalRequest = async (req, res) => {
 
             return res.status(200).json({
                 success: true,
-                message: "Approval updated successfully",
+                message: "Approval successfully",
                 approval
             });
         }
@@ -2916,7 +2961,7 @@ export const updateApprovalStatus = async (req, res) => {
         }
 
         res.json({
-            message: 'Approval updated successfully',
+            message: 'Approval successfully',
             approval: approverRecord,
             approvals: document.documentApprovalAuthority,
             status: document.status
@@ -3074,7 +3119,6 @@ export const verifyApprovalMail = async (req, res) => {
             }
 
             await document.save();
-            console.log(`Approval processed successfully for document ${documentId}`);
         })();
 
     } catch (error) {

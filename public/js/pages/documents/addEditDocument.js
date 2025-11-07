@@ -344,7 +344,10 @@ $(document).ready(function () {
     // Handle file uploads
     async function handleFileUpload(files) {
         const folderId = document.getElementById('selectedFolderId').value;
-        if (!folderId) return showToast("Please select a folder.", 'info');
+        if (!folderId) {
+            showToast("Please select a folder.", 'info');
+            return;
+        }
 
         for (const file of files) {
             const tempId = 'temp_' + Date.now() + Math.random().toString(36).substring(2, 8);
@@ -354,22 +357,22 @@ $(document).ready(function () {
             fileItem.setAttribute("data-file-id", tempId);
 
             fileItem.innerHTML = `
-            <div class="file-info d-flex align-items-center">
-                <i class="fa-solid fa-file fa-2x me-3"></i>
-                <div class="flex-grow-1">
-                    <h6 class="mb-0 text-truncate">${file.name}</h6>
-                    <small class="text-muted">${(file.size / 1024 / 1024).toFixed(2)} MB</small>
-                </div>
+        <div class="file-info d-flex align-items-center">
+            <i class="fa-solid fa-file fa-2x me-3"></i>
+            <div class="flex-grow-1">
+                <h6 class="mb-0 text-truncate">${file.name}</h6>
+                <small class="text-muted">${(file.size / 1024 / 1024).toFixed(2)} MB</small>
             </div>
-            <div class="file-progress mt-2">
-                <div class="progress">
-                    <div class="progress-bar bg-success" role="progressbar" style="width:0%">0%</div>
-                </div>
+        </div>
+        <div class="file-progress mt-2">
+            <div class="progress">
+                <div class="progress-bar bg-success" role="progressbar" style="width:0%">0%</div>
             </div>
-            <button class="remove-btn btn btn-sm btn-danger mt-2" data-file-id="${tempId}" disabled>
-                <i class="fa-solid fa-xmark"></i> Remove
-            </button>
-        `;
+        </div>
+        <button class="remove-btn btn btn-sm btn-danger mt-2" data-file-id="${tempId}" disabled>
+            <i class="fa-solid fa-xmark"></i> Remove
+        </button>
+    `;
             fileList.appendChild(fileItem);
 
             const progressBar = fileItem.querySelector(".progress-bar");
@@ -391,7 +394,7 @@ $(document).ready(function () {
                 fileItem.setAttribute("data-file-id", fileId);
                 removeBtn.setAttribute("data-file-id", fileId);
                 removeBtn.disabled = false;
-                // Now that fileId is real, enable opening file on double-click
+
                 fileItem.addEventListener('dblclick', () => {
                     window.location.href = `/folders/view/${fileId}`;
                 });
@@ -404,6 +407,10 @@ $(document).ready(function () {
                 progressBar.classList.add("bg-danger");
                 progressBar.textContent = "Error";
                 console.error("Upload failed:", err);
+                // Remove the failed file item
+                setTimeout(() => {
+                    fileItem.remove();
+                }, 3000);
             }
         }
     }
@@ -860,44 +867,65 @@ $(document).ready(function () {
     // --------------------------
     $('#documentForm').on('submit', async function (e) {
         e.preventDefault();
+
+        const submitBtn = $('#submitBtn');
+
+        // Prevent multiple submissions
+        if (submitBtn.prop('disabled')) {
+            return;
+        }
+
+        // Validate required fields before submission
+        if (!validateForm()) {
+            return;
+        }
+
+        // Update summernote content
         $('#summernote').val($('.summernote').summernote('code'));
 
-        $('#submitBtn').prop('disabled', true).html(
-            '<span class="spinner-border spinner-border-sm" role="status"></span> ' + (window.isEdit ? "Updating..." : "Adding...")
+        // Disable button and show loading state
+        submitBtn.prop('disabled', true).html(
+            '<span class="spinner-border spinner-border-sm" role="status"></span> ' +
+            (window.isEdit ? "Updating..." : "Adding...")
         );
 
         try {
+            // Create fileIds input
             const fileIdsInput = document.createElement('input');
             fileIdsInput.type = 'hidden';
             fileIdsInput.name = 'fileIds';
             fileIdsInput.value = JSON.stringify(uploadedFileIds || []);
             this.appendChild(fileIdsInput);
 
-            // NEW: clear the raw file input so multer won't receive unexpected 'files' field
+            // Clear the file input to prevent browser validation issues
             const rawFileInput = document.getElementById('fileInput');
             if (rawFileInput) {
-                try {
-                    rawFileInput.value = ''; // clears selected files from the <input>
-                } catch (err) {
-                    // fallback: remove input from DOM temporarily
-                    rawFileInput.parentNode && rawFileInput.parentNode.removeChild(rawFileInput);
-                }
+                rawFileInput.removeAttribute('required'); // Remove required attribute
+                rawFileInput.value = ''; // Clear the value
             }
 
             const formData = new FormData(this);
             const url = window.isEdit ? '/api/documents/' + window.documentId : '/api/documents';
             const method = window.isEdit ? 'PATCH' : 'POST';
 
-            const response = await fetch(url, { method, body: formData });
+            const response = await fetch(url, {
+                method,
+                body: formData
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
             const data = await response.json();
 
             if (data.success) {
-                const doc = data.data.document; // extract the document
+                const doc = data.data.document;
                 if (doc?.metadata?.fileName) {
                     document.getElementById('successFileName').textContent = doc.metadata.fileName;
                 }
 
-                // Show modal
+                // Show success modal
                 const successModal = new bootstrap.Modal(document.getElementById('data-success-modal'));
                 successModal.show();
 
@@ -907,12 +935,88 @@ $(document).ready(function () {
                     }, { once: true });
                 }
             } else {
-                showToast('Error: ' + (data.message || 'Unknown error occurred'), 'error');
+                throw new Error(data.message || 'Unknown error occurred');
             }
         } catch (error) {
-            showToast('An error occurred while submitting the form.' + error, 'error');
-        } finally {
-            $('#submitBtn').prop('disabled', false).html(window.isEdit ? "Update Document" : "Add Document");
+            console.error('Form submission error:', error);
+
+            let errorMessage = 'An error occurred while submitting the form.';
+            if (error.message.includes('HTTP error')) {
+                errorMessage = 'Network error. Please check your connection and try again.';
+            } else if (error.message) {
+                errorMessage = 'Error: ' + error.message;
+            }
+
+            showToast(errorMessage, 'error');
+
+            // Re-enable the button on error
+            submitBtn.prop('disabled', false).html(
+                window.isEdit ? "Update Document" : "Add Document"
+            );
         }
     });
+
+    // Custom form validation function
+    function validateForm() {
+        const projectName = $('#projectName').val();
+        const department = $('#department').val();
+        const projectManager = $('#projectManager').val();
+        const documentDate = $('input[name="documentDate"]').val();
+        const documentDonor = $('#documentDonor').val();
+        const documentVendor = $('#documentVendor').val();
+        const folderId = $('#selectedFolderId').val();
+
+        // Check if files are uploaded (only for new documents)
+        if (!window.isEdit && uploadedFileIds.length === 0) {
+            showToast('Please upload at least one file.', 'error');
+            // Scroll to upload section
+            document.getElementById('uploadBox').scrollIntoView({ behavior: 'smooth', block: 'center' });
+            return false;
+        }
+
+        // Validate other required fields
+        if (!projectName || projectName === 'all') {
+            showToast('Please select a project name.', 'error');
+            $('#projectName').focus();
+            return false;
+        }
+
+        if (!department || department === 'all') {
+            showToast('Please select a department.', 'error');
+            $('#department').focus();
+            return false;
+        }
+
+        if (!projectManager || projectManager === 'all') {
+            showToast('Please select a project manager.', 'error');
+            $('#projectManager').focus();
+            return false;
+        }
+
+        if (!documentDate) {
+            showToast('Please select a document date.', 'error');
+            $('input[name="documentDate"]').focus();
+            return false;
+        }
+
+        if (!documentDonor || documentDonor === 'all') {
+            showToast('Please select a donor.', 'error');
+            $('#documentDonor').focus();
+            return false;
+        }
+
+        if (!documentVendor || documentVendor === 'all') {
+            showToast('Please select a vendor.', 'error');
+            $('#documentVendor').focus();
+            return false;
+        }
+
+        if (!folderId) {
+            showToast('Please select a folder.', 'error');
+            $('#folderContainer').scrollIntoView({ behavior: 'smooth', block: 'center' });
+            return false;
+        }
+
+        return true;
+    }
 });

@@ -34,26 +34,44 @@ export const getDashboardStats = async (req, res) => {
         const userId = new mongoose.Types.ObjectId(user._id);
         const userDepartment = user.department ? new mongoose.Types.ObjectId(user.department) : null;
         const profileType = user.profile_type;
+        const selectedYear = req.session.selectedYear;
+        const selectedProjectId = req.session.selectedProject ? new mongoose.Types.ObjectId(req.session.selectedProject) : null;
 
+        // Base filters
         const matchConditions = [
             { isDeleted: { $ne: true } },
-            { isArchived: { $ne: true } }
+            { isArchived: { $ne: true } },
         ];
 
+        // Filter by selected project if available
+        if (selectedProjectId) {
+            matchConditions.push({ project: selectedProjectId });
+        }
+
+        // Filter by selected year if available
+        if (selectedYear) {
+            const startOfYear = new Date(`${selectedYear}-01-01T00:00:00.000Z`);
+            const endOfYear = new Date(`${Number(selectedYear) + 1}-01-01T00:00:00.000Z`);
+            matchConditions.push({ createdAt: { $gte: startOfYear, $lt: endOfYear } });
+        }
+
+        // Apply access restrictions for non-superadmin users
         if (profileType !== "superadmin") {
             const accessConditions = [
                 { owner: userId },
-                { sharedWithUsers: userId }
+                { sharedWithUsers: userId },
             ];
-            if (userDepartment) accessConditions.push({ department: userDepartment });
+
+            if (userDepartment) {
+                accessConditions.push({ department: userDepartment });
+            }
 
             matchConditions.push({ $or: accessConditions });
         }
 
+        // Aggregate stats
         const documentStats = await Document.aggregate([
-            {
-                $match: { $and: matchConditions }
-            },
+            { $match: { $and: matchConditions } },
             {
                 $group: {
                     _id: "$status",
@@ -62,11 +80,14 @@ export const getDashboardStats = async (req, res) => {
             }
         ]);
 
+        // Format stats
         const stats = { total: 0, draft: 0, pending: 0, approved: 0, rejected: 0 };
 
         documentStats.forEach(stat => {
             const key = stat._id?.toLowerCase();
-            if (stats.hasOwnProperty(key)) stats[key] = stat.count;
+            if (stats.hasOwnProperty(key)) {
+                stats[key] = stat.count;
+            }
             stats.total += stat.count;
         });
 

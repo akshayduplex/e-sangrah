@@ -341,12 +341,12 @@
                     if (response.ok) {
                         location.reload();
                     } else {
-                        alert('Error: ' + result.error);
+                        showToast('Error: ' + result.error, 'error');
                         submitButton.disabled = false;
                         submitButton.textContent = action === 'approve' ? 'Approve' : 'Reject';
                     }
                 } catch (error) {
-                    alert('Error updating approval: ' + error.message);
+                    showToast('Error updating approval: ' + error.message, 'error');
                     submitButton.disabled = false;
                     submitButton.textContent = action === 'approve' ? 'Approve' : 'Reject';
                 }

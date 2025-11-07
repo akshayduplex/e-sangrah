@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 const { Decimal128 } = mongoose.Schema.Types;
 const documentSchema = new mongoose.Schema({
-    description: { type: String, trim: true, maxlength: 1000 },
+    description: { type: String, trim: true, maxlength: 10000 },
     project: { type: mongoose.Schema.Types.ObjectId, ref: "Project", default: null },
     department: { type: mongoose.Schema.Types.ObjectId, ref: "Department" },
     folderId: { type: mongoose.Schema.Types.ObjectId, ref: "Folder", default: null },

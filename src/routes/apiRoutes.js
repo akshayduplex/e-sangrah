@@ -187,19 +187,19 @@ router.get("/documents/recyclebin", DocumentController.getRecycleBinDocuments);
  * Document Sharing & Permissions
  */
 // Share a document
-router.patch("/documents/:id/share", authorize('admin', 'superadmin'), DocumentValidators.shareDocumentValidator, validators, DocumentController.shareDocument);
+router.patch("/documents/:id/share", DocumentValidators.shareDocumentValidator, validators, DocumentController.shareDocument);
 
 // List all users a document is shared with
 router.get("/documents/:documentId/shared-users", DocumentController.getSharedUsers);
 
 // Done for updating the permission of all people with access
-router.patch("/documents/:documentId/permissions", authorize('admin', 'superadmin'), DocumentValidators.bulkPermissionUpdateValidator, validators, DocumentController.bulkPermissionUpdate);
+router.patch("/documents/:documentId/permissions", DocumentValidators.bulkPermissionUpdateValidator, validators, DocumentController.bulkPermissionUpdate);
 
 // Update user access level for a shared document
-router.put("/documents/share/:documentId", authorize('admin', 'superadmin'), DocumentValidators.updateSharedUserValidator, validators, DocumentController.updateSharedUser);
+router.put("/documents/share/:documentId", DocumentValidators.updateSharedUserValidator, validators, DocumentController.updateSharedUser);
 
 // Remove user from shared list
-router.delete("/documents/share/:documentId", authorize('admin', 'superadmin'), DocumentValidators.removeSharedUserValidator, validators, DocumentController.removeSharedUser);
+router.delete("/documents/share/:documentId", DocumentValidators.removeSharedUserValidator, validators, DocumentController.removeSharedUser);
 
 // Invite a user to a document (sends email)
 router.post("/documents/:documentId/invite", DocumentValidators.inviteUserValidator, validators, DocumentController.inviteUser);
@@ -211,7 +211,7 @@ router.get("/documents/:documentId/invite/:userId/auto-accept", DocumentControll
 router.post("/documents/:documentId/request-access", DocumentValidators.requestAccessValidator, validators, DocumentController.requestAccessAgain);
 
 // Grant access via token
-router.post("/documents/grant-access/:token", authorize('admin', 'superadmin'), DocumentValidators.grantAccessViaTokenValidator, validators, DocumentController.grantAccessViaToken);
+router.post("/documents/grant-access/:token", DocumentValidators.grantAccessViaTokenValidator, validators, DocumentController.grantAccessViaToken);
 
 // Generate shareable link for a document file
 router.get('/documents/:documentId/:fileId/share-link', DocumentController.generateShareableLink)

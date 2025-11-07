@@ -18,20 +18,6 @@
             </div>
             <!-- /Breadcrumb -->
 
-            <!-- DEBUG SECTION -->
-            <div class="alert alert-info mb-3" id="debugInfo">
-                <h6>Debug Information:</h6>
-                <p><strong>Document ID:</strong> <span id="debugDocId">
-                        <%= document._id %>
-                    </span></p>
-                <p><strong>Signature Present:</strong> <span id="debugSignature">
-                        <%= document.signature ? 'Yes' : 'No' %>
-                    </span></p>
-                <p><strong>Files Count:</strong> <span id="debugFiles">
-                        <%= document.files ? document.files.length : 0 %>
-                    </span></p>
-            </div>
-
             <div class="add-info-fieldset">
                 <form id="documentForm" enctype="multipart/form-data">
                     <input type="hidden" name="_method" value="PATCH">
@@ -43,55 +29,6 @@
 
                     <div class="modal-body">
                         <div class="row">
-                            <!-- Document Name -->
-                            <div class="col-md-4">
-                                <div class="mb-3">
-                                    <label class="form-label">Document Name <span class="text-danger">*</span></label>
-                                    <input type="text" id="documentName" name="documentName" class="form-control"
-                                        value="<%= document.documentName || '' %>" required>
-                                </div>
-                            </div>
-
-                            <!-- Document Type -->
-                            <div class="col-md-4">
-                                <div class="mb-3">
-                                    <label class="form-label">Document Type</label>
-                                    <select id="documentType" name="documentType" class="form-select select2">
-                                        <option value="">-- Select Type --</option>
-                                        <option value="contract" <%=document.documentType==='contract' ? 'selected' : ''
-                                            %>>Contract</option>
-                                        <option value="report" <%=document.documentType==='report' ? 'selected' : '' %>
-                                            >Report</option>
-                                        <option value="proposal" <%=document.documentType==='proposal' ? 'selected' : ''
-                                            %>>Proposal</option>
-                                        <option value="invoice" <%=document.documentType==='invoice' ? 'selected' : ''
-                                            %>>Invoice</option>
-                                        <option value="other" <%=document.documentType==='other' ? 'selected' : '' %>
-                                            >Other</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            <!-- Document Status -->
-                            <div class="col-md-4">
-                                <div class="mb-3">
-                                    <label class="form-label">Document Status</label>
-                                    <select id="documentStatus" name="documentStatus" class="form-select select2">
-                                        <option value="">-- Select Status --</option>
-                                        <option value="draft" <%=document.documentStatus==='draft' ? 'selected' : '' %>
-                                            >Draft</option>
-                                        <option value="in-review" <%=document.documentStatus==='in-review' ? 'selected'
-                                            : '' %>>In Review</option>
-                                        <option value="approved" <%=document.documentStatus==='approved' ? 'selected'
-                                            : '' %>>Approved</option>
-                                        <option value="rejected" <%=document.documentStatus==='rejected' ? 'selected'
-                                            : '' %>>Rejected</option>
-                                        <option value="archived" <%=document.documentStatus==='archived' ? 'selected'
-                                            : '' %>>Archived</option>
-                                    </select>
-                                </div>
-                            </div>
-
                             <!-- Project Name -->
                             <div class="col-md-4">
                                 <div class="mb-3">
@@ -162,10 +99,10 @@
                                 </div>
                             </div>
 
-                            <!-- Document Date -->
+                            <!-- Start Date -->
                             <div class="col-md-4">
                                 <div class="mb-3">
-                                    <label class="form-label">Document Date</label>
+                                    <label class="form-label">Start Date</label>
                                     <div class="input-icon-end position-relative">
                                         <input type="text" name="documentDate" class="form-control datetimepicker"
                                             placeholder="dd/mm/yyyy"
@@ -181,42 +118,6 @@
                                     <label class="form-label">Tags (comma separated)</label>
                                     <input type="text" name="tags" class="form-control" placeholder="tag1, tag2, tag3"
                                         value="<%= document.tags ? document.tags.join(', ') : '' %>">
-                                </div>
-                            </div>
-
-                            <!-- Document Reference -->
-                            <div class="col-md-4">
-                                <div class="mb-3">
-                                    <label class="form-label">Document Reference</label>
-                                    <input type="text" id="documentReference" name="documentReference"
-                                        class="form-control" value="<%= document.documentReference || '' %>">
-                                </div>
-                            </div>
-
-                            <!-- Document Version -->
-                            <div class="col-md-4">
-                                <div class="mb-3">
-                                    <label class="form-label">Document Version</label>
-                                    <input type="text" id="documentVersion" name="documentVersion" class="form-control"
-                                        value="<%= document.documentVersion || '' %>">
-                                </div>
-                            </div>
-
-                            <!-- Document Priority -->
-                            <div class="col-md-4">
-                                <div class="mb-3">
-                                    <label class="form-label">Document Priority</label>
-                                    <select id="documentPriority" name="documentPriority" class="form-select select2">
-                                        <option value="">-- Select Priority --</option>
-                                        <option value="low" <%=document.documentPriority==='low' ? 'selected' : '' %>
-                                            >Low</option>
-                                        <option value="medium" <%=document.documentPriority==='medium' ? 'selected' : ''
-                                            %>>Medium</option>
-                                        <option value="high" <%=document.documentPriority==='high' ? 'selected' : '' %>
-                                            >High</option>
-                                        <option value="urgent" <%=document.documentPriority==='urgent' ? 'selected' : ''
-                                            %>>Urgent</option>
-                                    </select>
                                 </div>
                             </div>
 
@@ -369,7 +270,7 @@
                                                         </div>
                                                         <div class="file-actions mt-2 d-flex gap-2">
                                                             <% if (file.file) { %>
-                                                                <a href="<%= file.file %>" target="_blank"
+                                                                <a href="/folders/view/<%= file._id %>" target="_blank"
                                                                     class="btn btn-sm btn-info flex-fill">
                                                                     <i class="fa-solid fa-eye"></i> View
                                                                 </a>

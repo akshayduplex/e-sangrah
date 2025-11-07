@@ -1411,9 +1411,6 @@ export const updateFolderLogPermission = async (req, res) => {
         const { logId } = req.params;
         const { requestStatus, access, duration, customEnd } = req.body;
         const updatedBy = req.user?._id || null;
-
-        debugger; // <-- sets a breakpoint for step-by-step debugging if using a debugger tool
-
         const log = await FolderPermissionLogs.findById(logId);
         if (!log) {
             return res.status(404).json({ message: "Log not found" });
@@ -1508,26 +1505,23 @@ export const updateFolderLogPermission = async (req, res) => {
  * @param req.body.canDownload - Boolean (optional)
  * @param req.body.access - Array of access strings: ['view','edit','owner'] (optional)
  */
+
 export const updateFolderPermission = async (req, res) => {
     const { id } = req.params;
-    // Support either a single permission payload or a bulk array called `permissions`
     const { permissions, principalId, canDownload, access, status } = req.body;
     const updatedBy = req.user?._id || null;
 
-    // helper to normalize one entry
-    const normalizeEntry = (entry) => {
-        if (!entry) return null;
-        return {
-            principalId: entry.principalId || entry.principal || null,
-            canDownload: typeof entry.canDownload === 'boolean' ? entry.canDownload : (entry.canDownload === undefined ? undefined : Boolean(entry.canDownload)),
-            access: typeof entry.access === 'string' ? entry.access : undefined,
-            model: entry.model || 'User',
-            expiresAt: entry.expiresAt || null,
-            customStart: entry.customStart || null,
-            customEnd: entry.customEnd || null,
-            duration: entry.duration || undefined
-        };
-    };
+    // ---------- 1. Helper ----------
+    const normalizeEntry = (e) => ({
+        principalId: e.principalId || e.principal || null,
+        canDownload: typeof e.canDownload === 'boolean' ? e.canDownload : undefined,
+        access: typeof e.access === 'string' ? e.access : undefined,
+        model: e.model || 'User',
+        expiresAt: e.expiresAt ?? null,
+        customStart: e.customStart ?? null,
+        customEnd: e.customEnd ?? null,
+        duration: e.duration ?? undefined
+    });
 
     try {
         if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -1537,76 +1531,67 @@ export const updateFolderPermission = async (req, res) => {
         const folder = await Folder.findById(id);
         if (!folder) return res.status(404).json({ message: 'Folder not found' });
 
-        // Update status if provided and valid
+        // ---------- 2. STATUS (Block / Unblock) ----------
         if (status && ['active', 'inactive'].includes(status)) {
             folder.status = status;
         }
 
-        // Build list of entries to process
+        // ---------- 3. PERMISSIONS ----------
         let entriesToProcess = [];
 
-        if (Array.isArray(permissions)) {
+        // a) Bulk array
+        if (Array.isArray(permissions) && permissions.length) {
             entriesToProcess = permissions.map(normalizeEntry).filter(Boolean);
-        } else if (principalId) {
+        }
+        // b) Single-object shorthand (old UI)
+        else if (principalId) {
             entriesToProcess = [normalizeEntry({ principalId, canDownload, access })];
-        } else {
-            return res.status(400).json({ message: 'No permission data provided' });
         }
 
-        // Process each entry (update existing ACE or create new)
-        const processedPrincipals = [];
+        // Process each ACE
         for (const entry of entriesToProcess) {
             const pid = entry.principalId;
-            if (!pid || !mongoose.Types.ObjectId.isValid(pid)) {
-                // skip invalid principal
-                continue;
-            }
+            if (!pid || !mongoose.Types.ObjectId.isValid(pid)) continue;
 
-            // find existing permission subdoc
             let ace = folder.permissions.find(p => String(p.principal) === String(pid));
 
             if (ace) {
-                // Update only provided fields (note: allow canDownload = false)
+                // update only the fields that were sent
                 if (entry.access !== undefined) ace.access = entry.access;
                 if (entry.canDownload !== undefined) ace.canDownload = entry.canDownload;
-                if (entry.expiresAt !== null && entry.expiresAt !== undefined) ace.expiresAt = entry.expiresAt;
-                if (entry.customStart !== null && entry.customStart !== undefined) ace.customStart = entry.customStart;
-                if (entry.customEnd !== null && entry.customEnd !== undefined) ace.customEnd = entry.customEnd;
+                if (entry.expiresAt !== null) ace.expiresAt = entry.expiresAt;
+                if (entry.customStart !== null) ace.customStart = entry.customStart;
+                if (entry.customEnd !== null) ace.customEnd = entry.customEnd;
                 if (entry.duration) ace.duration = entry.duration;
             } else {
-                // create new ACE - push plain object; mongoose will cast it to subdoc
-                const newAce = {
+                // create new ACE
+                folder.permissions.push({
                     principal: pid,
-                    model: entry.model || 'User',
-                    access: entry.access || 'view',
-                    canDownload: typeof entry.canDownload === 'boolean' ? entry.canDownload : false,
-                    expiresAt: entry.expiresAt || null,
-                    customStart: entry.customStart || null,
-                    customEnd: entry.customEnd || null,
-                    duration: entry.duration || 'lifetime'
-                };
-                folder.permissions.push(newAce);
+                    model: entry.model,
+                    access: entry.access ?? 'view',
+                    canDownload: entry.canDownload ?? false,
+                    expiresAt: entry.expiresAt ?? null,
+                    customStart: entry.customStart ?? null,
+                    customEnd: entry.customEnd ?? null,
+                    duration: entry.duration ?? 'lifetime'
+                });
             }
-
-            processedPrincipals.push(String(pid));
         }
 
         folder.updatedBy = updatedBy;
         await folder.save();
 
-        // Return updated ACEs for processed principals (or all if none matched)
-        const updatedPermissions = processedPrincipals.length
-            ? folder.permissions.filter(p => processedPrincipals.includes(String(p.principal)))
-            : folder.permissions;
-
+        // ---------- 4. Response ----------
         return res.json({
-            message: 'Permission(s) updated successfully',
-            permissions: updatedPermissions,
-            folderStatus: folder.status
+            success: true,
+            message: 'Folder updated',
+            folderStatus: folder.status,
+            permissions: folder.permissions   // send back the whole array (frontend expects it)
         });
+
     } catch (err) {
         console.error('updateFolderPermission error:', err);
-        return res.status(500).json({ message: 'Server error', error: err.message });
+        return res.status(500).json({ success: false, message: 'Server error', error: err.message });
     }
 };
 export const getFolderAccess = async (req, res) => {

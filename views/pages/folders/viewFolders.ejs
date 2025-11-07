@@ -311,7 +311,7 @@
                                 if (action === "view") window.location.href = `/folders/view/${fileId}`;
                                 if (action === "download" && CAN_DOWNLOAD) window.location.href = `/api/download/file/${fileId}`;
                             } else {
-                                alert("File not found");
+                                showToast("File not found", 'error');
                             }
                         };
 

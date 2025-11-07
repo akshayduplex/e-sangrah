@@ -311,7 +311,7 @@
                         throw new Error(data.message || 'Failed to load');
                     } catch (err) {
                         console.error(err);
-                        alert('Error loading document details');
+                        showToast('Error loading document details', 'error');
                         return null;
                     }
                 }
@@ -371,13 +371,12 @@
 
                             // Notify user
                             const message = currentMode === 'edit' ? 'Changes saved successfully!' : 'Approval submitted successfully!';
-                            console.log(message);
                         } else {
-                            alert(result.message || 'Operation failed');
+                            showToast(result.message || 'Operation failed', 'error');
                         }
                     } catch (err) {
                         console.error(err);
-                        alert('Network error');
+                        showToast('Network error', 'error');
                     } finally {
                         submitBtn.disabled = false;
                         submitBtn.innerHTML = currentMode === 'edit' ? 'Save Changes' : 'Approve';

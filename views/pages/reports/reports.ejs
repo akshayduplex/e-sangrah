@@ -328,7 +328,7 @@
 
 						if (!response.ok) {
 							const error = await response.json();
-							alert(`Export failed: ${error.message}`);
+							showToast(`Export failed: ${error.message}`, 'error');
 							return;
 						}
 
@@ -344,7 +344,7 @@
 
 					} catch (err) {
 						console.error('Export error:', err);
-						alert('Something went wrong while exporting.');
+						showToast('Something went wrong while exporting.', 'error');
 					}
 				});
 				// ---------------------

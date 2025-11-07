@@ -1,3 +1,5 @@
+import ejs from "ejs";
+import path from "path";
 import User from "../models/User.js";
 import { validationResult } from "express-validator";
 import { generateRandomPassword } from "../helper/GenerateRandomPassword.js";
@@ -9,7 +11,7 @@ import Project from "../models/Project.js";
 import UserPermission from "../models/UserPermission.js";
 import Menu from "../models/Menu.js";
 import { parseDateDDMMYYYY } from "../utils/formatDate.js";
-
+import { API_CONFIG } from "../config/ApiEndpoints.js";
 
 //page routes controllers
 
@@ -131,24 +133,20 @@ export const registerUser = async (req, res) => {
             await UserPermission.insertMany(permissionDocs);
         }
 
-        // === Send Email ===
-        const htmlContent = `
-            <p>Hello ${name},</p>
-            <p>Your account has been created successfully.</p>
-            <ul>
-                <li><strong>Employee ID:</strong> ${employee_id}</li>
-                <li><strong>Email:</strong> ${email}</li>
-                <li><strong>Password:</strong> ${randomPassword}</li>
-            </ul>
-            <p>Please log in and change your password immediately.</p>
-            <p>Thank you.</p>
-        `;
+        const templatePath = path.join(process.cwd(), "views", "emails", "welcomeTemplate.ejs");
+
+        const htmlContent = await ejs.renderFile(templatePath, {
+            name,
+            email,
+            password: randomPassword,
+            BASE_URL: API_CONFIG.baseUrl
+        });
 
         await sendEmail({
             to: email,
-            subject: "Your Account Has Been Created",
+            subject: "Welcome to E-Sangrah",
             html: htmlContent,
-            fromName: "Support Team",
+            fromName: "E-Sangrah Team",
         });
 
         res.status(201).json({
@@ -229,7 +227,7 @@ export const getAllUsers = async (req, res) => {
             User.find(filter)
                 .populate("userDetails.department", "name")
                 .populate("userDetails.designation", "name")
-                .select("name email profile_type createdAt userDetails status")
+                .select("name email phone_number profile_type createdAt userDetails status")
                 .sort({ [sortBy]: sortOrder === "asc" ? 1 : -1 })
                 .skip((page - 1) * limit)
                 .limit(Number(limit))

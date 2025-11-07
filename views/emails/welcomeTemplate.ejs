@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Welcome Email</title>
+</head>
+
+<body style="font-family:Arial;margin:0;padding:0;">
+    <div style="max-width:600px;">
+        <table style="width:100%;padding:20px;">
+            <tr>
+                <td style="text-align:center;">
+                    <img style="max-width:120px; margin-bottom:10px;" src="cid:logo@esangrah" alt="Logo">
+                </td>
+            </tr>
+            <tr>
+                <td style="background:#1c69d5;padding:10px; text-align:center;border-radius:6px;">
+                    <h2 style="font-size:24px;color:#fff;font-weight:500;">Welcome to E-Sangrah</h2>
+                    <img src="cid:imgmail@esangrah" alt="Email Banner">
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    <p style="line-height:25px; font-size:15px;">Hi <%= name %>,</p>
+                    <p style="line-height:25px; font-size:15px;">
+                        We're thrilled to have you join us! Your account has been successfully created.
+                        You can now log in and start using all the amazing features E-Sangrah offers.
+                    </p>
+                    <p style="line-height:25px; font-size:15px;">
+                        <strong>Email:</strong>
+                        <%= email %><br>
+                            <strong>Password:</strong>
+                            <%= password %>
+                    </p>
+                </td>
+            </tr>
+            <tr>
+                <td style="text-align:center;">
+                    <div style="margin:20px 0;">
+                        <a href="<%= BASE_URL %>/login"
+                            style="text-decoration:none;border-radius:7px;padding:10px 20px;color:#fff;background:#1c69d5;">
+                            Go to Dashboard
+                        </a>
+                    </div>
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    <p style="line-height:25px; font-size:15px;">
+                        If you didn't create this account, please ignore this email or
+                        <a href="<%= BASE_URL %>/support" style="color:blue;text-decoration:none;">contact support.</a>
+                    </p>
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    <div style="margin:15px 0;">
+                        <p style="line-height:25px; font-size:15px;margin-bottom:6px;">Regards,</p>
+                        <h4 style="font-size:17px;margin:0;font-weight:600;">The E-Sangrah Team</h4>
+                    </div>
+                </td>
+            </tr>
+        </table>
+    </div>
+</body>
+
+</html>

@@ -760,9 +760,6 @@
                     if (!res.ok) throw new Error('Failed to save year selection');
 
                     if (selectedYear) {
-                        console.log('Year selected:', selectedYear);
-                        // You can trigger any year-specific filtering here
-                        // For example, reload documents filtered by year
                         if (typeof reloadDocumentsByYear === 'function') {
                             reloadDocumentsByYear(selectedYear);
                         }
