@@ -323,9 +323,6 @@ export const updateApprovalStatusValidator = [
     param("documentId")
         .custom(isValidObjectId)
         .withMessage("Invalid document ID"),
-    body("approved")
-        .isBoolean()
-        .withMessage("approved must be a boolean"),
     body("comment")
         .optional()
         .isString()

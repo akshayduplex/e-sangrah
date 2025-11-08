@@ -193,7 +193,7 @@
 									<div class="col-md-12">
 										<div class="mb-3">
 											<div class="d-flex align-items-center gap-5">
-												<label class="form-label mb-0">Want Approver</label>
+												<label class="form-label mb-0">Allow Memeber Authority</label>
 												<div class="form-check">
 													<input class="form-check-input" type="radio" name="wantApprovers"
 														value="true" id="wantApproversYes" <%=isEdit &&
@@ -378,7 +378,7 @@
 								value="<%= isEdit && document.metadata && document.metadata.fileName ? document.metadata.fileName : '' %>">
 						</div>
 						<div class="mb-3">
-							<label class="form-label">File description</label>
+							<label class="form-label">File Description</label>
 							<input class="form-control" type="text" name="fileDescription" required
 								placeholder="Project about the new KVP app"
 								value="<%= isEdit && document.metadata && document.metadata.fileDescription ? document.metadata.fileDescription : '' %>">

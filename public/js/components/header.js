@@ -57,9 +57,6 @@ document.addEventListener("DOMContentLoaded", function () {
                                     </span>
                                     <div class="flex-grow-1 ms-2">
                                         <p class="mb-1">
-                                            <span class="text-dark fw-semibold">
-                                                ${n.sender?.name || 'System'}
-                                            </span> 
                                             ${n.message || ''}
                                         </p>
                                         <span>${createdTime}</span>

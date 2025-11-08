@@ -377,6 +377,7 @@
 							const div = document.createElement("div");
 							div.className = "folderbox";
 							div.dataset.id = folder._id;
+							div.title = folder.isOwner ? "You own this folder" : "Shared with you";
 							div.innerHTML = `
                 <div class="fldricon"><img src="/img/icons/folder.png" alt="Folder"></div>
                 <div class="fldrname"><p>${folder.name}</p></div>

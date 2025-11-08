@@ -27,7 +27,8 @@ const notificationSchema = new mongoose.Schema({
             "project_updated",
             "mention",
             "system_alert",
-            "storage_warning"
+            "storage_warning",
+            "discussion_request"
         ]
     },
     title: {

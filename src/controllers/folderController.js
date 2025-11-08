@@ -824,7 +824,6 @@ export const getFolderTree = async (req, res) => {
         let departmentFolderId = null;
 
         if (departmentId && departmentId !== "all") {
-            // Find the department folder under the project
             const departmentFolder = await Folder.findOne({
                 projectId: projectId ? new mongoose.Types.ObjectId(projectId) : null,
                 departmentId: new mongoose.Types.ObjectId(departmentId),
@@ -835,7 +834,6 @@ export const getFolderTree = async (req, res) => {
             if (departmentFolder) {
                 departmentFolderId = departmentFolder._id;
 
-                // Include department folder and all its descendants
                 if (!match.$or) match.$or = [];
                 match.$or.push({ _id: departmentFolder._id });
                 match.$or.push({ ancestors: departmentFolder._id });
@@ -844,7 +842,7 @@ export const getFolderTree = async (req, res) => {
             }
         }
 
-        // --- Fetch folders with files, project, and department info ---
+        // --- Fetch folders with project, department, and files ---
         const folders = await Folder.aggregate([
             { $match: match },
             {
@@ -879,6 +877,7 @@ export const getFolderTree = async (req, res) => {
                     parent: 1,
                     status: 1,
                     owner: 1,
+                    permissions: 1,
                     projectId: { $arrayElemAt: ["$projectId", 0] },
                     departmentId: { $arrayElemAt: ["$departmentId", 0] },
                     files: {
@@ -903,9 +902,15 @@ export const getFolderTree = async (req, res) => {
             return res.json({ success: true, tree: [] });
         }
 
+        // --- Add isOwner flag ---
+        const enhancedFolders = folders.map(f => ({
+            ...f,
+            isOwner: f.owner?.toString() === userId.toString(),
+        }));
+
         // --- Build folder hierarchy ---
         const folderMap = new Map();
-        folders.forEach(f => folderMap.set(f._id.toString(), { ...f, children: [] }));
+        enhancedFolders.forEach(f => folderMap.set(f._id.toString(), { ...f, children: [] }));
 
         const roots = [];
         for (const folder of folderMap.values()) {
@@ -930,6 +935,7 @@ export const getFolderTree = async (req, res) => {
             tree = roots;
         }
 
+        // --- Final response ---
         return res.json({
             success: true,
             tree,
@@ -943,6 +949,7 @@ export const getFolderTree = async (req, res) => {
         });
     }
 };
+
 
 
 export const archiveFolder = async (req, res) => {

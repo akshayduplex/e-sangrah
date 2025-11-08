@@ -132,7 +132,43 @@
                         <!-- /Search -->
 
                         <div class="d-flex align-items-center">
+                            <!-- Year Selection -->
+                            <div class="input-group d-inline-flex me-1">
+                                <select id="selectHeaderYear" class="form-select select2" style="width:50px;">
+                                    <!-- Years will be populated dynamically -->
+                                </select>
+                            </div>
+                            <!-- /Year Selection -->
 
+                            <!-- Project Select -->
+                            <div class="input-group d-inline-flex me-1">
+                                <select id="selectHeaderProject" class="form-select select2" style="width:200px;">
+                                    <option></option>
+                                </select>
+                                <span class="input-icon-addon"><i class="ti ti-search"></i></span>
+                            </div>
+                            <!-- /Project Select -->
+                            <!-- Upload Dropdown -->
+                            <div class="dropdown me-1">
+                                <a href="#" id="uploadBtn" class="btn sm_btnsite" data-bs-toggle="dropdown">
+                                    Upload <i class="ti ti-chevron-down"></i>
+                                </a>
+                                <div class="dropdown-menu dropdown-menu-end">
+                                    <div class="card mb-0 border-0 shadow-none">
+                                        <div class="card-body">
+                                            <a href="/upload-folder" class="d-block pb-2">
+                                                <span class="avatar avatar-md bg-transparent-dark me-2">
+                                                    <i class="ti ti-folder-filled text-gray-9"></i>
+                                                </span>
+                                                New Folder
+                                            </a>
+                                            <a href="/documents/add" class="d-block py-2">Upload Document</a>
+                                            <a href="/links/add" class="d-block py-2">Link</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- /Upload Dropdown -->
                             <!-- Notifications -->
                             <div class="me-1 notification_item">
                                 <a href="notifications" class="btn btn-menubar position-relative me-1"
@@ -247,44 +283,6 @@
                                 </div>
                             </div>
                             <!-- /Notifications -->
-                            <!-- Year Selection -->
-                            <div class="input-group d-inline-flex me-1">
-                                <select id="selectHeaderYear" class="form-select select2" style="width:50px;">
-                                    <!-- Years will be populated dynamically -->
-                                </select>
-                            </div>
-                            <!-- /Year Selection -->
-
-                            <!-- Project Select -->
-                            <div class="input-group d-inline-flex me-1">
-                                <select id="selectHeaderProject" class="form-select select2" style="width:200px;">
-                                    <option></option>
-                                </select>
-                                <span class="input-icon-addon"><i class="ti ti-search"></i></span>
-                            </div>
-                            <!-- /Project Select -->
-                            <!-- Upload Dropdown -->
-                            <div class="dropdown me-1">
-                                <a href="#" id="uploadBtn" class="btn sm_btnsite" data-bs-toggle="dropdown">
-                                    Upload <i class="ti ti-chevron-down"></i>
-                                </a>
-                                <div class="dropdown-menu dropdown-menu-end">
-                                    <div class="card mb-0 border-0 shadow-none">
-                                        <div class="card-body">
-                                            <a href="/upload-folder" class="d-block pb-2">
-                                                <span class="avatar avatar-md bg-transparent-dark me-2">
-                                                    <i class="ti ti-folder-filled text-gray-9"></i>
-                                                </span>
-                                                New Folder
-                                            </a>
-                                            <a href="/documents/add" class="d-block py-2">Upload Document</a>
-                                            <a href="/links/add" class="d-block py-2">Link</a>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <!-- /Upload Dropdown -->
-
                             <!-- Profile Dropdown -->
                             <div class="dropdown profile-dropdown">
                                 <a href="javascript:void(0);" class="dropdown-toggle d-flex align-items-center"

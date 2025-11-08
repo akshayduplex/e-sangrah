@@ -884,6 +884,171 @@
 
 </script>
 
+<!-- new -->
+<!-- <script>
+    $(document).ready(function () {
+        document.addEventListener('hidden.bs.modal', () => {
+            document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+            document.body.classList.remove('modal-open');
+        });
+
+        const $headerYearSelect = $('#selectHeaderYear');
+        const $headerProjectSelect = $('#selectHeaderProject');
+
+        // ---------------------------
+        // YEAR SELECT FIX
+        // ---------------------------
+        if ($headerYearSelect.length) {
+            const currentYear = new Date().getFullYear();
+            const startYear = 1995;
+            const endYear = currentYear; // ✅ stop at current year only
+
+            // Populate dropdown
+            for (let year = endYear; year >= startYear; year--) {
+                $headerYearSelect.append(new Option(year, year, false, false));
+            }
+
+            // Initialize Select2
+            $headerYearSelect.select2({
+                placeholder: 'Select Year',
+                width: '120px'
+            });
+
+            // On change — save and reload
+            $headerYearSelect.on('change', async function () {
+                const selectedYear = $(this).val();
+
+                try {
+                    const res = await fetch(`${baseUrl}/api/session/project`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({
+                            selectedYear: selectedYear || null,
+                            projectId: window.selectedProjectId || null
+                        })
+                    });
+
+                    if (!res.ok) throw new Error('Failed to save year selection');
+                    location.reload();
+                } catch (err) {
+                    console.error('Error saving year selection:', err);
+                }
+            });
+
+            // Load saved or default year
+            (async function loadSavedYear() {
+                try {
+                    const res = await fetch(`${baseUrl}/api/session/project`, { credentials: 'include' });
+                    const data = await res.json();
+                    const savedYear = data.selectedYear ? parseInt(data.selectedYear) : currentYear;
+
+                    // Ensure year exists
+                    if (!$headerYearSelect.find(`option[value="${savedYear}"]`).length) {
+                        $headerYearSelect.append(new Option(savedYear, savedYear, true, true));
+                    }
+
+                    $headerYearSelect.val(savedYear).trigger('change.select2');
+
+                    if (!data.selectedYear) {
+                        // Save default current year if none in session
+                        await fetch(`${baseUrl}/api/session/project`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            credentials: 'include',
+                            body: JSON.stringify({
+                                selectedYear: currentYear,
+                                projectId: window.selectedProjectId || null
+                            })
+                        });
+                    }
+                } catch (err) {
+                    console.error('Error loading saved year:', err);
+                }
+            })();
+        }
+
+        // ---------------------------
+        // PROJECT SELECT FIX
+        // ---------------------------
+        if ($headerProjectSelect.length) {
+            $headerProjectSelect.select2({
+                placeholder: 'Select Project',
+                allowClear: true,
+                width: '250px',
+                ajax: {
+                    url: `${baseUrl}/api/projects`,
+                    dataType: 'json',
+                    delay: 250,
+                    data: function (params) {
+                        return {
+                            search: params.term || '',
+                            page: params.page || 1,
+                            limit: 10
+                        };
+                    },
+                    processResults: function (data) {
+                        return {
+                            results: (data.data || []).map(p => ({
+                                id: p._id,
+                                text: p.projectName || p.name
+                            }))
+                        };
+                    },
+                    cache: true
+                }
+            });
+
+            // Save on select/unselect
+            $headerProjectSelect.on('select2:select select2:unselect', async function () {
+                const projectId = $(this).val();
+                const projectName = $(this).find('option:selected').text();
+
+                try {
+                    const res = await fetch(`${baseUrl}/api/session/project`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({
+                            projectId: projectId || null,
+                            projectName: projectName || ''
+                        })
+                    });
+
+                    if (!res.ok) throw new Error('Failed to save project selection');
+                    location.reload();
+                } catch (err) {
+                    console.error('Error saving project selection:', err);
+                }
+            });
+
+            // Load saved project from session
+            (async function loadSavedProject() {
+                try {
+                    const res = await fetch(`${baseUrl}/api/session/project`, { credentials: 'include' });
+                    const data = await res.json();
+
+                    if (data.selectedProject) {
+                        window.selectedProjectId = data.selectedProject;
+                        window.selectedProjectName = data.selectedProjectName;
+
+                        // ✅ Add selected project to Select2 if not in list
+                        if (!$headerProjectSelect.find(`option[value="${data.selectedProject}"]`).length) {
+                            const option = new Option(data.selectedProjectName, data.selectedProject, true, true);
+                            $headerProjectSelect.append(option);
+                        }
+
+                        // ✅ Set and refresh Select2 display
+                        $headerProjectSelect.val(data.selectedProject).trigger('change.select2');
+                    }
+                } catch (err) {
+                    console.error('Error loading saved project:', err);
+                }
+            })();
+        }
+    });
+</script> -->
+
 <script>
     (function ($) {
         "use strict";

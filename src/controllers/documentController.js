@@ -401,6 +401,16 @@ export const getDocuments = async (req, res) => {
         const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
         const skip = (pageNum - 1) * limitNum;
 
+        // --- Filter by year from session ---
+        if (req.session?.selectedYear) {
+            const year = parseInt(req.session.selectedYear, 10);
+            if (!isNaN(year)) {
+                const startOfYear = new Date(year, 0, 1);      // Jan 1, YYYY
+                const endOfYear = new Date(year + 1, 0, 1);    // Jan 1, YYYY+1
+                filter.createdAt = { $gte: startOfYear, $lt: endOfYear };
+            }
+        }
+
         // --- Fetch documents ---
         const documents = await Document.find(filter)
             .select("files updatedAt createdAt wantApprovers signature isDeleted isArchived comment sharedWithUsers compliance status metadata tags owner documentVendor documentDonor department project description")
@@ -2844,9 +2854,10 @@ export const updateApprovalStatus = async (req, res) => {
     try {
         const userId = req.user._id;
         const { documentId } = req.params;
-        const { approved, comment } = req.body;
+        const { action, comment } = req.body;
+        const approved = action === 'approve'; // define this once
 
-        // Fetch the document with approvers and owner populated
+        // Fetch document
         const document = await Document.findById(documentId)
             .populate('documentApprovalAuthority.userId', 'name email')
             .populate('department', 'name')
@@ -2856,7 +2867,7 @@ export const updateApprovalStatus = async (req, res) => {
             return res.status(404).json({ error: 'Document not found' });
         }
 
-        // Find the approver record for this user
+        // Find approver record
         const approverRecord = document.documentApprovalAuthority.find(
             a => String(a.userId?._id) === String(userId)
         );
@@ -2865,58 +2876,100 @@ export const updateApprovalStatus = async (req, res) => {
             return res.status(403).json({ error: 'You are not authorized to approve this document' });
         }
 
-        // Update this approver’s record
-        approverRecord.status = approved ? 'Approved' : 'Rejected';
-        approverRecord.isApproved = approved;
-        approverRecord.remark = comment || '';
-        approverRecord.approvedOn = new Date();
-
-        // Recalculate overall document status
-        const anyRejected = document.documentApprovalAuthority.some(a => a.status === 'Rejected');
-        const allApproved = document.documentApprovalAuthority.every(a => a.status === 'Approved');
-
-        if (anyRejected) {
-            document.status = 'Rejected';
-        } else if (allApproved) {
-            document.status = 'Approved';
+        /** ---------------- Update Approver Record ---------------- **/
+        if (action === 'need_discussion') {
+            // Only update approver’s record, not document status
+            approverRecord.status = 'Pending';
+            approverRecord.isApproved = false;
+            approverRecord.remark = comment;
+            approverRecord.approvedOn = null; // no timestamp since not a final decision
+        } else if (action === 'approve') {
+            approverRecord.status = 'Approved';
+            approverRecord.isApproved = true;
+            approverRecord.remark = comment || '';
+            approverRecord.approvedOn = new Date();
+        } else if (action === 'reject') {
+            approverRecord.status = 'Rejected';
+            approverRecord.isApproved = false;
+            approverRecord.remark = comment || '';
+            approverRecord.approvedOn = new Date();
         } else {
-            document.status = 'Pending';
+            return res.status(400).json({ error: 'Invalid action' });
+        }
+
+        /** ---------------- Document Status Recalculation ---------------- **/
+        // DO NOT include “Need Discussion” in document status update
+        if (action !== 'need_discussion') {
+            const anyRejected = document.documentApprovalAuthority.some(a => a.status === 'Rejected');
+            const allApproved = document.documentApprovalAuthority.every(a => a.status === 'Approved');
+
+            if (anyRejected) document.status = 'Rejected';
+            else if (allApproved) document.status = 'Approved';
+            else document.status = 'Pending';
         }
 
         await document.save();
 
-        // Notify other approvers
+        /** ---------------- Notifications ---------------- **/
         const otherApprovers = document.documentApprovalAuthority
             .filter(a => String(a.userId?._id) !== String(userId))
             .map(a => a.userId)
             .filter(Boolean);
 
-        for (const approver of otherApprovers) {
-            await addNotification({
-                recipient: approver._id,
-                sender: userId,
-                type: 'approval_update',
-                title: `Document ${approved ? 'Approved' : 'Rejected'}`,
-                message: `${req.user.name} has ${approved ? 'approved' : 'rejected'} the document "${document.metadata?.fileName || document._id}".`,
-                relatedDocument: documentId,
-                priority: approved ? 'low' : 'high'
-            });
-        }
-
-        // Notify document owner (if not same as approver)
-        if (String(document.owner._id) !== String(userId)) {
+        // Handle notifications separately for “need discussion”
+        if (action === 'need_discussion') {
             await addNotification({
                 recipient: document.owner._id,
                 sender: userId,
-                type: 'approval_update',
-                title: `Document ${approved ? 'Approved' : 'Rejected'}`,
-                message: `${req.user.name} has ${approved ? 'approved' : 'rejected'} your document "${document.metadata?.fileName || document._id}".`,
+                type: 'discussion_request',
+                title: 'Discussion Requested',
+                message: `${req.user.name} requested a discussion on document "${document.metadata?.fileName || document._id}". Remark: ${comment}`,
                 relatedDocument: documentId,
-                priority: approved ? 'low' : 'high'
+                priority: 'medium'
             });
+
+            const emailHtml = `
+                <p>Hello ${document.owner.name},</p>
+                <p>${req.user.name} has requested a <strong>discussion</strong> on your document:</p>
+                <p><strong>${document.metadata?.fileName || "Untitled Document"}</strong></p>
+                <p><b>Remark:</b> ${comment}</p>
+                <br/>
+                <p>Regards,<br/>DocuFlow System</p>
+            `;
+            await sendEmail({
+                to: document.owner.email,
+                subject: `Discussion Requested - ${document.metadata?.fileName || "Document"}`,
+                html: emailHtml,
+                fromName: "DocuFlow System"
+            });
+        } else {
+            // Notify other approvers + owner for approve/reject
+            for (const approver of otherApprovers) {
+                await addNotification({
+                    recipient: approver._id,
+                    sender: userId,
+                    type: 'approval_update',
+                    title: `Document ${approved ? 'Approved' : 'Rejected'}`,
+                    message: `${req.user.name} has ${approved ? 'approved' : 'rejected'} the document "${document.metadata?.fileName || document._id}".`,
+                    relatedDocument: documentId,
+                    priority: approved ? 'low' : 'high'
+                });
+            }
+
+            if (String(document.owner._id) !== String(userId)) {
+                await addNotification({
+                    recipient: document.owner._id,
+                    sender: userId,
+                    type: 'approval_update',
+                    title: `Document ${approved ? 'Approved' : 'Rejected'}`,
+                    message: `${req.user.name} has ${approved ? 'approved' : 'rejected'} your document "${document.metadata?.fileName || document._id}".`,
+                    relatedDocument: documentId,
+                    priority: approved ? 'low' : 'high'
+                });
+            }
         }
 
-        /** AUTO EMAIL TO NEXT APPROVER **/
+        /** ---------------- Next Approver Email ---------------- **/
         if (approved && document.status === 'Pending') {
             const currentPriority = approverRecord.priority;
             const nextApprover = document.documentApprovalAuthority.find(
@@ -2924,11 +2977,9 @@ export const updateApprovalStatus = async (req, res) => {
             );
 
             if (nextApprover && nextApprover.userId) {
-                // Update mail sent status
                 nextApprover.isMailSent = true;
                 await document.save();
 
-                // Send notification (in-app)
                 await addNotification({
                     recipient: nextApprover.userId._id,
                     sender: userId,
@@ -2939,9 +2990,7 @@ export const updateApprovalStatus = async (req, res) => {
                     priority: 'medium'
                 });
 
-                // Send email using template
                 const verifyUrl = `${process.env.FRONTEND_URL}/document/${documentId}/review`;
-
                 const emailHtml = approvalRequestTemplate({
                     approverName: nextApprover.userId.name,
                     documentName: document.metadata?.fileName || "Untitled Document",
@@ -2961,7 +3010,7 @@ export const updateApprovalStatus = async (req, res) => {
         }
 
         res.json({
-            message: 'Approval successfully',
+            message: 'Approval successfully updated',
             approval: approverRecord,
             approvals: document.documentApprovalAuthority,
             status: document.status
