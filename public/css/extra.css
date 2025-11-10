@@ -48,3 +48,47 @@
 .collapsed .arrow-icon {
     display: none !important;
 }
+
+/* 8 nov */
+
+
+/* --- Responsive Layout --- */
+@media (max-width: 768px) {
+    .dflexbtwn {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+
+    .filterbtn_wrps {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        width: 100%;
+    }
+
+    .filterbtn_wrps .btn {
+        flex: 1 1 calc(50% - 8px);
+        text-align: center;
+    }
+
+    .d-flex.gap-2.align-items-center {
+        flex-direction: column;
+        align-items: stretch !important;
+        width: 100%;
+    }
+
+    .d-flex.gap-2.align-items-center select,
+    .d-flex.gap-2.align-items-center .input-icon-end {
+        width: 100% !important;
+    }
+}
+
+.table-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+table.datatable {
+    min-width: 800px;
+}

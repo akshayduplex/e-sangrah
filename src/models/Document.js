@@ -82,19 +82,37 @@ const documentSchema = new mongoose.Schema({
     comment: { type: String, trim: true, maxlength: 1000 },
 
     versioning: {
-        currentVersion: { type: Decimal128, default: mongoose.Types.Decimal128.fromString("1.0") },
-        previousVersion: { type: Decimal128, default: null },
-        nextVersion: { type: Decimal128, default: null },
-        firstVersion: { type: Decimal128, default: mongoose.Types.Decimal128.fromString("1.0") },
+        currentVersion: {
+            type: Decimal128,
+            default: () => mongoose.Types.Decimal128.fromString("1.0")
+        },
+        previousVersion: {
+            type: Decimal128,
+            default: null
+        },
+        nextVersion: {
+            type: Decimal128,
+            default: () => mongoose.Types.Decimal128.fromString("1.1")
+        },
+        firstVersion: {
+            type: Decimal128,
+            default: () => mongoose.Types.Decimal128.fromString("1.0")
+        }
     },
+
     versionHistory: [{
-        version: { type: Decimal128, required: true, default: mongoose.Types.Decimal128.fromString("1.0") },
+        version: {
+            type: Decimal128,
+            required: true,
+            default: () => mongoose.Types.Decimal128.fromString("1.0")
+        },
         timestamp: { type: Date, default: Date.now },
         changedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
         changes: { type: String },
         file: { type: mongoose.Schema.Types.ObjectId, ref: "File" },
         snapshot: { type: mongoose.Schema.Types.Mixed }
     }],
+
 }, { timestamps: true });
 
 /** -------------------- INDEXES -------------------- **/
@@ -108,6 +126,9 @@ documentSchema.index({ tags: 1 });
 /** -------------------- VIRTUAL -------------------- **/
 documentSchema.virtual("isExpired").get(function () {
     return this.compliance.expiryDate ? this.compliance.expiryDate < new Date() : false;
+});
+documentSchema.virtual("versionLabel").get(function () {
+    return this.versioning?.currentVersion?.toString() || "1.0";
 });
 
 

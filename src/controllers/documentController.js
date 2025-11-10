@@ -910,7 +910,7 @@ export const createDocument = async (req, res) => {
             documentVendor: documentVendor || null,
             folderId: validFolderId,
             owner: req.user._id,
-            status: "Pending",
+            status: "Approved",
             tags: parsedTags,
             metadata: parsedMetadata,
             description,
@@ -1084,6 +1084,7 @@ export const updateDocument = async (req, res) => {
                         console.warn("Invalid metadata format:", error.message);
                     }
                     break;
+
                 case "wantApprovers":
                     const newWantApprovers = value === "true" || value === true;
 
@@ -1261,7 +1262,7 @@ export const updateDocument = async (req, res) => {
             if (fileUpdates) changeReason = "Files and content updated";
 
             // Bump version only if there are actual content changes (not just metadata)
-            const contentFields = ['description', 'files', 'signature', 'documentName', 'documentType'];
+            const contentFields = ['description', 'files', 'signature', 'documentName', 'documentType', 'metadata', 'comment', 'tags'];
             const hasContentChanges = changedFields.some(field => contentFields.includes(field));
 
             if (hasContentChanges) {
@@ -1432,12 +1433,14 @@ const createVersionHistory = async (document, user, changes, changedFields) => {
  */
 export const restoreVersion = async (req, res) => {
     const { id, version } = req.params;
+    const userId = req.user?._id;
+
+    // --- Validate Inputs ---
     if (!mongoose.Types.ObjectId.isValid(id)) {
         return res.status(400).json({ message: "Invalid document ID" });
     }
-
-    if (!version) {
-        return res.status(400).json({ message: "Version is required" });
+    if (!version || isNaN(parseFloat(version))) {
+        return res.status(400).json({ message: "A valid version number is required" });
     }
 
     try {
@@ -1446,36 +1449,70 @@ export const restoreVersion = async (req, res) => {
             return res.status(404).json({ message: "Document not found" });
         }
 
-        // Find the snapshot in versionHistory
-        const targetVersion = document.versionHistory.find(v =>
-            v.version.toString() === version.toString()
+        // --- Find Target Version in History ---
+        const targetVersion = document.versionHistory.find(
+            (v) => parseFloat(v.version.toString()) === parseFloat(version)
         );
-
         if (!targetVersion) {
-            return res.status(404).json({ message: "Version not found in history" });
+            return res.status(404).json({ message: `Version ${version} not found in history` });
         }
 
-        // Restore document from snapshot
+        // --- Validate Snapshot ---
         const snapshot = targetVersion.snapshot;
-        Object.keys(snapshot).forEach(key => {
-            document[key] = snapshot[key];
+        if (!snapshot || typeof snapshot !== "object") {
+            return res.status(500).json({ message: "Snapshot data missing or invalid" });
+        }
+
+        // --- Define allowed fields to restore (to prevent tampering) ---
+        const restorableFields = [
+            "description",
+            "files",
+            "signature",
+            "metadata",
+            "comment",
+            "tags",
+            "link",
+            "compliance"
+        ];
+
+        // --- Apply snapshot safely ---
+        restorableFields.forEach((key) => {
+            if (snapshot[key] !== undefined) {
+                document[key] = snapshot[key];
+            }
         });
 
-        // Update versioning
-        document.versioning.previousVersion = document.versioning.currentVersion;
-        document.versioning.currentVersion = mongoose.Types.Decimal128.fromString(version.toString());
-        document.versioning.nextVersion = null;
+        // --- Update version tracking ---
+        const prevVersion = parseFloat(document.versioning.currentVersion.toString());
+        const restoredVersion = parseFloat(version);
+        const nextVersion = (restoredVersion + 0.1).toFixed(1);
 
-        // Save document
-        await document.save();
+        // document.versioning.previousVersion = mongoose.Types.Decimal128.fromString(prevVersion.toString());
+        // document.versioning.currentVersion = mongoose.Types.Decimal128.fromString(restoredVersion.toString());
+        // document.versioning.nextVersion = mongoose.Types.Decimal128.fromString(nextVersion);
+
+        // --- Add restoration event to history ---
+        document.versionHistory.push({
+            version: mongoose.Types.Decimal128.fromString(restoredVersion.toString()),
+            timestamp: new Date(),
+            changedBy: userId || null,
+            changes: `Document restored to version ${version}`,
+            snapshot: snapshot,
+        });
+
+        // --- Save atomically ---
+        await document.save({ validateBeforeSave: true });
 
         res.status(200).json({
-            message: `Document restored to version ${version}`,
+            message: `Document successfully restored to version ${version}`,
             document,
         });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: "Internal server error", error });
+        console.error("RestoreVersion Error:", error);
+        res.status(500).json({
+            message: "An unexpected error occurred while restoring document version",
+            error: error.message,
+        });
     }
 };
 

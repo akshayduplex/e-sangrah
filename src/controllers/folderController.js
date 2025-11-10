@@ -19,6 +19,7 @@ import FolderPermissionLogs from '../models/FolderPermissionLogs.js';
 import { calculateExpiration } from '../helper/CalculateExpireDate.js';
 import Project from '../models/Project.js';
 import Department from '../models/Departments.js';
+import { getSessionFilters } from '../helper/sessionHelpers.js';
 
 //Page controlers
 
@@ -789,10 +790,10 @@ export const uploadToFolder = async (req, res) => {
 
 export const getFolderTree = async (req, res) => {
     try {
-        const { rootId, departmentId, projectId } = req.query;
+        const { rootId, departmentId } = req.query;
         const userId = req.user?._id;
         const profileType = req.user?.profile_type;
-
+        const { selectedProjectId } = getSessionFilters(req);
         if (!userId) {
             return res.status(401).json({
                 success: false,
@@ -815,34 +816,41 @@ export const getFolderTree = async (req, res) => {
             ];
         }
 
-        // --- Project filter ---
-        if (projectId && projectId !== "all") {
-            match.projectId = new mongoose.Types.ObjectId(projectId);
+        // --- Apply Project Filter ---
+        if (selectedProjectId && selectedProjectId !== "all") {
+            match.projectId = new mongoose.Types.ObjectId(selectedProjectId);
         }
 
-        // --- Department filter ---
+        // --- Apply Department Filter ---
         let departmentFolderId = null;
-
         if (departmentId && departmentId !== "all") {
-            const departmentFolder = await Folder.findOne({
-                projectId: projectId ? new mongoose.Types.ObjectId(projectId) : null,
-                departmentId: new mongoose.Types.ObjectId(departmentId),
+            const departmentFilter = {
                 isArchived: false,
                 deletedAt: null,
-            }).lean();
+                departmentId: new mongoose.Types.ObjectId(departmentId),
+            };
 
-            if (departmentFolder) {
-                departmentFolderId = departmentFolder._id;
+            if (selectedProjectId && selectedProjectId !== "all") {
+                departmentFilter.projectId = new mongoose.Types.ObjectId(selectedProjectId);
+            }
 
-                if (!match.$or) match.$or = [];
-                match.$or.push({ _id: departmentFolder._id });
-                match.$or.push({ ancestors: departmentFolder._id });
-            } else {
+            const departmentFolder = await Folder.findOne(departmentFilter).lean();
+
+            if (!departmentFolder) {
                 return res.json({ success: true, tree: [] });
             }
+
+            departmentFolderId = departmentFolder._id;
+
+            // Extend $or filter if not superadmin
+            if (!match.$or) match.$or = [];
+            match.$or.push(
+                { _id: departmentFolder._id },
+                { ancestors: departmentFolder._id }
+            );
         }
 
-        // --- Fetch folders with project, department, and files ---
+        // --- Fetch Matching Folders with Lookups ---
         const folders = await Folder.aggregate([
             { $match: match },
             {
@@ -898,35 +906,39 @@ export const getFolderTree = async (req, res) => {
             { $sort: { name: 1 } },
         ]);
 
+        // --- Empty Result Check ---
         if (!folders.length) {
             return res.json({ success: true, tree: [] });
         }
 
-        // --- Add isOwner flag ---
-        const enhancedFolders = folders.map(f => ({
+        // --- Add isOwner Flag ---
+        const enhancedFolders = folders.map((f) => ({
             ...f,
             isOwner: f.owner?.toString() === userId.toString(),
         }));
 
-        // --- Build folder hierarchy ---
+        // --- Build Folder Map for Hierarchy ---
         const folderMap = new Map();
-        enhancedFolders.forEach(f => folderMap.set(f._id.toString(), { ...f, children: [] }));
+        for (const folder of enhancedFolders) {
+            folderMap.set(folder._id.toString(), { ...folder, children: [] });
+        }
 
+        // --- Build Parent-Child Relationships ---
         const roots = [];
         for (const folder of folderMap.values()) {
             if (folder.parent) {
                 const parent = folderMap.get(folder.parent.toString());
                 if (parent) parent.children.push(folder);
+                else roots.push(folder); // orphaned folder, treat as root
             } else {
                 roots.push(folder);
             }
         }
 
+        // --- Determine Which Subtree to Return ---
         let tree = [];
-
-        // --- Determine which subtree to return ---
         if (rootId) {
-            const rootNode = folderMap.get(rootId);
+            const rootNode = folderMap.get(rootId.toString());
             if (rootNode) tree = [rootNode];
         } else if (departmentFolderId) {
             const deptNode = folderMap.get(departmentFolderId.toString());
@@ -935,19 +947,20 @@ export const getFolderTree = async (req, res) => {
             tree = roots;
         }
 
-        // --- Final response ---
+        // --- Final Response ---
         return res.json({
             success: true,
             tree,
         });
     } catch (err) {
         console.error("Get folder tree error:", err);
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             message: "Server error while fetching folder tree",
-            error: err.message,
+            error: process.env.NODE_ENV === "development" ? err.message : undefined,
         });
     }
+
 };
 
 

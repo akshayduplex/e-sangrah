@@ -248,19 +248,23 @@
 					elements.noProject.style.display = show ? 'block' : 'none';
 				};
 
-				const fetchFolders = async (projectId) => {
+				const fetchFolders = async () => {
 					const queryParams = new URLSearchParams();
-					if (projectId) queryParams.append('projectId', projectId);
+					queryParams.append("_ts", Date.now()); // prevent caching
 
+					const response = await fetch(`/api/folders/tree/structure?${queryParams}`, {
+						credentials: "include",
+						cache: "no-store"
+					});
 
-					queryParams.append('_ts', Date.now());
-
-					const response = await fetch(`/api/folders/tree/structure?${queryParams}`, { credentials: 'include', cache: 'no-store' });
 					if (!response.ok) throw new Error(`HTTP error! ${response.status}`);
+
 					const data = await response.json();
-					if (!data.success) throw new Error(data.message || 'API request failed');
+					if (!data.success) throw new Error(data.message || "API request failed");
+
 					return data.tree || [];
 				};
+
 
 
 				function openDownloadModal(folderId, folderName) {
@@ -340,26 +344,19 @@
 
 				// load folders
 
-				const loadFolders = async (parentFolderId = null, parentPath = [], projectId = window.selectedProjectId) => {
+				const loadFolders = async (parentFolderId = null, parentPath = []) => {
 					try {
 						showNoProject(false);
-						if (!projectId) {
-							elements.container.style.display = 'none';
-							setEmptyState(false);
-							showNoProject(true);
-							return;
-						}
+
 						setLoadingState(true);
-						const allFolders = await fetchFolders(projectId);
+						const allFolders = await fetchFolders();
 						setLoadingState(false);
 
 						const subfolders = getSubfolders(allFolders, parentFolderId);
-
-						// **FIXED: Get current folder data AND collect ALL files recursively**
 						const currentFolderData = allFolders.find(f => f._id === parentFolderId) || {};
 						const allFilesInThisFolderAndSubfolders = collectAllFilesRecursively(allFolders, parentFolderId);
 
-						// Show empty state only if no subfolders AND no files
+						// Handle empty folder display
 						if (!subfolders.length && !allFilesInThisFolderAndSubfolders.length) {
 							setEmptyState(true);
 							elements.container.innerHTML = "";
@@ -369,62 +366,59 @@
 							return;
 						}
 
+						// Render folders + files
 						setEmptyState(false);
 						elements.container.innerHTML = "";
 
-						// Display subfolders (unchanged)
 						subfolders.forEach(folder => {
 							const div = document.createElement("div");
 							div.className = "folderbox";
 							div.dataset.id = folder._id;
 							div.title = folder.isOwner ? "You own this folder" : "Shared with you";
 							div.innerHTML = `
-                <div class="fldricon"><img src="/img/icons/folder.png" alt="Folder"></div>
-                <div class="fldrname"><p>${folder.name}</p></div>
-                <div class="folder_links">
-                    <button type="button" class="btn border-0" data-bs-toggle="dropdown"><i class="ti ti-dots"></i></button>
-                    <ul class="dropdown-menu" data-bs-auto-close="outside">
-                        <li><a class="dropdown-item" href="/${folder._id}/list"><i class="ti ti-eye"></i> View</a></li>
-                        <li><a class="dropdown-item rename-folder" href="#"><i class="ti ti-pencil-minus"></i> Rename</a></li>
-                        <li><a class="dropdown-item toggle-block" href="#" data-id="${folder._id}"><i class="ti ti-lock${folder.status === 'inactive' ? '-open' : ''}"></i><span class="block-text" style="margin-left: 5px;">${folder.status === 'inactive' ? 'Unblock' : 'Block'}</span></a></li>
-                        <li><a class="dropdown-item share-btn" href="#" data-doc-id="${folder._id}" data-bs-toggle="modal" data-bs-target="#sharedoc-modal"><i class="ti ti-share"></i> Share</a></li>
-                        <li><a class="dropdown-item download-folder"><i class="ti ti-download"></i> Download</a></li>
-                        <li><a class="dropdown-item delete-folder" href="#" data-bs-toggle="modal" data-bs-target="#trashdoc-modal"><i class="ti ti-trash"></i> Move to Trash</a></li>
-                        <li><a class="dropdown-item archive-folder" href="#" data-bs-toggle="modal" data-bs-target="#archivedoc-modal"><i class="ti ti-archive"></i> Move to Archive</a></li>
-                    </ul>
-                </div>
-            `;
+        <div class="fldricon"><img src="/img/icons/folder.png" alt="Folder"></div>
+        <div class="fldrname"><p>${folder.name}</p></div>
+        <div class="folder_links">
+          <button type="button" class="btn border-0" data-bs-toggle="dropdown"><i class="ti ti-dots"></i></button>
+          <ul class="dropdown-menu" data-bs-auto-close="outside">
+            <li><a class="dropdown-item" href="/${folder._id}/list"><i class="ti ti-eye"></i> View</a></li>
+            <li><a class="dropdown-item rename-folder" href="#"><i class="ti ti-pencil-minus"></i> Rename</a></li>
+            <li><a class="dropdown-item toggle-block" href="#" data-id="${folder._id}"><i class="ti ti-lock${folder.status === "inactive" ? "-open" : ""}"></i><span class="block-text" style="margin-left: 5px;">${folder.status === "inactive" ? "Unblock" : "Block"}</span></a></li>
+            <li><a class="dropdown-item share-btn" href="#" data-doc-id="${folder._id}" data-bs-toggle="modal" data-bs-target="#sharedoc-modal"><i class="ti ti-share"></i> Share</a></li>
+            <li><a class="dropdown-item download-folder"><i class="ti ti-download"></i> Download</a></li>
+            <li><a class="dropdown-item delete-folder" href="#" data-bs-toggle="modal" data-bs-target="#trashdoc-modal"><i class="ti ti-trash"></i> Move to Trash</a></li>
+            <li><a class="dropdown-item archive-folder" href="#" data-bs-toggle="modal" data-bs-target="#archivedoc-modal"><i class="ti ti-archive"></i> Move to Archive</a></li>
+          </ul>
+        </div>
+      `;
 							div.addEventListener("dblclick", () => {
-								loadFolders(folder._id, [...parentPath, { id: folder._id, name: folder.name }], projectId);
+								loadFolders(folder._id, [...parentPath, { id: folder._id, name: folder.name }]);
 							});
 							elements.container.appendChild(div);
 						});
 
-						// **FIXED: Display ALL files from current folder + subfolders**
 						allFilesInThisFolderAndSubfolders.forEach(file => {
-							const ext = file.originalName.split('.').pop().toLowerCase();
+							const ext = file.originalName.split(".").pop().toLowerCase();
 							const icon = fileIcons[ext] || fileIcons.default;
 							const fileDiv = document.createElement("div");
 							fileDiv.className = "folderbox filebox";
 							fileDiv.dataset.id = file._id;
 							fileDiv.innerHTML = `
-                <div class="fldricon me-2">
-                    <img src="${icon}" alt="File" style="width:40px; height:40px;">
-                </div>
-                <div class="file-info" style="flex-grow:1;">
-                    <p class="mb-1" style="font-size:0.85rem; margin:0;" title="${file.originalName}">${file.originalName}</p>
-                    <p class="mb-0" style="font-size:0.75rem; color:#666;">${(file.size / 1024).toFixed(1)} KB</p>
-                </div>
-                <div class="folder_links ms-auto">
-                    <button type="button" class="btn border-0" data-bs-toggle="dropdown">
-                        <i class="ti ti-dots"></i>
-                    </button>
-                    <ul class="dropdown-menu">
-                        <li><a class="dropdown-item" href="/api/download/file/${file._id}"><i class="ti ti-download"></i> Download</a></li>
-                        <li><a class="dropdown-item" href="/folders/view/${file._id}" target="_blank"><i class="ti ti-eye"></i> View</a></li>
-                    </ul>
-                </div>
-            `;
+        <div class="fldricon me-2">
+          <img src="${icon}" alt="File" style="width:40px; height:40px;">
+        </div>
+        <div class="file-info" style="flex-grow:1;">
+          <p class="mb-1" style="font-size:0.85rem; margin:0;" title="${file.originalName}">${file.originalName}</p>
+          <p class="mb-0" style="font-size:0.75rem; color:#666;">${(file.size / 1024).toFixed(1)} KB</p>
+        </div>
+        <div class="folder_links ms-auto">
+          <button type="button" class="btn border-0" data-bs-toggle="dropdown"><i class="ti ti-dots"></i></button>
+          <ul class="dropdown-menu">
+            <li><a class="dropdown-item" href="/api/download/file/${file._id}"><i class="ti ti-download"></i> Download</a></li>
+            <li><a class="dropdown-item" href="/folders/view/${file._id}" target="_blank"><i class="ti ti-eye"></i> View</a></li>
+          </ul>
+        </div>
+      `;
 							elements.container.appendChild(fileDiv);
 						});
 
@@ -438,6 +432,7 @@
 						showToast("Failed to load folders", "error");
 					}
 				};
+
 
 				// **NEW FUNCTION: Recursively collect ALL files from folder + subfolders**
 				const collectAllFilesRecursively = (allFolders, targetFolderId) => {
@@ -659,10 +654,10 @@
 						new bootstrap.Modal("#folder-modal").show();
 					});
 
-					if (window.selectedProjectId) {
-						loadFolders(null, [], window.selectedProjectId);
-					}
+					// Always load from session project
+					loadFolders();
 				});
+
 				async function generateShareLink(folderId, accessType, role) {
 					if (!folderId || accessType !== "anyone") return;
 

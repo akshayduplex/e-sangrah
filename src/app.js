@@ -17,6 +17,7 @@ import { startCleanupJob } from "./helper/NodeCron.js";
 import { connectDB } from "./database/Db.js";
 import fs from "fs";
 import { API_CONFIG } from "./config/ApiEndpoints.js";
+import { getSessionFilters } from "./helper/sessionHelpers.js";
 
 const app = express();
 
@@ -85,9 +86,12 @@ const app = express();
 
     // ------------------- Global Locals -------------------
     app.use((req, res, next) => {
+        const { selectedProjectId, selectedProjectName } = getSessionFilters(req);
         const user = req.user || req.session.user || {};
         res.locals.BASE_URL = API_CONFIG.baseUrl || "";
         res.locals.designation = user.designation || null;
+        res.locals.selectedProject = selectedProjectId || null;
+        res.locals.selectedProjectName = selectedProjectName || null;
         res.locals.department = user.department || null;
         res.locals.profile_image = user.profile_image || null;
         res.locals.profile_type = user.profile_type || null;

@@ -822,7 +822,13 @@
                     // Invite user button
                     $('#sharedoc-modal').on('click', '#inviteUserBtn', function () {
                         const $btn = $(this);
-                        $btn.prop('disabled', true).addClass('btn-light').removeClass('btn-primary');
+                        const originalText = $btn.html();
+
+                        // Set button to loading state
+                        $btn.prop('disabled', true)
+                            .addClass('btn-light')
+                            .removeClass('btn-primary')
+                            .html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true">');
 
                         const userEmail = $('#userInviteSelect').val();
                         const accessLevel = $('#accessLevelSelect').val();
@@ -892,9 +898,13 @@
                         });
 
                         function resetBtn() {
-                            $btn.prop('disabled', false).removeClass('btn-light').addClass('btn-primary');
+                            $btn.prop('disabled', false)
+                                .removeClass('btn-light')
+                                .addClass('btn-primary')
+                                .html(originalText);
                         }
-                    });                // Remove user access using custom confirmation modal
+                    });
+                    // Remove user access using custom confirmation modal
                     $('#sharedoc-modal').on('click', '.remove-user', function () {
                         const userId = $(this).data('user-id');
                         const userRow = $(this).closest('.user-accssrow');

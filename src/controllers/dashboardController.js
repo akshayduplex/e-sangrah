@@ -6,6 +6,7 @@ import File from "../models/File.js";
 import { getFileIcon } from "../helper/getFileIcon.js";
 import { FILTER_PERIODS } from "../constant/Constant.js";
 import Project, { ProjectType } from "../models/Project.js";
+import { getSessionFilters } from "../helper/sessionHelpers.js";
 
 //Page controllers
 
@@ -34,9 +35,7 @@ export const getDashboardStats = async (req, res) => {
         const userId = new mongoose.Types.ObjectId(user._id);
         const userDepartment = user.department ? new mongoose.Types.ObjectId(user.department) : null;
         const profileType = user.profile_type;
-        const selectedYear = req.session.selectedYear;
-        const selectedProjectId = req.session.selectedProject ? new mongoose.Types.ObjectId(req.session.selectedProject) : null;
-
+        const { selectedProjectId, selectedYear } = getSessionFilters(req);
         // Base filters
         const matchConditions = [
             { isDeleted: { $ne: true } },
@@ -248,8 +247,6 @@ export const getFileStatus = async (req, res) => {
     }
 };
 
-
-
 /** Get Recent Activities */
 export const getRecentActivities = async (req, res) => {
     try {
@@ -436,7 +433,7 @@ export const getDepartmentDocumentUploads = async (req, res) => {
             matchStage.owner = new mongoose.Types.ObjectId(userId);
         }
 
-        // Optional project filter
+        // 🔹 Project filter (if provided)
         if (projectId && mongoose.Types.ObjectId.isValid(projectId)) {
             matchStage.project = new mongoose.Types.ObjectId(projectId);
         }
@@ -710,9 +707,12 @@ export const getDocumentsTypeUploads = async (req, res) => {
 // ------------------- Documents Summary -------------------
 export const getDocumentsStatusSummary = async (req, res) => {
     try {
-        const { period = "month", department, projectId, docType } = req.query;
+        const { period = "month", department, docType } = req.query;
+        const { selectedProjectId, selectedYear } = getSessionFilters(req);
+        const projectId = selectedProjectId;
+        const year = Number(selectedYear);
 
-        //Validate period
+        // Validate period
         if (!FILTER_PERIODS.includes(period)) {
             return failResponse(res, "Invalid period. Must be today, week, month, or year", 400);
         }
@@ -721,33 +721,48 @@ export const getDocumentsStatusSummary = async (req, res) => {
 
         // Base match query
         const match = {
-            createdAt: { $gte: startDate },
             isDeleted: false,
         };
 
-        if (department) match.department = new mongoose.Types.ObjectId(department);
-        if (projectId) match.project = new mongoose.Types.ObjectId(projectId);
+        // 🔹 Project filter
+        if (projectId && mongoose.Types.ObjectId.isValid(projectId)) {
+            match.project = new mongoose.Types.ObjectId(projectId);
+        }
+
+        // 🔹 Department filter
+        if (department && mongoose.Types.ObjectId.isValid(department)) {
+            match.department = new mongoose.Types.ObjectId(department);
+        }
+
+        // 🔹 DocType filter
         if (docType) match.docType = docType;
 
-        //Group by date and department for aggregation
+        // 🔹 Year filter (takes precedence)
+        if (year && !isNaN(year)) {
+            const yearStart = new Date(`${year}-01-01T00:00:00.000Z`);
+            const yearEnd = new Date(`${year + 1}-01-01T00:00:00.000Z`);
+            match.createdAt = { $gte: yearStart, $lt: yearEnd };
+        } else {
+            match.createdAt = { $gte: startDate };
+        }
+
+        // Define grouping logic based on period
         let dateGroup = null;
         let categories = [];
-        let periodFormat = "";
 
-        // Configure grouping granularity
         switch (period) {
             case "today":
-                dateGroup = { $hour: "$createdAt" }; // hourly trend
+                dateGroup = { $hour: "$createdAt" };
                 categories = Array.from({ length: 24 }, (_, i) => `${i}:00`);
                 break;
             case "week":
-                dateGroup = { $dayOfWeek: "$createdAt" }; // Sunday=1 ... Saturday=7
+                dateGroup = { $dayOfWeek: "$createdAt" };
                 categories = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
                 break;
             case "month":
                 dateGroup = { $dayOfMonth: "$createdAt" };
-                // get number of days in this month
-                const daysInMonth = new Date().getDate();
+                const now = new Date();
+                const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
                 categories = Array.from({ length: daysInMonth }, (_, i) => (i + 1).toString());
                 break;
             case "year":
@@ -762,40 +777,17 @@ export const getDocumentsStatusSummary = async (req, res) => {
                 $group: {
                     _id: {
                         period: dateGroup,
-                        department: "$department",
                         status: "$status",
                     },
                     count: { $sum: 1 },
                 },
             },
-            {
-                $lookup: {
-                    from: "departments",
-                    localField: "_id.department",
-                    foreignField: "_id",
-                    as: "departmentData",
-                },
-            },
-            {
-                $unwind: {
-                    path: "$departmentData",
-                    preserveNullAndEmptyArrays: true,
-                },
-            },
-            {
-                $project: {
-                    _id: 0,
-                    period: "$_id.period",
-                    department: "$departmentData.name",
-                    status: "$_id.status",
-                    count: 1,
-                },
-            },
-            { $sort: { period: 1 } },
+            { $sort: { "_id.period": 1 } }
         ];
 
         const results = await Document.aggregate(pipeline);
-        // Build series by status for charts
+
+        // Build chart data
         const statuses = ["Draft", "Pending", "Approved", "Rejected"];
         const series = statuses.map(status => ({
             name: status,
@@ -803,8 +795,8 @@ export const getDocumentsStatusSummary = async (req, res) => {
         }));
 
         results.forEach(item => {
-            const idx = item.period - 1; // adjust for zero-based arrays
-            const seriesItem = series.find(s => s.name === item.status);
+            const idx = (item._id.period || 1) - 1;
+            const seriesItem = series.find(s => s.name === item._id.status);
             if (seriesItem && idx >= 0 && idx < seriesItem.data.length) {
                 seriesItem.data[idx] += item.count;
             }
@@ -815,13 +807,14 @@ export const getDocumentsStatusSummary = async (req, res) => {
             {
                 categories,
                 series,
-                // results,
+                year: year || null,
+                projectId: projectId || null,
             },
-            "Department document uploads summary fetched successfully"
+            "Document status summary fetched successfully"
         );
 
     } catch (err) {
-        console.error("Error fetching department document uploads:", err);
+        console.error("Error in getDocumentsStatusSummary:", err);
         return errorResponse(res, err);
     }
 };
