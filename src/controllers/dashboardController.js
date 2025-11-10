@@ -33,7 +33,6 @@ export const getDashboardStats = async (req, res) => {
     try {
         const user = req.user || req.session.user;
         const userId = new mongoose.Types.ObjectId(user._id);
-        const userDepartment = user.department ? new mongoose.Types.ObjectId(user.department) : null;
         const profileType = user.profile_type;
         const { selectedProjectId, selectedYear } = getSessionFilters(req);
         // Base filters
@@ -54,18 +53,9 @@ export const getDashboardStats = async (req, res) => {
             matchConditions.push({ createdAt: { $gte: startOfYear, $lt: endOfYear } });
         }
 
-        // Apply access restrictions for non-superadmin users
+        // Restrict access for non-superadmin users (only show owned documents)
         if (profileType !== "superadmin") {
-            const accessConditions = [
-                { owner: userId },
-                { sharedWithUsers: userId },
-            ];
-
-            if (userDepartment) {
-                accessConditions.push({ department: userDepartment });
-            }
-
-            matchConditions.push({ $or: accessConditions });
+            matchConditions.push({ owner: userId });
         }
 
         // Aggregate stats
@@ -536,6 +526,80 @@ export const getDepartmentDocumentUploads = async (req, res) => {
     }
 };
 
+export const getDepartmentDocumentChart = async (req, res) => {
+    try {
+        const { period = "month", department } = req.query;
+        const user = req.user;
+        const userId = user?._id;
+
+        if (!FILTER_PERIODS.includes(period)) {
+            return res.status(400).json({ success: false, message: "Invalid period" });
+        }
+
+        const sessionFilters = getSessionFilters(req);
+        const finalProjectId = sessionFilters.selectedProjectId;
+        const startDate = calculateStartDate(period);
+
+        // Build query filter
+        const filter = {
+            createdAt: { $gte: startDate },
+            isDeleted: false
+        };
+
+        // Restrict to owner only if not superadmin
+        if (user.profile_type !== "superadmin") {
+            if (userId) {
+                filter.owner = new mongoose.Types.ObjectId(userId);
+            } else {
+                return res.status(400).json({ success: false, message: "User ID not found" });
+            }
+        }
+
+        // Apply project filter if exists
+        if (finalProjectId && mongoose.Types.ObjectId.isValid(finalProjectId)) {
+            filter.project = new mongoose.Types.ObjectId(finalProjectId);
+        }
+
+        // Get all documents matching the filter
+        const documents = await Document.find(filter)
+            .select('createdAt status')
+            .lean();
+
+        // Initialize months with zero counts for all statuses
+        const monthsData = Array.from({ length: 12 }, (_, i) => ({
+            month: i + 1,
+            Draft: 0,
+            Pending: 0,
+            Approved: 0,
+            Rejected: 0,
+            total: 0
+        }));
+
+        // Process documents and count by month and status
+        documents.forEach(doc => {
+            const month = doc.createdAt.getMonth() + 1; // getMonth() returns 0-11
+            const status = doc.status || 'Draft';
+
+            const monthData = monthsData.find(m => m.month === month);
+            if (monthData) {
+                monthData[status] = (monthData[status] || 0) + 1;
+                monthData.total += 1;
+            }
+        });
+
+        return res.json({
+            success: true,
+            period,
+            projectId: finalProjectId,
+            startDate,
+            monthlyStatusCounts: monthsData
+        });
+
+    } catch (err) {
+        console.error("Error in getDepartmentDocumentUploads:", err);
+        return res.status(500).json({ success: false, message: "Server Error", error: err.message });
+    }
+};
 
 export const getDocumentsTypeUploads = async (req, res) => {
     try {
@@ -816,5 +880,77 @@ export const getDocumentsStatusSummary = async (req, res) => {
     } catch (err) {
         console.error("Error in getDocumentsStatusSummary:", err);
         return errorResponse(res, err);
+    }
+};
+
+
+//Analytics page
+
+export const getAnalyticsStats = async (req, res) => {
+    try {
+        const { selectedYear, selectedProjectId } = getSessionFilters(req);
+
+        // Base filter (not deleted)
+        const baseFilter = { isDeleted: false };
+
+        // Apply project filter if present
+        if (selectedProjectId) {
+            baseFilter.project = selectedProjectId;
+        }
+
+        // Apply year filter (compare createdAt's year)
+        if (selectedYear) {
+            const startOfYear = new Date(selectedYear, 0, 1);
+            const endOfYear = new Date(selectedYear, 11, 31, 23, 59, 59);
+            baseFilter.createdAt = { $gte: startOfYear, $lte: endOfYear };
+        }
+
+        // Total documents (by project + year)
+        const totalDocuments = await Document.countDocuments(baseFilter);
+
+        //Uploaded this month (within selected year/project)
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        const uploadedThisMonth = await Document.countDocuments({
+            ...baseFilter,
+            createdAt: { $gte: startOfMonth, $lte: endOfMonth },
+        });
+
+        // Modified documents (updated after created)
+        const modifiedDocuments = await Document.countDocuments({
+            ...baseFilter,
+            $expr: { $gt: ["$updatedAt", "$createdAt"] },
+        });
+
+        // Deleted or archived
+        const deletedOrArchived = await Document.countDocuments({
+            ...(selectedProjectId && { project: selectedProjectId }),
+            ...(selectedYear && {
+                createdAt: {
+                    $gte: new Date(selectedYear, 0, 1),
+                    $lte: new Date(selectedYear, 11, 31, 23, 59, 59),
+                },
+            }),
+            $or: [{ isDeleted: true }, { isArchived: true }],
+        });
+
+        return res.status(200).json({
+            success: true,
+            data: {
+                totalDocuments,
+                uploadedThisMonth,
+                modifiedDocuments,
+                deletedOrArchived,
+                filters: { selectedYear, selectedProjectId },
+            },
+        });
+    } catch (err) {
+        console.error("Error fetching document stats:", err);
+        return res.status(500).json({
+            success: false,
+            message: "Server error",
+            error: err.message,
+        });
     }
 };

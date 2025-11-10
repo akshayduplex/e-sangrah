@@ -358,6 +358,102 @@ $(document).ready(function () {
             loadDepartmentUploads(currentProjectId, currentPeriod, departmentId);
         });
     }
+    // Department Document Uploads Chart
+    function loadDepartmentDocumentUploads(projectId = '', period = 'today') {
+        if (!$('#sales-income').length) return;
+
+        const params = new URLSearchParams();
+        if (projectId) params.append('projectId', projectId);
+        if (period) params.append('period', period);
+
+        const url = `${baseUrl}/api/dashboard/documentUploads?${params.toString()}`;
+
+        $.ajax({
+            url: url,
+            method: 'GET',
+            dataType: 'json',
+            success: function (result) {
+
+                if (!result.success || !result.monthlyStatusCounts) {
+                    console.warn('No monthlyStatusCounts in response');
+                    return;
+                }
+
+                // Ensure 12 months in order
+                const monthlyData = Array(12).fill().map((_, i) => {
+                    const monthData = result.monthlyStatusCounts.find(m => m.month === i + 1);
+                    return monthData || { Pending: 0, Approved: 0, Rejected: 0 };
+                });
+
+                const pendingData = monthlyData.map(m => m.Pending || 0);
+                const approvedData = monthlyData.map(m => m.Approved || 0);
+                const rejectedData = monthlyData.map(m => m.Rejected || 0);
+
+                console.log('Chart Data:', { pendingData, approvedData, rejectedData }); // DEBUG
+
+                const maxValue = Math.max(...[...pendingData, ...approvedData, ...rejectedData]) + 1;
+
+                const options = {
+                    chart: {
+                        height: 290,
+                        type: 'bar',
+                        stacked: true,               // ensure stacked bars
+                        toolbar: { show: false }
+                    },
+                    colors: ['#197BF7', '#2BB68D', '#F15C44'], // Pending, Approved, Rejected
+                    plotOptions: {
+                        bar: {
+                            borderRadius: 5,
+                            borderRadiusWhenStacked: 'all',
+                            horizontal: false,
+                            endingShape: 'rounded',
+                            columnWidth: '45%',
+                        }
+                    },
+                    series: [
+                        { name: 'Pending', data: pendingData },
+                        { name: 'Approved', data: approvedData },
+                        { name: 'Rejected', data: rejectedData }
+                    ],
+                    xaxis: {
+                        categories: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+                        labels: { style: { colors: '#6B7280', fontSize: '13px' } }
+                    },
+                    yaxis: {
+                        title: { text: 'Number of Documents', style: { color: '#6B7280', fontSize: '13px' } },
+                        labels: { style: { colors: '#6B7280', fontSize: '13px' } },
+                        min: 0,
+                        max: maxValue,
+                        tickAmount: maxValue
+                    },
+                    grid: { borderColor: '#E5E7EB', strokeDashArray: 5, padding: { left: -8 } },
+                    legend: { show: true },  // show legend to identify Rejected
+                    dataLabels: { enabled: false },
+                    fill: { opacity: 1 },
+                    tooltip: {
+                        y: {
+                            formatter: function (val) {
+                                return val + " doc" + (val !== 1 ? "s" : "");
+                            }
+                        }
+                    }
+                };
+
+                // Destroy old chart if exists
+                if (window.salesChart) {
+                    window.salesChart.destroy();
+                }
+
+                // Render new chart
+                window.salesChart = new ApexCharts(document.querySelector("#sales-income"), options);
+                window.salesChart.render();
+            },
+            error: function (err) {
+                console.error('Error loading department document uploads:', err);
+            }
+        });
+    }
+
 
     // Dashboard Stats
     function loadDashboardStats(projectId = '') {
@@ -718,6 +814,7 @@ $(document).ready(function () {
         currentPeriod = period;
         $('#currentPeriodLabel').text($(this).text());
         loadDepartmentUploads(currentProjectId, period);
+        loadDepartmentDocumentUploads(currentPeriod, currentPeriod)
     });
 
     $(document).on('click', '.period-option-type', function () {
@@ -726,6 +823,7 @@ $(document).ready(function () {
         typeUploadsperiod = period;
         $('#typePeriodLabel').text(label);
         loadDocumentTypeUploads(currentProjectId, period);
+        loadDepartmentDocumentUploads(currentPeriod, currentPeriod)
     });
 
     // Initialize Dashboard
@@ -746,6 +844,7 @@ $(document).ready(function () {
 
         loadDepartmentUploads(currentProjectId, currentPeriod);
         loadDocumentTypeUploads(currentProjectId, typeUploadsperiod);
+        loadDepartmentDocumentUploads(currentPeriod, currentPeriod)
     }
 
     // Start

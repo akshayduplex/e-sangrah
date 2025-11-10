@@ -3,7 +3,7 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Add Metadata</h5>
+                <h5 class="modal-title">Add Meta Data</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
@@ -14,14 +14,14 @@
                             value="<%= typeof document !== 'undefined' && document.metadata && document.metadata.fileName ? document.metadata.fileName : '' %>">
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">File description</label>
+                        <label class="form-label">File Description</label>
                         <input class="form-control" type="text" name="fileDescription" required
-                            placeholder="Project about the new KVP app"
+                            placeholder="File Description"
                             value="<%= typeof document !== 'undefined' && document.metadata && document.metadata.fileDescription ? document.metadata.fileDescription : '' %>">
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">File main Heading</label>
-                        <input type="text" class="form-control" name="mainHeading" placeholder="Main Heading"
+                        <label class="form-label">File Main Heading</label>
+                        <input type="text" class="form-control" name="mainHeading" placeholder="File Main Heading"
                             value="<%= typeof document !== 'undefined' && document.metadata && document.metadata.mainHeading ? document.metadata.mainHeading : '' %>">
                     </div>
                     <div class="mb-3 text-center">

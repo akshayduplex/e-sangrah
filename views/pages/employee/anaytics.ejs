@@ -27,7 +27,7 @@
                         <div class="col-md-3 d-flex">
                             <div class="card flex-fill">
                                 <div class="card-body">
-                                    <h3 class="fs-32 fw-medium mb-2">160</h3>
+                                    <h3 id="total-documents" class="fs-32 fw-medium mb-2">0</h3>
                                     <h6 class="fs-16 fw-light text-default mb-3">Total Documents</h6>
                                     <span class="fs-12 fw-medium text-success">
                                         <span class="sm-avatar avatar rounded bg-soft-success"><i
@@ -44,7 +44,7 @@
                         <div class="col-md-3 d-flex">
                             <div class="card flex-fill">
                                 <div class="card-body">
-                                    <h3 class="fs-32 fw-medium mb-2">70</h3>
+                                    <h3 id="uploaded-this-month" class="fs-32 fw-medium mb-2">0</h3>
                                     <h6 class="fs-16 fw-light text-default mb-3">Uploaded This Month</h6>
                                     <span class="fs-12 fw-medium text-success">
                                         <span class="sm-avatar avatar rounded bg-soft-success"><i
@@ -61,7 +61,7 @@
                         <div class="col-md-3 d-flex">
                             <div class="card flex-fill">
                                 <div class="card-body">
-                                    <h3 class="fs-32 fw-medium mb-2">50</h3>
+                                    <h3 id="modified-documents" class="fs-32 fw-medium mb-2">0</h3>
                                     <h6 class="fs-16 fw-light text-default mb-3">Modified Documents</h6>
                                     <span class="fs-12 fw-medium text-success">
                                         <span class="sm-avatar avatar rounded bg-soft-success"><i
@@ -78,7 +78,7 @@
                         <div class="col-md-3 d-flex">
                             <div class="card flex-fill">
                                 <div class="card-body">
-                                    <h3 class="fs-32 fw-medium mb-2">40</h3>
+                                    <h3 id="deleted-archive" class="fs-32 fw-medium mb-2">0</h3>
                                     <h6 class="fs-16 fw-light text-default mb-3">Deleted/ Archive</h6>
                                     <span class="fs-12 fw-medium text-success">
                                         <span class="sm-avatar avatar rounded bg-soft-success"><i
@@ -96,64 +96,72 @@
                 </div>
             </div>
 
-            <div class="row seprate_crdhdr">
+            <div class="row seprate_crdhdr" id="approval-status">
                 <div class="dflexbtwn mb-3">
                     <h3 class="fs-20 fw-normal">Approval Status</h3>
                     <div class="d-flex gap-2 align-items-center">
                         <div class="dropdown">
                             <div class="input-group">
-                                <select class="form-select border text-black">
-                                    <option selected="">Today</option>
-                                    <option value="1">Last Week</option>
-                                    <option value="2">Last Month</option>
-                                    <option value="3">Last Year</option>
+                                <select class="form-select border text-black" id="filterRange">
+                                    <option value="today" selected>Today</option>
+                                    <option value="week">Last Week</option>
+                                    <option value="month">Last Month</option>
+                                    <option value="year">Last Year</option>
                                 </select>
                             </div>
                         </div>
                     </div>
                 </div>
+
+                <!-- Pending -->
                 <div class="col-sm-6">
                     <div class="anlytc_linkbx bgcream">
                         <a href="#">
                             <div class="w-100 dflexbtwn">
                                 <div class="tctlft">
                                     <h6 class="fs-18 fw-normal text-default mb-4">Pending Approval</h6>
-                                    <h3 class="fs-32 fw-medium">23</h3>
+                                    <h3 class="fs-32 fw-medium" id="pendingCount">0</h3>
                                 </div>
                                 <span class="link_chevron"><i class="ti ti-chevron-right"></i></span>
                             </div>
                         </a>
                     </div>
                 </div>
+
+                <!-- Approved -->
                 <div class="col-sm-6">
                     <div class="anlytc_linkbx bgltgreen">
                         <a href="#">
                             <div class="w-100 dflexbtwn">
                                 <div class="tctlft">
                                     <h6 class="fs-18 fw-normal text-default mb-4">Approved Document</h6>
-                                    <h3 class="fs-32 fw-medium">50</h3>
+                                    <h3 class="fs-32 fw-medium" id="approvedCount">0</h3>
                                 </div>
                                 <span class="link_chevron"><i class="ti ti-chevron-right"></i></span>
                             </div>
                         </a>
                     </div>
                 </div>
+
+                <!-- Rejected -->
                 <div class="col-sm-6">
                     <div class="anlytc_linkbx bgltred">
                         <a href="#">
                             <div class="w-100 dflexbtwn">
                                 <div class="tctlft">
                                     <h6 class="fs-18 fw-normal text-default mb-4">Rejected Document</h6>
-                                    <h3 class="fs-32 fw-medium">05</h3>
+                                    <h3 class="fs-32 fw-medium" id="rejectedCount">0</h3>
                                 </div>
                                 <span class="link_chevron"><i class="ti ti-chevron-right"></i></span>
                             </div>
                         </a>
                     </div>
                 </div>
+
+                <!-- Tracking -->
                 <div class="col-sm-6">
                     <div class="anlytc_linkbx bgltblue">
-                        <a href="#">
+                        <a href="/employee/approval">
                             <div class="w-100 dflexbtwn">
                                 <div class="tctlft">
                                     <h6 class="fs-18 fw-normal text-default">Approval stage Tracking</h6>
@@ -165,27 +173,25 @@
                 </div>
             </div>
 
+
             <div class="row">
                 <div class="seprate_crdhdr">
                     <div class="dflexbtwn">
                         <h3 class="fs-20 fw-normal">Access and Permission Logs</h3>
                         <div class="d-flex gap-2 align-items-center">
                             <div class="d-flex gap-2 align-items-center">
-                                <div class="dropdown">
-                                    <div class="input-group">
-                                        <select class="form-select border text-black">
-                                            <option selected="">Today</option>
-                                            <option value="1">Last Week</option>
-                                            <option value="2">Last Month</option>
-                                            <option value="3">Last Year</option>
-                                        </select>
-                                    </div>
+                                <div class="position-relative mb-0">
+                                    <input type="text" class="form-control datetimepicker" placeholder="Select date">
+                                    <span class="input-icon-addon">
+                                        <i class="ti ti-calendar text-gray-7"></i>
+                                    </span>
                                 </div>
                             </div>
-                            <a href="#" class="fs-16 ms-4 fw-normal text-primary">View All</a>
+                            <a href="/permissionslogs" class="fs-16 ms-4 fw-normal text-primary">View All</a>
                         </div>
                     </div>
                 </div>
+
                 <div class="col-xxl-12 col-xl-12">
                     <div class="card flex-fill">
                         <div class="card-body p-0">
@@ -199,121 +205,9 @@
                                             <th>Action by User</th>
                                         </tr>
                                     </thead>
-                                    <tbody>
+                                    <tbody id="fileStatusTableBody">
                                         <tr>
-                                            <td>
-                                                <p>Vivek</p>
-                                            </td>
-                                            <td>
-                                                <div class="flxtblleft">
-                                                    <span class="avatar rounded bg-light mb-2">
-                                                        <img src="assets/img/icons/fn1.png">
-                                                    </span>
-                                                    <div class="flxtbltxt">
-                                                        <p class="fs-14 mb-1 fw-normal text-neutral">Project Proposal v1
-                                                        </p>
-                                                        <span class="fs-11 fw-light text-black">190KB</span>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <p class="tbl_date">11-02-2025 &nbsp;&nbsp; 11:20</p>
-                                            </td>
-                                            <td>
-                                                <p>Viewed</p>
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <td>
-                                                <p>Sunil</p>
-                                            </td>
-                                            <td>
-                                                <div class="flxtblleft">
-                                                    <span class="avatar rounded bg-light mb-2">
-                                                        <img src="assets/img/icons/fn1.png">
-                                                    </span>
-                                                    <div class="flxtbltxt">
-                                                        <p class="fs-14 mb-1 fw-normal text-neutral">Project Proposal v1
-                                                        </p>
-                                                        <span class="fs-11 fw-light text-black">190KB</span>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <p class="tbl_date">11-02-2025 &nbsp;&nbsp; 11:20</p>
-                                            </td>
-                                            <td>
-                                                <p>Modified</p>
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <td>
-                                                <p>Junaid</p>
-                                            </td>
-                                            <td>
-                                                <div class="flxtblleft">
-                                                    <span class="avatar rounded bg-light mb-2">
-                                                        <img src="assets/img/icons/fn1.png">
-                                                    </span>
-                                                    <div class="flxtbltxt">
-                                                        <p class="fs-14 mb-1 fw-normal text-neutral">Project Proposal v1
-                                                        </p>
-                                                        <span class="fs-11 fw-light text-black">190KB</span>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <p class="tbl_date">11-02-2025 &nbsp;&nbsp; 11:20</p>
-                                            </td>
-                                            <td>
-                                                <p>Deleted</p>
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <td>
-                                                <p>Saifia</p>
-                                            </td>
-                                            <td>
-                                                <div class="flxtblleft">
-                                                    <span class="avatar rounded bg-light mb-2">
-                                                        <img src="assets/img/icons/fn1.png">
-                                                    </span>
-                                                    <div class="flxtbltxt">
-                                                        <p class="fs-14 mb-1 fw-normal text-neutral">Project Proposal v1
-                                                        </p>
-                                                        <span class="fs-11 fw-light text-black">190KB</span>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <p class="tbl_date">11-02-2025 &nbsp;&nbsp; 11:20</p>
-                                            </td>
-                                            <td>
-                                                <p>Approved</p>
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <td>
-                                                <p>Piyush</p>
-                                            </td>
-                                            <td>
-                                                <div class="flxtblleft">
-                                                    <span class="avatar rounded bg-light mb-2">
-                                                        <img src="assets/img/icons/fn1.png">
-                                                    </span>
-                                                    <div class="flxtbltxt">
-                                                        <p class="fs-14 mb-1 fw-normal text-neutral">Project Proposal v1
-                                                        </p>
-                                                        <span class="fs-11 fw-light text-black">190KB</span>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <p class="tbl_date">11-02-2025 &nbsp;&nbsp; 11:20</p>
-                                            </td>
-                                            <td>
-                                                <p>Downloaded</p>
-                                            </td>
+                                            <td colspan="4" class="text-center py-3 text-muted">Loading...</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -321,7 +215,6 @@
                         </div>
                     </div>
                 </div>
-                <!-- /Projects -->
             </div>
 
             <div class="row">
@@ -367,15 +260,10 @@
                     <div class="dflexbtwn">
                         <h3 class="fs-20 fw-normal">Recent Activity</h3>
                         <div class="d-flex gap-2 align-items-center">
-                            <div class="dropdown">
-                                <a href="javascript:void(0);"
-                                    class="dropdown-toggle border text-black btn btn-outline-secondary fs-13 me-2"
-                                    data-bs-toggle="dropdown">
-                                    Select Department
-                                </a>
-                                <ul class="dropdown-menu dropdown-menu-end p-3">
-
-                                </ul>
+                            <div class="me-2">
+                                <select id="analyticsDepartment" class="form-select fs-13 select2">
+                                    <option value="">-- Select Department --</option>
+                                </select>
                             </div>
                             <div class="dropdown">
                                 <div class="input-group">
@@ -388,7 +276,7 @@
                                     </select>
                                 </div>
                             </div>
-                            <a href="#" class="fs-16 ms-4 fw-normal text-primary">View All</a>
+                            <a href="/compilance-retention" class="fs-16 ms-4 fw-normal text-primary">View All</a>
                         </div>
                     </div>
                 </div>
@@ -396,7 +284,7 @@
                     <div class="card flex-fill">
                         <div class="card-body p-0">
                             <div class="table-responsive">
-                                <table class="table table-nowrap mb-0">
+                                <table class="table table-nowrap mb-0" id="documentsTable">
                                     <thead>
                                         <tr>
                                             <th></th>
@@ -408,66 +296,6 @@
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <tr>
-                                            <td>
-                                                <div class="btn-group" role="group">
-                                                    <button type="button" class="btn border-0" data-bs-toggle="dropdown"
-                                                        aria-expanded="false">
-                                                        <i class="ti ti-settings"></i> </button>
-                                                    <ul class="dropdown-menu">
-                                                        <li><a class="dropdown-item" href="#"><i class="ti ti-eye"></i>
-                                                                View</a></li>
-                                                        <li><a class="dropdown-item" href="add-document.php"><i
-                                                                    class="ti ti-pencil-minus"></i> Edit</a></li>
-                                                        <li><a class="dropdown-item" href="#" data-bs-toggle="modal"
-                                                                data-bs-target="#sharedoc-modal">
-                                                                <i class="ti ti-share"></i> Share</a>
-                                                        </li>
-                                                        <li><a class="dropdown-item" href="#" data-bs-toggle="modal"
-                                                                data-bs-target="#versionhistory-modal">
-                                                                <i class="ti ti-history"></i> Version History</a>
-                                                        </li>
-                                                        <li><a class="dropdown-item" href="#" data-bs-toggle="modal"
-                                                                data-bs-target="#downloaddoc-modal">
-                                                                <i class="ti ti-download"></i> Download</a>
-                                                        </li>
-                                                        <li><a class="dropdown-item" href="#" data-bs-toggle="modal"
-                                                                data-bs-target="#trashdoc-modal">
-                                                                <i class="ti ti-trash"></i> Move to Trash</a>
-                                                        </li>
-                                                        <li><a class="dropdown-item" href="#" data-bs-toggle="modal"
-                                                                data-bs-target="#archivedoc-modal">
-                                                                <i class="ti ti-archive"></i> Move to Archive</a>
-                                                        </li>
-                                                    </ul>
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <div class="flxtblleft">
-                                                    <span class="avatar rounded bg-light mb-2">
-                                                        <img src="assets/img/icons/fn1.png">
-                                                    </span>
-                                                    <div class="flxtbltxt">
-                                                        <p class="fs-14 mb-1 fw-normal text-neutral">Project Proposal v1
-                                                            <span class="text-success">+2</span>
-                                                        </p>
-                                                        <span class="fs-11 fw-light text-black">190KB</span>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <p>Operation Team</p>
-                                            </td>
-                                            <td>
-                                                <p><i class="ti ti-circle-check"></i> Compliant</p>
-                                            </td>
-                                            <td>
-                                                <p>Active</p>
-                                            </td>
-                                            <td>
-                                                <p class="tbl_date">11-02-2025 &nbsp;&nbsp; 11:20</p>
-                                            </td>
-                                        </tr>
                                     </tbody>
                                 </table>
                             </div>
@@ -490,4 +318,5 @@
     </div>
     <!-- /Page Wrapper -->
 
+    <script src="/js/pages/analytics/Analytics.js"></script>
     <%- include('../../partials/footer') %>

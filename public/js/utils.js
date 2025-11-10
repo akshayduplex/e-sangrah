@@ -64,28 +64,6 @@ function formatDate(dateStr) {
     const year = date.getFullYear();
     return `${day}-${month}-${year}`;
 }
-
-// Format Date and Time
-// function formatDateTime(dateInput, { showDate = true, showTime = true, locale = 'en-GB' } = {}) {
-//     if (!dateInput) return '';
-//     const date = new Date(dateInput);
-//     if (isNaN(date)) return '';
-
-//     const options = {};
-//     if (showDate) {
-//         options.day = '2-digit';
-//         options.month = '2-digit';
-//         options.year = 'numeric';
-//     }
-//     if (showTime) {
-//         options.hour = '2-digit';
-//         options.minute = '2-digit';
-//         options.hour12 = true;
-//     }
-
-//     return date.toLocaleString(locale, options);
-// }
-
 /**
  * Formats a date into a readable format (e.g. "Nov 3, 2025 08:45 PM")
  * @param {string|Date|number} dateInput - A date string, timestamp, or Date object
@@ -108,6 +86,12 @@ function formatDateTime(dateInput) {
     });
 
     return `${formattedDate} ${formattedTime}`;
+}
+
+function getFileIcon(fileName) {
+    if (!fileName) return fileIcons.default;
+    const ext = fileName.split('.').pop().toLowerCase();
+    return fileIcons[ext] || fileIcons.default;
 }
 
 

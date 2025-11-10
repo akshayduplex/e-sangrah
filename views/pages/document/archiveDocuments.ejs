@@ -109,75 +109,79 @@
                 initSelect2('#department', `${baseUrl}/api/departments/search`, 'Department');
 
                 const columnMap = [
-                    null,                  // actions
-                    'files.originalName',  // file name
-                    'createdAt',           // created
-                    'department.name',     // department
-                    'updatedAt',           // deleted on
-                    'tags',                // tags
-                    null                   // metadata
+                    null,
+                    null, // fileName (not sortable)
+                    'createdAt',
+                    'department.name',
+                    'updatedAt',
+                    'tags',
+                    null
                 ];
 
-                // Initialize DataTable
                 const dataTable = $('#archived_documents_table').DataTable({
                     processing: true,
                     serverSide: true,
                     deferRender: true,
-                    searching: true,
-                    ordering: true,
-                    responsive: true,
-                    autoWidth: false,
                     pageLength: 25,
                     lengthMenu: [10, 25, 50, 100],
                     ajax: {
                         url: `${baseUrl}/api/documents/archive`,
                         type: 'GET',
+                        timeout: 30000,
                         data: function (d) {
-                            return {
-                                page: Math.floor(d.start / d.length) + 1,
-                                limit: d.length,
-                                search: d.search.value,
-                                orderColumn: columnMap[d.order[0].column] || 'updatedAt',
-                                orderDir: d.order[0].dir,
-                                department: $('#department').val() || 'all'
-                            };
+                            d.page = Math.floor(d.start / d.length) + 1;
+                            d.limit = d.length;
+                            d.search = d.search.value;
+                            d.orderColumn = columnMap[d.order[0].column] || 'updatedAt';
+                            d.orderDir = d.order[0].dir;
+                            d.department = $('#department').val() || 'all';
+                            // -----------------------------------------
+                            return d;
                         },
                         dataSrc: function (res) {
                             if (!res || !Array.isArray(res.data)) return [];
                             return res.data.map(doc => {
-                                const file = doc.files?.[0];
-                                const ext = file?.originalName?.split('.').pop().toLowerCase();
-                                const fileSizeKB = file?.fileSize ? (file.fileSize / 1024).toFixed(2) + ' KB' : '-';
+                                const file = doc.file || {};
+                                const ext = file.originalName?.split('.').pop()?.toLowerCase() || 'default';
+                                const fileSizeKB = file.fileSize ? (file.fileSize / 1024).toFixed(2) + ' KB' : '-';
                                 const icon = fileIcons[ext] || fileIcons.default;
 
                                 return {
                                     actions: `
-                            <div class="action-icon d-inline-flex">
-                                <a href="#" class="restore-folder me-2" data-folder-id="${doc._id}">
-                                    <i class="ti ti-restore"></i>
-                                </a>
-                                <a href="#" class="trash-folder" data-folder-id="${doc._id}" data-bs-toggle="modal" data-bs-target="#trashdoc-modal">
-                                    <i class="ti ti-trash"></i>
-                                </a>
-                            </div>`,
+                                <div class="action-icon d-inline-flex">
+                                    <a href="#" class="restore-folder me-2" data-folder-id="${doc._id}">
+                                        <i class="ti ti-restore"></i>
+                                    </a>
+                                    <a href="#" class="trash-folder" data-folder-id="${doc._id}" data-bs-toggle="modal" data-bs-target="#trashdoc-modal">
+                                        <i class="ti ti-trash"></i>
+                                    </a>
+                                </div>`,
                                     fileName: `
-                            <div class="d-flex align-items-center">
-                                <span class="avatar rounded bg-light me-2">
-                                    <img src="${icon}" style="height:30px;">
-                                </span>
-                                <div>
-                                    <p class="mb-0 text-dark">${file?.originalName || '-'}</p>
-                                    <small class="text-muted">${fileSizeKB}</small>
-                                </div>
-                            </div>`,
+                                <div class="d-flex align-items-center">
+                                    <span class="avatar rounded bg-light me-2">
+                                        <img src="${icon}" style="height:30px;">
+                                    </span>
+                                    <div>
+                                        <p class="mb-0 text-dark">${file.originalName || '-'}</p>
+                                        <small class="text-muted">${fileSizeKB}</small>
+                                    </div>
+                                </div>`,
                                     createdAt: new Date(doc.createdAt).toLocaleDateString(),
                                     department: doc.department?.name || "-",
-                                    deletedOn: new Date(doc.updatedAt || doc.createdAt).toLocaleDateString(),
+                                    deletedOn: new Date(doc.updatedAt).toLocaleDateString(),
                                     tags: doc.tags?.join(", ") || "-",
                                     metaData: `<strong>Description:</strong> ${doc.metadata?.fileDescription || "-"}<br>
-                                   <strong>Heading:</strong> ${doc.metadata?.mainHeading || "-"}`
+                                       <strong>Heading:</strong> ${doc.metadata?.mainHeading || "-"}`
                                 };
                             });
+                        },
+                        error: function (xhr, status, err) {
+                            let msg = "Failed to load data.";
+                            if (status === "timeout") msg = "Request timed out. Try filtering.";
+                            else if (xhr.responseJSON?.message) msg = xhr.responseJSON.message;
+
+                            showToast(msg, "error");
+                            dataTable.clear().draw();
                         }
                     },
                     columns: [
@@ -200,12 +204,12 @@
                 // Filter by Department
                 $('#department').on('change', refreshArchivedTable);
 
-                // Debounced Search
+                // Debounced search
                 let searchTimer;
                 $('.dataTables_filter input').off().on('keyup', function () {
                     clearTimeout(searchTimer);
                     const value = this.value;
-                    searchTimer = setTimeout(() => dataTable.search(value).draw(), 400);
+                    searchTimer = setTimeout(() => dataTable.search(value).draw(), 500);
                 });
 
                 // Trash Folder

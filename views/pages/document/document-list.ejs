@@ -50,11 +50,11 @@
                             <option value="">-- Select Department --</option>
                         </select>
                     </div>
-                    <div class=" mb-0">
+                    <!-- <div class=" mb-0">
                         <select id="projectName" class="form-select select2" style="width: 200px;">
                             <option value="">-- Select Project --</option>
                         </select>
-                    </div>
+                    </div> -->
                     <div class="mb-0 position-relative">
                         <!-- Filter Button -->
                         <div class="mb-0 position-relative">
@@ -293,7 +293,7 @@
 
                     // Initialize Select2
                     initSelect2('#department', `${baseUrl}/api/departments/search`, 'Select Department', 'name');
-                    initSelect2('#projectName', `${baseUrl}/api/projects`, 'Select Project', 'projectName');
+                    // initSelect2('#projectName', `${baseUrl}/api/projects`, 'Select Project', 'projectName');
 
                     // -------------------------
                     // Initialize DataTable
@@ -323,7 +323,7 @@
                                     limit: d.length,
                                     status: getCurrentStatus(), // Use the current active status
                                     department: $('#department').val(),
-                                    project: $('#projectName').val(),
+                                    // project: $('#projectName').val(),
                                     date: selectedDate,
                                     search: searchValue,
                                     orderColumn,
@@ -438,7 +438,7 @@
                         table.ajax.reload();
                     });
 
-                    $('#department, #projectName').on('change', function () {
+                    $('#department').on('change', function () {
                         table.ajax.reload();
                     });
 
@@ -581,7 +581,7 @@
                     // Filters & Tabs
                     // ------------------------
 
-                    $('#department, #projectName').on('change', function () {
+                    $('#department').on('change', function () {
                         table.ajax.reload();
                     });
 

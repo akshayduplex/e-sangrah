@@ -115,7 +115,7 @@ router.get("/admin/approval", authenticate, checkPermissions, AdminController.sh
 router.get("/document/:id/approval/track", authenticate, AdminController.showApprovalTrackPage);
 router.get("/documents/admin/recyclebin", authenticate, AdminController.showRecycleBinPage);
 router.get("/admin/folders/:folderId/manage-access", authenticate, AdminController.showManageAccessPage);
-router.get("/admin/permissionslogs", authenticate, AdminController.showPermissionLogsPage);
+router.get("/permissionslogs", authenticate, AdminController.showPermissionLogsPage);
 router.get("/admin/folders/permission", authenticate, AdminController.showFolderPermissionLogsPage);
 /* =========================================
    EMPLOYEE ROUTE
@@ -134,6 +134,7 @@ router.get("/employee/anaytics", authenticate, EmployeeController.showEmployeeAn
    ========================================= */
 // Add Designation page
 router.get("/report", authenticate, ReportsController.showReportPage);
+router.get("/compilance-retention", authenticate, ReportsController.showComplianceRetentionPage);
 
 
 /* =========================================

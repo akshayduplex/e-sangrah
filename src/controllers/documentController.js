@@ -16,17 +16,13 @@ import Approval from "../models/Approval.js";
 import { getObjectUrl } from "../utils/s3Helpers.js";
 import { decrypt } from "../helper/SymmetricEncryption.js";
 import { generateShareLink } from "../helper/GenerateUniquename.js";
-import { accessGrantedTemplate } from "../emailTemplates/accessGrantedTemplate.js";
-import { accessRequestTemplate } from "../emailTemplates/accessRequestTemplate.js";
 import { accessExpiredTemplate, alertRedirectTemplate } from "../emailTemplates/accessExpiredTemplate.js";
 import { inviteUserTemplate } from "../emailTemplates/inviteUserTemplate.js";
 import { API_CONFIG } from "../config/ApiEndpoints.js";
 import PermissionLogs from "../models/PermissionLogs.js";
-import Project from "../models/Project.js";
 import { addNotification } from "./NotificationController.js";
 import { cloudinary } from "../middlewares/fileUploads.js";
 import { approvalRequestTemplate } from "../emailTemplates/approvalRequestTemplate.js";
-import { populate } from "dotenv";
 
 //Page Controllers
 
@@ -301,7 +297,7 @@ export const getDocuments = async (req, res) => {
             search,
             status,
             department,
-            project,
+            project, // query-level project filter (optional)
             date,
             orderColumn,
             orderDir
@@ -309,6 +305,7 @@ export const getDocuments = async (req, res) => {
 
         const userId = req.user?._id;
         const profile_type = req.user?.profile_type;
+
         // --- Base filter ---
         const filter = {
             isDeleted: false,
@@ -363,15 +360,24 @@ export const getDocuments = async (req, res) => {
             }
         }
 
-        // --- Project filter ---
-        if (project) {
-            const projArray = toArray(project).filter(id => mongoose.Types.ObjectId.isValid(id));
-            if (projArray.length > 0) {
-                filter.project = projArray.length === 1 ? projArray[0] : { $in: projArray };
-            }
+        // --- Project filter (from query or session) ---
+        const sessionProjectId = req.session?.selectedProject;
+        const projectIds = [];
+
+        if (sessionProjectId && mongoose.Types.ObjectId.isValid(sessionProjectId)) {
+            projectIds.push(sessionProjectId);
         }
 
-        // --- Date filter ---
+        if (project) {
+            const projArray = toArray(project).filter(id => mongoose.Types.ObjectId.isValid(id));
+            projectIds.push(...projArray);
+        }
+
+        if (projectIds.length > 0) {
+            filter.project = projectIds.length === 1 ? projectIds[0] : { $in: projectIds };
+        }
+
+        // --- Date filter from query ---
         if (date) {
             const [day, month, year] = date.split('-').map(Number);
             const selectedDate = new Date(year, month - 1, day);
@@ -382,7 +388,44 @@ export const getDocuments = async (req, res) => {
             }
         }
 
-        // --- Column Sorting ---
+        // --- Year filter from session ---
+        if (req.session?.selectedYear) {
+            const year = parseInt(req.session.selectedYear, 10);
+            if (!isNaN(year)) {
+                const startOfYear = new Date(year, 0, 1);
+                const endOfYear = new Date(year + 1, 0, 1);
+
+                // Merge year filter with possible existing date filter
+                if (!filter.createdAt) {
+                    filter.createdAt = { $gte: startOfYear, $lt: endOfYear };
+                } else {
+                    filter.createdAt.$gte = startOfYear;
+                    filter.createdAt.$lt = endOfYear;
+                }
+            }
+        }
+        // --- Role filter ---
+        if (req.query.role) {
+            const roleValue = req.query.role.trim().toLowerCase();
+            // Assuming you store role in user.userDetails.role or profile_type
+            filter["owner.userDetails.role"] = roleValue;
+        }
+
+        // --- Doc Type filter ---
+        if (req.query.docType) {
+            const docTypeValue = req.query.docType.trim();
+            filter["metadata.mainHeading"] = { $regex: new RegExp(docTypeValue, "i") };
+        }
+
+        // --- Designation filter ---
+        if (req.query.designation) {
+            const designationId = req.query.designation.trim();
+            if (mongoose.Types.ObjectId.isValid(designationId)) {
+                filter["owner.userDetails.designation"] = designationId;
+            }
+        }
+
+        // --- Sorting ---
         const columnMap = {
             1: "metadata.fileName",
             2: "updatedAt",
@@ -401,19 +444,14 @@ export const getDocuments = async (req, res) => {
         const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
         const skip = (pageNum - 1) * limitNum;
 
-        // --- Filter by year from session ---
-        if (req.session?.selectedYear) {
-            const year = parseInt(req.session.selectedYear, 10);
-            if (!isNaN(year)) {
-                const startOfYear = new Date(year, 0, 1);      // Jan 1, YYYY
-                const endOfYear = new Date(year + 1, 0, 1);    // Jan 1, YYYY+1
-                filter.createdAt = { $gte: startOfYear, $lt: endOfYear };
-            }
-        }
-
         // --- Fetch documents ---
         const documents = await Document.find(filter)
-            .select("files updatedAt createdAt wantApprovers signature isDeleted isArchived comment sharedWithUsers compliance status metadata tags owner documentVendor documentDonor department project description")
+            .select(`
+                files updatedAt createdAt wantApprovers signature isDeleted isArchived 
+                comment sharedWithUsers compliance status metadata tags owner 
+                documentVendor documentDonor department project description
+                documentApprovalAuthority
+            `)
             .populate("department", "name")
             .populate("project", "projectName")
             .populate({
@@ -428,6 +466,10 @@ export const getDocuments = async (req, res) => {
             .populate("documentVendor", "name profile_image")
             .populate("sharedWithUsers", "name profile_image email")
             .populate("files", "originalName version fileSize")
+            .populate({
+                path: "documentApprovalAuthority.userId",
+                select: "name email profile_image"
+            })
             .sort({ [sortField]: sortOrder })
             .skip(skip)
             .limit(limitNum)
@@ -659,7 +701,7 @@ export const getArchivedDocuments = async (req, res) => {
     try {
         const draw = parseInt(req.query.draw) || 1;
         const page = parseInt(req.query.page) || 1;
-        const limit = Math.min(parseInt(req.query.limit) || 10, 500); // safety cap
+        const limit = Math.min(parseInt(req.query.limit) || 10, 500);
         const skip = (page - 1) * limit;
 
         const search = req.query.search?.trim() || "";
@@ -674,7 +716,6 @@ export const getArchivedDocuments = async (req, res) => {
             isDeleted: false,
         };
 
-        // Restrict data for non-superadmins
         if (profileType !== "superadmin") {
             query.owner = userId;
         }
@@ -683,19 +724,31 @@ export const getArchivedDocuments = async (req, res) => {
             query.department = new mongoose.Types.ObjectId(req.query.department);
         }
 
-        // Efficient text or regex search
+        // Use text search if available
         if (search) {
-            query.$or = [
-                { "metadata.fileDescription": { $regex: search, $options: "i" } },
-                { "metadata.mainHeading": { $regex: search, $options: "i" } },
-                { "tags": { $regex: search, $options: "i" } },
-                { "files.originalName": { $regex: search, $options: "i" } }
-            ];
+            query.$text = { $search: search };
         }
 
-        // === Aggregation pipeline for performance ===
+        // === Optimized Pipeline ===
         const pipeline = [
             { $match: query },
+
+            // Early: Get only primary file
+            {
+                $lookup: {
+                    from: "files",
+                    let: { fileIds: "$files" },
+                    pipeline: [
+                        { $match: { $expr: { $in: ["$_id", "$$fileIds"] }, isPrimary: true } },
+                        { $limit: 1 },
+                        { $project: { originalName: 1, fileSize: 1 } }
+                    ],
+                    as: "primaryFile"
+                }
+            },
+            { $unwind: { path: "$primaryFile", preserveNullAndEmptyArrays: true } },
+
+            // Department lookup
             {
                 $lookup: {
                     from: "departments",
@@ -705,6 +758,8 @@ export const getArchivedDocuments = async (req, res) => {
                 }
             },
             { $unwind: { path: "$department", preserveNullAndEmptyArrays: true } },
+
+            // Final projection
             {
                 $project: {
                     _id: 1,
@@ -713,36 +768,38 @@ export const getArchivedDocuments = async (req, res) => {
                     tags: 1,
                     metadata: 1,
                     department: { name: "$department.name" },
-                    files: {
-                        $filter: {
-                            input: "$files",
-                            as: "file",
-                            cond: { $eq: ["$$file.isPrimary", true] }
-                        }
-                    }
+                    file: "$primaryFile"
                 }
             },
+
             { $sort: { [orderColumn]: orderDir } },
             { $skip: skip },
             { $limit: limit }
         ];
 
-        const [documents, total] = await Promise.all([
+        // Parallel: data + count
+        const [documents, countResult] = await Promise.all([
             Document.aggregate(pipeline).allowDiskUse(true),
-            Document.countDocuments(query)
+            Document.aggregate([
+                { $match: query },
+                { $count: "total" }
+            ]).allowDiskUse(true)
         ]);
+
+        const total = countResult[0]?.total || 0;
+        const filtered = search ? documents.length : total;
 
         res.json({
             draw,
             recordsTotal: total,
-            recordsFiltered: total,
+            recordsFiltered: filtered,
             data: documents
         });
+
     } catch (err) {
         console.error("Error fetching archived documents:", err);
-        res.status(500).json({ success: false, message: err.message });
+        res.status(500).json({ success: false, message: "Server error. Try again." });
     }
-
 };
 
 // Restore a soft-deleted document

@@ -114,13 +114,13 @@ export const showManageAccessPage = async (req, res) => {
 };
 export const showPermissionLogsPage = async (req, res) => {
     try {
-        res.render("pages/admin/permissionLogs", {
+        res.render("pages/reports/permissionLogs", {
             title: "Permission Logs",
             user: req.user
         });
 
     } catch (err) {
-        logger.error("Admin render error:", err);
+        logger.error("render error:", err);
         res.status(500).render("pages/error", {
             user: req.user,
             message: "Unable to load manage access page"

@@ -224,6 +224,7 @@
 <script> window.baseUrl = "<%= BASE_URL %>";</script>
 <script src="/js/todo.js"></script>
 <script src="/js/toast.js"></script>
+<script src="/js/components/shareDocument.js"></script>
 <script defer src="/js/components/header.js"></script>
 <script src="/js/components/formatDate.js"></script>
 <script src="/js/theme-colorpicker.js"></script>
@@ -901,7 +902,7 @@
         if ($headerYearSelect.length) {
             const currentYear = new Date().getFullYear();
             const startYear = 1995;
-            const endYear = currentYear; // ✅ stop at current year only
+            const endYear = currentYear;
 
             // Populate dropdown
             for (let year = endYear; year >= startYear; year--) {
@@ -911,7 +912,7 @@
             // Initialize Select2
             $headerYearSelect.select2({
                 placeholder: 'Select Year',
-                width: '120px'
+                width: '20px'
             });
 
             // On change — save and reload
@@ -974,7 +975,7 @@
         if ($headerProjectSelect.length) {
             $headerProjectSelect.select2({
                 placeholder: 'Select Project',
-                allowClear: true,
+                allowClear: false,
                 width: '250px',
                 ajax: {
                     url: `${baseUrl}/api/projects`,
@@ -1032,13 +1033,11 @@
                         window.selectedProjectId = data.selectedProject;
                         window.selectedProjectName = data.selectedProjectName;
 
-                        // ✅ Add selected project to Select2 if not in list
                         if (!$headerProjectSelect.find(`option[value="${data.selectedProject}"]`).length) {
                             const option = new Option(data.selectedProjectName, data.selectedProject, true, true);
                             $headerProjectSelect.append(option);
                         }
 
-                        // ✅ Set and refresh Select2 display
                         $headerProjectSelect.val(data.selectedProject).trigger('change.select2');
                     }
                 } catch (err) {
@@ -1260,96 +1259,6 @@
             },
             minimumInputLength: 0
         });
-
-
-        // // Show Share Modal
-        // $('#sharedoc-modal').on('show.bs.modal', function (event) {
-        //     currentDocId = $(event.relatedTarget).data('doc-id');
-        //     if (!currentDocId) return showToast('Error: No document selected', 'info');
-
-        //     const modal = $(this);
-        //     modal.find('input[type="text"]').val('');
-        //     modal.find('select').val('view').trigger('change');
-        //     modal.find('#customDateWrapper').hide();
-        //     modal.find('input[type="radio"]').prop('checked', false);
-        //     modal.find('#lifetime').prop('checked', true);
-        //     modal.find('.user-accssrow.dynamic').remove();
-
-        //     loadSharedUsers(currentDocId, modal);
-        // });
-
-        // // Toggle custom duration
-        // $('#sharedoc-modal input[name="time"]').on('change', function () {
-        //     const isCustom = $(this).attr('id') === 'custom';
-        //     $('#customDateWrapper').toggle(isCustom);
-        //     if (isCustom) {
-        //         const today = new Date().toISOString().split('T')[0];
-        //         $('#startDate').val(today);
-        //         $('#endDate').attr('min', today);
-        //     }
-        // });
-
-        // // Load shared users from API
-        // function loadSharedUsers(docId, modal) {
-        //     $.ajax({
-        //         url: `${baseUrl}/api/documents/${docId}`,
-        //         method: 'GET',
-        //         success: function (res) {
-        //             if (!res.success || !res.document) return console.error('Failed to load document');
-
-        //             const sharedWith = res.document.sharedWith || [];
-        //             const wrapper = modal.find('.modal-body');
-        //             wrapper.find('.user-accssrow.dynamic').remove();
-
-        //             sharedWith.forEach(sw => {
-        //                 if (sw.user && sw.user.email) {
-        //                     const row = `
-        //                 <div class="user-accssrow dynamic" data-user-id="${sw.user._id}">
-        //                     <div class="empname_eml">
-        //                         <div class="fw-normal fs-18">${sw.user.name || sw.user.email}</div>
-        //                         <small class="fs-16">${sw.user.email}</small>
-        //                         <small class="badge bg-${sw.inviteStatus === 'accepted' ? 'success' : 'warning'}">
-        //                             ${sw.inviteStatus}
-        //                         </small>
-        //                     </div>
-        //                     <div class="d-flex align-items-center gap-4">
-        //                         <select class="form-select form-select-sm access-level" style="width:100px;">
-        //                             <option value="view" ${sw.accessLevel === 'view' ? 'selected' : ''}>View</option>
-        //                             <option value="edit" ${sw.accessLevel === 'edit' ? 'selected' : ''}>Edit</option>
-        //                         </select>
-        //                         <button class="btn btn-sm btn-outline-danger remove-user">Remove</button>
-        //                     </div>
-        //                 </div>`;
-        //                     wrapper.append(row);
-        //                 }
-        //             });
-        //         },
-        //         error: function (xhr, status, error) {
-        //             console.error('Error loading shared users:', error);
-        //         }
-        //     });
-        // }
-
-        // // Add user to UI dynamically
-        // function addUserToUI(email, accessLevel, isPending = true) {
-        //     const wrapper = $('#sharedoc-modal .modal-body');
-        //     const row = `
-        // <div class="user-accssrow dynamic" data-user-email="${email}">
-        //     <div class="empname_eml">
-        //         <div class="fw-normal fs-18">${email.split('@')[0]}</div>
-        //         <small class="fs-16">${email}</small>
-        //         <small class="badge bg-warning">pending</small>
-        //     </div>
-        //     <div class="d-flex align-items-center gap-4">
-        //         <select class="form-select form-select-sm access-level" style="width:100px;">
-        //             <option value="view" ${accessLevel === 'view' ? 'selected' : ''}>View</option>
-        //             <option value="edit" ${accessLevel === 'edit' ? 'selected' : ''}>Edit</option>
-        //         </select>
-        //         <button class="btn btn-sm btn-outline-danger remove-user">Remove</button>
-        //     </div>
-        // </div>`;
-        //     wrapper.append(row);
-        // }
     });
 </script>
 

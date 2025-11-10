@@ -8,7 +8,28 @@ import ExcelJS from 'exceljs';
 import PDFDocument from 'pdfkit';
 import { Parser } from 'json2csv';
 import { API_CONFIG } from "../config/ApiEndpoints.js";
+import { getSessionFilters } from "../helper/sessionHelpers.js";
+import mongoose from "mongoose";
+function sanitize(str) {
+    return String(str)
+        .replace(/[^a-zA-Z0-9_-]/g, '_')
+        .substring(0, 30);
+}
 
+function buildApproverString(doc) {
+    if (!doc.wantApprovers || !doc.documentApprovalAuthority?.length) {
+        return "N/A";
+    }
+
+    return doc.documentApprovalAuthority
+        .sort((a, b) => (a.priority || 0) - (b.priority || 0))
+        .map(a => {
+            const name = a.userId?.name || "Unknown";
+            const status = a.status || "Pending";
+            return `${name} [${status}]`;
+        })
+        .join(" | ");
+}
 export const servePDF = async (req, res) => {
     try {
         const { fileId } = req.params;
@@ -149,65 +170,85 @@ export const downloadFile = async (req, res) => {
 
 export const exportDocuments = async (req, res) => {
     try {
-        const { format, filters, columns, exportAll = false } = req.body;
+        const { format, filters = {}, exportAll = false } = req.body;
 
-
-        const validFormats = ['xlsx', 'csv', 'pdf', 'ods'];
-        if (!validFormats.includes(format)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid export format'
-            });
+        if (!["xlsx", "csv", "pdf", "ods"].includes(format)) {
+            return res
+                .status(400)
+                .json({ success: false, message: "Invalid export format" });
         }
 
+        const { selectedYear, selectedProjectId } = getSessionFilters(req);
         const query = buildQuery(filters);
-
-        let documents;
-        if (exportAll) {
-            documents = await Document.find(query)
-                .populate('owner', 'name designation')
-                .populate('department', 'name')
-                .populate('sharedWithUsers', 'name')
-                .populate('signature')
-                .sort({ updatedAt: -1 });
-        } else {
-            documents = await Document.find(query)
-                .populate('owner', 'name designation')
-                .populate('department', 'name')
-                .populate('sharedWithUsers', 'name')
-                .populate('signature')
-                .sort({ updatedAt: -1 })
-                .limit(1000);
+        if (selectedProjectId) {
+            query.project = new mongoose.Types.ObjectId(selectedProjectId);
         }
 
+        if (selectedYear) {
+            const start = new Date(`${selectedYear}-01-01T00:00:00.000Z`);
+            const end = new Date(`${Number(selectedYear) + 1}-01-01T00:00:00.000Z`);
+            query.createdAt = { $gte: start, $lt: end };
+        }
 
-        const exportData = formatExportData(documents, columns);
+        const docsQuery = Document.find(query)
+            .populate({
+                path: "owner",
+                select: "name",
+                populate: {
+                    path: "userDetails.designation",
+                    model: "Designation",
+                    select: "name"
+                }
+            })
+            .populate("department", "name")
+            .populate("sharedWithUsers", "name")
+            .populate("files", "originalName fileSize")
+            .populate({
+                path: "documentApprovalAuthority.userId",
+                select: "name"
+            })
+            .populate({
+                path: "documentApprovalAuthority.designation",
+                model: "Designation",
+                select: "name"
+            })
+            .sort({ updatedAt: -1 });
+        console.log("Report", docsQuery)
+        const documents = exportAll ? await docsQuery : await docsQuery.limit(1000);
+        const exportData = formatExportData(documents);
 
+        // ----- file name -------------------------------------------------
+        const parts = [];
+        if (filters.role) parts.push(`Role_${sanitize(filters.role)}`);
+        if (filters.department) parts.push(`Dept_${sanitize(filters.department)}`);
+        if (filters.docType) parts.push(`Type_${sanitize(filters.docType)}`);
+        if (filters.designation) parts.push(`Desig_${sanitize(filters.designation)}`);
+        if (filters.date) parts.push(`Date_${filters.date}`);
+        const suffix = parts.length ? parts.join("-") + "-" : "";
+        const fileName = `documents-${suffix}${new Date()
+            .toISOString()
+            .split("T")[0]}.${format}`;
+
+        // ----- generate --------------------------------------------------
         switch (format) {
-            case 'xlsx':
-                await generateExcel(exportData, res);
+            case "xlsx":
+                await generateExcel(exportData, res, fileName);
                 break;
-            case 'csv':
-                generateCSV(exportData, res);
+            case "csv":
+                generateCSV(exportData, res, fileName);
                 break;
-            case 'pdf':
-                await generatePDF(exportData, res);
+            case "pdf":
+                await generatePDF(exportData, res, fileName);
                 break;
-            case 'ods':
-                await generateODS(exportData, res);
+            case "ods":
+                await generateODS(exportData, res, fileName);
                 break;
-            default:
-                return res.status(400).json({
-                    success: false,
-                    message: 'Unsupported format'
-                });
         }
-
     } catch (error) {
-        console.error('Export error:', error);
+        console.error("Export error:", error);
         res.status(500).json({
             success: false,
-            message: 'Export failed',
+            message: "Export failed",
             error: error.message
         });
     }
@@ -256,39 +297,38 @@ function buildQuery(filters) {
 }
 
 // Format data for export
-function formatExportData(documents, selectedColumns) {
+function formatExportData(documents) {
     return documents.map(doc => {
-        const row = {
-            fileName: doc.metadata?.fileName || '',
-            owner: doc.owner?.name || '',
-            designation: doc.owner?.designation || '',
-            department: doc.department?.name || '',
-            role: doc.role || 'Admin',
-            approver: doc.projectManager || '',
-            lastModified: doc.updatedAt ? new Date(doc.updatedAt).toLocaleString() : '',
-            tags: doc.tags?.join(', ') || '',
-            metadata: doc.metadata?.fileDescription || '',
-            sharedWith: doc.sharedWithUsers?.map(u => u.name).join(', ') || '',
-            createdOn: doc.createdAt ? new Date(doc.createdAt).toLocaleString() : '',
-            description: doc.description?.replace(/<\/?[^>]+(>|$)/g, "") || '',
-            signature: doc.signature?.fileUrl ? 'Yes' : 'No',
-            status: doc.status || '',
-            fileSize: doc.files[0]?.fileSize ? `${(doc.files[0].fileSize / 1024).toFixed(2)} KB` : '',
-            fileType: doc.files[0]?.fileType || ''
+        const file = doc.files?.[0] || {};
+
+        return {
+            fileName: doc.metadata?.fileName || "",
+            owner: doc.owner?.name || "",
+            designation: doc.owner?.userDetails?.designation?.name || "",
+            department: doc.department?.name || "",
+            role: "Admin",                                 // keep your default
+            approver: buildApproverString(doc),            // <-- NEW
+            lastModified: doc.updatedAt
+                ? new Date(doc.updatedAt).toLocaleString()
+                : "",
+            tags: doc.tags?.join(", ") || "",
+            metadata: doc.metadata?.fileDescription || "",
+            sharedWith: doc.sharedWithUsers
+                ?.map(u => u.name)
+                .join(", ") || "",
+            createdOn: doc.createdAt
+                ? new Date(doc.createdAt).toLocaleString()
+                : "",
+            description: doc.description
+                ? doc.description.replace(/<\/?[^>]+(>|$)/g, "").trim()
+                : "",
+            signature: doc.signature?.fileUrl ? "Yes" : "No",
+            status: doc.status || "",
+            fileSize: file.fileSize
+                ? `${(file.fileSize / 1024).toFixed(2)} KB`
+                : "",
+            fileType: file.originalName?.split(".").pop()?.toUpperCase() || ""
         };
-
-        if (selectedColumns && selectedColumns.length > 0) {
-            const filteredRow = {};
-            selectedColumns.forEach(col => {
-                const key = mapColumnNameToKey(col);
-                if (row[key] !== undefined) {
-                    filteredRow[col] = row[key];
-                }
-            });
-            return filteredRow;
-        }
-
-        return row;
     });
 }
 
@@ -314,174 +354,113 @@ function mapColumnNameToKey(columnName) {
 }
 
 // Generate Excel file
-async function generateExcel(data, res) {
-    try {
-        const workbook = new ExcelJS.Workbook();
-        const worksheet = workbook.addWorksheet('Documents Report');
+async function generateExcel(data, res, fileName) {
+    const workbook = new ExcelJS.Workbook();
+    const ws = workbook.addWorksheet("Documents Report");
 
-        // Add title
-        worksheet.mergeCells('A1:N1');
-        worksheet.getCell('A1').value = 'Documents Report';
-        worksheet.getCell('A1').font = { size: 16, bold: true };
-        worksheet.getCell('A1').alignment = { horizontal: 'center' };
+    // Title
+    ws.mergeCells("A1:O1");
+    ws.getCell("A1").value = "Documents Report";
+    ws.getCell("A1").font = { size: 16, bold: true };
+    ws.getCell("A1").alignment = { horizontal: "center" };
 
-        // Add export date
-        worksheet.mergeCells('A2:N2');
-        worksheet.getCell('A2').value = `Exported on: ${new Date().toLocaleString()}`;
-        worksheet.getCell('A2').alignment = { horizontal: 'center' };
-        worksheet.getCell('A2').font = { italic: true };
+    ws.mergeCells("A2:O2");
+    ws.getCell("A2").value = `Exported on: ${new Date().toLocaleString()}`;
+    ws.getCell("A2").alignment = { horizontal: "center" };
+    ws.getCell("A2").font = { italic: true };
 
-        // Add headers
-        if (data.length > 0) {
-            const headers = Object.keys(data[0]);
-            worksheet.addRow(headers);
+    if (data.length) {
+        const headers = Object.keys(data[0]);
+        ws.addRow([]);                     // empty row after title
+        const headerRow = ws.addRow(headers);
+        headerRow.font = { bold: true };
+        headerRow.fill = {
+            type: "pattern",
+            pattern: "solid",
+            fgColor: { argb: "FFE6E6FA" }
+        };
 
-            // Style headers
-            const headerRow = worksheet.getRow(3);
-            headerRow.font = { bold: true };
-            headerRow.fill = {
-                type: 'pattern',
-                pattern: 'solid',
-                fgColor: { argb: 'FFE6E6FA' }
-            };
+        data.forEach(r => ws.addRow(Object.values(r)));
 
-            // Add data
-            data.forEach(row => {
-                worksheet.addRow(Object.values(row));
+        ws.columns.forEach(col => {
+            let max = 0;
+            col.eachCell({ includeEmpty: true }, c => {
+                const len = c.value ? c.value.toString().length : 10;
+                if (len > max) max = len;
             });
-
-            // Auto-fit columns
-            worksheet.columns.forEach(column => {
-                let maxLength = 0;
-                column.eachCell({ includeEmpty: true }, cell => {
-                    const columnLength = cell.value ? cell.value.toString().length : 10;
-                    if (columnLength > maxLength) {
-                        maxLength = columnLength;
-                    }
-                });
-                column.width = Math.min(maxLength + 2, 50);
-            });
-        }
-
-        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        res.setHeader('Content-Disposition', `attachment; filename=documents-${Date.now()}.xlsx`);
-
-        await workbook.xlsx.write(res);
-        res.end();
-
-    } catch (error) {
-        throw new Error(`Excel generation failed: ${error.message}`);
+            col.width = Math.min(max + 2, 50);
+        });
     }
+
+    res.setHeader(
+        "Content-Type",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+    res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+    await workbook.xlsx.write(res);
+    res.end();
 }
 
-// Generate CSV file
-function generateCSV(data, res) {
-    try {
-        if (data.length === 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'No data to export'
-            });
-        }
-
-        const fields = Object.keys(data[0]);
-        const json2csvParser = new Parser({ fields });
-        const csv = json2csvParser.parse(data);
-
-        res.setHeader('Content-Type', 'text/csv');
-        res.setHeader('Content-Disposition', `attachment; filename=documents-${Date.now()}.csv`);
-        res.send(csv);
-
-    } catch (error) {
-        throw new Error(`CSV generation failed: ${error.message}`);
+function generateCSV(data, res, fileName) {
+    if (!data.length) {
+        return res
+            .status(400)
+            .json({ success: false, message: "No data to export" });
     }
+    const parser = new Parser({ fields: Object.keys(data[0]) });
+    const csv = parser.parse(data);
+
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+    res.send(csv);
 }
 
-// Generate PDF file
-async function generatePDF(data, res) {
-    return new Promise((resolve, reject) => {
-        try {
-            const doc = new PDFDocument({ margin: 50 });
+async function generatePDF(data, res, fileName) {
+    const doc = new PDFDocument({ margin: 50 });
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+    doc.pipe(res);
 
-            res.setHeader('Content-Type', 'application/pdf');
-            res.setHeader('Content-Disposition', `attachment; filename=documents-${Date.now()}.pdf`);
+    doc.fontSize(20).font("Helvetica-Bold").text("Documents Report", { align: "center" });
+    doc.fontSize(10)
+        .font("Helvetica")
+        .text(`Exported on: ${new Date().toLocaleString()}`, { align: "center" });
 
-            doc.pipe(res);
+    let y = 120;
+    data.forEach((row, i) => {
+        if (y > 700) { doc.addPage(); y = 50; }
+        doc.fontSize(12).font("Helvetica-Bold").text(`Document ${i + 1}:`, 50, y);
+        y += 20;
 
-            // Add title
-            doc.fontSize(20).font('Helvetica-Bold')
-                .text('Documents Report', 50, 50, { align: 'center' });
-
-            // Add export date
-            doc.fontSize(10).font('Helvetica')
-                .text(`Exported on: ${new Date().toLocaleString()}`, 50, 80, { align: 'center' });
-
-            let yPosition = 120;
-
-            // Add data
-            data.forEach((item, index) => {
-                if (yPosition > 700) {
-                    doc.addPage();
-                    yPosition = 50;
-                }
-
-                doc.fontSize(12).font('Helvetica-Bold')
-                    .text(`Document ${index + 1}:`, 50, yPosition);
-                yPosition += 20;
-
-                Object.entries(item).forEach(([key, value]) => {
-                    if (yPosition > 700) {
-                        doc.addPage();
-                        yPosition = 50;
-                    }
-
-                    doc.fontSize(10).font('Helvetica-Bold')
-                        .text(`${key}:`, 70, yPosition);
-                    doc.font('Helvetica')
-                        .text(String(value || ''), 200, yPosition);
-                    yPosition += 15;
-                });
-
-                yPosition += 10;
-            });
-
-            doc.end();
-            resolve();
-
-        } catch (error) {
-            reject(new Error(`PDF generation failed: ${error.message}`));
-        }
+        Object.entries(row).forEach(([k, v]) => {
+            if (y > 700) { doc.addPage(); y = 50; }
+            doc.fontSize(10)
+                .font("Helvetica-Bold")
+                .text(`${k}:`, 70, y);
+            doc.font("Helvetica").text(String(v || ""), 200, y);
+            y += 15;
+        });
+        y += 10;
     });
+
+    doc.end();
 }
 
-// Generate ODS file
-async function generateODS(data, res) {
-    try {
+async function generateODS(data, res, fileName) {
+    const workbook = new ExcelJS.Workbook();
+    const ws = workbook.addWorksheet("Documents Report");
 
-        const workbook = new ExcelJS.Workbook();
-        const worksheet = workbook.addWorksheet('Documents Report');
-
-        // Add headers
-        if (data.length > 0) {
-            const headers = Object.keys(data[0]);
-            worksheet.addRow(headers);
-
-            // Add data
-            data.forEach(row => {
-                worksheet.addRow(Object.values(row));
-            });
-        }
-
-        res.setHeader('Content-Type', 'application/vnd.oasis.opendocument.spreadsheet');
-        res.setHeader('Content-Disposition', `attachment; filename=documents-${Date.now()}.ods`);
-
-        await workbook.ods.write(res);
-        res.end();
-
-    } catch (error) {
-        throw new Error(`ODS generation failed: ${error.message}`);
+    if (data.length) {
+        ws.addRow(Object.keys(data[0]));
+        data.forEach(r => ws.addRow(Object.values(r)));
     }
+
+    res.setHeader("Content-Type", "application/vnd.oasis.opendocument.spreadsheet");
+    res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+    await workbook.ods.write(res);
+    res.end();
 }
+
 
 // Get available export formats
 export const getExportFormats = async (req, res) => {

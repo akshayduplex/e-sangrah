@@ -1,152 +1,255 @@
-// $(document).ready(function () {
-//     const documentId = $('#documentForm').data('document-id'); // Make sure you have this in your form
-//     const baseUrl = window.baseUrl
-//     // --------------------------
-//     // 1. Initialize User Select2
-//     // --------------------------
-//     $('#userInviteSelect').select2({
-//         placeholder: "Search user",
-//         allowClear: true,
-//         ajax: {
-//             url: `${baseUrl}/api/user/search`,
-//             dataType: 'json',
-//             delay: 250,
-//             transport: function (params, success, failure) {
-//                 $.ajax({
-//                     url: this.url,
-//                     type: "GET",
-//                     data: { search: params.data.term || '' },
-//                     success: function (res) { success(res); },
-//                     error: failure
-//                 });
-//             },
-//             processResults: function (data) {
-//                 if (!data.success || !data.users) return { results: [] };
-//                 return {
-//                     results: data.users.map(u => ({ id: u._id, text: u.name }))
-//                 };
-//             },
-//             cache: true
-//         },
-//         minimumInputLength: 1
-//     });
+(function ($) {
+    "use strict";
 
-//     // --------------------------
-//     // 2. Invite User Button
-//     // --------------------------
-//     $('#inviteUserBtn').on('click', function () {
-//         const userId = $('#userInviteSelect').val();
-//         const accessLevel = $('#accessLevelSelect').val();
+    let currentDocId = null;
+    let currentFileId = null;
+    let customFlatpickr = null;
+    const baseUrl = window.location.origin;
 
-//         if (!userId) return alert('Please select a user to invite.');
-//         const userName = $('#userInviteSelect option:selected').text();
+    // Initialize Flatpickr only once
+    function initFlatpickr() {
+        if (!customFlatpickr && document.getElementById('flatpickr-range')) {
+            customFlatpickr = flatpickr("#flatpickr-range", {
+                mode: "range",
+                dateFormat: "Y-m-d",
+                conjunction: " to "
+            });
+        }
+    }
 
-//         // Append to People With Access section
-//         const userRow = `
-//         <div class="user-accssrow" data-user-id="${userId}">
-//             <div class="empname_eml">
-//                 <div class="fw-normal fs-18">${userName}</div>
-//                 <small class="fs-16">${userName.toLowerCase().replace(" ", ".")}@example.com</small>
-//             </div>
-//             <div class="d-flex align-items-center gap-4">
-//                 <div class="form-check form-switch">
-//                     <label>Download Access</label>
-//                     <input class="form-check-input" type="checkbox" checked>
-//                 </div>
-//                 <select class="form-select form-select-sm" style="width:100px;">
-//                     <option ${accessLevel === 'edit' ? 'selected' : ''}>Edit</option>
-//                     <option ${accessLevel === 'view' ? 'selected' : ''}>View</option>
-//                 </select>
-//                 <button class="btn btn-sm btn-outline-danger">Remove</button>
-//             </div>
-//         </div>
-//         `;
-//         $('.modal-body').find('.user-accssrow:last').after(userRow);
+    // Load users for invite dropdown
+    function loadUsersForInvite($select) {
+        $.ajax({
+            url: `${baseUrl}/api/user`,
+            method: 'GET',
+            success: function (response) {
+                $select.empty().append('<option value="">Search user...</option>');
+                if (response.data && response.data.length) {
+                    response.data.forEach(user => {
+                        $select.append(`<option value="${user.email}">${user.name} (${user.email})</option>`);
+                    });
+                }
+            },
+            error: function () {
+                console.error('Failed to load users for invite');
+            }
+        });
+    }
 
-//         // Reset select
-//         $('#userInviteSelect').val(null).trigger('change');
-//     });
+    // Open Share Modal
+    $(document).on('show.bs.modal', '#sharedoc-modal', function (event) {
+        const button = $(event.relatedTarget);
+        currentDocId = button.data('doc-id');
+        currentFileId = button.data('file-id');
+        const modal = $(this);
 
-//     // --------------------------
-//     // 3. Remove User Row
-//     // --------------------------
-//     $(document).on('click', '.user-accssrow .btn-outline-danger', function () {
-//         $(this).closest('.user-accssrow').remove();
-//     });
+        // Reset modal state
+        modal.find('#userInviteSelect').val('');
+        modal.find('#accessLevelSelect').val('view');
+        modal.find('input[name="time"]').prop('checked', false);
+        modal.find('#customDateWrapper').hide();
+        modal.find('#usersWithAccessContainer').empty();
+        modal.find('#sharelink').val('');
+        modal.find('#accessType').val('anyone');
+        modal.find('#roleType').val('viewer');
+        modal.find('#infoText').text('Anyone on the internet with the link can view');
 
-//     // --------------------------
-//     // 4. Time Duration Radios
-//     // --------------------------
-//     $('input[name="time"]').change(function () {
-//         const value = $(this).attr('id');
-//         if (value === 'custom') {
-//             $('#customDateWrapper').show();
-//         } else {
-//             $('#customDateWrapper').hide();
-//             $('#startDate').val('');
-//             $('#endDate').val('');
-//         }
-//     });
+        if (!currentDocId || !currentFileId) {
+            showToast('Invalid document or file', 'error');
+            modal.modal('hide');
+            return;
+        }
 
-//     // --------------------------
-//     // 5. General Access Dropdown
-//     // --------------------------
-//     $('#accessType').on('change', function () {
-//         const val = $(this).val();
-//         const infoText = val === 'anyone' ?
-//             "Anyone on the internet with the link can view" :
-//             "Only selected users can access this document";
-//         $('#infoText').text(infoText);
-//     });
+        initFlatpickr();
 
-//     // --------------------------
-//     // 6. Copy Link Button
-//     // --------------------------
-//     $('.input-group .btn').click(function () {
-//         const input = $(this).siblings('input')[0];
-//         input.select();
-//         input.setSelectionRange(0, 99999);
-//         navigator.clipboard.writeText(input.value);
-//         alert("Link copied to clipboard!");
-//     });
+        // Load Share Link
+        $.get(`${baseUrl}/api/documents/${currentDocId}/${currentFileId}/share-link`)
+            .done(res => {
+                if (res.success && res.link) {
+                    modal.find('#sharelink').val(res.link);
+                }
+            })
+            .fail(() => showToast('Failed to load share link', 'warning'));
 
-//     // --------------------------
-//     // 7. Share Button API Call
-//     // --------------------------
-//     $('.modal-footer .site-btnmd').click(async function () {
-//         const users = [];
-//         $('.user-accssrow').each(function () {
-//             const userId = $(this).data('user-id');
-//             const accessLevel = $(this).find('select').val().toLowerCase();
-//             const downloadAccess = $(this).find('input[type="checkbox"]').is(':checked');
-//             users.push({ userId, accessLevel, downloadAccess });
-//         });
+        // Load Shared Users
+        $.get(`${baseUrl}/api/documents/${currentDocId}/shared-users`)
+            .done(res => {
+                const container = modal.find('#usersWithAccessContainer');
+                container.empty();
+                if (!res.success || !Array.isArray(res.data)) {
+                    container.append('<div class="text-muted">No users found.</div>');
+                    return;
+                }
 
-//         const timeRadio = $('input[name="time"]:checked').attr('id');
-//         const customStart = $('#startDate').val();
-//         const customEnd = $('#endDate').val();
+                let rows = '';
+                res.data.forEach(user => {
+                    const isOwner = user.accessLevel === 'owner';
+                    const checkboxId = `download-${user.userId}`;
+                    rows += `
+                            <div class="user-accssrow dynamic d-flex justify-content-between align-items-center mb-2 p-2">
+                                <div class="empname_eml flex-grow-1">
+                                    <div class="fw-normal">${user.name}</div>
+                                    <small class="text-muted">${user.email}</small>
+                                    ${user.inviteStatus === 'pending' ? '<span class="badge bg-warning ms-2">Pending</span>' : ''}
+                                </div>
+                                <div class="d-flex align-items-center gap-2">
+                                    ${!isOwner ? `
+                                        <div class="form-check form-switch me-2">
+                                            <input class="form-check-input download-access" type="checkbox" id="${checkboxId}"
+                                                data-user-id="${user.userId}" ${user.canDownload ? 'checked' : ''}>
+                                            <label class="form-check-label" for="${checkboxId}">Download</label>
+                                        </div>
+                                        <select class="form-select form-select-sm access-level" data-user-id="${user.userId}">
+                                            <option value="edit" ${user.accessLevel === 'edit' ? 'selected' : ''}>Edit</option>
+                                            <option value="view" ${user.accessLevel === 'view' ? 'selected' : ''}>View</option>
+                                        </select>
+                                        <button class="btn btn-sm remvaccessbtn remove-user" data-user-id="${user.userId}">Remove</button>
+                                    ` : `<div class="fw-bold text-primary">Owner</div>`}
+                                </div>
+                            </div>`;
+                });
+                container.html(rows);
+            })
+            .fail(() => {
+                modal.find('#usersWithAccessContainer').html('<div class="text-danger">Failed to load users.</div>');
+            });
 
-//         try {
-//             for (const u of users) {
-//                 await fetch(`${baseUrl}/api/documents/${documentId}/share`, {
-//                     method: 'POST',
-//                     headers: { 'Content-Type': 'application/json' },
-//                     body: JSON.stringify({
-//                         userId: u.userId,
-//                         accessLevel: u.accessLevel,
-//                         duration: timeRadio,
-//                         customStart: customStart || null,
-//                         customEnd: customEnd || null
-//                     })
-//                 }).then(res => res.json()).then(data => {
-//                     if (!data.success) console.error("Error sharing with user:", u.userId, data.message);
-//                 });
-//             }
-//             alert("Document shared successfully!");
-//             $('#sharedoc-modal').modal('hide');
-//         } catch (err) {
-//             console.error(err);
-//             alert("Error sharing document. Check console for details.");
-//         }
-//     });
-// });
+        // Load invite users
+        loadUsersForInvite(modal.find('#userInviteSelect'));
+    });
+
+    // Custom Date Visibility
+    $(document).on('change', '#sharedoc-modal input[name="time"]', function () {
+        const isCustom = this.id === 'custom';
+        $('#customDateWrapper').toggle(isCustom);
+        if (isCustom && !customFlatpickr) initFlatpickr();
+    });
+
+    // Access Type & Role Info Text
+    $(document).on('change', '#sharedoc-modal #accessType, #sharedoc-modal #roleType', function () {
+        const accessType = $('#accessType').val();
+        const roleType = $('#roleType').val();
+        const infoText = $('#infoText');
+
+        if (accessType === 'anyone') {
+            infoText.text(roleType === 'viewer'
+                ? 'Anyone on the internet with the link can view'
+                : 'Anyone on the internet with the link can edit');
+        } else {
+            infoText.text('Only people with access can view');
+        }
+    });
+
+    // Invite User
+    $(document).on('click', '#inviteUserBtn', function () {
+        const $btn = $(this).prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span>');
+        const userEmail = $('#userInviteSelect').val();
+        const accessLevel = $('#accessLevelSelect').val();
+        const duration = $('input[name="time"]:checked').attr('id');
+        let customStart = null, customEnd = null;
+
+        if (duration === 'custom' && customFlatpickr?.selectedDates.length === 2) {
+            customStart = customFlatpickr.selectedDates[0].toISOString();
+            customEnd = customFlatpickr.selectedDates[1].toISOString();
+        }
+
+        if (!userEmail || !$('input[name="time"]:checked').length || (duration === 'custom' && (!customStart || !customEnd))) {
+            showToast('Please fill all required fields', 'info');
+            $btn.prop('disabled', false).html('Invite');
+            return;
+        }
+
+        const data = { userEmail, accessLevel, duration };
+        if (duration === 'custom') {
+            data.customStart = customStart;
+            data.customEnd = customEnd;
+        }
+
+        $.ajax({
+            url: `${baseUrl}/api/documents/${currentDocId}/invite`,
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify(data),
+            success: () => {
+                showToast('Invitation sent!', 'success');
+                $('#sharedoc-modal').modal('hide');
+            },
+            error: (err) => {
+                showToast(err.responseJSON?.message || 'Failed to send invite', 'error');
+            },
+            complete: () => $btn.prop('disabled', false).html('Invite')
+        });
+    });
+
+    // Remove User Access
+    $(document).on('click', '#sharedoc-modal .remove-user', function () {
+        const userId = $(this).data('user-id');
+        const $row = $(this).closest('.user-accssrow');
+
+        if (confirm('Remove this user\'s access?')) {
+            $.ajax({
+                url: `${baseUrl}/api/documents/share/${currentDocId}`,
+                method: 'DELETE',
+                contentType: 'application/json',
+                data: JSON.stringify({ userId }),
+                success: () => {
+                    $row.remove();
+                    showToast('Access removed', 'success');
+                },
+                error: () => showToast('Failed to remove access', 'error')
+            });
+        }
+    });
+
+    // Update Permissions (Done button)
+    $(document).on('click', '#sharedoc-modal #shareBtn', function () {
+        const users = $('#usersWithAccessContainer .user-accssrow').map(function () {
+            const userId = $(this).find('.access-level').data('user-id');
+            if (!userId) return null;
+            return {
+                userId,
+                accessLevel: $(this).find('.access-level').val(),
+                canDownload: $(this).find('.download-access').is(':checked')
+            };
+        }).get().filter(Boolean);
+
+        const generalAccess = $('#accessType').val() === 'anyone';
+        const generalRole = $('#roleType').val();
+
+        if (users.length === 0 && !generalAccess) {
+            showToast('Add at least one user or enable public access', 'info');
+            return;
+        }
+
+        $.ajax({
+            url: `${baseUrl}/api/documents/${currentDocId}/permissions`,
+            method: 'PATCH',
+            contentType: 'application/json',
+            data: JSON.stringify({ users, generalAccess, generalRole }),
+            success: (res) => {
+                showToast(res.message || 'Permissions updated!', 'success');
+                $('#sharedoc-modal').modal('hide');
+            },
+            error: (err) => showToast(err.responseJSON?.message || 'Update failed', 'error')
+        });
+    });
+
+    // Copy Link
+    $(document).on('click', '#copyLinkBtn', function () {
+        const link = $('#sharelink').val();
+        if (!link) return showToast('No link to copy', 'info');
+
+        navigator.clipboard.writeText(link).then(() => {
+            showToast('Link copied!', 'success');
+        }).catch(() => {
+            const temp = document.createElement('textarea');
+            temp.value = link;
+            document.body.appendChild(temp);
+            temp.select();
+            document.execCommand('copy');
+            document.body.removeChild(temp);
+            showToast('Link copied!', 'success');
+        });
+    });
+
+})(jQuery);

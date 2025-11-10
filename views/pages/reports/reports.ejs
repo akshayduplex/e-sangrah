@@ -161,9 +161,7 @@
 		<script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
 		<script>
 			$(document).ready(function () {
-				// -------------------------
-				// Initialize Select2 with Clear Option
-				// -------------------------
+				// ------------------------- Initialize Select2 with Clear Option -------------------------
 				function initSelect2(selector, url, textKey) {
 					$(selector).select2({
 						placeholder: `Select Department`,
@@ -174,7 +172,6 @@
 							delay: 250,
 							data: params => ({ search: params.term }),
 							processResults: data => {
-
 								const results = [
 									{ id: '', text: `-- Select Department --` },
 									...data.data.map(item => ({
@@ -182,16 +179,13 @@
 										text: item[textKey]
 											.split(' ')
 											.map(w => w.charAt(0).toUpperCase() + w.slice(1))
-											.join(' ') // Capitalize each word
+											.join(' ')
 									}))
 								];
-
 								return { results };
 							}
 						}
 					});
-
-					// Handle empty selection
 					$(selector).on('select2:select', function (e) {
 						if (!e.params.data.id) {
 							$(this).val(null).trigger('change');
@@ -200,25 +194,24 @@
 				}
 
 				initSelect2('#department', `${baseUrl}/api/departments/search`, 'name');
+
 				$('#docTypeSelect').select2({
 					placeholder: "Select Doc type",
 					allowClear: true,
 					width: '100%',
 					minimumResultsForSearch: 0,
 					sorter: function (data) {
-						// Keep placeholder at top
 						return data.sort(function (a, b) {
-							if (a.id === "") return -1; // always first
+							if (a.id === "") return -1;
 							if (b.id === "") return 1;
 							return a.text.localeCompare(b.text);
 						});
 					}
 				});
 
-				// Handle selecting the placeholder to clear selection
 				$('#clear').on('select2:select', function (e) {
-					if ($(this).val() === "") {   // placeholder selected
-						$(this).val(null).trigger('change.select2'); // reset selection
+					if ($(this).val() === "") {
+						$(this).val(null).trigger('change.select2');
 					}
 				});
 
@@ -226,57 +219,102 @@
 					placeholder: 'Select Designation',
 					allowClear: true
 				});
+
 				$('#roleSelect').select2({
 					placeholder: "Select Role"
 				});
-				$('#documentsTable').DataTable({
+
+				// ------------------------- DataTable Initialization -------------------------
+				const table = $('#documentsTable').DataTable({
 					processing: true,
 					serverSide: true,
-					pageLength: 10,  // rows per page
+					pageLength: 10,
 					lengthMenu: [10, 25, 50, 100],
 					ajax: {
 						url: `${baseUrl}/api/documents`,
 						type: 'GET',
 						data: function (d) {
-							// Convert DataTables params to your API query
 							return {
 								page: Math.ceil(d.start / d.length) + 1,
 								limit: d.length,
 								search: d.search.value,
 								orderColumn: d.order.length ? d.order[0].column + 1 : undefined,
-								orderDir: d.order.length ? d.order[0].dir : undefined
+								orderDir: d.order.length ? d.order[0].dir : undefined,
+								// Filters
+								role: $('#roleSelect').val(),
+								department: $('#department').val(),
+								docType: $('#docTypeSelect').val(),
+								designation: $('#designation_select').val(),
+								date: $('.datetimepicker').val()
 							};
 						},
 						dataSrc: function (json) {
-							// Update DataTables paging info
 							json.recordsTotal = json.data.pagination.totalDocuments;
 							json.recordsFiltered = json.data.pagination.totalDocuments;
 
-							// Map API data to table rows
-							return json.data.documents.map(doc => ({
-								fileName: `${doc.metadata.fileName} <br><small>${doc.files[0]?.fileSize ? (doc.files[0].fileSize / 1024).toFixed(2) + ' KB' : ''}</small>`,
-								owner: doc.owner?.name || '',
-								designation: doc.owner?.userDetails?.designation?.name
-									? doc.owner.userDetails.designation.name.charAt(0).toUpperCase() +
-									doc.owner.userDetails.designation.name.slice(1).toLowerCase()
-									: '',
-								department: doc.department?.name || '',
-								role: 'Admin', // Adjust if needed
-								approver: doc.projectManager || '',
-								lastModified: new Date(doc.updatedAt).toLocaleString(),
-								tags: doc.tags.join(', '),
-								metadata: doc.metadata.fileDescription || '',
-								sharedWith: doc.sharedWithUsers.map(u => u.name).join(', '),
-								createdOn: new Date(doc.createdAt).toLocaleString(),
-								description: doc.description
-									? (() => {
-										const text = doc.description.replace(/<\/?[^>]+(>|$)/g, '');
-										return text.length > 100 ? text.substring(0, 30) + '....' : text;
-									})()
-									: '-',
-								signature: `<img src="${doc.signature?.fileUrl || ''}" class="signimg" />`,
-								status: `<span class="status-badge bg-soft-success">${doc.status}</span>`
-							}));
+							return json.data.documents.map(doc => {
+								// Format Approvers
+								const approversHtml = (() => {
+									if (!doc.wantApprovers || !doc.documentApprovalAuthority?.length) {
+										return '<span class="text-muted">N/A</span>';
+									}
+									return doc.documentApprovalAuthority
+										.sort((a, b) => (a.priority || 0) - (b.priority || 0))
+										.map(approver => {
+											const name = approver.userId?.name || 'Unknown';
+											const status = approver.status || 'Pending';
+
+											const badge = {
+												'Approved': '<span class="badge bg-success badge-sm ms-2">Approved</span>',
+												'Rejected': '<span class="badge bg-danger badge-sm ms-2">Rejected</span>',
+												'Pending': '<span class="badge bg-warning badge-sm ms-2">Pending</span>'
+											}[status] || '<span class="badge bg-secondary badge-sm ms-2">Unknown</span>';
+
+											return `<div class="d-flex align-items-center justify-content-between mb-1">
+                        <span class="fw-medium text-truncate" style="max-width: 120px;" title="${name}">${name}</span>
+                        ${badge}
+                    </div>`;
+										})
+										.join('');
+								})();
+
+								return {
+									fileName: `${doc.metadata.fileName || '—'} <br><small class="text-muted">
+                            ${doc.files[0]?.fileSize ? (doc.files[0].fileSize / 1024).toFixed(2) + ' KB' : ''}
+                        </small>`,
+									owner: doc.owner?.name || '—',
+									designation: doc.owner?.userDetails?.designation?.name
+										? doc.owner.userDetails.designation.name.charAt(0).toUpperCase() +
+										doc.owner.userDetails.designation.name.slice(1).toLowerCase()
+										: '—',
+									department: doc.department?.name || '—',
+									role: 'Admin', // Customize if needed
+									approver: approversHtml,
+									lastModified: new Date(doc.updatedAt).toLocaleString('en-IN', {
+										day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+									}),
+									tags: doc.tags?.length ? doc.tags.join(', ') : '—',
+									metadata: doc.metadata.fileDescription || '—',
+									sharedWith: doc.sharedWithUsers?.length
+										? doc.sharedWithUsers.map(u => u.name).join(', ')
+										: '—',
+									createdOn: new Date(doc.createdAt).toLocaleString('en-IN', {
+										day: '2-digit', month: 'short', year: 'numeric'
+									}),
+									description: doc.description
+										? (() => {
+											const text = doc.description.replace(/<\/?[^>]+(>|$)/g, '').trim();
+											return text.length > 50 ? text.substring(0, 47) + '...' : text;
+										})()
+										: '—',
+									signature: doc.signature?.fileUrl
+										? `<img src="${doc.signature.fileUrl}" class="signimg" style="max-height: 40px; border-radius: 4px;" />`
+										: '—',
+									status: `<span class="badge ${doc.status === 'Approved' ? 'bg-success' : doc.status === 'Pending' ? 'bg-warning' : doc.status === 'Rejected' ? 'bg-danger' : 'bg-secondary'}">
+                            ${doc.status}
+                        </span>`
+								};
+							});
 						}
 					},
 					columns: [
@@ -285,7 +323,7 @@
 						{ data: 'designation' },
 						{ data: 'department' },
 						{ data: 'role' },
-						{ data: 'approver' },
+						{ data: 'approver', orderable: false },
 						{ data: 'lastModified' },
 						{ data: 'tags' },
 						{ data: 'metadata' },
@@ -295,14 +333,16 @@
 						{ data: 'signature' },
 						{ data: 'status' }
 					],
-					order: [[6, 'desc']] // default sort by Last Modified
+					order: [[6, 'desc']], // Default: Last Modified
+					columnDefs: [
+						{ targets: [5, 12, 13], orderable: false } // Disable sorting on Approver, Signature, Status
+					]
 				});
-				// Handle export clicks (XLSX / CSV / PDF / ODS)
+
+				// ------------------------- Export Functionality -------------------------
 				$('.export-link').on('click', async function (e) {
 					e.preventDefault();
 					const format = $(this).data('format');
-
-					// Collect filters from UI
 					const filters = {
 						role: $('#roleSelect').val(),
 						department: $('#department').val(),
@@ -317,13 +357,9 @@
 							method: 'POST',
 							headers: {
 								'Content-Type': 'application/json',
-								'Authorization': `Bearer ${localStorage.getItem('token') || ''}` // adjust auth
+								'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
 							},
-							body: JSON.stringify({
-								format,
-								filters,
-								exportAll: true // export all filtered documents
-							})
+							body: JSON.stringify({ format, filters, exportAll: true })
 						});
 
 						if (!response.ok) {
@@ -332,48 +368,24 @@
 							return;
 						}
 
-						// Convert response to blob and trigger download
 						const blob = await response.blob();
 						const fileURL = window.URL.createObjectURL(blob);
 						const a = document.createElement('a');
 						a.href = fileURL;
-						a.download = `documents-${Date.now()}.${format}`;
+						a.download = `documents-report-${new Date().toISOString().slice(0, 10)}.${format}`;
 						document.body.appendChild(a);
 						a.click();
 						a.remove();
-
 					} catch (err) {
 						console.error('Export error:', err);
-						showToast('Something went wrong while exporting.', 'error');
+						showToast('Export failed. Please try again.', 'error');
 					}
 				});
-				// ---------------------
-				// Add Dynamic Filtering
-				// ---------------------
-				const table = $('#documentsTable').DataTable();
 
-				// Re-fetch table data when filters change
-				$('#roleSelect, #department, #docTypeSelect, #designation_select, .datetimepicker, input[name="q"]').on('change keyup', function () {
-					table.ajax.reload();
-				});
-
-				// Modify the DataTable's existing AJAX call to include filters
-				$('#documentsTable').DataTable().settings()[0].ajax.data = function (d) {
-					return {
-						page: Math.ceil(d.start / d.length) + 1,
-						limit: d.length,
-						search: $('input[name="q"]').val(),
-						orderColumn: d.order.length ? d.order[0].column + 1 : undefined,
-						orderDir: d.order.length ? d.order[0].dir : undefined,
-
-						// Add filter parameters
-						role: $('#roleSelect').val(),
-						department: $('#department').val(),
-						docType: $('#docTypeSelect').val(),
-						designation: $('#designation_select').val(),
-						date: $('.datetimepicker').val()
-					};
-				};
-
+				// ------------------------- Live Filtering -------------------------
+				$('#roleSelect, #department, #docTypeSelect, #designation_select, .datetimepicker, input[name="q"]')
+					.on('change keyup', function () {
+						table.ajax.reload();
+					});
 			});
 		</script>

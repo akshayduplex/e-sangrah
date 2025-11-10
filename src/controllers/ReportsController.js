@@ -23,3 +23,18 @@ export const showReportPage = async (req, res) => {
         });
     }
 };
+
+export const showComplianceRetentionPage = async (req, res) => {
+    try {
+        res.render("pages/reports/complianceRetention", {
+            user: req.user,
+            roles: profile_type
+        });
+    } catch (err) {
+        logger.error("ComplianceRetention Page render error:", err);
+        res.status(500).render("pages/error", {
+            user: req.user,
+            message: "Unable to load ComplianceRetention Page"
+        });
+    }
+};

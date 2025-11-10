@@ -118,10 +118,16 @@ const documentSchema = new mongoose.Schema({
 /** -------------------- INDEXES -------------------- **/
 documentSchema.index({ status: 1 });
 documentSchema.index({ department: 1 });
-documentSchema.index({ owner: 1 });
+documentSchema.index({
+    "metadata.fileDescription": "text",
+    "metadata.mainHeading": "text",
+    "tags": "text",
+    "files.originalName": "text"
+});
 documentSchema.index({ createdAt: 1 });
 documentSchema.index({ "compliance.expiryDate": 1 });
 documentSchema.index({ tags: 1 });
+documentSchema.index({ "isArchived": 1, "isDeleted": 1, "owner": 1 });
 
 /** -------------------- VIRTUAL -------------------- **/
 documentSchema.virtual("isExpired").get(function () {

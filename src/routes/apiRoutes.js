@@ -128,8 +128,11 @@ router.get("/dashboard/file-status", AdminDashboard.getFileStatus);
 router.get("/dashboard/recent-activity", AdminDashboard.getRecentActivities);
 router.get("/dashboard/donorVendorProjects", AdminDashboard.getDonorVendorProjects);
 router.get("/dashboard/uploads", AdminDashboard.getDepartmentDocumentUploads);
+router.get("/dashboard/documentUploads", AdminDashboard.getDepartmentDocumentChart);
 router.get("/dashboard/documentsTypeUploads", AdminDashboard.getDocumentsTypeUploads);
 router.get("/dashboard/summary", AdminDashboard.getDocumentsStatusSummary);
+router.get("/analytics/stats", AdminDashboard.getAnalyticsStats);
+
 // Permission Logs
 router.get("/my-approvals", AdminController.getMyApprovals);
 router.get("/permission-logs", authorize('admin', 'superadmin'), AdminController.getPermissionLogs);
