@@ -1,6 +1,8 @@
 // controllers/documentController.js
 import mongoose from "mongoose";
 import jwt from "jsonwebtoken";
+import ejs from "ejs";
+import path from "path";
 import Document from "../models/Document.js";
 import { errorResponse, successResponse, failResponse } from "../utils/responseHandler.js";
 import TempFile from "../models/TempFile.js";
@@ -21,8 +23,8 @@ import { inviteUserTemplate } from "../emailTemplates/inviteUserTemplate.js";
 import { API_CONFIG } from "../config/ApiEndpoints.js";
 import PermissionLogs from "../models/PermissionLogs.js";
 import { addNotification } from "./NotificationController.js";
-import { cloudinary } from "../middlewares/fileUploads.js";
 import { approvalRequestTemplate } from "../emailTemplates/approvalRequestTemplate.js";
+import { PutObjectCommand, DeleteObjectCommand, S3Client } from "@aws-sdk/client-s3";
 
 //Page Controllers
 
@@ -2290,19 +2292,24 @@ export const inviteUser = async (req, res) => {
         );
 
         await Document.findByIdAndUpdate(documentId, { $addToSet: { sharedWithUsers: user._id } });
-
-        // Link using session-based route
         const inviteLink = `${API_CONFIG.baseUrl}/api/documents/${documentId}/invite/${user._id}/auto-accept`;
+        const templatePath = path.join(process.cwd(), "views", "emails", "inviteUser.ejs");
+        // Render EJS template to HTML
+        const htmlContent = await ejs.renderFile(templatePath, {
+            fileName: doc.metadata?.fileName,
+            name: user.name,
+            accessLevel,
+            expiresAt,
+            inviteLink,
+            BASE_URL: API_CONFIG.baseUrl
+        });
 
+        // Send the email
         await sendEmail({
             to: userEmail,
             subject: "Document Access Invitation - E-Sangrah",
-            html: inviteUserTemplate({
-                fileName: doc.metadata?.fileName,
-                accessLevel,
-                expiresAt,
-                inviteLink
-            })
+            html: htmlContent,
+            fromName: "E-Sangrah Team",
         });
         res.json({ success: true, message: "Invite sent successfully" });
 
@@ -2440,17 +2447,23 @@ export const requestAccessAgain = async (req, res) => {
         }, API_CONFIG.ACCESS_GRANT_SECRET || "supersecretkey", { expiresIn: "3d" });
 
         const baseUrl = API_CONFIG.baseUrl || "http://localhost:5000";
-        const approvalLink = `${baseUrl}/documents/approve-access/${token}`;
+        // const approvalLink = `${baseUrl}/documents/approve-access/${token}`;
+        const approvalLink = `${baseUrl}/permissionslogs`;
+        const templatePath = path.join(process.cwd(), "views", "emails", "documentAccessRequest.ejs");
 
-        // Send email to owner
+        const htmlContent = await ejs.renderFile(templatePath, {
+            userName,
+            email,
+            user,
+            doc,
+            approvalLink,
+        });
+
         await sendEmail({
             to: owner.email,
             subject: `Access Request for Document: ${doc.metadata?.fileName || 'Untitled'}`,
-            html: `
-                <p>${userName || email} (${email || user?.email}) requested access to <strong>${doc.metadata?.fileName || 'your document'}</strong>.</p>
-                <p>Click below to approve and set access duration:</p>
-                <a href="${approvalLink}" style="padding:10px 20px;background:#007bff;color:#fff;text-decoration:none;border-radius:5px;">Approve Access</a>
-            `
+            html: htmlContent,
+            fromName: "E-Sangrah Team",
         });
 
         // Log request in PermissionLogs
@@ -2579,17 +2592,30 @@ export const grantAccessViaToken = async (req, res) => {
             { new: true }
         );
 
-        // Send email notification only if internal
+        // Send EJS-based email notification for internal users
         if (!isExternal && user) {
+            const templatePath = path.join(process.cwd(), "views", "emails", "fileaccessGranted.ejs");
+            const html = await ejs.renderFile(templatePath, {
+                name: user.name || userEmail,
+                fileName: doc.metadata?.fileName,
+                duration,
+                ownerName: doc.owner?.name || "Document Owner"
+            });
+
             await sendEmail({
                 to: user.email,
                 subject: "Access Granted",
-                html: `<p>Your access to "${doc.metadata?.fileName}" has been granted for ${duration}.</p>`
+                html,
+                fromName: "E- sangrah"
             });
         }
 
-        res.send(`<h2>Access granted to ${userName || userEmail}</h2><p>${isExternal ? 'External user logged in PermissionLogs only.' : 'Email notification sent.'}</p>`);
-
+        res.send(`
+            <h2>Access granted to ${userName || userEmail}</h2>
+            <p>${isExternal
+                ? "External user logged in PermissionLogs only."
+                : "Email notification sent using EJS template."}</p>
+        `);
     } catch (err) {
         res.send(`<h2>Error</h2><p>${err.message}</p>`);
     }
@@ -3021,20 +3047,20 @@ export const updateApprovalStatus = async (req, res) => {
                 relatedDocument: documentId,
                 priority: 'medium'
             });
+            // Render EJS email template for discussion request
+            const discussionTemplate = path.join(process.cwd(), "views", "emails", "discussionRequest.ejs");
+            const html = await ejs.renderFile(discussionTemplate, {
+                ownerName: document.owner.name,
+                requesterName: req.user.name,
+                fileName: document.metadata?.fileName || "Untitled Document",
+                comment,
+            });
 
-            const emailHtml = `
-                <p>Hello ${document.owner.name},</p>
-                <p>${req.user.name} has requested a <strong>discussion</strong> on your document:</p>
-                <p><strong>${document.metadata?.fileName || "Untitled Document"}</strong></p>
-                <p><b>Remark:</b> ${comment}</p>
-                <br/>
-                <p>Regards,<br/>DocuFlow System</p>
-            `;
             await sendEmail({
                 to: document.owner.email,
                 subject: `Discussion Requested - ${document.metadata?.fileName || "Document"}`,
-                html: emailHtml,
-                fromName: "DocuFlow System"
+                html,
+                fromName: "DocuFlow System",
             });
         } else {
             // Notify other approvers + owner for approve/reject
@@ -3085,20 +3111,25 @@ export const updateApprovalStatus = async (req, res) => {
                 });
 
                 const verifyUrl = `${process.env.FRONTEND_URL}/document/${documentId}/review`;
-                const emailHtml = approvalRequestTemplate({
+                // Render EJS email template
+                const templatePath = path.join(process.cwd(), "views", "emails", "approvalRequest.ejs");
+
+                const htmlContent = await ejs.renderFile(templatePath, {
                     approverName: nextApprover.userId.name,
                     documentName: document.metadata?.fileName || "Untitled Document",
-                    description: document.description,
-                    departmentName: document.department?.name,
+                    description: document.description || "No description provided",
+                    departmentName: document.department?.name || "General",
                     requesterName: req.user.name,
                     verifyUrl,
+                    BASE_URL: API_CONFIG.baseUrl,
                 });
 
+                // Send email
                 await sendEmail({
                     to: nextApprover.userId.email,
                     subject: `Document Approval Request - ${document.metadata?.fileName || "Document"}`,
-                    html: emailHtml,
-                    fromName: "DocuFlow System",
+                    html: htmlContent,
+                    from: "E-Sangrah Team",
                 });
             }
         }
@@ -3152,18 +3183,20 @@ export const sendApprovalMail = async (req, res) => {
         if (!approverUser?.email) {
             return res.status(400).json({ success: false, message: "Approver does not have an email address" });
         }
+        const currentVersion = document.versioning.currentVersion.toString();
 
-        // Construct verification / review URL
-        const verifyUrl = `${process.env.FRONTEND_URL}/document/${document._id}/review`;
-
-        // Prepare email body using template
-        const html = approvalRequestTemplate({
+        const reviewUrl = `${API_CONFIG.baseUrl}/documents/${document._id}/versions/view?version=${currentVersion}`;
+        const verifyUrl = `${API_CONFIG.baseUrl}/approval-requests`;
+        const templatePath = path.join(process.cwd(), "views", "emails", "approvalRequest.ejs");
+        // Render the EJS template with data
+        const html = await ejs.renderFile(templatePath, {
             approverName: approverUser.name,
             documentName: document.metadata?.fileName || "Untitled Document",
             description: document.description || "No description provided",
             departmentName: document.department?.name || "N/A",
             requesterName: document.owner?.name || "System",
             verifyUrl,
+            reviewUrl
         });
 
         // Send the email
@@ -3171,9 +3204,8 @@ export const sendApprovalMail = async (req, res) => {
             to: approverUser.email,
             subject: `Document Approval Request - ${document.metadata?.fileName || "Document"}`,
             html,
-            fromName: "DocuFlow System",
+            fromName: "Support Team",
         });
-
         // Mark as mail sent
         approverEntry.isMailSent = true;
         await document.save();
@@ -3240,23 +3272,33 @@ export const verifyApprovalMail = async (req, res) => {
                     );
 
                     const verifyUrl = `${API_CONFIG.baseUrl}/api/verify-approval/${nextToken}`;
+                    const reviewUrl = `${API_CONFIG.baseUrl}/documents/${document._id}/versions/view?version=${currentVersion}`;
+                    // Define EJS template path
+                    const templatePath = path.join(
+                        process.cwd(),
+                        "views",
+                        "emails",
+                        "approvalRequest.ejs"
+                    );
 
-                    const html = approvalRequestTemplate({
+                    // Render the EJS template with dynamic data
+                    const html = await ejs.renderFile(templatePath, {
                         approverName: nextUser.name,
-                        documentName: document.description.replace(/<[^>]+>/g, ""),
+                        documentName: document.description.replace(/<[^>]+>/g, "") || "Untitled Document",
                         description: document.comment || "No description provided",
                         departmentName: nextUser.userDetails?.department?.name || "N/A",
                         requesterName: document.owner?.name || "System",
                         verifyUrl,
+                        reviewUrl
                     });
 
+                    // Send the email
                     await sendEmail({
                         to: nextUser.email,
                         subject: `Document Approval Request`,
                         html,
-                        fromName: "DocuFlow System",
+                        fromName: "E-sangrah",
                     });
-
                     nextApprover.isMailSent = true;
                 }
             }
@@ -3266,7 +3308,7 @@ export const verifyApprovalMail = async (req, res) => {
 
     } catch (error) {
         console.error("Error verifying approval:", error);
-        return res.redirect(`${API_CONFIG.clientBaseUrl}/admin/approval?error=invalid`);
+        return res.redirect(`${API_CONFIG.baseUrl}/admin/approval?error=invalid`);
     }
 };
 

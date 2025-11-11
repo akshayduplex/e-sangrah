@@ -40,7 +40,7 @@ export const API_CONFIG = {
     DB_NAME: process.env.DB_NAME,
 
     // AWS Configuration
-    Bucket: process.env.AWS_BUCKET,
+    AWS_BUCKET: process.env.AWS_BUCKET,
     AWS_REGION: process.env.AWS_DEFAULT_REGION,
     AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID,
     AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY,

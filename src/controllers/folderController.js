@@ -2,6 +2,8 @@
 import Folder from '../models/Folder.js';
 import Document from '../models/Document.js';
 import crypto from 'crypto'
+import path from "path";
+import ejs from "ejs";
 import mongoose from 'mongoose';
 import { generateUniqueFileName } from '../helper/GenerateUniquename.js';
 import { getObjectUrl, putObject } from '../utils/s3Helpers.js';
@@ -10,7 +12,6 @@ import TempFile from '../models/TempFile.js';
 import User from '../models/User.js';
 import { API_CONFIG } from '../config/ApiEndpoints.js';
 import { sendEmail } from '../services/emailService.js';
-import { folderSharedTemplate } from '../emailTemplates/folderSharedTemplate.js';
 import File from '../models/File.js';
 import { GetObjectCommand } from '@aws-sdk/client-s3';
 import { s3Client } from '../config/S3Client.js';
@@ -1264,16 +1265,24 @@ export const shareFolder = async (req, res) => {
 
         await folder.save();
 
-        // Send email
-        const html = folderSharedTemplate({
-            userName: user.name,
-            senderName: req.user?.name,
+        const templatePath = path.join(
+            process.cwd(),
+            "views",
+            "emails",
+            "folderShared.ejs"
+        );
+
+        // Render the EJS template
+        const html = await ejs.renderFile(templatePath, {
+            userName: user.name || "there",
+            senderName: req.user?.name || "Someone",
             folderName: folder.name,
-            access,
+            access: access || "Full Access",
             folderLink: shareLink,
-            expiresAt
+            expiresAt,
         });
 
+        // Send the email
         await sendEmail({
             to: userId,
             subject: `Folder Shared with You: ${folder.name}`,
@@ -1431,28 +1440,37 @@ export const updateFolderLogPermission = async (req, res) => {
         const { logId } = req.params;
         const { requestStatus, access, duration, customEnd } = req.body;
         const updatedBy = req.user?._id || null;
-        const log = await FolderPermissionLogs.findById(logId);
-        if (!log) {
-            return res.status(404).json({ message: "Log not found" });
-        }
+
+        const log = await FolderPermissionLogs.findById(logId).populate("user", "name email");
+        if (!log) return res.status(404).json({ message: "Log not found" });
 
         const folder = await Folder.findById(log.folder);
-
-        if (!folder) {
-            return res.status(404).json({ message: "Folder not found" });
-        }
+        if (!folder) return res.status(404).json({ message: "Folder not found" });
 
         const isExternal = log.isExternal;
         const principalId = log.user._id;
+        const userEmail = log.user.email;
+        const userName = log.user.name || "User";
+        const folderName = folder.name;
 
-        // --- Handle Rejection ---
+        // REJECTED REQUEST
         if (requestStatus === "rejected") {
             log.requestStatus = "rejected";
             log.rejectedBy = updatedBy;
             log.rejectedAt = new Date();
             log.expiresAt = null;
-
             await log.save();
+
+            // send rejection email
+            const rejectTemplate = path.join(process.cwd(), "views", "emails", "folderAccessRejected.ejs");
+            const htmlContent = await ejs.renderFile(rejectTemplate, { userName, folderName });
+
+            await sendEmail({
+                to: userEmail,
+                subject: `Folder Access Rejected: ${folderName}`,
+                html: htmlContent,
+                fromName: "E-Sangrah Team",
+            });
 
             return res.json({
                 message: "Permission request rejected successfully",
@@ -1460,7 +1478,7 @@ export const updateFolderLogPermission = async (req, res) => {
             });
         }
 
-        // --- Handle Approvals ---
+        // APPROVED REQUEST
         const expiresAt = calculateExpiration(duration, customEnd);
 
         log.requestStatus = "approved";
@@ -1470,12 +1488,8 @@ export const updateFolderLogPermission = async (req, res) => {
         log.duration = duration;
         log.expiresAt = expiresAt;
 
-        // Update folder permissions only if INTERNAL user
         if (!isExternal) {
-            let existingPermission = folder.permissions.find(
-                item => item.principal.equals(principalId)
-            );
-
+            let existingPermission = folder.permissions.find(item => item.principal.equals(principalId));
             if (existingPermission) {
                 if (access) existingPermission.access = access;
                 existingPermission.expiresAt = expiresAt;
@@ -1490,33 +1504,43 @@ export const updateFolderLogPermission = async (req, res) => {
                     duration,
                 });
             }
-
             folder.updatedBy = updatedBy;
             await folder.save();
-        } else {
-            console.log("External user — skipping folder permission update.");
         }
 
         await log.save();
 
+        // send approval email
+        const approveTemplate = path.join(process.cwd(), "views", "emails", "folderAccessApproved.ejs");
+        const folderLink = `${API_CONFIG.baseUrl}/folders/${access}er/${folder._id}`;
+        const htmlContent = await ejs.renderFile(approveTemplate, {
+            userName,
+            folderName,
+            access,
+            expiresAt,
+            folderLink,
+        });
+
+        await sendEmail({
+            to: userEmail,
+            subject: `Folder Access Approved: ${folderName}`,
+            html: htmlContent,
+            fromName: "E-Sangrah Team",
+        });
+
         return res.json({
-            message: "Permission updated successfully",
+            message: "Permission updated successfully and email sent",
             user: principalId,
             access,
             duration,
             expiresAt,
-            updatedPermissions: !isExternal ? folder.permissions : undefined,
             isExternal,
         });
 
     } catch (err) {
-        return res.status(500).json({
-            message: "Server Error",
-            error: err.message,
-        });
+        return res.status(500).json({ message: "Server Error", error: err.message });
     }
 };
-
 
 /**
  * Toggle or update permission for a folder.
@@ -1642,41 +1666,6 @@ export const getFolderAccess = async (req, res) => {
     }
 };
 
-// Request access to a folder
-// export const requestFolderAccess = async (req, res) => {
-//     try {
-//         const { folderId } = req.params;
-//         const user = req.user;
-
-//         if (!mongoose.Types.ObjectId.isValid(folderId))
-//             return res.status(400).json({ success: false, message: "Invalid folder ID" });
-
-//         const folder = await Folder.findById(folderId).populate("owner", "name email");
-//         if (!folder) return res.status(404).json({ success: false, message: "Folder not found" });
-
-//         const owner = folder.owner;
-//         if (!owner?.email) return res.status(400).json({ success: false, message: "Owner email not found" });
-
-//         const baseUrl = API_CONFIG.baseUrl || "http://localhost:5000";
-//         const manageLink = `${baseUrl}/admin/folders/${folderId}/manage-access?userEmail=${user.email}`;
-
-//         await sendEmail({
-//             to: owner.email,
-//             subject: `Access Request for Folder: ${folder.name}`,
-//             html: `
-//                 <p>${user.name} (${user.email}) requested access to folder <strong>${folder.name}</strong>.</p>
-//                 <p><a href="${manageLink}" style="color:white;background:#007bff;padding:10px 20px;border-radius:5px;text-decoration:none;">
-//                     Grant Access
-//                 </a></p>
-//             `
-//         });
-
-//         res.json({ success: true, message: `Access request notification sent to ${owner.name || owner.email}.` });
-//     } catch (err) {
-//         console.error("requestFolderAccess error:", err);
-//         res.status(500).json({ success: false, message: "Server error: " + err.message });
-//     }
-// };
 // Request access to a folder (internal/external logic)
 export const requestFolderAccess = async (req, res) => {
     try {
@@ -1712,20 +1701,22 @@ export const requestFolderAccess = async (req, res) => {
             { upsert: true, new: true }
         );
 
-        //Only send email if user is external
         if (!isInternal) {
             const baseUrl = API_CONFIG.baseUrl || "http://localhost:5000";
             const manageLink = `${baseUrl}/admin/folders/permission`;
 
+            const templatePath = path.join(process.cwd(), "views", "emails", "folderAccessRequest.ejs");
+            const htmlContent = await ejs.renderFile(templatePath, {
+                user,
+                folder,
+                manageLink,
+            });
+
             await sendEmail({
                 to: owner.email,
                 subject: `Access Request for Folder: ${folder.name}`,
-                html: `
-                    <p>${user.name} (${user.email}) requested access to folder <strong>${folder.name}</strong>.</p>
-                    <p><a href="${manageLink}" style="color:white;background:#007bff;padding:10px 20px;border-radius:5px;text-decoration:none;">
-                        Grant Access
-                    </a></p>
-                `
+                html: htmlContent,
+                fromName: "E-Sangrah Team",
             });
         }
 
@@ -1742,98 +1733,6 @@ export const requestFolderAccess = async (req, res) => {
     }
 };
 
-// Approve or deny access
-// export const grantFolderAccess = async (req, res) => {
-//     try {
-//         const { folderId } = req.params;
-//         const { userEmail, access, duration, customEnd } = req.body;
-//         const owner = req.user;
-
-//         // Validate folder ID
-//         if (!mongoose.Types.ObjectId.isValid(folderId))
-//             return res.status(400).json({ success: false, message: "Invalid folder ID" });
-
-//         const folder = await Folder.findById(folderId);
-//         if (!folder) return res.status(404).json({ success: false, message: "Folder not found" });
-
-//         // Check ownership
-//         if (folder.owner.toString() !== owner._id.toString())
-//             return res.status(403).json({ success: false, message: "Not authorized" });
-
-//         const user = await User.findOne({ email: userEmail });
-//         if (!user) return res.status(404).json({ success: false, message: "User not found" });
-
-//         // Calculate expiration date
-//         let expiresAt = null;
-//         const now = new Date();
-
-//         switch (duration) {
-//             case "oneday":
-//                 expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-//                 break;
-//             case "oneweek":
-//                 expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-//                 break;
-//             case "onemonth":
-//                 expiresAt = new Date(now);
-//                 expiresAt.setMonth(expiresAt.getMonth() + 1);
-//                 break;
-//             case "custom":
-//                 if (customEnd) expiresAt = new Date(customEnd);
-//                 break;
-//             case "lifetime":
-//                 expiresAt = new Date(now);
-//                 expiresAt.setFullYear(expiresAt.getFullYear() + 50);
-//                 break;
-//             case "onetime":
-//                 expiresAt = null;
-//                 break;
-//             default:
-//                 expiresAt = null;
-//         }
-
-//         // Check for existing permission
-//         const existing = folder.permissions.find(
-//             p => p.principal.toString() === user._id.toString()
-//         );
-
-//         if (existing) {
-//             // Update existing permission
-//             existing.access = access;
-//             existing.duration = duration;
-//             existing.expiresAt = expiresAt;
-//             if (duration === "onetime") existing.used = false;
-//         } else {
-//             // Add new permission
-//             folder.permissions.push({
-//                 principal: user._id,
-//                 model: "User",
-//                 access,
-//                 duration,
-//                 expiresAt,
-//                 used: duration === "onetime" ? false : undefined
-//             });
-//         }
-
-//         folder.updatedBy = owner._id;
-//         await folder.save();
-
-//         // Notify user
-//         await sendEmail({
-//             to: user.email,
-//             subject: `Access Granted/Updated - Folder: ${folder.name}`,
-//             html: `<p>Your access to folder <strong>${folder.name}</strong> has been granted/updated.</p>
-//                <p><a href="${API_CONFIG.baseUrl}/folders/${folderId}">Open Folder</a></p>
-//                ${expiresAt ? `<p>Expires: ${expiresAt.toLocaleString()}</p>` : ''}`
-//         });
-
-//         res.json({ success: true, message: "Access granted/updated successfully." });
-
-//     } catch (err) {
-//         console.error(err);
-//         res.status(500).json({ success: false, message: "Server error" });
-//     }
-// };
 export const grantFolderAccess = async (req, res) => {
     try {
         const { folderId } = req.params;
@@ -1898,10 +1797,30 @@ export const grantFolderAccess = async (req, res) => {
             { new: true }
         );
 
+        // Define EJS template path
+        const templatePath = path.join(
+            process.cwd(),
+            "views",
+            "emails",
+            "folderAccessApproved.ejs"
+        );
+
+        // Render the EJS template
+        const html = await ejs.renderFile(templatePath, {
+            userName: user.name || "User",
+            folderName: folder.name,
+            access: duration || "Full Access",
+            expiresAt,
+            folderLink: `${API_CONFIG.baseUrl}/${access}er/${folder._id}`,
+            approvedByName: owner.name || "Unknown"
+        });
+
+        // Send the email
         await sendEmail({
             to: user.email,
             subject: `Folder Access Approved: ${folder.name}`,
-            html: `<p>Your access to folder <strong>${folder.name}</strong> has been granted.</p>`
+            html,
+            fromName: "E-sangrah",
         });
 
         return res.json({ success: true, message: "Access granted successfully." });

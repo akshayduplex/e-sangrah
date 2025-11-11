@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Folder Shared</title>
+</head>
+
+<body style="font-family:Arial, Helvetica, sans-serif; margin:0; padding:0; background:#f6f9fc;">
+    <div style="max-width:600px; margin:auto; background:#ffffff; border-radius:8px; overflow:hidden;">
+        <table style="width:100%; border-collapse:collapse;">
+
+            <!-- Header -->
+            <tr>
+                <td style="background:#007bff; text-align:center;">
+                    <h2 style="color:#fff; font-size:24px; margin:0; padding:15px 0;">Folder Shared With You</h2>
+                </td>
+            </tr>
+
+            <!-- Body -->
+            <tr>
+                <td style="padding:25px 30px; color:#333;">
+                    <p style="font-size:15px; line-height:25px;">
+                        Hi <%= userName || "there" %>,
+                    </p>
+                    <p style="font-size:15px; line-height:25px;">
+                        <%= senderName || "Someone" %> has shared a folder with you.
+                    </p>
+
+                    <p style="font-size:15px; line-height:25px;">
+                        <strong>Folder Name:</strong>
+                        <%= folderName %><br>
+                            <strong>Access Level:</strong>
+                            <%= access %><br>
+                                <strong>Expires At:</strong>
+                                <%= expiresAt ? new Date(expiresAt).toLocaleString() : "N/A" %>
+                    </p>
+
+                    <div style="text-align:center; margin:25px 0;">
+                        <a href="<%= folderLink %>" target="_blank"
+                            style="background:#007bff; color:#fff; text-decoration:none; font-size:15px; padding:12px 25px; border-radius:6px; display:inline-block;">
+                            View Folder
+                        </a>
+                    </div>
+
+                    <p style="font-size:14px; color:#666;">You can now view or manage this folder as per your granted
+                        access.</p>
+                </td>
+            </tr>
+
+            <!-- Footer -->
+            <tr>
+                <td style="background:#f2f4f7; padding:15px 30px;">
+                    <p style="font-size:13px; color:#777; margin:0;">Best regards,<br><strong>E-Sangrah</strong></p>
+                </td>
+            </tr>
+
+        </table>
+    </div>
+</body>
+
+</html>

@@ -156,6 +156,7 @@
     <!-- /Page Wrapper -->
     <%- include('../../modals/addApprovers') %>
         <%- include('../../partials/footer') %>
+            <script src="/js/components/shareDocument.js"></script>
             <!-- <link href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" rel="stylesheet"> -->
             <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
             <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
@@ -1225,8 +1226,8 @@
                                 let actionCellContent = '';
                                 if (approval.isApproved) {
                                     actionCellContent = `<span class="text-success small">Already Approved</span>`;
-                                } else if (!isMailSent && priority !== highestPriority) {
-                                    actionCellContent = `<span class="text-muted small">Mail not sent</span>`;
+                                } else if (isMailSent && priority !== highestPriority) {
+                                    actionCellContent = `<span class="text-muted small">Mail Already sent</span>`;
                                 } else {
                                     actionCellContent = `<button class="btn btn-sm btn-success send-mail"
                     data-project-id="${projectId}"

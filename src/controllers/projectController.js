@@ -165,8 +165,8 @@ export const createProject = async (req, res) => {
             createdBy: user._id
         };
 
-        if (req.file && req.file.path) {
-            projectData.projectLogo = req.file.path;
+        if (req.file && req.file.location) {
+            projectData.projectLogo = req.file.location;
         }
 
         // Save project
@@ -290,7 +290,6 @@ export const updateProject = async (req, res) => {
             body[field] = body[field].map((val) => new mongoose.Types.ObjectId(val));
         }
 
-        // 🧩 Parse Approval Authority (handles FormData keys like approvalAuthority[0][userId])
         let approvalAuthority = [];
         const aaEntries = Object.keys(body).filter(k => k.startsWith("approvalAuthority["));
         if (aaEntries.length > 0) {
@@ -318,8 +317,8 @@ export const updateProject = async (req, res) => {
         }
 
         // Handle file upload
-        if (req.file && req.file.path) {
-            body.projectLogo = req.file.path || body.projectLogo;
+        if (req.file && req.file.location) {
+            body.projectLogo = req.file.location || body.projectLogo;
         } else {
             delete body.projectLogo;
         }

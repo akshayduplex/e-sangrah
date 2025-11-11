@@ -7,7 +7,9 @@ import PermissionLogs from "../models/PermissionLogs.js";
 import User from "../models/User.js";
 import SharedWith from "../models/SharedWith.js";
 import { sendEmail } from "../services/emailService.js";
-import Approval from "../models/Approval.js";
+import path from "path";
+import ejs from "ejs";
+import { API_CONFIG } from "../config/ApiEndpoints.js";
 
 //Page controllers
 
@@ -359,7 +361,7 @@ export const grantAccess = async (req, res) => {
         const loggedUser = log.user; // embedded data
         const userEmail = loggedUser?.email;
 
-        // Determine external or internal user
+        // Determine internal or external user
         const internalUser = await User.findOne({ email: userEmail });
         const isExternal = !internalUser;
 
@@ -381,6 +383,11 @@ export const grantAccess = async (req, res) => {
         } else {
             expiresAt = durationMap[duration]?.() ?? null;
         }
+
+        // Construct Access URL (use current document version)
+        const currentVersion = doc.versioning?.currentVersion?.toString() || "1.0";
+        const accessUrl = `${API_CONFIG.baseUrl}/documents/${doc._id}/versions/view?version=${currentVersion}`;
+
         // If Internal User → Update SharedWith
         if (!isExternal && internalUser) {
             await SharedWith.findOneAndUpdate(
@@ -401,21 +408,35 @@ export const grantAccess = async (req, res) => {
         log.isExternal = isExternal;
         log.duration = duration;
         log.expiresAt = expiresAt;
+        log.accessUrl = accessUrl; // optional: store URL in log for reference
         await log.save();
 
         // Email Notification
         if (!isExternal && userEmail) {
+            const templatePath = path.join(process.cwd(), "views", "emails", "accessGrantedCustom.ejs");
+
+            const html = await ejs.renderFile(templatePath, {
+                userName: internalUser?.name || userEmail,
+                fileName: doc.metadata?.fileName || "Untitled Document",
+                duration,
+                expiresAt: expiresAt ? expiresAt.toLocaleString() : "N/A",
+                ownerName: doc.owner?.name || "Document Owner",
+                accessUrl // include in email template
+            });
+
             await sendEmail({
                 to: userEmail,
                 subject: "Access Granted",
-                html: `<p>Your access to "${doc.metadata?.fileName}" has been granted.</p>`
+                html,
+                fromName: "Support Team",
             });
         }
 
         return res.status(200).json({
             message: `Access granted to ${loggedUser?.username || userEmail}`,
             expiresAt,
-            isExternal
+            isExternal,
+            accessUrl
         });
 
     } catch (err) {
@@ -423,4 +444,3 @@ export const grantAccess = async (req, res) => {
         return res.status(500).json({ error: err.message });
     }
 };
-

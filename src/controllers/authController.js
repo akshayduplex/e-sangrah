@@ -1,20 +1,19 @@
 import User from "../models/User.js";
+import path from "path";
+import ejs from "ejs";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import nodemailer from "nodemailer";
 import {
     successResponse,
     failResponse,
     errorResponse,
 } from "../utils/responseHandler.js";
-import { getOtpEmailHtml } from "../emailTemplates/OtpEmailTemplate.js";
 
 import crypto from "crypto"
 import { sendEmail } from "../services/emailService.js";
 import logger from "../utils/logger.js";
 import { API_CONFIG } from "../config/ApiEndpoints.js";
 import UserToken from "../models/UserToken.js";
-import { loginOtpTemplate } from "../emailTemplates/loginOtpTemplate.js";
 
 const otpStore = {};
 
@@ -156,20 +155,29 @@ export const login = async (req, res) => {
         }
 
 
-        // 6️⃣ No valid token -> generate OTP
+        // No valid token -> generate OTP
         const otp = Math.floor(1000 + Math.random() * 9000).toString(); // 4-digit OTP
 
         // Save OTP and expiry to user
         user.otp = otp;
         user.otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
         await user.save();
+        const templatePath = path.join(process.cwd(), "views", "emails", "otpEmail.ejs");
+        const html = await ejs.renderFile(templatePath, {
+            userName: user.name,
+            otp,
+            minutes: 10,
+            BASE_URL: API_CONFIG.baseUrl
+        });
+
         // Send OTP email
         await sendEmail({
             to: email,
             subject: "Your Login OTP",
-            html: loginOtpTemplate(user.name, otp, 10),
-            fromName: "DMS Support Team"
+            html,
+            fromName: "DMS Support Team",
         });
+
         return successResponse(res, {
             message: "OTP sent to your registered email/phone",
         });
@@ -532,7 +540,7 @@ export const updateProfile = async (req, res) => {
 
         if (department) updateFields["userDetails.department"] = department;
         if (designation) updateFields["userDetails.designation"] = designation;
-        if (req.file) updateFields.profile_image = req.file.path;
+        if (req.file) updateFields.profile_image = req.file.location;
 
         const updatedUser = await User.findByIdAndUpdate(
             userId,

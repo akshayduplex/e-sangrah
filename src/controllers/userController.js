@@ -78,7 +78,7 @@ export const registerUser = async (req, res) => {
         let profile_image = null;
 
         if (req.file) {
-            profile_image = `/uploads/general/${req.file.filename}`;
+            profile_image = req.file.location;
         }
 
         // Check if user already exists

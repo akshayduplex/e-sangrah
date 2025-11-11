@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Access Granted</title>
+</head>
+
+<body style="font-family: Arial, sans-serif; background-color:#f5f5f5; padding:20px;">
+    <div style="max-width:600px;margin:auto;background:white;padding:20px;border-radius:8px;">
+        <h2>Hello <%= name %>,</h2>
+        <p>Your access to the document
+            <strong>
+                <%= fileName %>
+            </strong>
+            has been granted by <%= ownerName %>.
+        </p>
+        <p>Access Duration: <strong>
+                <%= duration %>
+            </strong></p>
+        <p>You can now view the document as per your permissions.</p>
+        <br>
+        <p>— DMS Support Team</p>
+    </div>
+</body>
+
+</html>

@@ -15898,6 +15898,7 @@ button.swal2-cancel {
 
 @media (max-width: 991.98px) {
   .page-wrapper .content {
+    margin-top: 15px;
     padding: 15px;
     padding-bottom: 0;
   }

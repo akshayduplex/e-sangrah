@@ -4,9 +4,10 @@ import { successResponse, failResponse, errorResponse } from "../utils/responseH
 import { calculateStartDate } from "../utils/calculateStartDate.js";
 import File from "../models/File.js";
 import { getFileIcon } from "../helper/getFileIcon.js";
-import { FILTER_PERIODS } from "../constant/Constant.js";
+import { FILE_TYPE_CATEGORIES, FILTER_PERIODS } from "../constant/Constant.js";
 import Project, { ProjectType } from "../models/Project.js";
 import { getSessionFilters } from "../helper/sessionHelpers.js";
+import Department from "../models/Departments.js";
 
 //Page controllers
 
@@ -952,5 +953,56 @@ export const getAnalyticsStats = async (req, res) => {
             message: "Server error",
             error: err.message,
         });
+    }
+};
+
+export const getDepartmentFileUsage = async (req, res) => {
+    try {
+        // Get all active departments
+        const departments = await Department.find({ status: "Active" }).sort({ priority: 1 });
+
+        // Initialize base structure
+        const departmentNames = departments.map(dep => dep.name);
+
+        const fileTypeCounts = {
+            Word: Array(departmentNames.length).fill(0),
+            Excel: Array(departmentNames.length).fill(0),
+            PPT: Array(departmentNames.length).fill(0),
+            PDF: Array(departmentNames.length).fill(0),
+            Media: Array(departmentNames.length).fill(0)
+        };
+
+        // Fetch all active files with department references
+        const files = await File.find({ status: "active" }).populate("departmentId", "name");
+
+        // Count by department and file type
+        files.forEach(file => {
+            if (!file.departmentId) return;
+            const deptIndex = departmentNames.indexOf(file.departmentId.name);
+            if (deptIndex === -1) return;
+
+            const ext = (file.originalName.split(".").pop() || "").toLowerCase();
+
+            if (FILE_TYPE_CATEGORIES.word.includes(ext)) fileTypeCounts.Word[deptIndex]++;
+            else if (FILE_TYPE_CATEGORIES.excel.includes(ext)) fileTypeCounts.Excel[deptIndex]++;
+            else if (FILE_TYPE_CATEGORIES.ppt.includes(ext)) fileTypeCounts.PPT[deptIndex]++;
+            else if (FILE_TYPE_CATEGORIES.pdf.includes(ext)) fileTypeCounts.PDF[deptIndex]++;
+            else if (FILE_TYPE_CATEGORIES.media.includes(ext)) fileTypeCounts.Media[deptIndex]++;
+        });
+
+        // Response formatted for Highcharts
+        res.status(200).json({
+            categories: departmentNames,
+            series: [
+                { name: "Word", data: fileTypeCounts.Word },
+                { name: "Excel", data: fileTypeCounts.Excel },
+                { name: "PPT", data: fileTypeCounts.PPT },
+                { name: "PDF", data: fileTypeCounts.PDF },
+                { name: "Media", data: fileTypeCounts.Media }
+            ]
+        });
+    } catch (err) {
+        console.error("Error fetching file usage:", err);
+        res.status(500).json({ message: "Server Error", error: err.message });
     }
 };

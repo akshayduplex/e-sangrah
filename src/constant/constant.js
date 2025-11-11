@@ -47,3 +47,11 @@ export const docTypes = [
     { value: "application/x-excel", label: "Legacy Excel (.xls)" },
     { value: "application/x-msexcel", label: "Legacy Excel alternative (.xls)" }
 ];
+
+export const FILE_TYPE_CATEGORIES = {
+    word: ["doc", "docx"],
+    excel: ["xls", "xlsx"],
+    ppt: ["ppt", "pptx"],
+    pdf: ["pdf"],
+    media: ["mp3", "mp4", "mov", "avi", "wav"]
+};

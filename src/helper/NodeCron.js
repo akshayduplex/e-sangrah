@@ -1,69 +1,115 @@
 import cron from "node-cron";
 import TempFile from "../models/TempFile.js";
 import PermissionLogs from "../models/PermissionLogs.js";
+import FolderPermissionLogs from "../models/FolderPermissionLogs.js";
 import { deleteObject } from "../utils/s3Helpers.js";
 import logger from "../utils/logger.js";
 
-/* -------------------------------
-TEMP FILE CLEANUP (every 2 hours)
---------------------------------*/
-export const cleanupOldTempFiles = async () => {
+let isRunningTempFiles = false;
+let isRunningLogs = false;
+
+/* ----------------------------
+  Temp files cleanup
+---------------------------- */
+const cleanupTempFiles = async () => {
+    if (isRunningTempFiles) {
+        logger.warn("Temp file cleanup skipped: previous run still in progress.");
+        return;
+    }
+    isRunningTempFiles = true;
+
     try {
         const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
-
-        const oldFiles = await TempFile.find({
-            status: "temp",
-            addDate: { $lt: twoHoursAgo },
-        });
+        const oldFiles = await TempFile.find({ status: "temp", addDate: { $lt: twoHoursAgo } });
 
         for (const file of oldFiles) {
             try {
                 await deleteObject(file.s3Filename);
                 await TempFile.deleteOne({ _id: file._id });
-                logger.info(`Permanently deleted file: ${file.s3Filename}`);
+                logger.info(`Deleted temp file: ${file.s3Filename}`);
             } catch (err) {
                 logger.error(`Failed to delete file ${file.s3Filename}:`, err);
             }
         }
 
-        logger.info(`Temp file cleanup complete. ${oldFiles.length} files removed.`);
-        return oldFiles.length;
+        if (oldFiles.length > 0) {
+            logger.info(`Temp file cleanup complete. ${oldFiles.length} files removed.`);
+        } else {
+            logger.info("Temp file cleanup complete. No files to remove.");
+        }
     } catch (err) {
-        logger.error("Temp file cleanup error:", err);
-        return 0;
+        logger.error("Temp file cleanup failed:", err);
+    } finally {
+        isRunningTempFiles = false;
     }
 };
 
-/* -------------------------------
-   PERMISSION LOG CLEANUP (every day at midnight)
---------------------------------*/
-export const cleanupExpiredPermissionLogs = async () => {
+/* ----------------------------
+  PermissionLogs cleanup
+---------------------------- */
+const cleanupPermissionLogs = async () => {
+    const now = new Date();
+    const result = await PermissionLogs.deleteMany({ expiresAt: { $lt: now } });
+    logger.info(`Permission log cleanup complete. ${result.deletedCount} expired logs removed.`);
+};
+
+/* ----------------------------
+  FolderPermissionLogs cleanup
+---------------------------- */
+const cleanupFolderPermissionLogs = async () => {
+    const now = new Date();
+    const result = await FolderPermissionLogs.deleteMany({ expiresAt: { $lt: now } });
+    logger.info(`Folder permission log cleanup complete. ${result.deletedCount} expired logs removed.`);
+};
+
+/* ----------------------------
+  Combined logs cleanup runner
+---------------------------- */
+const runLogsCleanup = async () => {
+    if (isRunningLogs) {
+        logger.warn("Logs cleanup skipped: previous run still in progress.");
+        return;
+    }
+
+    isRunningLogs = true;
+    const startTime = new Date();
+    logger.info(`[${startTime.toISOString()}] Permission logs cleanup job started.`);
+
     try {
-        const now = new Date();
-        // Assuming your PermissionLogs model has an `expiresAt` field
-        const result = await PermissionLogs.deleteMany({ expiresAt: { $lt: now } });
-
-        logger.info(`Permission log cleanup complete. ${result.deletedCount} expired logs removed.`);
-        return result.deletedCount;
+        await cleanupPermissionLogs();
+        await cleanupFolderPermissionLogs();
     } catch (err) {
-        logger.error("Permission log cleanup error:", err);
-        return 0;
+        logger.error("Logs cleanup job failed:", err);
+    } finally {
+        const endTime = new Date();
+        logger.info(`[${endTime.toISOString()}] Permission logs cleanup job finished. Duration: ${((endTime - startTime) / 1000).toFixed(2)}s`);
+        isRunningLogs = false;
     }
 };
 
-/* -------------------------------
-    START ALL CRON JOBS
---------------------------------*/
+/* ----------------------------
+  Start scheduled jobs
+---------------------------- */
 export const startCleanupJob = () => {
-    // Temp files: every 2 hours
-    cron.schedule("0 */2 * * *", async () => {
-        console.log("Running temp file cleanup job...");
-        await cleanupOldTempFiles();
-    });
+    logger.info("Scheduling cleanup cron jobs...");
 
-    // Permission logs: every day at midnight
-    cron.schedule("0 */2 * * *", async () => {
-        console.log("Running permission log cleanup job...");
-        await cleanupExpiredPermissionLogs();
-    });
+    // Temp files: every 2 hours on the hour
+    cron.schedule(
+        "0 */2 * * *",
+        async () => {
+            logger.info("Triggering temp file cleanup...");
+            await cleanupTempFiles();
+        },
+        { scheduled: true, timezone: "UTC" }
+    );
+
+    // PermissionLogs and FolderPermissionLogs: daily at midnight UTC
+    cron.schedule(
+        "0 0 * * *",
+        async () => {
+            logger.info("Triggering permission logs cleanup...");
+            await runLogsCleanup();
+        },
+        { scheduled: true, timezone: "UTC" }
+    );
 };

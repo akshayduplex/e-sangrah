@@ -168,8 +168,25 @@
                             <ul class="dropdown-menu">
                                 <li><a class="dropdown-item" href="#"><i class="ti ti-eye"></i> View</a></li>
                                 <li><a class="dropdown-item" href="#"><i class="ti ti-pencil-minus"></i> Edit</a></li>
-                                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#sharedoc-modal"><i class="ti ti-share"></i> Share</a></li>
-                                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#versionhistory-modal"><i class="ti ti-history"></i> Version History</a></li>
+<li>
+                <a class="dropdown-item" 
+                   href="#" 
+                   data-bs-toggle="modal" 
+                   data-bs-target="#sharedoc-modal"
+                   data-doc-id="${item._id}"
+                   data-file-id="${item.files?.[0]?._id || ''}">
+                   <i class="ti ti-share"></i> Share
+                </a>
+            </li>
+            <li>
+                <a class="dropdown-item" 
+                   href="#" 
+                   data-bs-toggle="modal" 
+                   data-bs-target="#versionhistory-modal"
+                   data-id="${item._id}">
+                   <i class="ti ti-history"></i> Version History
+                </a>
+            </li>
                                 <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#downloaddoc-modal"><i class="ti ti-download"></i> Download</a></li>
                                 <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#trashdoc-modal"><i class="ti ti-trash"></i> Move to Trash</a></li>
                                 <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#archivedoc-modal"><i class="ti ti-archive"></i> Move to Archive</a></li>

@@ -187,7 +187,6 @@
 
 <!-- Slimscroll JS -->
 <script src="/js/jquery.slimscroll.min.js"></script>
-
 <!-- Chart JS -->
 <script src="/plugins/apexchart/apexcharts.min.js"></script>
 <script src="/plugins/apexchart/chart-data.js"></script>
@@ -217,14 +216,12 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 
-
 <!-- <script src="/socket.io/socket.io.js"></script> -->
 
 <!-- Custom JS -->
 <script> window.baseUrl = "<%= BASE_URL %>";</script>
 <script src="/js/todo.js"></script>
 <script src="/js/toast.js"></script>
-<script src="/js/components/shareDocument.js"></script>
 <script defer src="/js/components/header.js"></script>
 <script src="/js/components/formatDate.js"></script>
 <script src="/js/theme-colorpicker.js"></script>
@@ -336,7 +333,6 @@
 </div>
 
 <!-- Version modal -->
-
 <div class="modal fade" id="versionhistory-modal" tabindex="-1" aria-labelledby="versionHistoryModalLabel"
     aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
@@ -347,100 +343,15 @@
             </div>
             <div class="modal-body">
                 <div class="search-bar mb-3">
-                    <input type="text" class="form-control" placeholder="Search Version History">
+                    <input type="text" class="form-control" placeholder="Search Version History" id="versionSearch">
                 </div>
-                <div class="version-list">
-                    <div class="version-item">
-                        <div class="dflexbtwn align-items-start">
-                            <div class="flxtblleft">
-                                <span class="avatar rounded bg-light mb-2">
-                                    <img src="/img/icons/fn2.png">
-                                </span>
-                                <div class="flxtbltxt">
-                                    <p class="fs-18 mb-1 fw-normal">Project Proposal v2.4</p>
-                                    <span class="fs-16 fw-normal d-block mb-2">Modified by Arun Sharma </span>
-                                    <h5 class="fs-18 fw-light text-black mb-3">Added New feature in the Document
-                                    </h5>
-                                    <div class="version-actions">
-                                        <button class="site-btnmd fw-light">View</button>
-                                        <button class="btn btn-outline-light rounded-pill">Restore to v2.4
-                                            Version</button>
-                                    </div>
-                                </div>
-                            </div>
-                            <p>Modified on August 08, 2025</p>
+                <div class="version-list" id="versionListContainer">
+                    <!-- Dynamic content will be loaded here -->
+                    <div class="text-center py-4">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Loading...</span>
                         </div>
                     </div>
-
-                    <div class="version-item">
-                        <div class="dflexbtwn align-items-start">
-                            <div class="flxtblleft">
-                                <span class="avatar rounded bg-light mb-2">
-                                    <img src="/img/icons/fn2.png">
-                                </span>
-                                <div class="flxtbltxt">
-                                    <p class="fs-18 mb-1 fw-normal">Project Proposal v2.4</p>
-                                    <span class="fs-16 fw-normal d-block mb-2">Modified by Arun Sharma </span>
-                                    <h5 class="fs-18 fw-light text-black mb-3">Added New feature in the Document
-                                    </h5>
-                                    <div class="version-actions">
-                                        <button class="site-btnmd fw-light">View</button>
-                                        <button class="btn btn-outline-light rounded-pill">Restore to v2.4
-                                            Version</button>
-                                    </div>
-                                </div>
-                            </div>
-                            <p>Modified on August 08, 2025</p>
-                        </div>
-                    </div>
-
-                    <div class="version-item">
-                        <div class="dflexbtwn align-items-start">
-                            <div class="flxtblleft">
-                                <span class="avatar rounded bg-light mb-2">
-                                    <img src="/img/icons/fn2.png">
-                                </span>
-                                <div class="flxtbltxt">
-                                    <p class="fs-18 mb-1 fw-normal">Project Proposal v2.4</p>
-                                    <span class="fs-16 fw-normal d-block mb-2">Modified by Arun Sharma </span>
-                                    <h5 class="fs-18 fw-light text-black mb-3">Added New feature in the Document
-                                    </h5>
-                                    <div class="version-actions">
-                                        <button class="site-btnmd fw-light">View</button>
-                                        <button class="btn btn-outline-light rounded-pill">Restore to v2.4
-                                            Version</button>
-                                    </div>
-                                </div>
-                            </div>
-                            <p>Modified on August 08, 2025</p>
-                        </div>
-                    </div>
-
-                    <div class="version-item">
-                        <div class="dflexbtwn align-items-start">
-                            <div class="flxtblleft">
-                                <span class="avatar rounded bg-light mb-2">
-                                    <img src="/img/icons/fn2.png">
-                                </span>
-                                <div class="flxtbltxt">
-                                    <p class="fs-18 mb-1 fw-normal">Project Proposal v2.4</p>
-                                    <span class="fs-16 fw-normal d-block mb-2">Modified by Arun Sharma </span>
-                                    <h5 class="fs-18 fw-light text-black mb-3">Added New feature in the Document
-                                    </h5>
-                                    <div class="version-actions">
-                                        <button class="site-btnmd fw-light">View</button>
-                                        <button class="btn btn-outline-light rounded-pill">Restore to v2.4
-                                            Version</button>
-                                    </div>
-                                </div>
-                            </div>
-                            <p>Modified on August 08, 2025</p>
-                        </div>
-                    </div>
-
-
-
-
                 </div>
             </div>
         </div>
@@ -897,12 +808,15 @@
         const $headerProjectSelect = $('#selectHeaderProject');
 
         // ---------------------------
-        // YEAR SELECT FIX
+        // YEAR SELECT FIX (with All)
         // ---------------------------
         if ($headerYearSelect.length) {
             const currentYear = new Date().getFullYear();
             const startYear = 1995;
             const endYear = currentYear;
+
+            // Add “All” option first
+            $headerYearSelect.append(new Option('All', 'all', false, false));
 
             // Populate dropdown
             for (let year = endYear; year >= startYear; year--) {
@@ -925,7 +839,7 @@
                         headers: { 'Content-Type': 'application/json' },
                         credentials: 'include',
                         body: JSON.stringify({
-                            selectedYear: selectedYear || null,
+                            selectedYear: selectedYear === 'all' ? null : selectedYear,
                             projectId: window.selectedProjectId || null
                         })
                     });
@@ -942,27 +856,13 @@
                 try {
                     const res = await fetch(`${baseUrl}/api/session/project`, { credentials: 'include' });
                     const data = await res.json();
-                    const savedYear = data.selectedYear ? parseInt(data.selectedYear) : currentYear;
+                    const savedYear = data.selectedYear ? data.selectedYear : 'all';
 
-                    // Ensure year exists
                     if (!$headerYearSelect.find(`option[value="${savedYear}"]`).length) {
                         $headerYearSelect.append(new Option(savedYear, savedYear, true, true));
                     }
 
                     $headerYearSelect.val(savedYear).trigger('change.select2');
-
-                    if (!data.selectedYear) {
-                        // Save default current year if none in session
-                        await fetch(`${baseUrl}/api/session/project`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            credentials: 'include',
-                            body: JSON.stringify({
-                                selectedYear: currentYear,
-                                projectId: window.selectedProjectId || null
-                            })
-                        });
-                    }
                 } catch (err) {
                     console.error('Error loading saved year:', err);
                 }
@@ -970,7 +870,7 @@
         }
 
         // ---------------------------
-        // PROJECT SELECT FIX
+        // PROJECT SELECT FIX (with “All Projects”)
         // ---------------------------
         if ($headerProjectSelect.length) {
             $headerProjectSelect.select2({
@@ -989,14 +889,25 @@
                         };
                     },
                     processResults: function (data) {
+                        // Map projects from API
+                        const projects = (data.data || []).map(p => ({
+                            id: p._id,
+                            text: p.projectName || p.name
+                        }));
+
+                        // Always include “All Projects” at the top
                         return {
-                            results: (data.data || []).map(p => ({
-                                id: p._id,
-                                text: p.projectName || p.name
-                            }))
+                            results: [
+                                { id: 'all', text: 'All Projects' },
+                                ...projects
+                            ]
                         };
                     },
                     cache: true
+                },
+                // Ensure “All Projects” shows when loaded with no search
+                templateSelection: function (data) {
+                    return data.text || 'All Projects';
                 }
             });
 
@@ -1011,8 +922,8 @@
                         headers: { 'Content-Type': 'application/json' },
                         credentials: 'include',
                         body: JSON.stringify({
-                            projectId: projectId || null,
-                            projectName: projectName || ''
+                            projectId: projectId === 'all' ? null : projectId,
+                            projectName: projectId === 'all' ? '' : projectName
                         })
                     });
 
@@ -1039,6 +950,10 @@
                         }
 
                         $headerProjectSelect.val(data.selectedProject).trigger('change.select2');
+                    } else {
+                        // Default to “All Projects”
+                        const allOption = new Option('All Projects', 'all', true, true);
+                        $headerProjectSelect.append(allOption).trigger('change.select2');
                     }
                 } catch (err) {
                     console.error('Error loading saved project:', err);
@@ -1047,6 +962,8 @@
         }
     });
 </script>
+
+
 
 <script>
     (function ($) {

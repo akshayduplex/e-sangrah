@@ -132,12 +132,12 @@ router.get("/dashboard/documentUploads", AdminDashboard.getDepartmentDocumentCha
 router.get("/dashboard/documentsTypeUploads", AdminDashboard.getDocumentsTypeUploads);
 router.get("/dashboard/summary", AdminDashboard.getDocumentsStatusSummary);
 router.get("/analytics/stats", AdminDashboard.getAnalyticsStats);
-
+router.get("/analytics/department-file-usage", AdminDashboard.getDepartmentFileUsage);
 // Permission Logs
 router.get("/my-approvals", AdminController.getMyApprovals);
 router.get("/permission-logs", authorize('admin', 'superadmin'), AdminController.getPermissionLogs);
-router.patch("/permission-logs/requestStatus", authorize('admin', 'superadmin'), PermissionLogsValidators.updateRequestStatusValidator, validators, AdminController.updateRequestStatus);
-router.post("/permission-logs/grant-access", authorize('admin', 'superadmin'), PermissionLogsValidators.grantAccessValidator, validators, AdminController.grantAccess)
+router.patch("/permission-logs/requestStatus", authorize('admin', 'superadmin', 'user'), PermissionLogsValidators.updateRequestStatusValidator, validators, AdminController.updateRequestStatus);
+router.post("/permission-logs/grant-access", authorize('admin', 'superadmin', 'user'), PermissionLogsValidators.grantAccessValidator, validators, AdminController.grantAccess)
 
 // ---------------------------
 // Employee routes
@@ -1127,7 +1127,7 @@ router.post('/folders/:folderId/request-access', FolderController.requestFolderA
 // Grant access to a user
 router.post('/folders/:folderId/grant-access', FolderController.grantFolderAccess);
 
-// Get folder access permissions (for prefilling forms)
+// Get folder access permissions
 router.get('/folders/:folderId/access', FolderController.getFolderAccess);
 
 // Remove user access

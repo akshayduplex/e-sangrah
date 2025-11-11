@@ -224,9 +224,8 @@
                             <div class="card-title">Document Classification</div>
                         </div>
                         <div class="card-body">
-                            <div class="chartjs-wrapper-demo">
-                                <canvas id="chartLineDocument" class=""></canvas>
-                            </div>
+                            <div id="fileUsageChart" style="height:400px;"></div>
+
                         </div>
                     </div>
                 </div>
@@ -237,7 +236,8 @@
                         </div>
                         <div class="card-body">
                             <div class="chartjs-wrapper-demo">
-                                <canvas id="storageChart"></canvas>
+                                <div id="storageChart" style="height:300px;"></div>
+
                             </div>
                             <div class="storage-info my-3">
                                 <span class="text-default fs-20 fw-medium">120 GB Storage</span>
@@ -317,6 +317,22 @@
 
     </div>
     <!-- /Page Wrapper -->
+    <script>
+        Highcharts.chart('storageChart', {
+            chart: { type: 'areaspline' },
+            title: null,
+            xAxis: { visible: false },
+            yAxis: { visible: false },
+            legend: { enabled: false },
+            series: [{
+                data: [90, 60, 80, 70, 100, 65, 85],
+                color: '#00aaff',
+                fillOpacity: 0.3
+            }],
+            credits: false
+        });
+    </script>
 
     <script src="/js/pages/analytics/Analytics.js"></script>
     <%- include('../../partials/footer') %>
+        <script src="/js/components/shareDocument.js"></script>

@@ -84,7 +84,7 @@ export const listVendors = async (req, res) => {
 
 export const registerDonorVendor = async (req, res, next) => {
     try {
-        const profile_image = req.file ? req.file.filename : undefined;
+        const profile_image = req.file ? req.file.location : undefined;
         const {
             id,
             user_name,
@@ -196,7 +196,7 @@ export const registerDonorVendor = async (req, res, next) => {
 export const registerVendor = async (req, res, next) => {
     try {
         // Multer file (optional)
-        const uploadedProfileImage = req.file ? req.file.filename : undefined;
+        const uploadedProfileImage = req.file ? req.file.location : undefined;
 
         // Extract vendor-specific fields from multipart/form-data
         const {

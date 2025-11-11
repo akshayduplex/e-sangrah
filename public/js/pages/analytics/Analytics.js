@@ -123,29 +123,38 @@ async function loadDocuments() {
         Non-Compliant
      </p>`;
 
+            // --- Action Buttons (with proper data attributes) ---
+            const viewUrl = doc.link || `/documents/view/${doc._id}`;
+            const editUrl = `/documents/edit/${doc._id}`;
+
+            const actionsDropdown = `
+                <div class="btn-group" role="group">
+                    <button type="button" class="btn border-0" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="ti ti-settings"></i>
+                    </button>
+                    <!-- 1. DROPDOWN MENU – add the two new items -->
+<ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="${doc.link || '#'}"><i class="ti ti-eye"></i> View</a></li>
+                    <li><a class="dropdown-item" href="/documents/edit/${doc._id}"><i class="ti ti-pencil-minus"></i> Edit</a></li>
+                    <li>
+                        <a class="dropdown-item share-btn" href="#" data-doc-id="${doc._id}"  data-file-id="${doc.files?.[0]?._id || ''}"  data-bs-toggle="modal" data-bs-target="#sharedoc-modal">
+                            <i class="ti ti-share"></i> Share
+                        </a>
+                    </li>
+                    <li>
+<a class="dropdown-item" href="#" data-id="${doc._id}" data-bs-toggle="modal" data-bs-target="#versionhistory-modal">
+    <i class="ti ti-history"></i> Version History
+</a></li>
+                    <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#downloaddoc-modal"><i class="ti ti-download"></i> Download</a></li>
+                    <li><a class="dropdown-item btn-delete" href="#" data-id="${doc._id}" data-bs-toggle="modal" data-bs-target="#trashdoc-modal"><i class="ti ti-trash"></i> Move to Trash</a></li>
+                    <li><a class="dropdown-item archive-document" href="#"  data-id="${doc._id}" data-bs-toggle="modal" data-bs-target="#archivedoc-modal"><i class="ti ti-archive"></i> Move to Archive</a></li>
+                </ul>
+                </div>`;
+
+            // --- Row HTML ---
             const rowHTML = `
                 <tr>
-                    <td>
-                        <div class="btn-group" role="group">
-                            <button type="button" class="btn border-0" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="ti ti-settings"></i>
-                            </button>
-                            <ul class="dropdown-menu">
-                                <li><a class="dropdown-item" href="#"><i class="ti ti-eye"></i> View</a></li>
-                                <li><a class="dropdown-item" href="add-document.php"><i class="ti ti-pencil-minus"></i> Edit</a></li>
-                                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#sharedoc-modal">
-                                    <i class="ti ti-share"></i> Share</a></li>
-                                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#versionhistory-modal">
-                                    <i class="ti ti-history"></i> Version History</a></li>
-                                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#downloaddoc-modal">
-                                    <i class="ti ti-download"></i> Download</a></li>
-                                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#trashdoc-modal">
-                                    <i class="ti ti-trash"></i> Move to Trash</a></li>
-                                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#archivedoc-modal">
-                                    <i class="ti ti-archive"></i> Move to Archive</a></li>
-                            </ul>
-                        </div>
-                    </td>
+                    <td>${actionsDropdown}</td>
                     <td>
                         <div class="flxtblleft">
                             <span class="avatar rounded bg-light mb-2">
@@ -153,7 +162,7 @@ async function loadDocuments() {
                             </span>
                             <div class="flxtbltxt">
                                 <p class="fs-14 mb-1 fw-normal text-neutral">
-                                    ${fileName}${version}
+                                    ${escapeHtml(fileName)}${version}
                                 </p>
                                 <span class="fs-11 fw-light text-black">${fileSizeKB}</span>
                             </div>
@@ -161,18 +170,63 @@ async function loadDocuments() {
                     </td>
                     <td><p>${department?.name || 'N/A'}</p></td>
                     <td>${isCompliant}</td>
-                    <td><p>${retention}</p></td>
+                    <td><p>${escapeHtml(retention)}</p></td>
                     <td><p class="tbl_date">${expiry}</p></td>
-                </tr>
-            `;
+                </tr>`;
 
             tbody.insertAdjacentHTML('beforeend', rowHTML);
         });
 
     } catch (err) {
         console.error('Error loading documents:', err);
+        const tbody = document.querySelector('#documentsTable tbody');
+        if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger py-3">Failed to load documents.</td></tr>`;
+        }
     }
 }
+
+// --- Helper: Escape HTML to prevent XSS ---
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function getFileIcon(fileName) {
+    const ext = fileName.split('.').pop().toLowerCase();
+    return fileIcons[ext] || fileIcons.default;
+}
+
+function formatDateTime(iso) {
+    if (!iso) return 'N/A';
+    return new Date(iso).toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+}
+
+async function loadFileUsage() {
+    try {
+        const res = await fetch('/api/analytics/department-file-usage');
+        const data = await res.json();
+
+        Highcharts.chart('fileUsageChart', {
+            chart: { type: 'line' },
+            title: { text: null },
+            xAxis: { categories: data.categories },
+            yAxis: { title: null },
+            series: data.series,
+            credits: false
+        });
+    } catch (error) {
+        console.error("Error loading chart:", error);
+    }
+}
+
 
 async function loadAnalyticsStats() {
     try {
@@ -194,11 +248,11 @@ document.addEventListener('DOMContentLoaded', () => {
     loadFileStatusLogs();
     loadDocuments();
     loadAnalyticsStats();
+    loadFileUsage();
     document.getElementById('filterRange')?.addEventListener('change', (e) => {
         loadDashboardStats(e.target.value);
     });
-
-    document.getElementById('logFilter')?.addEventListener('change', (e) => {
-        loadFileStatusLogs(e.target.value);
-    });
+});
+document.getElementById('logFilter')?.addEventListener('change', (e) => {
+    loadFileStatusLogs(e.target.value);
 });
