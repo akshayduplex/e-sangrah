@@ -19,12 +19,12 @@ import { getObjectUrl } from "../utils/s3Helpers.js";
 import { decrypt } from "../helper/SymmetricEncryption.js";
 import { generateShareLink } from "../helper/GenerateUniquename.js";
 import { accessExpiredTemplate, alertRedirectTemplate } from "../emailTemplates/accessExpiredTemplate.js";
-import { inviteUserTemplate } from "../emailTemplates/inviteUserTemplate.js";
 import { API_CONFIG } from "../config/ApiEndpoints.js";
 import PermissionLogs from "../models/PermissionLogs.js";
 import { addNotification } from "./NotificationController.js";
-import { approvalRequestTemplate } from "../emailTemplates/approvalRequestTemplate.js";
-import { PutObjectCommand, DeleteObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { s3Client } from "../config/S3Client.js";
+import { deleteObject } from "../utils/s3Helpers.js";
 
 //Page Controllers
 
@@ -1043,27 +1043,37 @@ export const createDocument = async (req, res) => {
             }
             document.signature = {
                 fileName: file.originalname,
-                fileUrl: file.path || file.filename,
+                fileUrl: file.location, // multer-s3 gives you the S3 URL
+                uploadedAt: new Date(),
             };
         } else if (req.body.signature?.startsWith("data:image/")) {
-            cloudinary.uploader
-                .upload(req.body.signature, {
-                    folder: "signatures",
-                    public_id: `signature-${Date.now()}`,
-                    overwrite: true,
-                })
-                .then((uploaded) => {
-                    Document.findByIdAndUpdate(document._id, {
-                        $set: {
-                            signature: {
-                                fileName: uploaded.original_filename,
-                                fileUrl: uploaded.secure_url,
-                            },
-                        },
-                    }).catch((err) => logger.error("Signature update failed:", err));
-                })
-                .catch((err) => logger.error("Signature upload error:", err));
+            try {
+                const base64Data = req.body.signature.replace(/^data:image\/\w+;base64,/, "");
+                const buffer = Buffer.from(base64Data, "base64");
+                const fileName = `signatures/signature-${Date.now()}.png`;
+
+                const uploadParams = {
+                    Bucket: API_CONFIG.AWS_BUCKET,
+                    Key: fileName,
+                    Body: buffer,
+                    ContentEncoding: "base64",
+                    ContentType: "image/png",
+                };
+
+                await s3Client.send(new PutObjectCommand(uploadParams));
+
+                const fileUrl = `https://${API_CONFIG.AWS_BUCKET}.s3.amazonaws.com/${fileName}`;
+
+                document.signature = {
+                    fileName,
+                    fileUrl,
+                    uploadedAt: new Date(),
+                };
+            } catch (err) {
+                logger.error("Signature upload error (S3):", err);
+            }
         }
+
 
         // ------------------- Save Document -------------------
         await document.save();
@@ -1414,6 +1424,7 @@ const handleSignatureUpdate = async (document, req) => {
     let signatureUpdated = false;
 
     try {
+        // If user uploaded a file via multipart
         if (req.files?.signature?.[0]) {
             const file = req.files.signature[0];
             if (!file.mimetype.startsWith("image/")) {
@@ -1422,47 +1433,45 @@ const handleSignatureUpdate = async (document, req) => {
 
             document.signature = {
                 fileName: file.originalname,
-                fileUrl: file.path || file.filename,
-                uploadedAt: new Date()
+                fileUrl: file.location, // multer-s3 URL
+                uploadedAt: new Date(),
             };
             signatureUpdated = true;
+        }
+        // If signature is sent as base64 string
+        else if (req.body.signature?.startsWith("data:image/")) {
+            const base64Data = req.body.signature.replace(/^data:image\/\w+;base64,/, "");
+            const buffer = Buffer.from(base64Data, "base64");
+            const fileName = `signatures/signature-${document._id}-${Date.now()}.png`;
 
-        } else if (req.body.signature && req.body.signature.trim() !== '') {
-            const base64Data = req.body.signature;
-            if (!base64Data.startsWith("data:image/")) {
-                throw new Error("Invalid signature format");
-            }
+            const uploadParams = {
+                Bucket: API_CONFIG.AWS_BUCKET,
+                Key: fileName,
+                Body: buffer,
+                ContentEncoding: "base64",
+                ContentType: "image/png",
+            };
 
-            if (typeof cloudinary !== 'undefined') {
-                const uploaded = await cloudinary.uploader.upload(base64Data, {
-                    folder: "signatures",
-                    public_id: `signature-${document._id}-${Date.now()}`,
-                    overwrite: false
-                });
+            await S3Client.send(new PutObjectCommand(uploadParams));
 
-                document.signature = {
-                    fileName: uploaded.original_filename,
-                    fileUrl: uploaded.secure_url,
-                    uploadedAt: new Date(),
-                    cloudinaryId: uploaded.public_id
-                };
-            } else {
+            const fileUrl = `https://${API_CONFIG.AWS_BUCKET}.s3.amazonaws.com/${fileName}`;
 
-                document.signature = {
-                    fileName: `signature-${Date.now()}.png`,
-                    fileUrl: base64Data,
-                    uploadedAt: new Date()
-                };
-            }
+            document.signature = {
+                fileName,
+                fileUrl,
+                uploadedAt: new Date(),
+            };
+
             signatureUpdated = true;
         }
     } catch (error) {
-        console.error("Signature update error:", error);
+        console.error("Signature update error (S3):", error);
         throw error;
     }
 
     return signatureUpdated;
 };
+
 
 /**
  * Create version history entry
@@ -1805,10 +1814,16 @@ export const deleteDocument = async (req, res) => {
 
         const objectIds = ids.map(id => new mongoose.Types.ObjectId(id));
 
-        // Fetch all dependent IDs in one query
+        // Fetch all dependent data
         const docs = await Document.aggregate([
             { $match: { _id: { $in: objectIds } } },
-            { $project: { files: 1, approvalHistory: 1, versionFiles: "$versionHistory.file" } }
+            {
+                $project: {
+                    files: 1,
+                    approvalHistory: 1,
+                    versionFiles: "$versionHistory.file"
+                }
+            }
         ]);
 
         if (!docs.length) {
@@ -1820,13 +1835,19 @@ export const deleteDocument = async (req, res) => {
             });
         }
 
-        // Flatten all dependent IDs
+        // Gather all file and approval IDs
         const fileIds = docs.flatMap(d => [...(d.files || []), ...(d.versionFiles || [])]);
         const approvalIds = docs.flatMap(d => d.approvalHistory || []);
 
+        // Retrieve file records to delete from S3
+        let filesToDelete = [];
+        if (fileIds.length) {
+            const files = await File.find({ _id: { $in: fileIds } }).session(session);
+            filesToDelete = files.map(f => f.s3Key || f.key).filter(Boolean);
+        }
 
+        // Delete from MongoDB (inside transaction)
         const deletions = [];
-
         if (fileIds.length) deletions.push(File.deleteMany({ _id: { $in: fileIds } }).session(session));
         if (approvalIds.length) deletions.push(Approval.deleteMany({ _id: { $in: approvalIds } }).session(session));
         deletions.push(Document.deleteMany({ _id: { $in: objectIds } }).session(session));
@@ -1835,12 +1856,27 @@ export const deleteDocument = async (req, res) => {
             await op;
         }
 
+        // Commit DB changes first
         await session.commitTransaction();
         session.endSession();
 
+        // Then delete from S3 (outside transaction)
+        if (filesToDelete.length) {
+            await Promise.allSettled(
+                filesToDelete.map(async (key) => {
+                    try {
+                        await deleteObject(key);
+                    } catch (err) {
+                        console.error(`Failed to delete S3 object ${key}:`, err.message);
+                    }
+                })
+            );
+        }
+
         return res.status(200).json({
             success: true,
-            message: `${docs.length} document(s) and their dependencies permanently deleted.`
+            message: `${docs.length} document(s) and their dependencies permanently deleted.`,
+            s3FilesDeleted: filesToDelete.length
         });
 
     } catch (error) {

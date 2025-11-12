@@ -1226,7 +1226,7 @@
                                 let actionCellContent = '';
                                 if (approval.isApproved) {
                                     actionCellContent = `<span class="text-success small">Already Approved</span>`;
-                                } else if (isMailSent && priority !== highestPriority) {
+                                } else if (!isMailSent && priority !== highestPriority) {
                                     actionCellContent = `<span class="text-muted small">Mail Already sent</span>`;
                                 } else {
                                     actionCellContent = `<button class="btn btn-sm btn-success send-mail"

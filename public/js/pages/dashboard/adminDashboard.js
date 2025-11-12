@@ -3,6 +3,7 @@ $(document).ready(function () {
     let currentProjectId = '';
     let currentPeriod = 'today';
     let typeUploadsperiod = 'today';
+    let isInitialized = false;
 
     // File type icons
     const fileIcons = {
@@ -15,6 +16,7 @@ $(document).ready(function () {
         pdf: "/img/icons/fn4.png",
         default: "/img/icons/fn1.png"
     };
+
     // Safe Select2 init (prevents double initialization)
     function safeSelect2Init(selector, initFn) {
         const $el = $(selector);
@@ -24,69 +26,86 @@ $(document).ready(function () {
         initFn();
     }
 
-    // Initialize Donor Select2
     function initializeDonorSelect2() {
         $('#dashboardDonor').select2({
             placeholder: '-- Select Donor Name --',
             allowClear: true,
+            width: '180px',
             ajax: {
                 url: '/api/user/search',
                 dataType: 'json',
                 delay: 250,
                 data: function (params) {
-                    const projectId = $('#projectName').val();
                     return {
                         search: params.term || '',
                         page: params.page || 1,
                         limit: 10,
-                        projectId: projectId,
                         profile_type: 'donor'
                     };
                 },
                 processResults: function (data, params) {
                     params.page = params.page || 1;
-                    const results = data.users.map(u => ({ id: u._id, text: u.name }));
-                    return {
-                        results,
-                        pagination: { more: params.page * 10 < data.pagination.total }
-                    };
+                    if (data.users && Array.isArray(data.users)) {
+                        const results = data.users.map(u => ({
+                            id: u._id,
+                            text: u.name || 'Unknown Donor'
+                        }));
+                        return {
+                            results,
+                            pagination: {
+                                more: params.page * 10 < (data.pagination?.total || 0)
+                            }
+                        };
+                    }
+                    return { results: [] };
                 },
                 cache: true
             },
             minimumInputLength: 0
+        }).on('change', function () {
+            loadDonorVendorProjects();
         });
     }
 
-    // Initialize Vendor Select2
+    // Initialize Vendor Select2 with proper configuration
     function initializeVendorSelect2() {
         $('#dashboardVendor').select2({
             placeholder: '-- Select Vendor Name --',
             allowClear: true,
+            width: '180px',
             ajax: {
                 url: '/api/user/search',
                 dataType: 'json',
                 delay: 250,
                 data: function (params) {
-                    const projectId = $('#projectName').val();
                     return {
                         search: params.term || '',
                         page: params.page || 1,
                         limit: 10,
-                        projectId: projectId,
                         profile_type: 'vendor'
                     };
                 },
                 processResults: function (data, params) {
                     params.page = params.page || 1;
-                    const results = data.users.map(u => ({ id: u._id, text: u.name }));
-                    return {
-                        results,
-                        pagination: { more: params.page * 10 < data.pagination.total }
-                    };
+                    if (data.users && Array.isArray(data.users)) {
+                        const results = data.users.map(u => ({
+                            id: u._id,
+                            text: u.name || 'Unknown Vendor'
+                        }));
+                        return {
+                            results,
+                            pagination: {
+                                more: params.page * 10 < (data.pagination?.total || 0)
+                            }
+                        };
+                    }
+                    return { results: [] };
                 },
                 cache: true
             },
             minimumInputLength: 0
+        }).on('change', function () {
+            loadDonorVendorProjects();
         });
     }
 
@@ -105,10 +124,6 @@ $(document).ready(function () {
                 if ($('#uploadDepartment').length && currentProjectId) {
                     $('#uploadDepartment').val(currentProjectId).trigger('change');
                 }
-
-                // Load with current filters
-                loadDepartmentUploads(currentProjectId, currentPeriod);
-                loadDocumentTypeUploads(currentProjectId, typeUploadsperiod);
             }
         } catch (error) {
             console.error('Error loading current project:', error);
@@ -358,13 +373,15 @@ $(document).ready(function () {
             loadDepartmentUploads(currentProjectId, currentPeriod, departmentId);
         });
     }
+
     // Department Document Uploads Chart
-    function loadDepartmentDocumentUploads(projectId = '', period = 'today') {
+    function loadDepartmentDocumentUploads(projectId = '', period = 'today', departmentId = '') {
         if (!$('#sales-income').length) return;
 
         const params = new URLSearchParams();
         if (projectId) params.append('projectId', projectId);
         if (period) params.append('period', period);
+        if (departmentId) params.append('departmentId', departmentId);
 
         const url = `${baseUrl}/api/dashboard/documentUploads?${params.toString()}`;
 
@@ -373,9 +390,9 @@ $(document).ready(function () {
             method: 'GET',
             dataType: 'json',
             success: function (result) {
-
                 if (!result.success || !result.monthlyStatusCounts) {
                     console.warn('No monthlyStatusCounts in response');
+                    createEmptySalesChart();
                     return;
                 }
 
@@ -389,15 +406,13 @@ $(document).ready(function () {
                 const approvedData = monthlyData.map(m => m.Approved || 0);
                 const rejectedData = monthlyData.map(m => m.Rejected || 0);
 
-                console.log('Chart Data:', { pendingData, approvedData, rejectedData }); // DEBUG
-
                 const maxValue = Math.max(...[...pendingData, ...approvedData, ...rejectedData]) + 1;
 
                 const options = {
                     chart: {
                         height: 290,
                         type: 'bar',
-                        stacked: true,               // ensure stacked bars
+                        stacked: true,
                         toolbar: { show: false }
                     },
                     colors: ['#197BF7', '#2BB68D', '#F15C44'], // Pending, Approved, Rejected
@@ -424,10 +439,10 @@ $(document).ready(function () {
                         labels: { style: { colors: '#6B7280', fontSize: '13px' } },
                         min: 0,
                         max: maxValue,
-                        tickAmount: maxValue
+                        tickAmount: maxValue > 5 ? 5 : maxValue
                     },
                     grid: { borderColor: '#E5E7EB', strokeDashArray: 5, padding: { left: -8 } },
-                    legend: { show: true },  // show legend to identify Rejected
+                    legend: { show: false },
                     dataLabels: { enabled: false },
                     fill: { opacity: 1 },
                     tooltip: {
@@ -450,10 +465,35 @@ $(document).ready(function () {
             },
             error: function (err) {
                 console.error('Error loading department document uploads:', err);
+                createEmptySalesChart();
             }
         });
     }
 
+    function createEmptySalesChart() {
+        if (window.salesChart) {
+            window.salesChart.destroy();
+        }
+
+        const options = {
+            chart: {
+                height: 290,
+                type: 'bar',
+                stacked: true,
+                toolbar: { show: false }
+            },
+            series: [
+                { name: 'Pending', data: [] },
+                { name: 'Approved', data: [] },
+                { name: 'Rejected', data: [] }
+            ],
+            xaxis: { categories: [] },
+            noData: { text: 'No data available' }
+        };
+
+        window.salesChart = new ApexCharts(document.querySelector("#sales-income"), options);
+        window.salesChart.render();
+    }
 
     // Dashboard Stats
     function loadDashboardStats(projectId = '') {
@@ -478,22 +518,216 @@ $(document).ready(function () {
             }
         });
     }
-    // Donor/Vendor Period
-    $(document).on('click', '.donor-vendor-period-option', function () {
-        const period = $(this).data('period');
-        const label = $(this).text();
-        $('#currentPeriodLabel').text(label).data('period', period);
-        loadDonorVendorProjects();
-    });
 
-    // Department Uploads Period
-    $(document).on('click', '.dept-upload-period-option', function () {
-        const period = $(this).data('period');
-        const label = $(this).text();
-        $('#currentDocTypePeriodLabel').text(label);
-        currentPeriod = period;
-        loadDepartmentUploads(currentProjectId, period, $('#uploadDepartment').val() || '');
-    });
+    // Load Donor/Vendor Projects with proper period handling
+    async function loadDonorVendorProjects() {
+        const donorId = $('#dashboardDonor').val() || '';
+        const vendorId = $('#dashboardVendor').val() || '';
+        const period = $('#currentDonorVendorPeriodLabel').data('period') || 'today';
+
+        console.log('Loading Donor/Vendor Projects:', { donorId, vendorId, period }); // Debug log
+
+        try {
+            const params = new URLSearchParams();
+            if (donorId) params.append('donorId', donorId);
+            if (vendorId) params.append('vendorId', vendorId);
+            if (period) params.append('period', period);
+
+            const response = await fetch(`/api/dashboard/donorVendorProjects?${params.toString()}`);
+            const result = await response.json();
+
+            console.log('API Response:', result); // Debug log
+
+            if (!result.success || !result.data) {
+                createEmptyDonorVendorChart();
+                return;
+            }
+
+            const data = result.data;
+
+            // Ensure we have valid data
+            if (!Array.isArray(data) || data.length === 0) {
+                createEmptyDonorVendorChart();
+                return;
+            }
+
+            const categories = data.map(item => item.projectType || 'Unknown Type');
+            const donorSeries = data.map(item => item.donorCount || 0);
+            const vendorSeries = data.map(item => item.vendorCount || 0);
+
+            // Destroy existing chart if it exists
+            if (window.donorVendorChart) {
+                window.donorVendorChart.destroy();
+            }
+
+            const options = {
+                series: [
+                    {
+                        name: "Donor",
+                        data: donorSeries,
+                        color: '#008FFB'
+                    },
+                    {
+                        name: "Vendor",
+                        data: vendorSeries,
+                        color: '#FF4560'
+                    }
+                ],
+                chart: {
+                    type: 'bar',
+                    height: 400,
+                    toolbar: { show: false }
+                },
+                plotOptions: {
+                    bar: {
+                        horizontal: false,
+                        columnWidth: '55%',
+                        borderRadius: 5,
+                        borderRadiusApplication: 'end'
+                    },
+                },
+                dataLabels: {
+                    enabled: false
+                },
+                stroke: {
+                    show: true,
+                    width: 2,
+                    colors: ['transparent']
+                },
+                xaxis: {
+                    categories: categories,
+                    labels: {
+                        style: {
+                            colors: '#6B7280',
+                            fontSize: '12px'
+                        }
+                    }
+                },
+                yaxis: {
+                    title: {
+                        text: "Number of Projects",
+                        style: {
+                            color: '#6B7280',
+                            fontSize: '12px'
+                        }
+                    },
+                    labels: {
+                        style: {
+                            colors: '#6B7280',
+                            fontSize: '11px'
+                        }
+                    }
+                },
+                fill: {
+                    opacity: 1
+                },
+                tooltip: {
+                    y: {
+                        formatter: function (val) {
+                            return val + " project" + (val !== 1 ? "s" : "");
+                        }
+                    }
+                },
+                legend: {
+                    position: 'top',
+                    horizontalAlign: 'right',
+                    fontSize: '12px',
+                    markers: {
+                        width: 12,
+                        height: 12,
+                        radius: 6
+                    }
+                },
+                grid: {
+                    borderColor: '#E5E7EB',
+                    strokeDashArray: 4,
+                    padding: {
+                        top: 0,
+                        right: 0,
+                        bottom: 0,
+                        left: 0
+                    }
+                }
+            };
+
+            const chartEl = document.querySelector("#donorvendorprojects");
+            chartEl.innerHTML = ''; // Clear previous content
+
+            window.donorVendorChart = new ApexCharts(chartEl, options);
+            window.donorVendorChart.render();
+
+        } catch (error) {
+            console.error('Error loading donor/vendor projects:', error);
+            createEmptyDonorVendorChart();
+        }
+    }
+
+    // Create empty state for chart
+    function createEmptyDonorVendorChart() {
+        const chartEl = document.querySelector("#donorvendorprojects");
+
+        // Destroy existing chart if it exists
+        if (window.donorVendorChart) {
+            window.donorVendorChart.destroy();
+        }
+
+        // Create empty chart with message
+        const options = {
+            series: [{
+                name: "No Data",
+                data: []
+            }],
+            chart: {
+                type: 'bar',
+                height: 400,
+                toolbar: { show: false }
+            },
+            xaxis: {
+                categories: []
+            },
+            noData: {
+                text: 'No data available',
+                align: 'center',
+                verticalAlign: 'middle',
+                style: {
+                    color: '#6B7280',
+                    fontSize: '14px'
+                }
+            }
+        };
+
+        window.donorVendorChart = new ApexCharts(chartEl, options);
+        window.donorVendorChart.render();
+    }
+
+    // Pre-populate Donor and Vendor dropdowns on page load
+    async function preloadDonorVendorOptions() {
+        try {
+            // Preload donors
+            const donorResponse = await fetch('/api/user/search?profile_type=donor&limit=50');
+            const donorData = await donorResponse.json();
+
+            if (donorData.users && donorData.users.length > 0) {
+                $('#dashboardDonor').empty().append('<option value="">-- Select Donor Name --</option>');
+                donorData.users.forEach(donor => {
+                    $('#dashboardDonor').append(new Option(donor.name, donor._id));
+                });
+            }
+
+            // Preload vendors
+            const vendorResponse = await fetch('/api/user/search?profile_type=vendor&limit=50');
+            const vendorData = await vendorResponse.json();
+
+            if (vendorData.users && vendorData.users.length > 0) {
+                $('#dashboardVendor').empty().append('<option value="">-- Select Vendor Name --</option>');
+                vendorData.users.forEach(vendor => {
+                    $('#dashboardVendor').append(new Option(vendor.name, vendor._id));
+                });
+            }
+        } catch (error) {
+            console.error('Error preloading donor/vendor options:', error);
+        }
+    }
     // Recent Documents Table
     async function loadDocumentsFiltered(projectId = '', departmentId = '', sortBy = 'updatedAt') {
         try {
@@ -690,14 +924,15 @@ $(document).ready(function () {
             },
             error: () => createEmptyChart(chartCanvas, 'department')
         });
+
         function updateDepartmentChartCenterText(departments) {
             const centerElement = document.querySelector('#department').closest('.chartjs-wrapper-demo').querySelector('.attendance-canvas');
             if (centerElement && departments.length > 0) {
                 const topDepartment = departments[0];
                 centerElement.innerHTML = `
-            <p class="fs-13 mb-1">${topDepartment.departmentName}</p>
-            <h3>${topDepartment.percentage}%</h3>
-        `;
+                    <p class="fs-13 mb-1">${topDepartment.departmentName}</p>
+                    <h3>${topDepartment.percentage}%</h3>
+                `;
             }
         }
     }
@@ -784,15 +1019,15 @@ $(document).ready(function () {
             error: () => createEmptyChart(chartCanvas, 'documentUploads')
         });
     }
+
     function updateDocumentTypeChartCenterText(fileTypes) {
         const centerElement = document.querySelector('#documentUploads').closest('.chartjs-wrapper-demo').querySelector('.attendance-canvas');
         if (centerElement && fileTypes.length > 0) {
-            // Show top file type by percentage
             const topFileType = fileTypes.sort((a, b) => b.percentage - a.percentage)[0];
             centerElement.innerHTML = `
-            <p class="fs-13 mb-1">${topFileType.type}</p>
-            <h3>${topFileType.percentage}%</h3>
-        `;
+                <p class="fs-13 mb-1">${topFileType.type}</p>
+                <h3>${topFileType.percentage}%</h3>
+            `;
         }
     }
 
@@ -808,13 +1043,50 @@ $(document).ready(function () {
         if (center) center.innerHTML = `<p class="fs-13 mb-1 text-muted">No Data</p><h3>0%</h3>`;
     }
 
-    // Period Dropdown Handlers
-    $(document).on('click', '.period-option', function () {
+    // Event Handlers for Period Dropdowns
+    $(document).on('click', '.donor-vendor-period-option', function () {
         const period = $(this).data('period');
+        const label = $(this).text();
+
+        console.log('Period changed to:', period); // Debug log
+
+        // Update label and store period in data attribute
+        $('#currentDonorVendorPeriodLabel')
+            .text(label)
+            .data('period', period);
+
+        // Reload chart with new period
+        loadDonorVendorProjects();
+    });
+
+    // Initialize Donor/Vendor section
+    function initializeDonorVendorSection() {
+        // Initialize Select2 dropdowns
+        initializeDonorSelect2();
+        initializeVendorSelect2();
+
+        // Preload options
+        preloadDonorVendorOptions();
+
+        // Set initial period
+        $('#currentDonorVendorPeriodLabel').data('period', 'today');
+
+        // Load initial chart
+        loadDonorVendorProjects();
+    }
+    $(document).on('click', '.dept-upload-period-option', function () {
+        const period = $(this).data('period');
+        const label = $(this).text();
+        $('#currentDeptUploadPeriodLabel').text(label);
+        loadDepartmentUploads(currentProjectId, period, $('#uploadDepartment').val() || '');
+    });
+
+    $(document).on('click', '.doc-type-period-option', function () {
+        const period = $(this).data('period');
+        const label = $(this).text();
         currentPeriod = period;
-        $('#currentPeriodLabel').text($(this).text());
-        loadDepartmentUploads(currentProjectId, period);
-        loadDepartmentDocumentUploads(currentPeriod, currentPeriod)
+        $('#currentDocTypePeriodLabel').text(label);
+        loadDepartmentDocumentUploads(currentProjectId, period, $('#uploadDepartment').val() || '');
     });
 
     $(document).on('click', '.period-option-type', function () {
@@ -823,15 +1095,17 @@ $(document).ready(function () {
         typeUploadsperiod = period;
         $('#typePeriodLabel').text(label);
         loadDocumentTypeUploads(currentProjectId, period);
-        loadDepartmentDocumentUploads(currentPeriod, currentPeriod)
     });
 
     // Initialize Dashboard
     async function initializeDashboard() {
+        if (isInitialized) return;
+        isInitialized = true;
+
         initializeHeaderProjectSelect();
         initializeRecentActivityDepartment();
         initializeUploadDepartment();
-
+        initializeDonorVendorSection();
         await loadCurrentProject();
 
         loadDashboardStats(currentProjectId);
@@ -844,7 +1118,29 @@ $(document).ready(function () {
 
         loadDepartmentUploads(currentProjectId, currentPeriod);
         loadDocumentTypeUploads(currentProjectId, typeUploadsperiod);
-        loadDepartmentDocumentUploads(currentPeriod, currentPeriod)
+        loadDepartmentDocumentUploads(currentProjectId, currentPeriod);
+        loadDonorVendorProjects();
+
+        // Dashboard card click handlers
+        const dashboardCards = document.querySelectorAll('.dashboard-card');
+        dashboardCards.forEach(card => {
+            card.style.cursor = 'pointer';
+            card.addEventListener('click', function () {
+                const status = this.getAttribute('data-status');
+                redirectToDocumentsWithStatus(status);
+            });
+        });
+    }
+
+    function redirectToDocumentsWithStatus(status) {
+        const baseUrl = window.location.origin;
+        let url = `${baseUrl}/documents/list`;
+
+        if (status && status !== 'all') {
+            url += `?status=${encodeURIComponent(status)}`;
+        }
+
+        window.location.href = url;
     }
 
     // Start

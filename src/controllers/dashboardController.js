@@ -958,10 +958,11 @@ export const getAnalyticsStats = async (req, res) => {
 
 export const getDepartmentFileUsage = async (req, res) => {
     try {
+        const user = req.user; // Assuming you have user info from auth middleware
+
         // Get all active departments
         const departments = await Department.find({ status: "Active" }).sort({ priority: 1 });
 
-        // Initialize base structure
         const departmentNames = departments.map(dep => dep.name);
 
         const fileTypeCounts = {
@@ -972,8 +973,16 @@ export const getDepartmentFileUsage = async (req, res) => {
             Media: Array(departmentNames.length).fill(0)
         };
 
-        // Fetch all active files with department references
-        const files = await File.find({ status: "active" }).populate("departmentId", "name");
+        // Build file query based on user type
+        let fileQuery = { status: "active" };
+
+        if (user.profile_type !== "superadmin") {
+            // Restrict to files uploaded by the logged-in user
+            fileQuery.uploadedBy = user._id;
+        }
+
+        // Fetch files with department references
+        const files = await File.find(fileQuery).populate("departmentId", "name");
 
         // Count by department and file type
         files.forEach(file => {
@@ -1001,6 +1010,7 @@ export const getDepartmentFileUsage = async (req, res) => {
                 { name: "Media", data: fileTypeCounts.Media }
             ]
         });
+
     } catch (err) {
         console.error("Error fetching file usage:", err);
         res.status(500).json({ message: "Server Error", error: err.message });
