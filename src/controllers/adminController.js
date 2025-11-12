@@ -10,6 +10,7 @@ import { sendEmail } from "../services/emailService.js";
 import path from "path";
 import ejs from "ejs";
 import { API_CONFIG } from "../config/ApiEndpoints.js";
+import { generateEmailTemplate } from "../helper/emailTemplate.js";
 
 //Page controllers
 
@@ -413,17 +414,20 @@ export const grantAccess = async (req, res) => {
 
         // Email Notification
         if (!isExternal && userEmail) {
-            const templatePath = path.join(process.cwd(), "views", "emails", "accessGrantedCustom.ejs");
-
-            const html = await ejs.renderFile(templatePath, {
+            // Prepare dynamic data for the template
+            const data = {
                 userName: internalUser?.name || userEmail,
                 fileName: doc.metadata?.fileName || "Untitled Document",
                 duration,
                 expiresAt: expiresAt ? expiresAt.toLocaleString() : "N/A",
                 ownerName: doc.owner?.name || "Document Owner",
-                accessUrl // include in email template
-            });
+                accessUrl
+            };
 
+            // Generate HTML using your central email generator
+            const html = generateEmailTemplate('accessGranted', data);
+
+            // Send the email
             await sendEmail({
                 to: userEmail,
                 subject: "Access Granted",
@@ -431,7 +435,6 @@ export const grantAccess = async (req, res) => {
                 fromName: "Support Team",
             });
         }
-
         return res.status(200).json({
             message: `Access granted to ${loggedUser?.username || userEmail}`,
             expiresAt,

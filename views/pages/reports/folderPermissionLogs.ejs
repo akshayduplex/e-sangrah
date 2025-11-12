@@ -178,7 +178,11 @@
                        Grant Access (PATCH)
                        ============================ */
                     $("#grantBtn").on("click", async function () {
-                        const logId = $(this).data("log-id");
+                        const btn = $(this);
+                        const spinner = btn.find(".spinner-border");
+                        const btnText = btn.find(".btn-text");
+
+                        const logId = btn.data("log-id");
 
                         const payload = {
                             requestStatus: "approved",
@@ -187,6 +191,10 @@
                         };
 
                         try {
+                            // Show spinner and disable button
+                            spinner.removeClass("d-none");
+                            btn.prop("disabled", true);
+
                             const res = await fetch(`/api/folders/permissions/${logId}`, {
                                 method: "PATCH",
                                 headers: { "Content-Type": "application/json" },
@@ -200,31 +208,71 @@
                             showToast(data.message || "Access Granted", "success");
                         } catch {
                             showToast("Approval Failed", "danger");
+                        } finally {
+                            // Hide spinner and enable button
+                            spinner.addClass("d-none");
+                            btnText.text("Grant Access");
+                            btn.prop("disabled", false);
                         }
                     });
-
 
                     /* ==================================
                        Reject Access Request (PATCH)
                        ================================== */
-                    $(document).on("click", ".reject-btn", async function (e) {
+                    $(document).on("click", ".reject-btn", function (e) {
                         e.preventDefault();
-                        const logId = $(this).data("id");
+                        selectedLogId = $(this).data("id");
+
+                        // Update modal content dynamically
+                        $("#trashdocLabel").html('<img src="/img/icons/bin.png"><br>Reject Access Request');
+                        $("#trashdoc-modal .modal-body").text("Are you sure you want to reject this access request?");
+                        $("#confirm-trash-folder").text("Yes, Reject").removeClass("btn-light").addClass("btn-primary");
+
+                        // Reset button state
+                        const btn = $("#confirm-trash-folder");
+                        btn.prop("disabled", false);
+                        if (!btn.find(".spinner-border").length) {
+                            btn.append('<span class="spinner-border spinner-border-sm ms-2 d-none" role="status" aria-hidden="true"></span>');
+                        }
+                        btn.find(".spinner-border").addClass("d-none");
+
+                        // Show modal
+                        const modal = new bootstrap.Modal(document.getElementById("trashdoc-modal"));
+                        modal.show();
+                    });
+
+                    /* ============================
+                       Confirm Reject with Spinner
+                       ============================ */
+                    $("#confirm-trash-folder").on("click", async function () {
+                        if (!selectedLogId) return;
+
+                        const btn = $(this);
+                        const spinner = btn.find(".spinner-border");
+
+                        // Show spinner and disable button
+                        spinner.removeClass("d-none");
+                        btn.prop("disabled", true);
 
                         try {
-                            const res = await fetch(`/api/folders/permissions/${logId}`, {
+                            const res = await fetch(`/api/folders/permissions/${selectedLogId}`, {
                                 method: "PATCH",
                                 headers: { "Content-Type": "application/json" },
                                 body: JSON.stringify({ requestStatus: "rejected" })
                             });
                             const data = await res.json();
 
-                            table.ajax.reload();
-                            showToast(data.message || "Rejected Successfully", "warning");
+                            // Hide modal and reload table
+                            bootstrap.Modal.getInstance(document.getElementById("trashdoc-modal")).hide();
+                            $('#folderPermissionLogsTable').DataTable().ajax.reload();
+
+                            showToast(data.message || "Rejected Successfully", "success");
                         } catch {
                             showToast("Failed to reject request", "danger");
+                        } finally {
+                            spinner.addClass("d-none");
+                            btn.prop("disabled", false);
                         }
                     });
-
                 });
             </script>

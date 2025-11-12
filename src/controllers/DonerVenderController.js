@@ -169,14 +169,14 @@ export const registerDonorVendor = async (req, res, next) => {
 
         await newUser.save();
         // Prepare HTML email content
-        const templatePath = path.join(process.cwd(), "views", "emails", "welcomeTemplate.ejs");
-
-        const htmlContent = await ejs.renderFile(templatePath, {
+        const data = {
             name: user_name,
             email: email_id,
             password: randomPassword,
             BASE_URL: API_CONFIG.baseUrl
-        });
+        }
+        // Generate HTML using your central email generator
+        const html = generateEmailTemplate('registeration', data);
 
         await sendEmail({
             to: email_id,
@@ -309,20 +309,19 @@ export const registerVendor = async (req, res, next) => {
                 services_offered: servicesArrayCreate,
             }
         });
-        // Prepare HTML email content
-        const templatePath = path.join(process.cwd(), "views", "emails", "welcomeTemplate.ejs");
-
-        const htmlContent = await ejs.renderFile(templatePath, {
+        const data = {
             name: vendor_name,
             email: vendor_email,
             password: randomPassword,
             BASE_URL: API_CONFIG.baseUrl
-        });
+        }
+        // Generate HTML using your central email generator
+        const html = generateEmailTemplate('registeration', data);
 
         await sendEmail({
             to: vendor_email,
             subject: "Welcome to E-Sangrah",
-            html: htmlContent,
+            html,
             fromName: "E-Sangrah Team",
         });
 

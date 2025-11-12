@@ -21,6 +21,7 @@ import { calculateExpiration } from '../helper/CalculateExpireDate.js';
 import Project from '../models/Project.js';
 import Department from '../models/Departments.js';
 import { getSessionFilters } from '../helper/sessionHelpers.js';
+import { generateEmailTemplate } from '../helper/emailTemplate.js';
 
 //Page controlers
 
@@ -1265,22 +1266,7 @@ export const shareFolder = async (req, res) => {
 
         await folder.save();
 
-        const templatePath = path.join(
-            process.cwd(),
-            "views",
-            "emails",
-            "folderShared.ejs"
-        );
-
-        // Render the EJS template
-        const html = await ejs.renderFile(templatePath, {
-            userName: user.name || "there",
-            senderName: req.user?.name || "Someone",
-            folderName: folder.name,
-            access: access || "Full Access",
-            folderLink: shareLink,
-            expiresAt,
-        });
+        const html = generateEmailTemplate("folderShared", data)
 
         // Send the email
         await sendEmail({
@@ -1462,13 +1448,15 @@ export const updateFolderLogPermission = async (req, res) => {
             await log.save();
 
             // send rejection email
-            const rejectTemplate = path.join(process.cwd(), "views", "emails", "folderAccessRejected.ejs");
-            const htmlContent = await ejs.renderFile(rejectTemplate, { userName, folderName });
-
+            const data = {
+                userName,
+                folderName
+            }
+            const html = generateEmailTemplate("folderAccessRejected", data)
             await sendEmail({
                 to: userEmail,
                 subject: `Folder Access Rejected: ${folderName}`,
-                html: htmlContent,
+                html,
                 fromName: "E-Sangrah Team",
             });
 
@@ -1511,20 +1499,19 @@ export const updateFolderLogPermission = async (req, res) => {
         await log.save();
 
         // send approval email
-        const approveTemplate = path.join(process.cwd(), "views", "emails", "folderAccessApproved.ejs");
         const folderLink = `${API_CONFIG.baseUrl}/folders/${access}er/${folder._id}`;
-        const htmlContent = await ejs.renderFile(approveTemplate, {
+        const data = {
             userName,
             folderName,
             access,
             expiresAt,
             folderLink,
-        });
-
+        }
+        const html = generateEmailTemplate('folderAccessApproved', data)
         await sendEmail({
             to: userEmail,
             subject: `Folder Access Approved: ${folderName}`,
-            html: htmlContent,
+            html,
             fromName: "E-Sangrah Team",
         });
 
@@ -1704,14 +1691,12 @@ export const requestFolderAccess = async (req, res) => {
         if (!isInternal) {
             const baseUrl = API_CONFIG.baseUrl || "http://localhost:5000";
             const manageLink = `${baseUrl}/admin/folders/permission`;
-
-            const templatePath = path.join(process.cwd(), "views", "emails", "folderAccessRequest.ejs");
-            const htmlContent = await ejs.renderFile(templatePath, {
+            const data = {
                 user,
                 folder,
                 manageLink,
-            });
-
+            }
+            const htmlContent = generateEmailTemplate("folderAccessRequest", data)
             await sendEmail({
                 to: owner.email,
                 subject: `Access Request for Folder: ${folder.name}`,
@@ -1796,24 +1781,15 @@ export const grantFolderAccess = async (req, res) => {
             },
             { new: true }
         );
-
-        // Define EJS template path
-        const templatePath = path.join(
-            process.cwd(),
-            "views",
-            "emails",
-            "folderAccessApproved.ejs"
-        );
-
-        // Render the EJS template
-        const html = await ejs.renderFile(templatePath, {
+        const data = {
             userName: user.name || "User",
             folderName: folder.name,
             access: duration || "Full Access",
             expiresAt,
             folderLink: `${API_CONFIG.baseUrl}/${access}er/${folder._id}`,
             approvedByName: owner.name || "Unknown"
-        });
+        }
+        const html = generateEmailTemplate("folderAccessApproved", data)
 
         // Send the email
         await sendEmail({

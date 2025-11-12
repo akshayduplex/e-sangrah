@@ -28,7 +28,7 @@ $(document).ready(function () {
 
     function initializeDonorSelect2() {
         $('#dashboardDonor').select2({
-            placeholder: '-- Select Donor Name --',
+            placeholder: ' Select Donor Name ',
             allowClear: true,
             width: '180px',
             ajax: {
@@ -70,7 +70,7 @@ $(document).ready(function () {
     // Initialize Vendor Select2 with proper configuration
     function initializeVendorSelect2() {
         $('#dashboardVendor').select2({
-            placeholder: '-- Select Vendor Name --',
+            placeholder: ' Select Vendor Name ',
             allowClear: true,
             width: '180px',
             ajax: {
@@ -206,9 +206,9 @@ $(document).ready(function () {
     // Initialize Recent Activity Department
     function initializeRecentActivityDepartment() {
         $("#recentActivityDepartment").select2({
-            placeholder: "-- Select Department --",
+            placeholder: "Select Department",
             allowClear: true,
-            width: '100%',
+            // width: '200px',
             ajax: {
                 url: '/api/departments/search',
                 dataType: 'json',
@@ -345,9 +345,9 @@ $(document).ready(function () {
     // Upload Department Select
     function initializeUploadDepartment() {
         $("#uploadDepartment").select2({
-            placeholder: "-- All Departments --",
+            placeholder: "Select Departments",
             allowClear: true,
-            width: '100%',
+            width: '200px',
             ajax: {
                 url: '/api/departments/search',
                 dataType: 'json',
@@ -370,7 +370,8 @@ $(document).ready(function () {
 
         $("#uploadDepartment").on('change', function () {
             const departmentId = $(this).val() || '';
-            loadDepartmentUploads(currentProjectId, currentPeriod, departmentId);
+            // Refresh the stacked bar chart for department document uploads
+            loadDepartmentDocumentUploads(currentProjectId, currentPeriod, departmentId);
         });
     }
 
@@ -525,7 +526,7 @@ $(document).ready(function () {
         const vendorId = $('#dashboardVendor').val() || '';
         const period = $('#currentDonorVendorPeriodLabel').data('period') || 'today';
 
-        console.log('Loading Donor/Vendor Projects:', { donorId, vendorId, period }); // Debug log
+        console.log('Loading Donor/Vendor Projects:', { donorId, vendorId, period });
 
         try {
             const params = new URLSearchParams();
@@ -536,122 +537,65 @@ $(document).ready(function () {
             const response = await fetch(`/api/dashboard/donorVendorProjects?${params.toString()}`);
             const result = await response.json();
 
-            console.log('API Response:', result); // Debug log
-
-            if (!result.success || !result.data) {
+            if (!result.success || !Array.isArray(result.data) || result.data.length === 0) {
                 createEmptyDonorVendorChart();
                 return;
             }
 
             const data = result.data;
 
-            // Ensure we have valid data
-            if (!Array.isArray(data) || data.length === 0) {
-                createEmptyDonorVendorChart();
-                return;
-            }
-
             const categories = data.map(item => item.projectType || 'Unknown Type');
-            const donorSeries = data.map(item => item.donorCount || 0);
-            const vendorSeries = data.map(item => item.vendorCount || 0);
 
-            // Destroy existing chart if it exists
+            // If both donorCount and vendorCount are 0, set to null (no bar)
+            const donorSeries = data.map(item => {
+                return (item.donorCount || item.vendorCount) === 0 ? null : (item.donorCount ?? 0);
+            });
+
+            const vendorSeries = data.map(item => {
+                return (item.donorCount || item.vendorCount) === 0 ? null : (item.vendorCount ?? 0);
+            });
+
+            console.log({ categories, donorSeries, vendorSeries });
+
             if (window.donorVendorChart) {
                 window.donorVendorChart.destroy();
             }
 
             const options = {
                 series: [
-                    {
-                        name: "Donor",
-                        data: donorSeries,
-                        color: '#008FFB'
-                    },
-                    {
-                        name: "Vendor",
-                        data: vendorSeries,
-                        color: '#FF4560'
-                    }
+                    { name: "Donor", data: donorSeries, color: '#008FFB' },
+                    { name: "Vendor", data: vendorSeries, color: '#FF4560' }
                 ],
-                chart: {
-                    type: 'bar',
-                    height: 400,
-                    toolbar: { show: false }
-                },
+                chart: { type: 'bar', height: 400, toolbar: { show: false } },
                 plotOptions: {
-                    bar: {
-                        horizontal: false,
-                        columnWidth: '55%',
-                        borderRadius: 5,
-                        borderRadiusApplication: 'end'
-                    },
+                    bar: { horizontal: false, columnWidth: '55%', borderRadius: 5, borderRadiusApplication: 'end' },
                 },
-                dataLabels: {
-                    enabled: false
-                },
-                stroke: {
-                    show: true,
-                    width: 2,
-                    colors: ['transparent']
-                },
-                xaxis: {
-                    categories: categories,
-                    labels: {
-                        style: {
-                            colors: '#6B7280',
-                            fontSize: '12px'
-                        }
-                    }
-                },
+                dataLabels: { enabled: false },
+                stroke: { show: true, width: 2, colors: ['transparent'] },
+                xaxis: { categories, labels: { style: { colors: '#6B7280', fontSize: '12px' } } },
                 yaxis: {
-                    title: {
-                        text: "Number of Projects",
-                        style: {
-                            color: '#6B7280',
-                            fontSize: '12px'
-                        }
-                    },
-                    labels: {
-                        style: {
-                            colors: '#6B7280',
-                            fontSize: '11px'
-                        }
-                    }
+                    title: { text: "Number of Projects", style: { color: '#6B7280', fontSize: '12px' } },
+                    labels: { style: { colors: '#6B7280', fontSize: '11px' } }
                 },
-                fill: {
-                    opacity: 1
-                },
-                tooltip: {
-                    y: {
-                        formatter: function (val) {
-                            return val + " project" + (val !== 1 ? "s" : "");
-                        }
-                    }
-                },
+                fill: { opacity: 1 },
+                // tooltip: { y: { formatter: val => val !== null ? `${val} project${val !== 1 ? 's' : ''}` : '0 projects' } },
                 legend: {
                     position: 'top',
                     horizontalAlign: 'right',
                     fontSize: '12px',
-                    markers: {
-                        width: 12,
-                        height: 12,
-                        radius: 6
-                    }
+                    markers: { width: 12, height: 12, radius: 6 }
                 },
-                grid: {
-                    borderColor: '#E5E7EB',
-                    strokeDashArray: 4,
-                    padding: {
-                        top: 0,
-                        right: 0,
-                        bottom: 0,
-                        left: 0
-                    }
+                grid: { borderColor: '#E5E7EB', strokeDashArray: 4, padding: { top: 0, right: 0, bottom: 0, left: 0 } },
+                noData: {
+                    text: 'No data available',
+                    align: 'center',
+                    verticalAlign: 'middle',
+                    style: { color: '#6B7280', fontSize: '14px' }
                 }
             };
 
             const chartEl = document.querySelector("#donorvendorprojects");
-            chartEl.innerHTML = ''; // Clear previous content
+            chartEl.innerHTML = '';
 
             window.donorVendorChart = new ApexCharts(chartEl, options);
             window.donorVendorChart.render();
@@ -661,6 +605,7 @@ $(document).ready(function () {
             createEmptyDonorVendorChart();
         }
     }
+
 
     // Create empty state for chart
     function createEmptyDonorVendorChart() {
@@ -704,22 +649,22 @@ $(document).ready(function () {
     async function preloadDonorVendorOptions() {
         try {
             // Preload donors
-            const donorResponse = await fetch('/api/user/search?profile_type=donor&limit=50');
+            const donorResponse = await fetch('/api/user/search?profile_type=donor');
             const donorData = await donorResponse.json();
 
             if (donorData.users && donorData.users.length > 0) {
-                $('#dashboardDonor').empty().append('<option value="">-- Select Donor Name --</option>');
+                $('#dashboardDonor').empty().append('<option value=""> Select Donor Name </option>');
                 donorData.users.forEach(donor => {
                     $('#dashboardDonor').append(new Option(donor.name, donor._id));
                 });
             }
 
             // Preload vendors
-            const vendorResponse = await fetch('/api/user/search?profile_type=vendor&limit=50');
+            const vendorResponse = await fetch('/api/user/search?profile_type=vendor');
             const vendorData = await vendorResponse.json();
 
             if (vendorData.users && vendorData.users.length > 0) {
-                $('#dashboardVendor').empty().append('<option value="">-- Select Vendor Name --</option>');
+                $('#dashboardVendor').empty().append('<option value=""> Select Vendor Name </option>');
                 vendorData.users.forEach(vendor => {
                     $('#dashboardVendor').append(new Option(vendor.name, vendor._id));
                 });
@@ -1118,7 +1063,7 @@ $(document).ready(function () {
 
         loadDepartmentUploads(currentProjectId, currentPeriod);
         loadDocumentTypeUploads(currentProjectId, typeUploadsperiod);
-        loadDepartmentDocumentUploads(currentProjectId, currentPeriod);
+        loadDepartmentDocumentUploads(currentProjectId, currentPeriod, departmentId);
         loadDonorVendorProjects();
 
         // Dashboard card click handlers

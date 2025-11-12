@@ -14,7 +14,7 @@ import { sendEmail } from "../services/emailService.js";
 import logger from "../utils/logger.js";
 import { API_CONFIG } from "../config/ApiEndpoints.js";
 import UserToken from "../models/UserToken.js";
-
+import { generateEmailTemplate } from "../helper/emailTemplate.js";
 const otpStore = {};
 
 // ---------------------------
@@ -158,17 +158,21 @@ export const login = async (req, res) => {
         // No valid token -> generate OTP
         const otp = Math.floor(1000 + Math.random() * 9000).toString(); // 4-digit OTP
 
-        // Save OTP and expiry to user
+        // Generate OTP and save
         user.otp = otp;
         user.otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
         await user.save();
-        const templatePath = path.join(process.cwd(), "views", "emails", "otpEmail.ejs");
-        const html = await ejs.renderFile(templatePath, {
+
+        // Prepare data for the email template
+        const data = {
             userName: user.name,
             otp,
-            minutes: 10,
+            expiryMinutes: 10,
             BASE_URL: API_CONFIG.baseUrl
-        });
+        };
+
+        // Generate email HTML using your central template function
+        const html = generateEmailTemplate('otp', data);
 
         // Send OTP email
         await sendEmail({
@@ -297,23 +301,28 @@ export const sendOtp = async (req, res) => {
         const user = await User.findOne({ email });
         if (!user) return failResponse(res, "User not found", 404);
 
+        // Generate a 4-digit OTP
         const otp = Math.floor(1000 + Math.random() * 9000).toString();
-        otpStore[email] = { code: otp, expires: Date.now() + 10 * 60 * 1000 };
 
-        const transporter = nodemailer.createTransport({
-            service: "gmail",
-            auth: {
-                user: process.env.EMAIL_USER,
-                pass: process.env.EMAIL_PASSWORD,
-            },
-        });
+        // Store OTP temporarily
+        otpStore[email] = { code: otp, expires: Date.now() + 10 * 60 * 1000 }; // expires in 10 min
 
-        const htmlContent = getOtpEmailHtml(user.name, otp);
+        // Prepare template data
+        const data = {
+            userName: user.name || "User",
+            otp,
+            expiryMinutes: 10,
+            BASE_URL: API_CONFIG.baseUrl
+        };
 
+        // Generate HTML using your template system
+        const html = generateEmailTemplate('passwordReset', data);
+
+        // Send OTP email
         await sendEmail({
             to: email,
             subject: "Your OTP for Password Reset",
-            html: htmlContent,
+            html,
             fromName: "DMS Support Team",
         });
 
@@ -376,7 +385,7 @@ export const sendResetLink = async (req, res) => {
     try {
         const { email, password, confirmPassword } = req.body;
 
-        // Validate inputs
+        // --- Input Validation ---
         if (!email || !password || !confirmPassword) {
             return failResponse(res, "All fields are required", 400);
         }
@@ -385,24 +394,25 @@ export const sendResetLink = async (req, res) => {
             return failResponse(res, "Passwords do not match", 400);
         }
 
+        // --- Find User ---
         const user = await User.findOne({ email });
         if (!user) return failResponse(res, "User not found", 404);
 
-        // Generate secure token
+        // --- Generate Secure Token ---
         const token = crypto.randomBytes(32).toString("hex");
         const tokenExpiry = Date.now() + 15 * 60 * 1000; // 15 minutes
 
-        // Store token and new password (for demo; use DB or Redis in prod)
+        // --- Store Token + New Password Temporarily ---
         otpStore[email] = {
             resetToken: token,
             newPassword: password,
-            expires: tokenExpiry
+            expires: tokenExpiry,
         };
 
         user.passwordVerification = "pending";
         await user.save();
 
-        // Destroy session (wrapped in promise)
+        // --- Destroy Session ---
         await new Promise((resolve) => {
             req.session.destroy((err) => {
                 if (err) logger.error("Session destroy error:", err);
@@ -417,25 +427,33 @@ export const sendResetLink = async (req, res) => {
             });
         });
 
-        // Send reset link
-        const resetLink = `${API_CONFIG.baseUrl || 'http://localhost:5000'}/api/auth/verify-reset/${token}?email=${encodeURIComponent(email)}`;
+        // --- Construct Reset Link ---
+        const baseUrl = API_CONFIG.baseUrl || "http://localhost:5000";
+        const resetLink = `${baseUrl}/api/auth/verify-reset/${token}?email=${encodeURIComponent(email)}`;
 
-        // Email HTML content
-        const htmlContent = `
-            <p>You have requested to change your password. Click the link below to verify this change:</p>
-            <a href="${resetLink}">${resetLink}</a>
-            <p>This link will expire in 15 minutes.</p>
-            <p>If you didn't request this change, please ignore this email.</p>
-        `;
+        // --- Prepare Email Template Data ---
+        const data = {
+            name: user.name || "User",
+            resetLink,
+        };
 
+        // --- Generate Email HTML ---
+        const html = generateEmailTemplate("passwordVerify", data);
 
+        // --- Send Email ---
         await sendEmail({
             to: email,
             subject: "Verify Password Change",
-            html: htmlContent,
-            fromName: "Your App",
+            html,
+            fromName: "Support Team",
         });
-        return successResponse(res, {}, "Verification link sent to your email. Please check your email to complete the process.");
+
+        // --- Success Response ---
+        return successResponse(
+            res,
+            {},
+            "Verification link sent to your email. Please check your inbox to complete the process."
+        );
 
     } catch (err) {
         logger.error("Send reset link error:", err);

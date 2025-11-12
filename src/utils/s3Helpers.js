@@ -85,3 +85,43 @@ export const getObjectUrl = async (key, expiresIn = 3600) => {
         throw error;
     }
 };
+
+/**
+ * Get total bucket storage size in bytes, MB, and GB
+ */
+export const getBucketStorage = async () => {
+    try {
+        let continuationToken;
+        let totalSize = 0;
+        let totalObjects = 0;
+
+        do {
+            const params = {
+                Bucket: process.env.AWS_BUCKET,
+                ContinuationToken: continuationToken,
+            };
+
+            const command = new ListObjectsV2Command(params);
+            const response = await s3Client.send(command);
+
+            if (response.Contents) {
+                for (const item of response.Contents) {
+                    totalSize += item.Size;
+                    totalObjects += 1;
+                }
+            }
+
+            continuationToken = response.IsTruncated ? response.NextContinuationToken : null;
+        } while (continuationToken);
+
+        return {
+            totalObjects,
+            totalSizeBytes: totalSize,
+            totalSizeMB: (totalSize / (1024 * 1024)).toFixed(2),
+            totalSizeGB: (totalSize / (1024 * 1024 * 1024)).toFixed(2)
+        };
+    } catch (error) {
+        console.error('Error fetching bucket storage:', error);
+        throw new Error(`Failed to get bucket storage: ${error.message}`);
+    }
+};

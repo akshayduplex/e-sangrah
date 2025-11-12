@@ -115,7 +115,7 @@
 
                 <!-- Pending -->
                 <div class="col-sm-6">
-                    <div class="anlytc_linkbx bgcream">
+                    <div class="anlytc_linkbx bgcream" data-status="Pending">
                         <a href="#">
                             <div class="w-100 dflexbtwn">
                                 <div class="tctlft">
@@ -130,7 +130,7 @@
 
                 <!-- Approved -->
                 <div class="col-sm-6">
-                    <div class="anlytc_linkbx bgltgreen">
+                    <div class="anlytc_linkbx bgltgreen" data-status="Approved">
                         <a href="#">
                             <div class="w-100 dflexbtwn">
                                 <div class="tctlft">
@@ -145,7 +145,7 @@
 
                 <!-- Rejected -->
                 <div class="col-sm-6">
-                    <div class="anlytc_linkbx bgltred">
+                    <div class="anlytc_linkbx bgltred" data-status="Rejected">
                         <a href="#">
                             <div class="w-100 dflexbtwn">
                                 <div class="tctlft">
@@ -331,6 +331,31 @@
             }],
             credits: false
         });
+    </script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const statusCards = document.querySelectorAll('.anlytc_linkbx[data-status]');
+
+            statusCards.forEach(card => {
+                card.style.cursor = 'pointer';
+                card.addEventListener('click', function (e) {
+                    e.preventDefault(); // Prevent default <a> navigation
+                    const status = this.getAttribute('data-status');
+                    redirectToDocumentsWithStatus(status);
+                });
+            });
+        });
+
+        function redirectToDocumentsWithStatus(status) {
+            const baseUrl = window.location.origin;
+            let url = `${baseUrl}/documents/list`;
+
+            if (status && status !== 'all') {
+                url += `?status=${encodeURIComponent(status)}`;
+            }
+
+            window.location.href = url;
+        }
     </script>
 
     <script src="/js/pages/analytics/Analytics.js"></script>

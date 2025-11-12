@@ -92,3 +92,17 @@
 table.datatable {
     min-width: 800px;
 }
+
+/* for share document */
+/* Hide button text on devices smaller than 768px */
+@media (max-width: 767.98px) {
+    .btncopylink {
+        padding-left: 0.5rem;
+        /* optional, adjusts button padding */
+        padding-right: 0.5rem;
+    }
+
+    .btncopylink span {
+        display: none;
+    }
+}

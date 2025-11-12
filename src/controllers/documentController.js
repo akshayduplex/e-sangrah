@@ -25,6 +25,7 @@ import { addNotification } from "./NotificationController.js";
 import { PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { s3Client } from "../config/S3Client.js";
 import { deleteObject } from "../utils/s3Helpers.js";
+import { generateEmailTemplate } from "../helper/emailTemplate.js";
 
 //Page Controllers
 
@@ -299,7 +300,7 @@ export const getDocuments = async (req, res) => {
             search,
             status,
             department,
-            project, // query-level project filter (optional)
+            project,
             date,
             orderColumn,
             orderDir
@@ -329,17 +330,27 @@ export const getDocuments = async (req, res) => {
         };
 
         // --- Search ---
+        // --- Search ---
         if (search?.trim()) {
             const safeSearch = search.trim();
             filter.$and = filter.$and || [];
             filter.$and.push({
                 $or: [
+                    // Metadata fields
                     { "metadata.fileName": { $regex: safeSearch, $options: "i" } },
                     { "metadata.fileDescription": { $regex: safeSearch, $options: "i" } },
+                    { "metadata.mainHeading": { $regex: safeSearch, $options: "i" } },
+
+                    // Document-level fields
                     { description: { $regex: safeSearch, $options: "i" } },
+                    { remark: { $regex: safeSearch, $options: "i" } },
                     { tags: { $in: [new RegExp(safeSearch, "i")] } },
+
+                    // Files
                     { "files.originalName": { $regex: safeSearch, $options: "i" } },
-                    { remark: { $regex: safeSearch, $options: "i" } }
+
+                    // Project name (via populated field)
+                    { "project.projectName": { $regex: safeSearch, $options: "i" } }
                 ]
             });
         }
@@ -2329,22 +2340,21 @@ export const inviteUser = async (req, res) => {
 
         await Document.findByIdAndUpdate(documentId, { $addToSet: { sharedWithUsers: user._id } });
         const inviteLink = `${API_CONFIG.baseUrl}/api/documents/${documentId}/invite/${user._id}/auto-accept`;
-        const templatePath = path.join(process.cwd(), "views", "emails", "inviteUser.ejs");
-        // Render EJS template to HTML
-        const htmlContent = await ejs.renderFile(templatePath, {
+
+        const data = {
             fileName: doc.metadata?.fileName,
             name: user.name,
             accessLevel,
             expiresAt,
-            inviteLink,
-            BASE_URL: API_CONFIG.baseUrl
-        });
-
+            inviteLink
+        }
+        // Generate HTML using your central email generator
+        const html = generateEmailTemplate('documentInvitation', data);
         // Send the email
         await sendEmail({
             to: userEmail,
             subject: "Document Access Invitation - E-Sangrah",
-            html: htmlContent,
+            html,
             fromName: "E-Sangrah Team",
         });
         res.json({ success: true, message: "Invite sent successfully" });
@@ -2393,51 +2403,6 @@ export const autoAcceptInvite = async (req, res) => {
     }
 };
 
-/**
- * RE-REQUEST ACCESS
- * Allows a user to request new access after expiration.
- */
-// export const requestAccessAgain = async (req, res) => {
-//     try {
-//         const { documentId } = req.params;
-//         const userId = req.session.user?._id;
-//         if (!userId) return res.status(401).json({ success: false, message: "Not logged in" });
-
-//         const doc = await Document.findById(documentId).populate("owner", "email name");
-//         if (!doc) return res.status(404).json({ success: false, message: "Document not found" });
-
-//         const owner = doc.owner;
-//         if (!owner?.email) return res.status(400).json({ success: false, message: "Owner email not found" });
-
-//         // Create a JWT token for owner approval
-//         const token = jwt.sign({
-//             docId: documentId,
-//             userId,
-//             action: "approveAccess"
-//         }, process.env.JWT_SECRET || "supersecretkey", { expiresIn: "3d" });
-
-//         const baseUrl = process.env.APP_BASE_URL || "http://localhost:5000";
-//         const approvalLink = `${baseUrl}/documents/approve-access/${token}`;
-
-//         // Send email to owner
-//         await sendEmail({
-//             to: owner.email,
-//             subject: `Access Request for Document: ${doc.metadata?.fileName || 'Untitled'}`,
-//             html: `
-//                 <p>${req.session.user.name} (${req.session.user.email}) requested access to <strong>${doc.metadata?.fileName || 'your document'}</strong>.</p>
-//                 <p>Click below to approve and set access duration:</p>
-//                 <a href="${approvalLink}" style="padding:10px 20px;background:#007bff;color:#fff;text-decoration:none;border-radius:5px;">Approve Access</a>
-//             `
-//         });
-
-//         res.json({ success: true, message: `Request sent to ${owner.name || owner.email}` });
-
-//     } catch (err) {
-//         console.error(err);
-//         res.status(500).json({ success: false, message: "Server error: " + err.message });
-//     }
-// };
-
 export const requestAccessAgain = async (req, res) => {
     try {
         const { documentId } = req.params;
@@ -2485,20 +2450,20 @@ export const requestAccessAgain = async (req, res) => {
         const baseUrl = API_CONFIG.baseUrl || "http://localhost:5000";
         // const approvalLink = `${baseUrl}/documents/approve-access/${token}`;
         const approvalLink = `${baseUrl}/permissionslogs`;
-        const templatePath = path.join(process.cwd(), "views", "emails", "documentAccessRequest.ejs");
-
-        const htmlContent = await ejs.renderFile(templatePath, {
+        const data = {
             userName,
             email,
             user,
             doc,
-            approvalLink,
-        });
+            approvalLink
+        }
+        // Generate HTML using your central email generator
+        const html = generateEmailTemplate('documentAccessRequest', data);
 
         await sendEmail({
             to: owner.email,
             subject: `Access Request for Document: ${doc.metadata?.fileName || 'Untitled'}`,
-            html: htmlContent,
+            html,
             fromName: "E-Sangrah Team",
         });
 
@@ -2526,52 +2491,6 @@ export const requestAccessAgain = async (req, res) => {
         res.status(500).json({ success: false, message: "Server error: " + err.message });
     }
 };
-
-
-// export const grantAccessViaToken = async (req, res) => {
-//     try {
-//         const { token } = req.params;
-//         const { duration } = req.body;
-
-//         const decoded = jwt.verify(token, process.env.JWT_SECRET || "supersecretkey");
-//         const { docId, userId, action } = decoded;
-//         if (action !== "approveAccess") return res.status(403).send("Invalid action");
-
-//         const doc = await Document.findById(docId).populate("owner");
-//         if (!doc) return res.status(404).send("Document not found");
-
-//         // Calculate expiration
-//         const now = new Date();
-//         let expiresAt;
-//         switch (duration) {
-//             case "oneday": expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); break;
-//             case "oneweek": expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); break;
-//             case "onemonth": expiresAt = new Date(now); expiresAt.setMonth(expiresAt.getMonth() + 1); break;
-//             case "lifetime": expiresAt = new Date(now); expiresAt.setFullYear(expiresAt.getFullYear() + 50); break;
-//             default: expiresAt = null;
-//         }
-
-//         // Update or create SharedWith
-//         await SharedWith.findOneAndUpdate(
-//             { document: docId, user: userId },
-//             { accessLevel: "view", duration, expiresAt, generalAccess: true },
-//             { new: true, upsert: true }
-//         );
-
-//         // Notify user
-//         const user = await User.findById(userId);
-//         await sendEmail({
-//             to: user.email,
-//             subject: "Access Granted",
-//             html: `<p>Your access to "${doc.metadata?.fileName}" has been granted for ${duration}.</p>`
-//         });
-
-//         res.send(`<h2>Access granted to ${user.name}</h2><p>Email notification sent.</p>`);
-
-//     } catch (err) {
-//         res.send(`<h2>Error</h2><p>${err.message}</p>`);
-//     }
-// };
 
 export const grantAccessViaToken = async (req, res) => {
     try {
@@ -2630,14 +2549,14 @@ export const grantAccessViaToken = async (req, res) => {
 
         // Send EJS-based email notification for internal users
         if (!isExternal && user) {
-            const templatePath = path.join(process.cwd(), "views", "emails", "fileaccessGranted.ejs");
-            const html = await ejs.renderFile(templatePath, {
+            const data = {
                 name: user.name || userEmail,
                 fileName: doc.metadata?.fileName,
                 duration,
                 ownerName: doc.owner?.name || "Document Owner"
-            });
-
+            }
+            // Generate HTML using your central email generator
+            const html = generateEmailTemplate('fileaccessGranted', data);
             await sendEmail({
                 to: user.email,
                 subject: "Access Granted",
@@ -3083,20 +3002,20 @@ export const updateApprovalStatus = async (req, res) => {
                 relatedDocument: documentId,
                 priority: 'medium'
             });
-            // Render EJS email template for discussion request
-            const discussionTemplate = path.join(process.cwd(), "views", "emails", "discussionRequest.ejs");
-            const html = await ejs.renderFile(discussionTemplate, {
+            const data = {
                 ownerName: document.owner.name,
                 requesterName: req.user.name,
                 fileName: document.metadata?.fileName || "Untitled Document",
                 comment,
-            });
+            }
+            // Generate HTML using your central email generator
+            const html = generateEmailTemplate('discussionRequested', data);
 
             await sendEmail({
                 to: document.owner.email,
                 subject: `Discussion Requested - ${document.metadata?.fileName || "Document"}`,
                 html,
-                fromName: "DocuFlow System",
+                fromName: "E-sangrah",
             });
         } else {
             // Notify other approvers + owner for approve/reject
@@ -3148,9 +3067,7 @@ export const updateApprovalStatus = async (req, res) => {
 
                 const verifyUrl = `${process.env.FRONTEND_URL}/document/${documentId}/review`;
                 // Render EJS email template
-                const templatePath = path.join(process.cwd(), "views", "emails", "approvalRequest.ejs");
-
-                const htmlContent = await ejs.renderFile(templatePath, {
+                const data = {
                     approverName: nextApprover.userId.name,
                     documentName: document.metadata?.fileName || "Untitled Document",
                     description: document.description || "No description provided",
@@ -3158,13 +3075,15 @@ export const updateApprovalStatus = async (req, res) => {
                     requesterName: req.user.name,
                     verifyUrl,
                     BASE_URL: API_CONFIG.baseUrl,
-                });
+                }
+                // Generate HTML using your central email generator
+                const html = generateEmailTemplate('documentAccessRequest', data);
 
                 // Send email
                 await sendEmail({
                     to: nextApprover.userId.email,
                     subject: `Document Approval Request - ${document.metadata?.fileName || "Document"}`,
-                    html: htmlContent,
+                    html,
                     from: "E-Sangrah Team",
                 });
             }
@@ -3223,9 +3142,7 @@ export const sendApprovalMail = async (req, res) => {
 
         const reviewUrl = `${API_CONFIG.baseUrl}/documents/${document._id}/versions/view?version=${currentVersion}`;
         const verifyUrl = `${API_CONFIG.baseUrl}/approval-requests`;
-        const templatePath = path.join(process.cwd(), "views", "emails", "approvalRequest.ejs");
-        // Render the EJS template with data
-        const html = await ejs.renderFile(templatePath, {
+        const data = {
             approverName: approverUser.name,
             documentName: document.metadata?.fileName || "Untitled Document",
             description: document.description || "No description provided",
@@ -3233,8 +3150,9 @@ export const sendApprovalMail = async (req, res) => {
             requesterName: document.owner?.name || "System",
             verifyUrl,
             reviewUrl
-        });
-
+        }
+        // Generate HTML using your central email generator
+        const html = generateEmailTemplate('documentApprovalRequest', data);
         // Send the email
         await sendEmail({
             to: approverUser.email,
@@ -3309,16 +3227,7 @@ export const verifyApprovalMail = async (req, res) => {
 
                     const verifyUrl = `${API_CONFIG.baseUrl}/api/verify-approval/${nextToken}`;
                     const reviewUrl = `${API_CONFIG.baseUrl}/documents/${document._id}/versions/view?version=${currentVersion}`;
-                    // Define EJS template path
-                    const templatePath = path.join(
-                        process.cwd(),
-                        "views",
-                        "emails",
-                        "approvalRequest.ejs"
-                    );
-
-                    // Render the EJS template with dynamic data
-                    const html = await ejs.renderFile(templatePath, {
+                    const data = {
                         approverName: nextUser.name,
                         documentName: document.description.replace(/<[^>]+>/g, "") || "Untitled Document",
                         description: document.comment || "No description provided",
@@ -3326,8 +3235,9 @@ export const verifyApprovalMail = async (req, res) => {
                         requesterName: document.owner?.name || "System",
                         verifyUrl,
                         reviewUrl
-                    });
-
+                    }
+                    // Generate HTML using your central email generator
+                    const html = generateEmailTemplate('documentApprovalRequest', data);
                     // Send the email
                     await sendEmail({
                         to: nextUser.email,

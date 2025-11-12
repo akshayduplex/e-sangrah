@@ -12,6 +12,7 @@ import UserPermission from "../models/UserPermission.js";
 import Menu from "../models/Menu.js";
 import { parseDateDDMMYYYY } from "../utils/formatDate.js";
 import { API_CONFIG } from "../config/ApiEndpoints.js";
+import { generateEmailTemplate } from "../helper/emailTemplate.js";
 
 //page routes controllers
 
@@ -132,15 +133,14 @@ export const registerUser = async (req, res) => {
 
             await UserPermission.insertMany(permissionDocs);
         }
-
-        const templatePath = path.join(process.cwd(), "views", "emails", "welcomeTemplate.ejs");
-
-        const htmlContent = await ejs.renderFile(templatePath, {
+        const data = {
             name,
             email,
             password: randomPassword,
             BASE_URL: API_CONFIG.baseUrl
-        });
+        }
+
+        const htmlContent = generateEmailTemplate("registeration", data)
 
         await sendEmail({
             to: email,

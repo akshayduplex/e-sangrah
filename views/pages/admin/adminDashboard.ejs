@@ -209,13 +209,11 @@
                                     <div class="me-2">
                                         <select id="dashboardVendor" name="dashboardVendor"
                                             class="form-select form-select-sm select2">
-                                            <option value="">-- Select Vendor Name --</option>
                                         </select>
                                     </div>
                                     <div class="me-2">
                                         <select id="dashboardDonor" name="dashboardDonor"
                                             class="form-select form-select-sm select2">
-                                            <option value="">-- Select Donor Name --</option>
                                         </select>
                                     </div>
                                     <div class="dropdown">
@@ -240,16 +238,6 @@
                                         </ul>
                                     </div>
                                 </div>
-                            </div>
-
-                            <!-- 2nd Row: Legend (Right) -->
-                            <div class="d-flex justify-content-end align-items-center mt-2">
-                                <p class="fs-13 me-3 mb-0">
-                                    <i class="ti ti-square-filled text-lblue me-2"></i>Donor
-                                </p>
-                                <p class="fs-13 me-3 mb-0">
-                                    <i class="ti ti-square-filled text-lred me-2"></i>Vendor
-                                </p>
                             </div>
                         </div>
 
@@ -283,8 +271,8 @@
                             <div class="d-flex align-items-center justify-content-end">
                                 <!-- Department Select using Select2 -->
                                 <div class="mb-2">
-                                    <select id="uploadDepartment" class="form-select fs-13 select2">
-                                        <option value="">-- All Departments --</option>
+                                    <select id="uploadDepartment" class="form-select fs-13 select2"
+                                        style="width: 200px;">
                                         <!-- Options will be dynamically loaded via AJAX -->
                                     </select>
                                 </div>
@@ -321,17 +309,19 @@
                         <h3 class="fs-20 fw-normal">Recent Activity</h3>
                         <div class="d-flex gap-2 align-items-center">
                             <!-- Department Select using Select2 -->
-                            <div class="mb-2">
-                                <select id="recentActivityDepartment" class="form-select fs-13 select2">
+                            <div class="me-2">
+                                <select id="recentActivityDepartment" class="form-select fs-13 select2"
+                                    style="width: 200px;">
                                     <option value="">-- Select Department --</option>
                                     <!-- Options will be dynamically loaded via AJAX -->
                                 </select>
                             </div>
 
+                            <!-- Sort Dropdown -->
                             <div class="dropdown">
                                 <div class="input-group">
                                     <span class="input-group-text border">Sort by:</span>
-                                    <select id="recentActivitySort" class="form-select select2 text-black">
+                                    <select id="recentActivitySort" class="form-select border text-black">
                                         <option value="updatedAt" selected>Doc type</option>
                                         <option value="createdAt">Date</option>
                                         <option value="metadata.fileName">Name</option>
@@ -339,6 +329,8 @@
                                     </select>
                                 </div>
                             </div>
+
+                            <!-- View All Link -->
                             <a href="/documents/list" class="fs-16 ms-4 fw-normal text-primary">View All</a>
                         </div>
                     </div>
@@ -385,94 +377,6 @@
     </div>
     <!-- /Page Wrapper -->
     <%- include('../../partials/footer') %>
-        <!-- <script>
-            async function loadDonorVendorProjects() {
-                const donorId = document.getElementById("dashboardDonor").value;
-                const vendorId = document.getElementById("dashboardVendor").value;
-                const period = document.getElementById("currentPeriodLabel").dataset.period || "month";
-
-                const response = await fetch(`/api/dashboard/donorVendorProjects?donorId=${donorId}&vendorId=${vendorId}&period=${period}`);
-                const result = await response.json();
-
-                if (!result.success) return;
-
-                const data = result.data;
-
-                const categories = data.map(item => item.projectType);
-                const donorSeries = data.map(item => item.donorCount);
-                const vendorSeries = data.map(item => item.vendorCount);
-
-                const options = {
-                    series: [
-                        { name: "Donor", data: donorSeries },
-                        { name: "Vendor", data: vendorSeries }
-                    ],
-                    chart: { type: 'bar', height: 400 },
-                    plotOptions: {
-                        bar: {
-                            horizontal: false,
-                            columnWidth: '55%',
-                            borderRadius: 5,
-                            borderRadiusApplication: 'end'
-                        },
-                    },
-                    dataLabels: { enabled: false },
-                    xaxis: { categories },
-                    yaxis: { title: { text: "Number of Projects" } },
-                    colors: ['#008FFB', '#FF4560']
-                };
-
-                const chartEl = document.querySelector("#donorvendorprojects");
-                chartEl.innerHTML = ""; // Clear previous chart
-
-                const chart = new ApexCharts(chartEl, options);
-                chart.render();
-            }
-
-            // Load on page load
-            document.addEventListener("DOMContentLoaded", loadDonorVendorProjects);
-
-            // Reload chart when filters change
-            document.getElementById("dashboardVendor").addEventListener("change", loadDonorVendorProjects);
-            document.getElementById("dashboardDonor").addEventListener("change", loadDonorVendorProjects);
-
-            // Dropdown period event
-            document.querySelectorAll(".period-option").forEach(el => {
-                el.addEventListener("click", e => {
-                    const period = e.target.dataset.period;
-                    document.getElementById("currentPeriodLabel").textContent = e.target.textContent;
-                    document.getElementById("currentPeriodLabel").dataset.period = period;
-                    loadDonorVendorProjects();
-                });
-            });
-        </script> -->
-
-        <script>// Dashboard card click handlers
-            document.addEventListener('DOMContentLoaded', function () {
-                const dashboardCards = document.querySelectorAll('.dashboard-card');
-
-                dashboardCards.forEach(card => {
-                    card.style.cursor = 'pointer';
-                    card.addEventListener('click', function () {
-                        const status = this.getAttribute('data-status');
-                        redirectToDocumentsWithStatus(status);
-                    });
-                });
-            });
-
-            function redirectToDocumentsWithStatus(status) {
-                // Construct the URL with status parameter
-                const baseUrl = window.location.origin;
-                let url = `${baseUrl}/documents/list`;
-
-                // Add status parameter if not "all"
-                if (status && status !== 'all') {
-                    url += `?status=${encodeURIComponent(status)}`;
-                }
-
-                // Redirect to documents list page
-                window.location.href = url;
-            }</script>
         <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
         <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
         <script src="/js/components/shareDocument.js"></script>

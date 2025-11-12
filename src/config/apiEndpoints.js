@@ -57,9 +57,8 @@ export const API_CONFIG = {
     timeout: Number(process.env.API_TIMEOUT) || 5000,
     retryAttempts: Number(process.env.API_RETRY_ATTEMPTS) || 3,
 
-    // Default headers
-    headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-    }
+    //Company Details
+    COMPANY_NAME: process.env.COMPANY_NAME,
+    LOGO_URL: process.env.LOGO_URL,
+    EMAIL_BANNER: process.env.EMAIL_BANNER
 };

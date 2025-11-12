@@ -318,9 +318,10 @@
 
                 <!-- Share Link -->
                 <div class="input-group mb-3 copygroup">
-                    <input type="text" id="sharelink" class="form-control" value="https://duplextech.com/" readonly>
+                    <input type="text" id="sharelink" class="form-control copygroup" style="max-width: 87%"
+                        value="https://duplextech.com/" readonly>
                     <button class="btn btncopylink" id="copyLinkBtn">
-                        <i class="ti ti-copy"></i> Copy link
+                        <i class="ti ti-copy"></i> <span>Copy link</span>
                     </button>
                 </div>
             </div>
@@ -634,169 +635,6 @@
     </div>
 </div>
 
-
-<!-- <script>
-    $(document).ready(function () {
-
-        document.addEventListener('hidden.bs.modal', () => {
-            // Remove stray backdrops (in case of interrupted modal close)
-            document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
-            document.body.classList.remove('modal-open');
-        });
-        // Year Selection
-        const $headerYearSelect = $('#selectHeaderYear');
-        if ($headerYearSelect.length) {
-            // Populate years (e.g., from 2020 to current year + 1)
-            const currentYear = new Date().getFullYear();
-            const startYear = 1995; // You can change this start year
-            const endYear = currentYear + 1;
-
-            for (let year = endYear; year >= startYear; year--) {
-                $headerYearSelect.append(new Option(year, year, false, false));
-            }
-
-            $headerYearSelect.on('change', async function () {
-                const selectedYear = $(this).val();
-
-                try {
-                    const res = await fetch(`${baseUrl}/api/session/project`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        credentials: 'include',
-                        body: JSON.stringify({
-                            selectedYear: selectedYear || null,
-                            projectId: window.selectedProjectId || null
-                        })
-                    });
-
-                    if (!res.ok) throw new Error('Failed to save year selection');
-
-                    if (selectedYear) {
-                        if (typeof reloadDocumentsByYear === 'function') {
-                            reloadDocumentsByYear(selectedYear);
-                        }
-
-                        // Or reload the page if your filtering is server-side
-                        // location.reload();
-                    }
-
-                } catch (err) {
-                    console.error('Error saving year selection:', err);
-                }
-            });
-
-            // Load saved year on page load
-            (async function loadSavedYear() {
-                try {
-                    const res = await fetch(`${baseUrl}/api/session/project`, { credentials: 'include' });
-                    const data = await res.json();
-
-                    if (data.selectedYear) {
-                        $headerYearSelect.val(data.selectedYear).trigger('change');
-                    }
-                } catch (err) {
-                    console.error('Error loading saved year:', err);
-                }
-            })();
-        }
-
-        const $headerProjectSelect = $('#selectHeaderProject');
-        if ($headerProjectSelect.length) {
-            $headerProjectSelect.select2({
-                placeholder: 'Select project',
-                allowClear: true,
-                width: '200px',
-                ajax: {
-                    url: `${baseUrl}/api/projects`,
-                    dataType: 'json',
-                    delay: 250,
-                    data: function (params) {
-                        return {
-                            search: params.term || '',
-                            page: params.page || 1,
-                            limit: 10
-                        };
-                    },
-                    processResults: function (data) {
-                        return {
-                            results: (data.data || []).map(p => ({
-                                id: p._id,
-                                text: p.projectName || p.name
-                            }))
-                        };
-                    },
-                    cache: true
-                }
-            });
-
-            $headerProjectSelect.on('select2:select select2:unselect', async function () {
-                const projectId = $(this).val();
-                const projectName = $(this).find('option:selected').text();
-
-                try {
-                    const res = await fetch(`${baseUrl}/api/session/project`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        credentials: 'include',
-                        body: JSON.stringify({
-                            projectId: projectId || null,
-                            projectName: projectName || ''
-                        })
-                    });
-
-                    if (!res.ok) throw new Error('Failed to save project selection');
-
-                    if (projectId) {
-                        $('#currentProjectName').text(projectName);
-
-                        // ADD THESE LINES
-                        window.selectedProjectId = projectId;
-                        window.selectedProjectName = projectName;
-                        loadFolders(null, [], projectId); // Load folders immediately
-                        // location.reload(); // Optional — remove if AJAX load is enough
-                    } else {
-                        $('#currentProjectName').text('No project selected');
-                    }
-
-
-                    // Reload page after session is updated
-                    location.reload();
-
-                } catch (err) {
-                    console.error('Error saving project selection:', err);
-                }
-            });
-
-            // Load saved project on page load
-            (async function loadSavedProject() {
-                try {
-                    const res = await fetch(`${baseUrl}/api/session/project`, { credentials: 'include' });
-                    const data = await res.json();
-
-                    if (data.selectedProject) {
-                        // Set globals so your folder UI recognizes the selected project
-                        window.selectedProjectId = data.selectedProject;
-                        window.selectedProjectName = data.selectedProjectName;
-
-                        // Ensure the option exists in the dropdown
-                        if (!$headerProjectSelect.find(`option[value="${data.selectedProject}"]`).length) {
-                            const option = new Option(data.selectedProjectName, data.selectedProject, true, true);
-                            $headerProjectSelect.append(option).trigger('change');
-                        }
-
-                        // Auto load folders on page load!
-                        loadFolders(null, [], data.selectedProject);
-                    }
-                } catch (err) {
-                    console.error('Error loading saved project:', err);
-                }
-            })();
-        }
-    });
-
-</script> -->
-
-<!-- new -->
 <script>
     $(document).ready(function () {
         document.addEventListener('hidden.bs.modal', () => {
@@ -826,7 +664,7 @@
             // Initialize Select2
             $headerYearSelect.select2({
                 placeholder: 'Select Year',
-                width: '20px'
+                allowClear: false,
             });
 
             // On change — save and reload

@@ -1124,27 +1124,27 @@
                         });
                     });
 
-                    // Copy share link to clipboard
-                    $('#sharedoc-modal').on('click', '#copyLinkBtn', function () {
-                        const linkInput = $('#sharelink');
-                        if (!linkInput.val()) {
-                            showToast('No link available to copy', 'info');
-                            return;
-                        }
+                    // // Copy share link to clipboard
+                    // $('#sharedoc-modal').on('click', '#copyLinkBtn', function () {
+                    //     const linkInput = $('#sharelink');
+                    //     if (!linkInput.val()) {
+                    //         showToast('No link available to copy', 'info');
+                    //         return;
+                    //     }
 
-                        // Select the text
-                        linkInput.select();
-                        linkInput[0].setSelectionRange(0, 99999); // For mobile devices
+                    //     // Select the text
+                    //     linkInput.select();
+                    //     linkInput[0].setSelectionRange(0, 99999); // For mobile devices
 
-                        // Copy to clipboard
-                        navigator.clipboard.writeText(linkInput.val())
-                            .then(() => {
-                                showToast('Link copied to clipboard!', 'success');
-                            })
-                            .catch(() => {
-                                showToast('Failed to copy link', 'error');
-                            });
-                    });
+                    //     // Copy to clipboard
+                    //     navigator.clipboard.writeText(linkInput.val())
+                    //         .then(() => {
+                    //             showToast('Link copied to clipboard!', 'success');
+                    //         })
+                    //         .catch(() => {
+                    //             showToast('Failed to copy link', 'error');
+                    //         });
+                    // });
 
                     // Function to load users for invite dropdown
                     function loadUsersForInvite() {
