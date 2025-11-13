@@ -24,14 +24,17 @@
             <div class="row">
                 <div class="col-xxl-12">
                     <div class="row flex-fill">
+                        <!-- Total Documents -->
                         <div class="col-md-3 d-flex">
-                            <div class="card flex-fill">
+                            <div class="card flex-fill anlytc_linkbx" data-documenttype="all">
                                 <div class="card-body">
                                     <h3 id="total-documents" class="fs-32 fw-medium mb-2">0</h3>
                                     <h6 class="fs-16 fw-light text-default mb-3">Total Documents</h6>
                                     <span class="fs-12 fw-medium text-success">
-                                        <span class="sm-avatar avatar rounded bg-soft-success"><i
-                                                class="ti ti-trending-up"></i> </span> +10%
+                                        <span class="sm-avatar avatar rounded bg-soft-success">
+                                            <i class="ti ti-trending-up"></i>
+                                        </span>
+                                        +10%
                                     </span>
                                     <div class="card_avtr_right">
                                         <span class="avatar rounded bg-primary mb-2">
@@ -41,14 +44,18 @@
                                 </div>
                             </div>
                         </div>
+
+                        <!-- Uploaded This Month -->
                         <div class="col-md-3 d-flex">
-                            <div class="card flex-fill">
+                            <div class="card flex-fill anlytc_linkbx" data-documenttype="uploaded">
                                 <div class="card-body">
                                     <h3 id="uploaded-this-month" class="fs-32 fw-medium mb-2">0</h3>
                                     <h6 class="fs-16 fw-light text-default mb-3">Uploaded This Month</h6>
                                     <span class="fs-12 fw-medium text-success">
-                                        <span class="sm-avatar avatar rounded bg-soft-success"><i
-                                                class="ti ti-trending-up"></i> </span> +10%
+                                        <span class="sm-avatar avatar rounded bg-soft-success">
+                                            <i class="ti ti-trending-up"></i>
+                                        </span>
+                                        +10%
                                     </span>
                                     <div class="card_avtr_right">
                                         <span class="avatar rounded bg-success mb-2">
@@ -58,14 +65,18 @@
                                 </div>
                             </div>
                         </div>
+
+                        <!-- Modified Documents -->
                         <div class="col-md-3 d-flex">
-                            <div class="card flex-fill">
+                            <div class="card flex-fill anlytc_linkbx" data-documenttype="modified">
                                 <div class="card-body">
                                     <h3 id="modified-documents" class="fs-32 fw-medium mb-2">0</h3>
                                     <h6 class="fs-16 fw-light text-default mb-3">Modified Documents</h6>
                                     <span class="fs-12 fw-medium text-success">
-                                        <span class="sm-avatar avatar rounded bg-soft-success"><i
-                                                class="ti ti-trending-up"></i> </span> +10%
+                                        <span class="sm-avatar avatar rounded bg-soft-success">
+                                            <i class="ti ti-trending-up"></i>
+                                        </span>
+                                        +10%
                                     </span>
                                     <div class="card_avtr_right">
                                         <span class="avatar rounded bg-warning mb-2">
@@ -75,14 +86,18 @@
                                 </div>
                             </div>
                         </div>
+
+                        <!-- Deleted/Archive -->
                         <div class="col-md-3 d-flex">
-                            <div class="card flex-fill">
+                            <div class="card flex-fill anlytc_linkbx" data-documenttype="deletedarchive">
                                 <div class="card-body">
                                     <h3 id="deleted-archive" class="fs-32 fw-medium mb-2">0</h3>
-                                    <h6 class="fs-16 fw-light text-default mb-3">Deleted/ Archive</h6>
+                                    <h6 class="fs-16 fw-light text-default mb-3">Deleted / Archive</h6>
                                     <span class="fs-12 fw-medium text-success">
-                                        <span class="sm-avatar avatar rounded bg-soft-success"><i
-                                                class="ti ti-trending-up"></i> </span> +10%
+                                        <span class="sm-avatar avatar rounded bg-soft-success">
+                                            <i class="ti ti-trending-up"></i>
+                                        </span>
+                                        +10%
                                     </span>
                                     <div class="card_avtr_right">
                                         <span class="avatar rounded bg-danger mb-2">
@@ -357,7 +372,31 @@
             window.location.href = url;
         }
     </script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const statusCards = document.querySelectorAll('.anlytc_linkbx[data-documenttype]');
 
+            statusCards.forEach(card => {
+                card.style.cursor = 'pointer';
+                card.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    const documentType = this.getAttribute('data-documenttype');
+                    redirectToDocumentsWithDocumentType(documentType);
+                });
+            });
+        });
+
+        function redirectToDocumentsWithDocumentType(documentType) {
+            const baseUrl = window.location.origin;
+            let url = `${baseUrl}/documents/list`;
+
+            if (documentType && documentType !== 'all') {
+                url += `?status=${encodeURIComponent(documentType)}`;
+            }
+
+            window.location.href = url;
+        }
+    </script>
     <script src="/js/pages/analytics/Analytics.js"></script>
     <%- include('../../partials/footer') %>
         <script src="/js/components/shareDocument.js"></script>

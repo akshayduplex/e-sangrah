@@ -161,6 +161,9 @@
 		<script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
 		<script>
 			$(document).ready(function () {
+				function sanitize(text) {
+					return text.replace(/[^a-zA-Z0-9-_]/g, '_').substring(0, 50);
+				}
 				// ------------------------- Initialize Select2 with Clear Option -------------------------
 				function initSelect2(selector, url, textKey) {
 					$(selector).select2({
@@ -340,16 +343,21 @@
 				});
 
 				// ------------------------- Export Functionality -------------------------
+				// In your frontend script, update the export function:
 				$('.export-link').on('click', async function (e) {
 					e.preventDefault();
 					const format = $(this).data('format');
+
+					// Get ALL current filters including search
 					const filters = {
 						role: $('#roleSelect').val(),
 						department: $('#department').val(),
 						docType: $('#docTypeSelect').val(),
 						designation: $('#designation_select').val(),
 						search: $('input[name="q"]').val(),
-						date: $('.datetimepicker').val()
+						date: $('.datetimepicker').val(),
+						// Add status if you have it in your UI
+						// status: $('#statusSelect').val()
 					};
 
 					try {
@@ -359,7 +367,11 @@
 								'Content-Type': 'application/json',
 								'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
 							},
-							body: JSON.stringify({ format, filters, exportAll: true })
+							body: JSON.stringify({
+								format,
+								filters,
+								exportAll: true
+							})
 						});
 
 						if (!response.ok) {
@@ -376,6 +388,8 @@
 						document.body.appendChild(a);
 						a.click();
 						a.remove();
+
+						showToast(`Export completed successfully!`, 'success');
 					} catch (err) {
 						console.error('Export error:', err);
 						showToast('Export failed. Please try again.', 'error');

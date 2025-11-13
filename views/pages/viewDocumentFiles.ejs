@@ -3,7 +3,8 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>File Preview - <%= file ? file.originalName : "No File" %>
+    <title>
+        <%= file ? file.originalName : "View Document" %>
     </title>
     <style>
         html,
@@ -12,6 +13,8 @@
             padding: 0;
             height: 100%;
             background-color: #000;
+            color: #fff;
+            font-family: Arial, sans-serif;
         }
 
         iframe,
@@ -31,135 +34,69 @@
             justify-content: center;
             align-items: center;
             height: 100%;
-            color: #fff;
-            font-family: Arial, sans-serif;
             text-align: center;
             padding: 20px;
         }
 
-        .btn {
-            padding: 10px 20px;
-            background: #007bff;
-            color: #fff;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 15px;
+        .info-bar {
+            text-align: center;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 10px;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+
+        .expired {
+            color: red;
+        }
+
+        a {
+            color: #0af;
+            text-decoration: none;
         }
     </style>
-
 </head>
 
 <body>
-
-    <% const expired=sharedAccess && sharedAccess.expiresAt && new Date()> sharedAccess.expiresAt; %>
-
-        <% if (!sharedAccess || expired) { %>
-
-            <!-- Access Not Granted UI -->
-            <div class="fallback">
-                <div>
-                    <h2>Access Restricted</h2>
-                    <p>You do not have permission to view this file.</p>
-
-                    <form id="requestAccessForm" action="/api/documents/<%= documentId %>/request-access" method="POST">
-                        <% if (!user) { %>
-                            <input type="email" name="email" placeholder="Enter your email" required
-                                style="margin-bottom:10px; padding:5px;" />
-                            <% } %>
-                                <button type="submit" class="btn">Request Access</button>
-                    </form>
-
-                    <div id="message" style="display:none; margin-top:15px; color:#0af;"></div>
-                </div>
-            </div>
-
-
-            <% } else { %>
-
-                <!-- Access Granted Info -->
-                <% if (sharedAccess.expiresAt) { %>
-                    <p style="color:#fff; text-align:center;">
-                        Access granted until: <%= sharedAccess.expiresAt.toLocaleString() %>
-                    </p>
+    <% if (expiredMessage || docExpired) { %>
+        <div class="fallback">
+            <div>
+                <!-- <h2>Access Restricted</h2> -->
+                <p>
+                    <%= expiredMessage || "This document is no longer accessible." %>
+                </p>
+                <% if (document && document.ispublic) { %>
+                    <p>This public document link has expired or is unavailable.</p>
                     <% } else { %>
-                        <p style="color:#fff; text-align:center;">Lifetime access granted</p>
+                        <p>Access to this document is restricted.</p>
                         <% } %>
+            </div>
+        </div>
+        <% } else { %>
+            <% if (!file || !file.fileUrl) { %>
+                <div class="fallback">
+                    <h2>File not available</h2>
+                </div>
 
-                            <!-- Preview Section -->
-                            <% if (!file || !file.fileUrl) { %>
+                <% } else if (file.fileType.isPDF) { %>
+                    <iframe src="/api/file/pdf/<%= file._id %>" title="PDF Preview"></iframe>
+
+                    <% } else if (file.fileType.isWord || file.fileType.isExcel || file.fileType.isPowerPoint) { %>
+                        <iframe
+                            src="https://view.officeapps.live.com/op/embed.aspx?src=<%= encodeURIComponent(file.fileUrl) %>"
+                            title="Office Preview"></iframe>
+
+                        <% } else if (/\.(jpg|jpeg|png|gif|webp)$/i.test(file.originalName)) { %>
+                            <img src="<%= file.fileUrl %>" alt="Image Preview">
+
+                            <% } else { %>
                                 <div class="fallback">
-                                    <h2>File not available</h2>
+                                    <h2>Preview not available</h2>
+                                    <p>This file type cannot be previewed.</p>
+                                    <p><a href="<%= file.fileUrl %>" target="_blank">Download file</a></p>
                                 </div>
-
-                                <% } else if (file.fileType.isPDF) { %>
-                                    <iframe src="/api/file/pdf/<%= file._id %>" title="PDF Preview"></iframe>
-
-                                    <% } else if (file.fileType.isWord || file.fileType.isExcel ||
-                                        file.fileType.isPowerPoint) { %>
-                                        <iframe
-                                            src="https://view.officeapps.live.com/op/embed.aspx?src=<%= encodeURIComponent(file.fileUrl) %>"
-                                            title="Office Preview">
-                                        </iframe>
-
-                                        <% } else if (/\.(jpg|jpeg|png|gif|webp)$/i.test(file.originalName)) { %>
-                                            <img src="<%= file.fileUrl %>" alt="Image Preview">
-
-                                            <% } else { %>
-                                                <div class="fallback">
-                                                    <h2>Preview not available</h2>
-                                                    <p>This file type cannot be previewed.</p>
-                                                    <p><a href="<%= file.fileUrl %>" target="_blank"
-                                                            style="color:#0af;">Download file</a></p>
-                                                </div>
-                                                <% } %>
-
-                                                    <% } %>
-                                                        <script>
-                                                            document.getElementById("requestAccessForm").addEventListener("submit", async function (e) {
-                                                                e.preventDefault(); // prevent normal form submit
-
-                                                                const form = e.target;
-                                                                const button = form.querySelector("button");
-
-                                                                // Prepare JSON body
-                                                                const emailInput = form.querySelector('input[name="email"]');
-                                                                const body = emailInput ? { email: emailInput.value } : {};
-
-                                                                button.disabled = true;
-                                                                button.innerText = "Sending...";
-
-                                                                try {
-                                                                    const response = await fetch(form.action, {
-                                                                        method: "POST",
-                                                                        headers: { "Content-Type": "application/json" },
-                                                                        body: JSON.stringify(body)
-                                                                    });
-
-                                                                    const result = await response.json();
-
-                                                                    const messageBox = document.getElementById("message");
-                                                                    messageBox.style.display = "block";
-
-                                                                    if (result.success) {
-                                                                        messageBox.innerHTML = `<h3>${result.message}</h3>`;
-                                                                        button.innerText = "Request Sent";
-                                                                    } else {
-                                                                        messageBox.innerHTML = `<h3 style="color:red;">${result.message}</h3>`;
-                                                                        button.disabled = false;
-                                                                        button.innerText = "Request Access";
-                                                                    }
-                                                                } catch (err) {
-                                                                    const messageBox = document.getElementById("message");
-                                                                    messageBox.style.display = "block";
-                                                                    messageBox.innerHTML = `<h3 style="color:red;">Server error. Try again later.</h3>`;
-                                                                    button.disabled = false;
-                                                                    button.innerText = "Request Access";
-                                                                    console.error(err);
-                                                                }
-                                                            });
-                                                        </script>
-
+                                <% } %>
+                                    <% } %>
 </body>
 
 </html>

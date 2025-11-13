@@ -1,6 +1,5 @@
 (function ($) {
     "use strict";
-
     let currentDocId = null;
     let currentFileId = null;
     let customFlatpickr = null;
@@ -120,13 +119,110 @@
         // Load invite users
         loadUsersForInvite(modal.find('#userInviteSelect'));
     });
+    // Invite user button
+    $('#sharedoc-modal').on('click', '#inviteUserBtn', function () {
+        const $btn = $(this);
+        const originalText = $btn.html();
 
-    // Custom Date Visibility
-    $(document).on('change', '#sharedoc-modal input[name="time"]', function () {
-        const isCustom = this.id === 'custom';
-        $('#customDateWrapper').toggle(isCustom);
-        if (isCustom && !customFlatpickr) initFlatpickr();
+        // Set button to loading state
+        $btn.prop('disabled', true)
+            .addClass('btn-light')
+            .removeClass('btn-primary')
+            .html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true">');
+
+        const userEmail = $('#userInviteSelect').val();
+        const accessLevel = $('#accessLevelSelect').val();
+        const duration = $('input[name="time"]:checked').attr('id');
+
+        let customStart = null;
+        let customEnd = null;
+
+        // Read dates from Flatpickr range if "Custom" is selected
+        if (duration === 'custom' && customFlatpickr?.selectedDates.length === 2) {
+            customStart = customFlatpickr.selectedDates[0].toISOString();
+            customEnd = customFlatpickr.selectedDates[1].toISOString();
+        }
+
+        if (!currentDocId) {
+            showToast('No document selected', 'info');
+            resetBtn();
+            return;
+        }
+
+        if (!userEmail) {
+            showToast('Please enter user email', 'info');
+            resetBtn();
+            return;
+        }
+
+        if (!$('input[name="time"]:checked').length) {
+            showToast('Please select a time duration', 'info');
+            resetBtn();
+            return;
+        }
+
+        if (duration === 'custom' && (!customStart || !customEnd)) {
+            showToast('Please select a start and end date for custom duration', 'info');
+            resetBtn();
+            return;
+        }
+
+        const inviteData = {
+            userEmail: userEmail,
+            accessLevel: accessLevel,
+            duration: duration
+        };
+
+        if (duration === 'custom') {
+            inviteData.customStart = customStart;
+            inviteData.customEnd = customEnd;
+        }
+
+        $.ajax({
+            url: `${baseUrl}/api/documents/${currentDocId}/invite`,
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify(inviteData),
+            success: function (response) {
+                showToast('Invitation sent successfully!', 'success');
+                $('#userInviteSelect').val(''); // Clear the input
+                $('#sharedoc-modal').modal('hide');
+            },
+            error: function (err) {
+                const errorMsg = err.responseJSON?.message || 'Failed to send invitation';
+                showToast(errorMsg, 'error');
+            },
+            complete: function () {
+                resetBtn();
+            }
+        });
+
+        function resetBtn() {
+            $btn.prop('disabled', false)
+                .removeClass('btn-light')
+                .addClass('btn-primary')
+                .html(originalText);
+        }
     });
+    // Custom Date Visibility
+    $('#sharedoc-modal input[name="time"]').on('change', function () {
+        const isCustom = $(this).attr('id') === 'custom';
+
+        if (isCustom) {
+            $('#customDateWrapper').slideDown(200, function () {
+                if (!customFlatpickr) {
+                    customFlatpickr = flatpickr("#flatpickr-range", {
+                        mode: "range",
+                        dateFormat: "Y-m-d",
+                        conjunction: " to "
+                    });
+                }
+            });
+        } else {
+            $('#customDateWrapper').slideUp(200);
+        }
+    });
+
 
     // Access Type & Role Info Text
     $(document).on('change', '#sharedoc-modal #accessType, #sharedoc-modal #roleType', function () {
@@ -157,7 +253,6 @@
         }
 
         if (!userEmail || !$('input[name="time"]:checked').length || (duration === 'custom' && (!customStart || !customEnd))) {
-            showToast('Please fill all required fields', 'info');
             $btn.prop('disabled', false).html('Invite');
             return;
         }
@@ -183,25 +278,51 @@
             complete: () => $btn.prop('disabled', false).html('Invite')
         });
     });
-
+    // Time duration radio buttons
     // Remove User Access
-    $(document).on('click', '#sharedoc-modal .remove-user', function () {
+    $('#sharedoc-modal').on('click', '.remove-user', function () {
         const userId = $(this).data('user-id');
-        const $row = $(this).closest('.user-accssrow');
+        const userRow = $(this).closest('.user-accssrow');
 
-        if (confirm('Remove this user\'s access?')) {
+        if (!currentDocId || !userId) {
+            userRow.remove();
+            return;
+        }
+
+        // Update modal content dynamically for removing user access
+        $('#trashdocLabel').html(`
+                        <img src="/img/icons/bin.png" alt="Remove User" width="40" class="mb-2"><br>
+                        Remove User Access
+                    `);
+        $('#trashdoc-modal .modal-body').text(
+            'Are you sure you want to remove this user’s access to the document? This action cannot be undone.'
+        );
+        $('#confirm-trash-folder').text('Yes, Remove');
+
+        // Show confirmation modal
+        $('#trashdoc-modal').modal('show');
+
+        // Ensure previous click handler is removed before reattaching
+        $('#confirm-trash-folder').off('click').on('click', function () {
             $.ajax({
                 url: `${baseUrl}/api/documents/share/${currentDocId}`,
                 method: 'DELETE',
                 contentType: 'application/json',
-                data: JSON.stringify({ userId }),
-                success: () => {
-                    $row.remove();
-                    showToast('Access removed', 'success');
+                data: JSON.stringify({ userId: userId }),
+                success: function () {
+                    userRow.remove();
+                    $('#trashdoc-modal').modal('hide'); // Hide modal after success
+                    showToast('User access removed successfully!', 'success');
                 },
-                error: () => showToast('Failed to remove access', 'error')
+                error: function (err) {
+                    $('#trashdoc-modal').modal('hide');
+                    showToast(
+                        err.responseJSON?.message || 'Failed to remove user access',
+                        'error'
+                    );
+                }
             });
-        }
+        });
     });
 
     // Update Permissions (Done button)
@@ -238,22 +359,63 @@
     });
 
     // Copy Link
+    // Copy Link and update visibility settings
     $(document).on('click', '#copyLinkBtn', function () {
         const link = $('#sharelink').val();
-        if (!link) return showToast('No link to copy', 'info');
+        const accessType = $('#accessType').val(); // 'anyone' or 'restricted'
+        const duration = $('input[name="time"]:checked').attr('id'); // e.g., 'oneday', 'oneweek', etc.
+        const isCustom = duration === 'custom';
 
-        navigator.clipboard.writeText(link).then(() => {
-            showToast('Link copied!', 'success');
-        }).catch(() => {
-            const temp = document.createElement('textarea');
-            temp.value = link;
-            document.body.appendChild(temp);
-            temp.select();
-            document.execCommand('copy');
-            document.body.removeChild(temp);
-            showToast('Link copied!', 'success');
+        if (!link) return showToast('No link to copy', 'info');
+        if (!currentDocId) return showToast('Invalid document ID', 'error');
+
+        // Copy link to clipboard
+        navigator.clipboard.writeText(link)
+            .then(() => showToast('Link copied!', 'success'))
+            .catch(() => {
+                const temp = document.createElement('textarea');
+                temp.value = link;
+                document.body.appendChild(temp);
+                temp.select();
+                document.execCommand('copy');
+                document.body.removeChild(temp);
+                showToast('Link copied!', 'success');
+            });
+
+        // --- Build query string ---
+        let query = '';
+
+        if (accessType === 'anyone') {
+            if (!duration) {
+                showToast('Please select a time duration before copying the link', 'info');
+                return;
+            }
+
+            if (isCustom && customFlatpickr?.selectedDates.length === 2) {
+                const start = customFlatpickr.selectedDates[0].toISOString();
+                const end = customFlatpickr.selectedDates[1].toISOString();
+
+                query = `?ispublic=true&duration=custom&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
+            } else {
+                query = `?ispublic=true&duration=${duration}`;
+            }
+        } else {
+            query = `?ispublic=false`;
+        }
+
+        // --- Send PATCH request ---
+        $.ajax({
+            url: `${baseUrl}/api/documents/${currentDocId}/sharelink${query}`,
+            method: 'PATCH',
+            success: function (res) {
+                // showToast(res.message || 'Share settings updated!', 'success');
+            },
+            error: function (err) {
+                showToast(err.responseJSON?.message || 'Failed to update share settings', 'error');
+            }
         });
     });
+
 
     // -------------------------
     // Archive Document

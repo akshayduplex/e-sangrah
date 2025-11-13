@@ -1,6 +1,4 @@
 import User from "../models/User.js";
-import path from "path";
-import ejs from "ejs";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import {

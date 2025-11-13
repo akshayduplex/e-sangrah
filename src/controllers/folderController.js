@@ -2,8 +2,6 @@
 import Folder from '../models/Folder.js';
 import Document from '../models/Document.js';
 import crypto from 'crypto'
-import path from "path";
-import ejs from "ejs";
 import mongoose from 'mongoose';
 import { generateUniqueFileName } from '../helper/GenerateUniquename.js';
 import { getObjectUrl, putObject } from '../utils/s3Helpers.js';
@@ -1823,6 +1821,8 @@ export const getFolderPermissions = async (req, res) => {
         } = req.query;
 
         const userId = req.user?._id;
+        const profileType = req.session?.user.profile_type;
+
         if (!userId) {
             return res.status(401).json({ success: false, message: "Unauthorized" });
         }
@@ -1830,9 +1830,14 @@ export const getFolderPermissions = async (req, res) => {
         page = parseInt(page);
         limit = parseInt(limit);
 
-        const query = { owner: userId };
+        const query = {};
 
-        //Search by username or email
+        // Only restrict by owner if not superadmin
+        if (profileType !== 'superadmin') {
+            query.owner = userId;
+        }
+
+        // Search by username or email
         if (search) {
             query.$or = [
                 { "user.username": { $regex: search, $options: "i" } },
@@ -1840,9 +1845,12 @@ export const getFolderPermissions = async (req, res) => {
             ];
         }
 
+        // Filter by status (except "all")
         if (status && status !== "all") {
             query.requestStatus = status;
         }
+
+        console.log("FolderPermissions Query:", query);
 
         const total = await FolderPermissionLogs.countDocuments(query);
 

@@ -1,8 +1,6 @@
 // controllers/documentController.js
 import mongoose from "mongoose";
 import jwt from "jsonwebtoken";
-import ejs from "ejs";
-import path from "path";
 import Document from "../models/Document.js";
 import { errorResponse, successResponse, failResponse } from "../utils/responseHandler.js";
 import TempFile from "../models/TempFile.js";
@@ -16,7 +14,7 @@ import { bumpVersion } from "../utils/bumpVersion.js";
 import _ from "lodash";
 import Approval from "../models/Approval.js";
 import { getObjectUrl } from "../utils/s3Helpers.js";
-import { decrypt } from "../helper/SymmetricEncryption.js";
+import { decrypt, encrypt } from "../helper/SymmetricEncryption.js";
 import { generateShareLink } from "../helper/GenerateUniquename.js";
 import { accessExpiredTemplate, alertRedirectTemplate } from "../emailTemplates/accessExpiredTemplate.js";
 import { API_CONFIG } from "../config/ApiEndpoints.js";
@@ -30,11 +28,15 @@ import { generateEmailTemplate } from "../helper/emailTemplate.js";
 //Page Controllers
 
 // Document List page
+// In your showDocumentListPage controller
 export const showDocumentListPage = async (req, res) => {
     try {
         const status = req.query.status;
-        //    const status = req.query.status || 'all';
         const searchQuery = req.query.q || '';
+        const filter = req.query.filter;
+        const month = req.query.month;
+        const year = req.query.year;
+
         const designations = await Designation.find({ status: "Active" })
             .sort({ name: 1 })
             .lean();
@@ -44,7 +46,10 @@ export const showDocumentListPage = async (req, res) => {
             designations,
             user: req.user,
             searchQuery: searchQuery,
-            status
+            status,
+            filter,
+            month,
+            year
         });
     } catch (err) {
         logger.error("Error loading document list:", err);
@@ -155,6 +160,117 @@ export const viewDocumentFiles = async (req, res) => {
         } catch (err) {
             return res.render("pages/viewDocumentFiles", {
                 expiredMessage: "Invalid or corrupted link.",
+                documentTitle: "Document",
+                file: null,
+                document: null,
+                documentId: null,
+                docExpired: true
+            });
+        }
+
+        const { id: documentId, fileId } = decrypted;
+        const now = new Date();
+
+        // Fetch the document
+        const document = await Document.findById(documentId);
+        if (!document) {
+            return res.render("pages/viewDocumentFiles", {
+                expiredMessage: "Document not found.",
+                documentTitle: "Document",
+                file: null,
+                document: null,
+                documentId,
+                docExpired: true
+            });
+        }
+
+        let expiredMessage = null;
+        let docExpired = false;
+
+        // 🔹 PUBLIC document logic only
+        if (!document.ispublic) {
+            expiredMessage = "Access restricted. This document is private.";
+        } else if (document.docExpiresAt && now > document.docExpiresAt) {
+            docExpired = true;
+            expiredMessage = "This public document link has expired.";
+        }
+
+        // --- Fetch file only if access is valid ---
+        let file = null;
+        if (!expiredMessage && !docExpired) {
+            file = await File.findById(fileId).exec();
+        }
+
+        let fileUrl = null;
+        if (file) {
+            fileUrl = file.s3Url || (file.file ? await getObjectUrl(file.file, 3600) : null);
+        }
+
+        // --- Helpers ---
+        const formatFileSize = (bytes) => {
+            if (!bytes) return "0 Bytes";
+            const k = 1024;
+            const sizes = ["Bytes", "KB", "MB", "GB"];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+        };
+
+        const getFileType = (filename) => {
+            const ext = filename.split(".").pop().toLowerCase();
+            return {
+                isPDF: ext === "pdf",
+                isWord: ["doc", "docx"].includes(ext),
+                isExcel: ["xls", "xlsx"].includes(ext),
+                isPowerPoint: ["ppt", "pptx"].includes(ext),
+                isText: ["txt", "md", "json", "xml", "html", "csv"].includes(ext),
+                extension: ext
+            };
+        };
+
+        res.render("pages/viewDocumentFiles", {
+            expiredMessage,
+            documentTitle: document.metadata?.fileName || "Document",
+            document,
+            documentId,
+            docExpired,
+            file: file
+                ? {
+                    ...file.toObject(),
+                    formattedSize: formatFileSize(file.fileSize),
+                    fileUrl,
+                    fileType: getFileType(file.originalName)
+                }
+                : null
+        });
+
+    } catch (error) {
+        console.error("❌ viewDocumentFiles Error:", error);
+        res.render("pages/viewDocumentFiles", {
+            expiredMessage: "Server error while fetching file.",
+            documentTitle: "Document",
+            file: null,
+            document: null,
+            documentId: null,
+            docExpired: true
+        });
+    }
+};
+
+/**
+ * GET /documents/:id/view
+ * Render a page to view files of a document
+ */
+export const viewInvitedDocumentFiles = async (req, res) => {
+    try {
+        const { token } = req.params;
+        if (!token) throw new Error("Invalid link");
+
+        let decrypted;
+        try {
+            decrypted = JSON.parse(decrypt(token));
+        } catch (err) {
+            return res.render("pages/document/viewInvitedDocumentFiles", {
+                expiredMessage: "Invalid or corrupted link.",
                 canRenew: false,
                 documentTitle: "Document",
                 user: req.user,
@@ -230,7 +346,7 @@ export const viewDocumentFiles = async (req, res) => {
             };
         };
 
-        res.render("pages/viewDocumentFiles", {
+        res.render("pages/document/viewInvitedDocumentFiles", {
             expiredMessage,
             canRenew: expiredMessage ? true : false,
             documentTitle: sharedAccess?.document?.title || "Document",
@@ -249,7 +365,7 @@ export const viewDocumentFiles = async (req, res) => {
         });
     } catch (error) {
         console.error(error);
-        res.render("pages/viewDocumentFiles", {
+        res.render("pages/document/viewInvitedDocumentFiles", {
             expiredMessage: "Server error while fetching file.",
             canRenew: false,
             documentTitle: "Document",
@@ -261,8 +377,6 @@ export const viewDocumentFiles = async (req, res) => {
         });
     }
 };
-
-
 export const viewGrantAccessPage = async (req, res) => {
     try {
         const { token } = req.params;
@@ -303,12 +417,15 @@ export const getDocuments = async (req, res) => {
             project,
             date,
             orderColumn,
-            orderDir
+            orderDir,
+            role,
+            docType,
+            designation,
         } = req.query;
 
         const userId = req.user?._id;
         const profile_type = req.user?.profile_type;
-
+        console.log("status", status)
         // --- Base filter ---
         const filter = {
             isDeleted: false,
@@ -329,7 +446,6 @@ export const getDocuments = async (req, res) => {
             return val.split(',').map(v => v.trim()).filter(Boolean);
         };
 
-        // --- Search ---
         // --- Search ---
         if (search?.trim()) {
             const safeSearch = search.trim();
@@ -358,7 +474,25 @@ export const getDocuments = async (req, res) => {
         // --- Status ---
         if (status) {
             const normalizedStatus = status.replace(/\s+/g, ' ').trim();
-            if (normalizedStatus === "Compliance and Retention") {
+            if (normalizedStatus === "uploaded") {
+                const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+                const startOfNextMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1);
+                filter.createdAt = { $gte: startOfMonth, $lt: startOfNextMonth };
+            }
+            else if (normalizedStatus === "deletedarchive") {
+                delete filter.isDeleted;
+                delete filter.isArchived;
+                filter.$or = [
+                    { isDeleted: true },
+                    { isArchived: true }
+                ];
+            }
+            else if (normalizedStatus === "modified") {
+                filter["versioning.currentVersion"] = {
+                    $gt: mongoose.Types.Decimal128.fromString("1.0")
+                };
+            }
+            else if (normalizedStatus === "Compliance and Retention") {
                 filter["compliance.isCompliance"] = true;
             } else {
                 filter.status = normalizedStatus;
@@ -390,9 +524,9 @@ export const getDocuments = async (req, res) => {
             filter.project = projectIds.length === 1 ? projectIds[0] : { $in: projectIds };
         }
 
-        // --- Date filter from query ---
+        /** -------------------- DATE -------------------- **/
         if (date) {
-            const [day, month, year] = date.split('-').map(Number);
+            const [day, month, year] = date.split("-").map(Number);
             const selectedDate = new Date(year, month - 1, day);
             if (!isNaN(selectedDate.getTime())) {
                 const nextDate = new Date(selectedDate);
@@ -400,7 +534,6 @@ export const getDocuments = async (req, res) => {
                 filter.createdAt = { $gte: selectedDate, $lt: nextDate };
             }
         }
-
         // --- Year filter from session ---
         if (req.session?.selectedYear) {
             const year = parseInt(req.session.selectedYear, 10);
@@ -417,28 +550,45 @@ export const getDocuments = async (req, res) => {
                 }
             }
         }
-        // --- Role filter ---
-        if (req.query.role) {
-            const roleValue = req.query.role.trim().toLowerCase();
-            // Assuming you store role in user.userDetails.role or profile_type
-            filter["owner.userDetails.role"] = roleValue;
-        }
 
-        // --- Doc Type filter ---
-        if (req.query.docType) {
-            const docTypeValue = req.query.docType.trim();
-            filter["metadata.mainHeading"] = { $regex: new RegExp(docTypeValue, "i") };
-        }
-
-        // --- Designation filter ---
-        if (req.query.designation) {
-            const designationId = req.query.designation.trim();
-            if (mongoose.Types.ObjectId.isValid(designationId)) {
-                filter["owner.userDetails.designation"] = designationId;
+        /** -------------------- ROLE FILTER -------------------- **/
+        if (role?.trim()) {
+            const usersByRole = await mongoose
+                .model("User")
+                .find({ "userDetails.role": role.trim() }, { _id: 1 });
+            if (usersByRole.length > 0) {
+                filter.owner = { $in: usersByRole.map((u) => u._id) };
+            } else {
+                filter.owner = null; // no matching users
             }
         }
 
-        // --- Sorting ---
+        /** -------------------- DESIGNATION FILTER -------------------- **/
+        if (designation?.trim() && mongoose.Types.ObjectId.isValid(designation)) {
+            const usersByDesg = await mongoose
+                .model("User")
+                .find({ "userDetails.designation": designation }, { _id: 1 });
+            if (usersByDesg.length > 0) {
+                filter.owner = { $in: usersByDesg.map((u) => u._id) };
+            } else {
+                filter.owner = null;
+            }
+        }
+
+        /** -------------------- DOC TYPE FILTER -------------------- **/
+        if (docType?.trim()) {
+            const filesByType = await mongoose
+                .model("File")
+                .find({ fileType: docType.trim() }, { document: 1 });
+            const docIds = filesByType.map((f) => f.document).filter(Boolean);
+            if (docIds.length > 0) {
+                filter._id = { $in: docIds };
+            } else {
+                filter._id = null;
+            }
+        }
+
+        /** -------------------- SORTING -------------------- **/
         const columnMap = {
             1: "metadata.fileName",
             2: "updatedAt",
@@ -447,12 +597,12 @@ export const getDocuments = async (req, res) => {
             5: "project.projectName",
             9: "tags",
             10: "metadata",
-            14: "status"
+            14: "status",
         };
         const sortField = columnMap[orderColumn] || "createdAt";
         const sortOrder = orderDir === "asc" ? 1 : -1;
 
-        // --- Pagination ---
+        /** -------------------- PAGINATION -------------------- **/
         const pageNum = Math.max(1, parseInt(page));
         const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
         const skip = (pageNum - 1) * limitNum;
@@ -469,11 +619,8 @@ export const getDocuments = async (req, res) => {
             .populate("project", "projectName")
             .populate({
                 path: "owner",
-                select: "name email profile_image userDetails.designation",
-                populate: {
-                    path: "userDetails.designation",
-                    select: "name"
-                }
+                select: "name email profile_image userDetails.role userDetails.designation",
+                populate: { path: "userDetails.designation", select: "name" },
             })
             .populate("documentDonor", "name profile_image")
             .populate("documentVendor", "name profile_image")
@@ -599,7 +746,6 @@ export const getRecycleBinDocuments = async (req, res) => {
     try {
         const userId = req.user?._id;
         const profileType = req.user?.profile_type;
-
         if (!userId) {
             return res.status(401).json({ success: false, message: "Unauthorized" });
         }
@@ -1952,6 +2098,98 @@ export const updateDocumentStatus = async (req, res) => {
     }
 };
 
+export const updateShareSettings = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { ispublic, duration, start, end } = req.query;
+
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({ success: false, message: "Invalid document ID" });
+        }
+
+        const document = await Document.findById(id);
+        if (!document) {
+            return res.status(404).json({ success: false, message: "Document not found" });
+        }
+
+        const now = new Date();
+        document.ispublic = ispublic === "true";
+        document.docExpireDuration = duration;
+
+        let expiresAt = null;
+        let used = undefined;
+
+        switch (duration) {
+            case "oneday":
+                expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+                break;
+            case "oneweek":
+                expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+                break;
+            case "onemonth":
+                expiresAt = new Date(now);
+                expiresAt.setMonth(expiresAt.getMonth() + 1);
+                break;
+            case "custom":
+                if (!start || !end)
+                    return res.status(400).json({ success: false, message: "Custom start and end dates are required" });
+
+                const startDate = new Date(start);
+                const endDate = new Date(end);
+
+                if (isNaN(startDate) || isNaN(endDate))
+                    return res.status(400).json({ success: false, message: "Invalid custom date format" });
+
+                if (endDate <= startDate)
+                    return res.status(400).json({ success: false, message: "End date must be after start date" });
+
+                // Save custom range
+                document.DoccustomStart = startDate;
+                document.DoccustomEnd = endDate;
+                expiresAt = endDate;
+                break;
+            case "onetime":
+                used = false;
+                break;
+            case "lifetime":
+                expiresAt = new Date(now);
+                expiresAt.setFullYear(expiresAt.getFullYear() + 50);
+                break;
+            default:
+                expiresAt = null;
+        }
+
+        document.docExpiresAt = expiresAt;
+        if (typeof used !== "undefined") document.used = used;
+
+        // If not public, clear expiration fields
+        if (ispublic !== "true") {
+            document.docExpireDuration = "lifetime";
+            document.docExpiresAt = null;
+            document.DoccustomStart = null;
+            document.DoccustomEnd = null;
+        }
+
+        await document.save();
+
+        return res.status(200).json({
+            success: true,
+            message: "Document share settings updated successfully",
+            data: {
+                ispublic: document.ispublic,
+                docExpireDuration: document.docExpireDuration,
+                docExpiresAt: document.docExpiresAt,
+                DoccustomStart: document.DoccustomStart,
+                DoccustomEnd: document.DoccustomEnd
+            }
+        });
+    } catch (error) {
+        console.error("Error updating share settings:", error);
+        return res.status(500).json({ success: false, message: "Failed to update document share settings" });
+    }
+};
+
+
 /**
  * Share document with users or departments
  */
@@ -2394,7 +2632,9 @@ export const autoAcceptInvite = async (req, res) => {
         req.session.user = await User.findById(userId);
 
         const fileId = share.document?.files?.[0]?._id || "default";
-        const viewDocLink = generateShareLink(documentId, fileId);
+        const payload = JSON.stringify({ id: documentId, fileId });
+        const token = encrypt(payload);
+        const viewDocLink = `${API_CONFIG.baseUrl}/documents/invited/${encodeURIComponent(token)}`;
         return res.redirect(viewDocLink);
 
     } catch (err) {

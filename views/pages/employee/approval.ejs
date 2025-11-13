@@ -99,6 +99,7 @@
     <%- include('../../partials/footer') %>
         <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
         <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+        <script src="/js/components/shareDocument.js"></script>
         <script>
             $(document).ready(function () {
                 const fileIcons = {
@@ -187,16 +188,15 @@
                    <i class="ti ti-history"></i> Version History
                 </a>
             </li>
-                                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#downloaddoc-modal"><i class="ti ti-download"></i> Download</a></li>
-                                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#trashdoc-modal"><i class="ti ti-trash"></i> Move to Trash</a></li>
-                                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#archivedoc-modal"><i class="ti ti-archive"></i> Move to Archive</a></li>
-                            </ul>
+                                                   <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#downloaddoc-modal"><i class="ti ti-download"></i> Download</a></li>
+                    <li><a class="dropdown-item btn-delete" href="#" data-id="${item._id}" data-bs-toggle="modal" data-bs-target="#trashdoc-modal"><i class="ti ti-trash"></i> Move to Trash</a></li>
+                    <li><a class="dropdown-item archive-document" href="#"  data-id="${item._id}" data-bs-toggle="modal" data-bs-target="#archivedoc-modal"><i class="ti ti-archive"></i> Move to Archive</a></li>
                         </div>`;
 
                                 return {
                                     "0": actionsDropdown,
                                     "1": fileInfoHtml,
-                                    "2": `<p class="tbl_date">${new Date(item.documentDate).toLocaleDateString()} ${new Date(item.documentDate).toLocaleTimeString()}</p>`,
+                                    "2": `<p class="tbl_date">${formatDateTime(item.documentDate || item.createdAt || item.updatedAt)}</p>`,
                                     "3": item.department?.name || '-',
                                     "4": approversHtml,
                                     "5": `<span class="badge badge-md ${statusClass}">${item.status}</span>`,

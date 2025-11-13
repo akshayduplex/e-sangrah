@@ -112,7 +112,7 @@ router.post("/auth/logout", authenticate, AuthController.logout);
 // ---------------------------
 // Common routes
 // ---------------------------
-router.get('/file/pdf/:fileId', authenticate, CommonController.servePDF);
+router.get('/file/pdf/:fileId', CommonController.servePDF);
 // Route to Download Folder
 router.get("/download/:folderId", authenticate, CommonController.downloadFolderAsZip);
 router.get("/download/file/:fileId", authenticate, CommonController.downloadFile);
@@ -135,7 +135,7 @@ router.get("/analytics/stats", AdminDashboard.getAnalyticsStats);
 router.get("/analytics/department-file-usage", AdminDashboard.getDepartmentFileUsage);
 // Permission Logs
 router.get("/my-approvals", AdminController.getMyApprovals);
-router.get("/permission-logs", authorize('admin', 'superadmin'), AdminController.getPermissionLogs);
+router.get("/permission-logs", authorize('admin', 'superadmin', 'user'), AdminController.getPermissionLogs);
 router.patch("/permission-logs/requestStatus", authorize('admin', 'superadmin', 'user'), PermissionLogsValidators.updateRequestStatusValidator, validators, AdminController.updateRequestStatus);
 router.post("/permission-logs/grant-access", authorize('admin', 'superadmin', 'user'), PermissionLogsValidators.grantAccessValidator, validators, AdminController.grantAccess)
 
@@ -168,6 +168,7 @@ router.post("/documents", upload.fields([{ name: "signatureFile", maxCount: 1 }]
 // Update a document (with optional signature update)
 router.patch("/documents/:id", upload.fields([{ name: "signature", maxCount: 1 }]), DocumentValidators.updateDocumentValidator, validators, DocumentController.updateDocument);
 
+router.patch('/documents/:id/sharelink', DocumentController.updateShareSettings);
 // Hard delete (permanent removal)
 router.delete("/documents/permanent", DocumentValidators.deleteDocumentValidator, validators, DocumentController.deleteDocument);
 // Soft delete (move to recycle bin)
@@ -781,7 +782,7 @@ router.get("/user", UserController.getAllUsers);
 router.get("/user/search", UserController.searchUsers);
 router.get("/user/:id", UserController.getUserById);
 router.put("/user/:id", UserController.updateUser);
-router.delete("/user/:id", authorize('admin', 'superadmin'), UserController.deleteUser);
+router.delete("/user/:id", authorize('admin', 'superadmin', 'user'), UserController.deleteUser);
 
 
 // ---------------------------

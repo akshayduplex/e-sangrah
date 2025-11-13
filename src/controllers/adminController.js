@@ -7,8 +7,6 @@ import PermissionLogs from "../models/PermissionLogs.js";
 import User from "../models/User.js";
 import SharedWith from "../models/SharedWith.js";
 import { sendEmail } from "../services/emailService.js";
-import path from "path";
-import ejs from "ejs";
 import { API_CONFIG } from "../config/ApiEndpoints.js";
 import { generateEmailTemplate } from "../helper/emailTemplate.js";
 
@@ -279,9 +277,15 @@ export const getMyApprovals = async (req, res) => {
 
 export const getPermissionLogs = async (req, res) => {
     const ownerId = req.user._id;
+    const profileType = req.session.user.profile_type;
     const { page = 1, limit = 10, startDate, endDate } = req.query;
     try {
-        const query = { owner: ownerId };
+        // Base query
+        const query = {};
+        // Restrict by owner unless superadmin
+        if (profileType !== 'superadmin') {
+            query.owner = ownerId;
+        }
 
         // Optional date filter
         if (startDate || endDate) {
@@ -296,10 +300,10 @@ export const getPermissionLogs = async (req, res) => {
             .select("user document requestedAt isExternal requestStatus access expiresAt duration")
             .populate({
                 path: "document",
-                select: "files", // only these fields from document
+                select: "files",
                 populate: {
                     path: "files",
-                    select: "originalName version fileType fileSize" // only these fields from files
+                    select: "originalName version fileType fileSize"
                 }
             })
             .populate("user", "username email")
@@ -323,6 +327,7 @@ export const getPermissionLogs = async (req, res) => {
         res.status(500).json({ success: false, message: 'Failed to fetch permission logs' });
     }
 };
+
 
 export const updateRequestStatus = async (req, res) => {
     const { logId, requestStatus } = req.body;;

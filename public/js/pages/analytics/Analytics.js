@@ -12,9 +12,9 @@ const fileIcons = {
 
 
 // =================== Dashboard Stats ===================
-async function loadDashboardStats(filter = 'today') {
+async function loadDashboardStats(filter = 'year') {
     try {
-        const response = await fetch('/api/dashboard/stats');
+        const response = await fetch(`/api/dashboard/stats?filter=${filter}`);
         const result = await response.json();
 
         if (result.success) {
@@ -30,42 +30,43 @@ async function loadDashboardStats(filter = 'today') {
     }
 }
 
+
 // =================== File Status Logs ===================
-async function loadFileStatusLogs(filter = 'today') {
+async function loadFileStatusLogs(filter = 'year') {
     const tableBody = document.getElementById('fileStatusTableBody');
     tableBody.innerHTML = `<tr><td colspan="4" class="text-center py-3 text-muted">Loading...</td></tr>`;
-
     try {
-        const response = await fetch('/api/dashboard/file-status');
+        const response = await fetch('/api/permission-logs');
         const result = await response.json();
 
-        if (result.success && Array.isArray(result.files)) {
-            const rows = result.files.map(file => {
-                const user = file.performedBy?.name || "Unknown User";
-                const fileName = file.name || "Untitled";
-                const fileSize = file.fileSize || "-";
+        if (result.success && Array.isArray(result.data)) {
+            const rows = result.data.map(entry => {
+                const user = entry.user?.username || "Unknown User";
+                const fileObj = entry.document?.files?.[0] || {};
+                const fileName = fileObj.originalName || "Untitled";
+                const fileSize = fileObj.fileSize ? formatFileSize(fileObj.fileSize) : "-"; // Optional: format bytes
                 const icon = getFileIcon(fileName);
-                const action = file.status || "—";
-                const formattedDate = formatDateTime(file.lastActionTime);
+                const action = entry.requestStatus || "—";
+                const formattedDate = formatDateTime(entry.requestedAt);
 
                 return `
-                    <tr>
-                        <td><p>${user}</p></td>
-                        <td>
-                            <div class="flxtblleft">
-                                <span class="avatar rounded bg-light mb-2">
-                                    <img src="${icon}" alt="${fileName}">
-                                </span>
-                                <div class="flxtbltxt">
-                                    <p class="fs-14 mb-1 fw-normal text-neutral">${fileName}</p>
-                                    <span class="fs-11 fw-light text-black">${fileSize}</span>
-                                </div>
+                <tr>
+                    <td><p>${user}</p></td>
+                    <td>
+                        <div class="flxtblleft">
+                            <span class="avatar rounded bg-light mb-2">
+                                <img src="${icon}" alt="${fileName}">
+                            </span>
+                            <div class="flxtbltxt">
+                                <p class="fs-14 mb-1 fw-normal text-neutral">${fileName}</p>
+                                <span class="fs-11 fw-light text-black">${fileSize}</span>
                             </div>
-                        </td>
-                        <td><p class="tbl_date">${formattedDate}</p></td>
-                        <td><p>${action}</p></td>
-                    </tr>
-                `;
+                        </div>
+                    </td>
+                    <td><p class="tbl_date">${formattedDate}</p></td>
+                    <td><p>${action}</p></td>
+                </tr>
+            `;
             }).join('');
 
             tableBody.innerHTML = rows || `<tr><td colspan="4" class="text-center py-3 text-muted">No records found.</td></tr>`;
@@ -76,6 +77,15 @@ async function loadFileStatusLogs(filter = 'today') {
         console.error('Error fetching file status logs:', error);
         tableBody.innerHTML = `<tr><td colspan="4" class="text-center py-3 text-danger">Error loading data</td></tr>`;
     }
+
+
+}
+// Optional helper to format bytes nicely
+function formatFileSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    return (bytes / (1024 * 1024 * 1024)).toFixed(1) + ' GB';
 }
 
 // =================== Documents ===================
@@ -226,7 +236,6 @@ async function loadFileUsage() {
         console.error("Error loading chart:", error);
     }
 }
-
 
 async function loadAnalyticsStats() {
     try {

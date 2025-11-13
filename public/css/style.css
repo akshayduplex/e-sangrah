@@ -17344,11 +17344,11 @@ button.swal2-cancel {
   color: #637381;
 }
 
-.sidebar .sidebar-menu>ul>li>a.active {
+/* .sidebar .sidebar-menu>ul>li>a.active {
   background: rgba(254, 159, 67, 0.08);
   color: #FE9F43;
   border-radius: 5px;
-}
+} */
 
 .sidebar .sidebar-menu>ul>li>a.active svg {
   color: #FFF;
@@ -17359,7 +17359,7 @@ button.swal2-cancel {
 }
 
 .sidebar .sidebar-menu>ul>li>a.active span {
-  color: #FE9F43;
+  font-weight: 500;
 }
 
 .sidebar .sidebar-menu>ul>li>a.active .menu-arrow {

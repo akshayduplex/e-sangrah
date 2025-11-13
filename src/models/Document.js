@@ -17,6 +17,11 @@ const documentSchema = new mongoose.Schema({
         type: Boolean,
         default: false
     },
+    ispublic: { type: Boolean, default: true },
+    docExpiresAt: { type: Date, default: null },
+    docExpireDuration: { type: String, enum: ['oneday', 'oneweek', 'onemonth', 'custom', 'onetime', 'lifetime'], default: 'lifetime' },
+    DoccustomStart: { type: Date, default: null },
+    DoccustomEnd: { type: Date, default: null },
     metadata: {
         fileName: { type: String, trim: true },
         fileDescription: { type: String, trim: true },

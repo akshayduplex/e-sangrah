@@ -1,8 +1,8 @@
 $(document).ready(function () {
     const baseUrl = window.baseUrl || '';
     let currentProjectId = '';
-    let currentPeriod = 'today';
-    let typeUploadsperiod = 'today';
+    let currentPeriod = 'year';
+    let typeUploadsperiod = 'year';
     let isInitialized = false;
 
     // File type icons
@@ -376,7 +376,7 @@ $(document).ready(function () {
     }
 
     // Department Document Uploads Chart
-    function loadDepartmentDocumentUploads(projectId = '', period = 'today', departmentId = '') {
+    function loadDepartmentDocumentUploads(projectId = '', period = 'year', departmentId = '') {
         if (!$('#sales-income').length) return;
 
         const params = new URLSearchParams();
@@ -524,9 +524,7 @@ $(document).ready(function () {
     async function loadDonorVendorProjects() {
         const donorId = $('#dashboardDonor').val() || '';
         const vendorId = $('#dashboardVendor').val() || '';
-        const period = $('#currentDonorVendorPeriodLabel').data('period') || 'today';
-
-        console.log('Loading Donor/Vendor Projects:', { donorId, vendorId, period });
+        const period = $('#currentDonorVendorPeriodLabel').data('period') || 'year';
 
         try {
             const params = new URLSearchParams();
@@ -554,8 +552,6 @@ $(document).ready(function () {
             const vendorSeries = data.map(item => {
                 return (item.donorCount || item.vendorCount) === 0 ? null : (item.vendorCount ?? 0);
             });
-
-            console.log({ categories, donorSeries, vendorSeries });
 
             if (window.donorVendorChart) {
                 window.donorVendorChart.destroy();
@@ -712,8 +708,8 @@ $(document).ready(function () {
 
             documents.forEach(doc => {
                 const fileSizeKB = doc.files?.[0] ? (doc.files[0].fileSize / 1024).toFixed(2) + ' KB' : '0 KB';
-                const createdDate = new Date(doc.createdAt).toLocaleString();
-                const updatedDate = new Date(doc.updatedAt).toLocaleString();
+                const createdDate = formatDateTime(doc.createdAt);
+                const updatedDate = formatDateTime(doc.updatedAt);
                 const tags = doc.tags?.join(', ') || '-';
                 const sharedWith = doc.sharedWithUsers?.length ? (() => {
                     const users = doc.sharedWithUsers.slice(0, 3);
@@ -790,7 +786,7 @@ $(document).ready(function () {
     }
 
     // Department Uploads Chart
-    function loadDepartmentUploads(projectId = '', period = 'today', departmentId = '') {
+    function loadDepartmentUploads(projectId = '', period = 'year', departmentId = '') {
         if (!$('#department').length) return;
 
         const chartCanvas = document.getElementById('department');
@@ -883,7 +879,7 @@ $(document).ready(function () {
     }
 
     // Document Type Uploads Chart
-    function loadDocumentTypeUploads(projectId = '', period = 'today', departmentId = '') {
+    function loadDocumentTypeUploads(projectId = '', period = 'year', departmentId = '') {
         if (!$('#documentUploads').length) return;
 
         const chartCanvas = document.getElementById('documentUploads');
@@ -1014,7 +1010,7 @@ $(document).ready(function () {
         preloadDonorVendorOptions();
 
         // Set initial period
-        $('#currentDonorVendorPeriodLabel').data('period', 'today');
+        $('#currentDonorVendorPeriodLabel').data('period', 'year');
 
         // Load initial chart
         loadDonorVendorProjects();
@@ -1057,7 +1053,7 @@ $(document).ready(function () {
         loadRecentActivities(currentProjectId);
         loadFileStatus(currentProjectId);
         loadDocumentsFiltered(currentProjectId);
-
+        loadDepartmentDocumentUploads(currentProjectId);
         safeSelect2Init('#dashboardDonor', initializeDonorSelect2);
         safeSelect2Init('#dashboardVendor', initializeVendorSelect2);
 

@@ -65,34 +65,32 @@ const cleanupFolderPermissionLogs = async () => {
 /* ----------------------------
   Combined logs cleanup runner
 ---------------------------- */
-const runLogsCleanup = async () => {
-    if (isRunningLogs) {
-        logger.warn("Logs cleanup skipped: previous run still in progress.");
-        return;
-    }
+// const runLogsCleanup = async () => {
+//     if (isRunningLogs) {
+//         logger.warn("Logs cleanup skipped: previous run still in progress.");
+//         return;
+//     }
 
-    isRunningLogs = true;
-    const startTime = new Date();
-    logger.info(`[${startTime.toISOString()}] Permission logs cleanup job started.`);
+//     isRunningLogs = true;
+//     const startTime = new Date();
+//     logger.info(`[${startTime.toISOString()}] Permission logs cleanup job started.`);
 
-    try {
-        await cleanupPermissionLogs();
-        await cleanupFolderPermissionLogs();
-    } catch (err) {
-        logger.error("Logs cleanup job failed:", err);
-    } finally {
-        const endTime = new Date();
-        logger.info(`[${endTime.toISOString()}] Permission logs cleanup job finished. Duration: ${((endTime - startTime) / 1000).toFixed(2)}s`);
-        isRunningLogs = false;
-    }
-};
+//     try {
+//         await cleanupPermissionLogs();
+//         await cleanupFolderPermissionLogs();
+//     } catch (err) {
+//         logger.error("Logs cleanup job failed:", err);
+//     } finally {
+//         const endTime = new Date();
+//         logger.info(`[${endTime.toISOString()}] Permission logs cleanup job finished. Duration: ${((endTime - startTime) / 1000).toFixed(2)}s`);
+//         isRunningLogs = false;
+//     }
+// };
 
 /* ----------------------------
   Start scheduled jobs
 ---------------------------- */
 export const startCleanupJob = () => {
-    logger.info("Scheduling cleanup cron jobs...");
-
     // Temp files: every 2 hours on the hour
     cron.schedule(
         "0 */2 * * *",
@@ -104,12 +102,12 @@ export const startCleanupJob = () => {
     );
 
     // PermissionLogs and FolderPermissionLogs: daily at midnight UTC
-    cron.schedule(
-        "0 0 * * *",
-        async () => {
-            logger.info("Triggering permission logs cleanup...");
-            await runLogsCleanup();
-        },
-        { scheduled: true, timezone: "UTC" }
-    );
+    // cron.schedule(
+    //     "0 0 * * *",
+    //     async () => {
+    //         logger.info("Triggering permission logs cleanup...");
+    //         await runLogsCleanup();
+    //     },
+    //     { scheduled: true, timezone: "UTC" }
+    // );
 };

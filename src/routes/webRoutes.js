@@ -167,7 +167,8 @@ router.get("/documents/add", authenticate, DocumentController.showAddDocumentPag
 
 // Edit Document page
 router.get("/documents/edit/:id", authenticate, checkPermissions, DocumentController.showEditDocumentPage);
-router.get('/documents/view/:token', authenticate, DocumentController.viewDocumentFiles);
+router.get('/documents/view/:token', DocumentController.viewDocumentFiles);
+router.get('/documents/invited/:token', authenticate, DocumentController.viewInvitedDocumentFiles);
 router.get('/documents/approve-access/:token', authenticate, DocumentController.viewGrantAccessPage);
 
 /* =========================================

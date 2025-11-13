@@ -1,8 +1,8 @@
 import mongoose from "mongoose";
 import Document from "../models/Document.js";
+import File from "../models/File.js";
 import { successResponse, failResponse, errorResponse } from "../utils/responseHandler.js";
 import { calculateStartDate } from "../utils/calculateStartDate.js";
-import File from "../models/File.js";
 import { getFileIcon } from "../helper/getFileIcon.js";
 import { FILE_TYPE_CATEGORIES, FILTER_PERIODS } from "../constant/Constant.js";
 import Project, { ProjectType } from "../models/Project.js";
@@ -35,26 +35,47 @@ export const getDashboardStats = async (req, res) => {
         const user = req.user || req.session.user;
         const userId = new mongoose.Types.ObjectId(user._id);
         const profileType = user.profile_type;
-        const { selectedProjectId, selectedYear } = getSessionFilters(req);
+        const { selectedProjectId } = getSessionFilters(req);
+        const { filter } = req.query;
+
         // Base filters
         const matchConditions = [
             { isDeleted: { $ne: true } },
             { isArchived: { $ne: true } },
         ];
 
-        // Filter by selected project if available
+        // Filter by project/year if available
         if (selectedProjectId) {
             matchConditions.push({ project: selectedProjectId });
         }
 
-        // Filter by selected year if available
-        if (selectedYear) {
-            const startOfYear = new Date(`${selectedYear}-01-01T00:00:00.000Z`);
-            const endOfYear = new Date(`${Number(selectedYear) + 1}-01-01T00:00:00.000Z`);
-            matchConditions.push({ createdAt: { $gte: startOfYear, $lt: endOfYear } });
+        // Date filter based on user selection
+        const now = new Date();
+        let startDate;
+
+        switch (filter) {
+            case 'today':
+                startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                break;
+            case 'week':
+                startDate = new Date(now);
+                startDate.setDate(now.getDate() - 7);
+                break;
+            case 'month':
+                startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+                break;
+            case 'year':
+                startDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+                break;
+            default:
+                startDate = null;
         }
 
-        // Restrict access for non-superadmin users (only show owned documents)
+        if (startDate) {
+            matchConditions.push({ createdAt: { $gte: startDate, $lte: now } });
+        }
+
+        // Restrict access for non-superadmin users
         if (profileType !== "superadmin") {
             matchConditions.push({ owner: userId });
         }
@@ -72,7 +93,6 @@ export const getDashboardStats = async (req, res) => {
 
         // Format stats
         const stats = { total: 0, draft: 0, pending: 0, approved: 0, rejected: 0 };
-
         documentStats.forEach(stat => {
             const key = stat._id?.toLowerCase();
             if (stats.hasOwnProperty(key)) {
@@ -87,6 +107,7 @@ export const getDashboardStats = async (req, res) => {
         return errorResponse(res, err, "Failed to fetch dashboard stats");
     }
 };
+
 
 export const getFileStatus = async (req, res) => {
     try {
@@ -640,7 +661,7 @@ export const getDocumentsTypeUploads = async (req, res) => {
         return successResponse(res, {
             period,
             startDate,
-            projectId: projectId || sessionFilters.selectedProjectId || null,
+            projectId: projectId || req.session.selectedProjectId || null,
             departmentId: departmentId || null,
             uploadedBy: uploadedBy || null,
             fileTypeBreakdown: result
@@ -774,42 +795,52 @@ export const getDocumentsStatusSummary = async (req, res) => {
 export const getAnalyticsStats = async (req, res) => {
     try {
         const { selectedYear, selectedProjectId } = getSessionFilters(req);
+        const user = req.user;
+        const isSuperAdmin = req.session?.user?.profile_type === "superadmin";
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
 
-        // Base filter (not deleted)
+        // === BASE FILTER ===
         const baseFilter = { isDeleted: false };
 
-        // Apply project filter if present
+        // Restrict if not super admin
+        if (!isSuperAdmin) {
+            baseFilter.owner = user._id;
+        }
+
+        // Filter by project
         if (selectedProjectId) {
             baseFilter.project = selectedProjectId;
         }
 
-        // Apply year filter (compare createdAt's year)
+        // Filter by selected year
         if (selectedYear) {
-            const startOfYear = new Date(selectedYear, 0, 1);
-            const endOfYear = new Date(selectedYear, 11, 31, 23, 59, 59);
-            baseFilter.createdAt = { $gte: startOfYear, $lte: endOfYear };
+            baseFilter.createdAt = {
+                $gte: new Date(selectedYear, 0, 1),
+                $lte: new Date(selectedYear, 11, 31, 23, 59, 59),
+            };
         }
 
-        // Total documents (by project + year)
+        // === TOTAL DOCUMENTS ===
         const totalDocuments = await Document.countDocuments(baseFilter);
 
-        //Uploaded this month (within selected year/project)
-        const now = new Date();
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        // === UPLOADED THIS MONTH ===
         const uploadedThisMonth = await Document.countDocuments({
             ...baseFilter,
             createdAt: { $gte: startOfMonth, $lte: endOfMonth },
         });
 
-        // Modified documents (updated after created)
+        // === MODIFIED DOCUMENTS ===
+        // modified = currentVersion > 1.0
         const modifiedDocuments = await Document.countDocuments({
             ...baseFilter,
-            $expr: { $gt: ["$updatedAt", "$createdAt"] },
+            "versioning.currentVersion": { $gt: mongoose.Types.Decimal128.fromString("1.0") },
         });
 
-        // Deleted or archived
+        // === DELETED OR ARCHIVED ===
         const deletedOrArchived = await Document.countDocuments({
+            ...(isSuperAdmin ? {} : { owner: user._id }),
             ...(selectedProjectId && { project: selectedProjectId }),
             ...(selectedYear && {
                 createdAt: {
@@ -839,6 +870,7 @@ export const getAnalyticsStats = async (req, res) => {
         });
     }
 };
+
 
 export const getDepartmentFileUsage = async (req, res) => {
     try {

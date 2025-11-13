@@ -37,16 +37,20 @@ export const profile_type = ["user", "vendor", "donor"];
 
 // Centralized array of document types
 export const docTypes = [
+    { value: "application/pdf", label: "PDF" },
+    { value: "application/msword", label: "Word (.doc)" },
+    { value: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", label: "Word (.docx)" },
     { value: "application/vnd.ms-excel", label: "Excel (.xls)" },
     { value: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", label: "Excel (.xlsx)" },
-    { value: "application/vnd.ms-excel.sheet.macroenabled.12", label: "Excel Macro (.xlsm)" },
-    { value: "application/vnd.ms-excel.sheet.binary.macroenabled.12", label: "Excel Binary Macro (.xlsb)" },
-    { value: "application/vnd.ms-excel.template.macroenabled.12", label: "Excel Macro Template (.xltm)" },
-    { value: "application/vnd.openxmlformats-officedocument.spreadsheetml.template", label: "Excel Template (.xltx)" },
-    { value: "application/vnd.oasis.opendocument.spreadsheet", label: "OpenDocument (.ods)" },
-    { value: "application/x-excel", label: "Legacy Excel (.xls)" },
-    { value: "application/x-msexcel", label: "Legacy Excel alternative (.xls)" }
+    { value: "application/vnd.ms-powerpoint", label: "PowerPoint (.ppt)" },
+    { value: "application/vnd.openxmlformats-officedocument.presentationml.presentation", label: "PowerPoint (.pptx)" },
+    { value: "text/plain", label: "Text File (.txt)" },
+    { value: "text/csv", label: "CSV File (.csv)" },
+    { value: "image/jpeg", label: "Image (.jpg, .jpeg)" },
+    { value: "image/png", label: "Image (.png)" },
+    { value: "application/zip", label: "ZIP Archive (.zip)" },
 ];
+
 
 export const FILE_TYPE_CATEGORIES = {
     word: ["doc", "docx"],

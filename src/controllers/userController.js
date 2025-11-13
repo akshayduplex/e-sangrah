@@ -1,5 +1,3 @@
-import ejs from "ejs";
-import path from "path";
 import User from "../models/User.js";
 import { validationResult } from "express-validator";
 import { generateRandomPassword } from "../helper/GenerateRandomPassword.js";

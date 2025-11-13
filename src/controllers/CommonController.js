@@ -8,7 +8,6 @@ import ExcelJS from 'exceljs';
 import PDFDocument from 'pdfkit';
 import { Parser } from 'json2csv';
 import { API_CONFIG } from "../config/ApiEndpoints.js";
-import { getSessionFilters } from "../helper/sessionHelpers.js";
 import mongoose from "mongoose";
 function sanitize(str) {
     return String(str)
@@ -23,13 +22,14 @@ function buildApproverString(doc) {
 
     return doc.documentApprovalAuthority
         .sort((a, b) => (a.priority || 0) - (b.priority || 0))
-        .map(a => {
-            const name = a.userId?.name || "Unknown";
-            const status = a.status || "Pending";
-            return `${name} [${status}]`;
+        .map(approver => {
+            const name = approver.userId?.name || 'Unknown';
+            const status = approver.status || 'Pending';
+            return `${name} (${status})`;
         })
-        .join(" | ");
+        .join('; ');
 }
+
 export const servePDF = async (req, res) => {
     try {
         const { fileId } = req.params;
@@ -178,42 +178,179 @@ export const exportDocuments = async (req, res) => {
                 .json({ success: false, message: "Invalid export format" });
         }
 
-        const { selectedYear, selectedProjectId } = getSessionFilters(req);
-        const query = buildQuery(filters);
-        if (selectedProjectId) {
-            query.project = new mongoose.Types.ObjectId(selectedProjectId);
+        // Use the SAME filtering logic as getDocuments
+        const {
+            search,
+            status,
+            department,
+            project,
+            date,
+            role,
+            docType,
+            designation,
+        } = filters;
+
+        const userId = req.user?._id;
+        const profile_type = req.user?.profile_type;
+
+        // --- Base filter (SAME as getDocuments) ---
+        const query = {
+            isDeleted: false,
+            isArchived: false,
+        };
+
+        // --- If not superadmin, restrict documents ---
+        if (profile_type !== "superadmin") {
+            query.$or = [
+                { owner: userId },
+                // { sharedWithUsers: userId }
+            ];
         }
 
-        if (selectedYear) {
-            const start = new Date(`${selectedYear}-01-01T00:00:00.000Z`);
-            const end = new Date(`${Number(selectedYear) + 1}-01-01T00:00:00.000Z`);
-            query.createdAt = { $gte: start, $lt: end };
+        const toArray = val => {
+            if (!val) return [];
+            if (Array.isArray(val)) return val;
+            return val.split(',').map(v => v.trim()).filter(Boolean);
+        };
+
+        // --- Search ---
+        if (search?.trim()) {
+            const safeSearch = search.trim();
+            query.$and = query.$and || [];
+            query.$and.push({
+                $or: [
+                    // Metadata fields
+                    { "metadata.fileName": { $regex: safeSearch, $options: "i" } },
+                    { "metadata.fileDescription": { $regex: safeSearch, $options: "i" } },
+                    { "metadata.mainHeading": { $regex: safeSearch, $options: "i" } },
+
+                    // Document-level fields
+                    { description: { $regex: safeSearch, $options: "i" } },
+                    { remark: { $regex: safeSearch, $options: "i" } },
+                    { tags: { $in: [new RegExp(safeSearch, "i")] } },
+
+                    // Files
+                    { "files.originalName": { $regex: safeSearch, $options: "i" } },
+
+                    // Project name (via populated field)
+                    { "project.projectName": { $regex: safeSearch, $options: "i" } }
+                ]
+            });
         }
 
+        // --- Status ---
+        if (status) {
+            const normalizedStatus = status.replace(/\s+/g, ' ').trim();
+            if (normalizedStatus === "Compliance and Retention") {
+                query["compliance.isCompliance"] = true;
+            } else {
+                query.status = normalizedStatus;
+            }
+        }
+
+        // --- Department filter ---
+        if (department) {
+            const deptArray = toArray(department).filter(id => mongoose.Types.ObjectId.isValid(id));
+            if (deptArray.length > 0) {
+                query.department = deptArray.length === 1 ? deptArray[0] : { $in: deptArray };
+            }
+        }
+
+        // --- Project filter (from session) ---
+        const sessionProjectId = req.session?.selectedProject;
+        if (sessionProjectId && mongoose.Types.ObjectId.isValid(sessionProjectId)) {
+            query.project = sessionProjectId;
+        }
+
+        // --- Date filter ---
+        if (date) {
+            const [day, month, year] = date.split("-").map(Number);
+            const selectedDate = new Date(year, month - 1, day);
+            if (!isNaN(selectedDate.getTime())) {
+                const nextDate = new Date(selectedDate);
+                nextDate.setDate(nextDate.getDate() + 1);
+                query.createdAt = { $gte: selectedDate, $lt: nextDate };
+            }
+        }
+
+        // --- Year filter from session ---
+        if (req.session?.selectedYear) {
+            const year = parseInt(req.session.selectedYear, 10);
+            if (!isNaN(year)) {
+                const startOfYear = new Date(year, 0, 1);
+                const endOfYear = new Date(year + 1, 0, 1);
+
+                if (!query.createdAt) {
+                    query.createdAt = { $gte: startOfYear, $lt: endOfYear };
+                } else {
+                    query.createdAt.$gte = startOfYear;
+                    query.createdAt.$lt = endOfYear;
+                }
+            }
+        }
+
+        /** -------------------- ROLE FILTER -------------------- **/
+        if (role?.trim()) {
+            const usersByRole = await mongoose
+                .model("User")
+                .find({ "userDetails.role": role.trim() }, { _id: 1 });
+            if (usersByRole.length > 0) {
+                query.owner = { $in: usersByRole.map((u) => u._id) };
+            } else {
+                query.owner = null; // no matching users
+            }
+        }
+
+        /** -------------------- DESIGNATION FILTER -------------------- **/
+        if (designation?.trim() && mongoose.Types.ObjectId.isValid(designation)) {
+            const usersByDesg = await mongoose
+                .model("User")
+                .find({ "userDetails.designation": designation }, { _id: 1 });
+            if (usersByDesg.length > 0) {
+                query.owner = { $in: usersByDesg.map((u) => u._id) };
+            } else {
+                query.owner = null;
+            }
+        }
+
+        /** -------------------- DOC TYPE FILTER -------------------- **/
+        if (docType?.trim()) {
+            const filesByType = await mongoose
+                .model("File")
+                .find({ fileType: docType.trim() }, { document: 1 });
+            const docIds = filesByType.map((f) => f.document).filter(Boolean);
+            if (docIds.length > 0) {
+                query._id = { $in: docIds };
+            } else {
+                query._id = null;
+            }
+        }
+
+        // --- Fetch documents with SAME population as getDocuments ---
         const docsQuery = Document.find(query)
+            .select(`
+                files updatedAt createdAt wantApprovers signature isDeleted isArchived 
+                comment sharedWithUsers compliance status metadata tags owner 
+                documentVendor documentDonor department project description
+                documentApprovalAuthority
+            `)
+            .populate("department", "name")
+            .populate("project", "projectName")
             .populate({
                 path: "owner",
-                select: "name",
-                populate: {
-                    path: "userDetails.designation",
-                    model: "Designation",
-                    select: "name"
-                }
+                select: "name email profile_image userDetails.role userDetails.designation",
+                populate: { path: "userDetails.designation", select: "name" },
             })
-            .populate("department", "name")
-            .populate("sharedWithUsers", "name")
-            .populate("files", "originalName fileSize")
+            .populate("documentDonor", "name profile_image")
+            .populate("documentVendor", "name profile_image")
+            .populate("sharedWithUsers", "name profile_image email")
+            .populate("files", "originalName version fileSize")
             .populate({
                 path: "documentApprovalAuthority.userId",
-                select: "name"
-            })
-            .populate({
-                path: "documentApprovalAuthority.designation",
-                model: "Designation",
-                select: "name"
+                select: "name email profile_image"
             })
             .sort({ updatedAt: -1 });
-        console.log("Report", docsQuery)
+
         const documents = exportAll ? await docsQuery : await docsQuery.limit(1000);
         const exportData = formatExportData(documents);
 
@@ -224,6 +361,7 @@ export const exportDocuments = async (req, res) => {
         if (filters.docType) parts.push(`Type_${sanitize(filters.docType)}`);
         if (filters.designation) parts.push(`Desig_${sanitize(filters.designation)}`);
         if (filters.date) parts.push(`Date_${filters.date}`);
+        if (filters.search) parts.push(`Search_${sanitize(filters.search)}`);
         const suffix = parts.length ? parts.join("-") + "-" : "";
         const fileName = `documents-${suffix}${new Date()
             .toISOString()
@@ -253,7 +391,6 @@ export const exportDocuments = async (req, res) => {
         });
     }
 };
-
 
 function buildQuery(filters) {
     const query = {};

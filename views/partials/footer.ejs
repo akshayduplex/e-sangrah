@@ -963,23 +963,6 @@
 
     })(jQuery);
 </script>
-<script>$(document).ready(function () {
-        $('#sharedoc-modal').on('shown.bs.modal', function () {
-            flatpickr('#flatpickr-range', {
-                mode: 'range',
-                dateFormat: 'd-m-Y',
-                appendTo: this, // attach to current modal
-            });
-        });
-
-        // Prevent Bootstrap from blocking Flatpickr focus
-        $('#shareDocumentModal').on('focusin', function (e) {
-            if ($(e.target).closest('.flatpickr-calendar').length) {
-                e.stopPropagation();
-            }
-        });
-    });
-</script>
 <script>
     $(document).ready(function () {
         const baseUrl = window.baseUrl;

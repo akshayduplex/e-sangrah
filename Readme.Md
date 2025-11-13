@@ -30,7 +30,17 @@ line 17404
 }
 
 
+line 17361
+.sidebar .sidebar-menu>ul>li>a.active span {
+  color: #FE9F43;  chnage to fonnt-wiegh-500
+}
 
+removed
+.sidebar .sidebar-menu>ul>li>a.active {
+  background: rgba(254, 159, 67, 0.08);
+  color: #FE9F43;
+  border-radius: 5px;
+}
 
 
 
