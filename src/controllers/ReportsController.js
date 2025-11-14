@@ -1,6 +1,6 @@
 import { docTypes, profile_type } from "../constant/Constant.js";
 import Designation from "../models/Designation.js";
-
+import { activityLogger } from "../helper/activityLogger.js";
 
 // Render Dashboard page
 export const showReportPage = async (req, res) => {

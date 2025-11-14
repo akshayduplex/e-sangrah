@@ -92,8 +92,10 @@
 
                     <!-- Content -->
                     <div id="modalContent" style="display: none;">
-                        <p class="fs-16"><i class="ti ti-user"></i> <strong id="modalOwnerName"></strong> has requested
-                            document approval</p>
+                        <p class="fs-16">
+                            <i class="ti ti-user"></i>
+                            <strong id="modalOwnerName"></strong> has requested document approval
+                        </p>
 
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <div class="flxtblleft">
@@ -116,13 +118,16 @@
                                 id="modalDescription"></textarea>
                         </div>
 
-                        <!-- Approval Toggle (Hidden in View/Edit) -->
+                        <!-- Approval Toggle -->
                         <div class="approval-switch d-flex mb-3" id="approvalToggle">
                             <button type="button" class="btn flex-fill border-0 py-2 active" id="approveBtn">
                                 <i class="ti ti-circle-check me-1"></i> Approve
                             </button>
                             <button type="button" class="btn flex-fill border-0 py-2" id="declineBtn">
                                 <i class="ti ti-circle-x me-1"></i> Decline
+                            </button>
+                            <button type="button" class="btn flex-fill border-0 py-2" id="needDiscussionBtn">
+                                <i class="ti ti-message-circle me-1"></i> Need Discussion
                             </button>
                         </div>
 
@@ -158,6 +163,7 @@
             </div>
         </div>
     </div>
+
     <%- include('../../partials/footer') %>
 
 
@@ -292,13 +298,33 @@
                     commentBox.value = remark;
 
                     // Reset toggle state
+                    // Reset toggle state (for 'approve' mode)
                     if (mode === 'approve') {
                         const approveBtn = document.getElementById('approveBtn');
                         const declineBtn = document.getElementById('declineBtn');
+                        const discussionBtn = document.getElementById('needDiscussionBtn');
+                        console.log("clciked initally", discussionBtn)
+                        // Reset active states
                         approveBtn.classList.add('active');
                         declineBtn.classList.remove('active');
-                        approveBtn.onclick = () => { approveBtn.classList.add('active'); declineBtn.classList.remove('active'); };
-                        declineBtn.onclick = () => { declineBtn.classList.add('active'); approveBtn.classList.remove('active'); };
+                        discussionBtn.classList.remove('active');
+
+                        // Add click handlers
+                        approveBtn.onclick = () => {
+                            approveBtn.classList.add('active');
+                            declineBtn.classList.remove('active');
+                            discussionBtn.classList.remove('active');
+                        };
+                        declineBtn.onclick = () => {
+                            approveBtn.classList.remove('active');
+                            declineBtn.classList.add('active');
+                            discussionBtn.classList.remove('active');
+                        };
+                        discussionBtn.onclick = () => {
+                            approveBtn.classList.remove('active');
+                            declineBtn.classList.remove('active');
+                            discussionBtn.classList.add('active');
+                        };
                     }
                 }
 
@@ -319,19 +345,32 @@
                 // Open Modal with Mode
                 $(document).on('click', '.openApprovalModal', async function () {
                     const docId = this.getAttribute('data-id');
-                    const status = this.getAttribute('data-status');
+                    const approverStat = this.getAttribute('data-status');
                     const remark = this.getAttribute('data-remark') || '';
+                    const outerStat = this.getAttribute('data-outer-status');  // NEW
+
                     currentDocumentId = docId;
                     currentRow = $(this).closest('tr');
-                    currentMode = status === 'Approved' ? 'edit' : (status === 'Rejected' ? 'view' : 'approve');
 
-                    // Reset modal
+                    // FORCE VIEW MODE IF DOCUMENT IS ALREADY APPROVED
+                    let mode = 'approve';
+                    if (outerStat === 'Approved') {
+                        mode = 'view';
+                    } else {
+                        mode = approverStat === 'Approved' ? 'edit'
+                            : approverStat === 'Rejected' ? 'view'
+                                : 'approve';
+                    }
+
+                    currentMode = mode;
+
+                    // Show loading
                     document.getElementById('modalLoading').style.display = 'block';
                     document.getElementById('modalContent').style.display = 'none';
 
                     const data = await loadDocument(docId);
                     if (data) {
-                        populateModal(data, currentMode, remark);
+                        populateModal(data, mode, remark);
                     }
 
                     const modal = new bootstrap.Modal(document.getElementById('approvalModal'));
@@ -339,47 +378,54 @@
                 });
 
                 // Submit Approval / Edit
-                // Submit Approval / Edit
                 document.getElementById('submitApprovalBtn').addEventListener('click', async () => {
                     if (!currentDocumentId || currentMode === 'view') return;
 
                     const submitBtn = document.getElementById('submitApprovalBtn');
                     const approveBtn = document.getElementById('approveBtn');
                     const declineBtn = document.getElementById('declineBtn');
+                    const discussionBtn = document.getElementById('needDiscussionBtn');
                     const comment = document.getElementById('modalComment').value.trim();
-                    const approved = approveBtn.classList.contains('active') && !declineBtn.classList.contains('active');
+                    console.log("Clciked nedd", discussionBtn)
+                    // Detect which action user selected
+                    let action = 'approve';
+                    if (declineBtn.classList.contains('active')) {
+                        action = 'reject';
+                    } else if (discussionBtn.classList.contains('active')) {
+                        action = 'need_discussion';
+                    }
+
+                    // For "Need Discussion", remark is compulsory
+                    if (action === 'need_discussion' && !comment) {
+                        showToast('Please enter a remark for discussion.', 'error');
+                        return;
+                    }
 
                     submitBtn.disabled = true;
-                    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
+                    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Processing...';
 
                     try {
-                        const payload = { approved, comment };
                         const res = await fetch(`/api/documents/${currentDocumentId}/approval`, {
                             method: 'PATCH',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(payload)
+                            body: JSON.stringify({ action, comment })
                         });
                         const result = await res.json();
 
                         if (res.ok && result.success) {
-                            // Close the modal
                             const modalInstance = bootstrap.Modal.getInstance(document.getElementById('approvalModal'));
                             if (modalInstance) modalInstance.hide();
-
-                            // Refresh only that row
                             await refreshRowOnly(currentDocumentId);
-
-                            // Notify user
-                            const message = currentMode === 'edit' ? 'Changes saved successfully!' : 'Approval submitted successfully!';
+                            showToast(result.message || `Action submitted successfully!`, 'success');
                         } else {
-                            showToast(result.message || 'Operation failed', 'error');
+                            showToast(result.message || 'Operation failed', 'success');
                         }
                     } catch (err) {
                         console.error(err);
                         showToast('Network error', 'error');
                     } finally {
                         submitBtn.disabled = false;
-                        submitBtn.innerHTML = currentMode === 'edit' ? 'Save Changes' : 'Approve';
+                        submitBtn.innerHTML = 'Submit';
                     }
                 });
 
@@ -495,22 +541,45 @@
                             data: null,
                             render: (data, type, row) => {
                                 const approvers = row.documentApprovalAuthority || [];
-                                const latest = approvers.length > 0 ? approvers.reduce((a, b) => new Date(a.approvedOn || a.addDate) > new Date(b.approvedOn || b.addDate) ? a : b) : null;
-                                const status = latest?.status || 'Pending';
+                                const latest = approvers.length
+                                    ? approvers.reduce((a, b) =>
+                                        new Date(a.approvedOn || a.addDate) >
+                                            new Date(b.approvedOn || b.addDate) ? a : b)
+                                    : null;
+
+                                const approverStatus = latest?.status || 'Pending';
                                 const remark = latest?.remark || '';
+                                const outerStatus = row.status;               // <-- outer doc status
 
-                                const config = {
-                                    'Pending': { label: 'Approve', class: 'adminapprv_btn', mode: 'approve' },
-                                    'Approved': { label: 'Edit', class: 'adminapprv_btn bg-primary', mode: 'edit' },
-                                    'Rejected': { label: 'View', class: 'btn btn-light', mode: 'view' }
-                                }[status] || config['Pending'];
+                                let mode = 'approve';
+                                let label = 'Approve';
+                                let btnCls = 'adminapprv_btn';
 
-                                return `<button class="${config.class} openApprovalModal"
-                            data-id="${row._id}"
-                            data-status="${status}"
-                            data-remark="${remark}">
-                            ${config.label}
-                        </button>`;
+                                if (outerStatus === 'Approved') {
+                                    mode = 'view';
+                                    label = 'View';
+                                    btnCls = 'btn btn-light';
+                                } else {
+                                    const cfg = {
+                                        'Pending': { label: 'Approve', class: 'adminapprv_btn', mode: 'approve' },
+                                        'Approved': { label: 'Edit', class: 'adminapprv_btn bg-primary', mode: 'edit' },
+                                        'Rejected': { label: 'View', class: 'btn btn-light', mode: 'view' }
+                                    }[approverStatus] || cfg['Pending'];
+
+                                    label = cfg.label;
+                                    btnCls = cfg.class;
+                                    mode = cfg.mode;
+                                }
+
+                                return `
+    <button class="${btnCls} openApprovalModal"
+            data-id="${row._id}"
+            data-status="${approverStatus}"
+            data-remark="${remark}"
+            data-mode="${mode}"
+            data-outer-status="${outerStatus}">  <!-- ADD THIS -->
+        ${label}
+    </button>`;
                             }
                         },
                         { data: "_id", render: id => `<a href="/document/${id}/approval/track" class="site-btnmd">Track</a>` },

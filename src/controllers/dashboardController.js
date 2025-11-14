@@ -3,11 +3,12 @@ import Document from "../models/Document.js";
 import File from "../models/File.js";
 import { successResponse, failResponse, errorResponse } from "../utils/responseHandler.js";
 import { calculateStartDate } from "../utils/calculateStartDate.js";
-import { getFileIcon } from "../helper/getFileIcon.js";
+import { formatFileSize, getFileIcon } from "../helper/getFileIcon.js";
 import { FILE_TYPE_CATEGORIES, FILTER_PERIODS } from "../constant/Constant.js";
 import Project, { ProjectType } from "../models/Project.js";
 import { applyFilters, getSessionFilters } from "../helper/sessionHelpers.js";
 import Department from "../models/Departments.js";
+import ActivityLog from "../models/ActivityLog.js"
 
 //Page controllers
 
@@ -113,136 +114,103 @@ export const getFileStatus = async (req, res) => {
     try {
         const user = req.user;
         const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 4;
+        const limit = parseInt(req.query.limit) || 5;
         const skip = (page - 1) * limit;
 
-        // Build base query
-        let query = {};
+        const matchQuery = { entityType: "File" };
+
         if (user.profile_type !== "superadmin") {
-            query = { uploadedBy: user._id };
+            matchQuery.actorId = user._id;
         }
 
         const pipeline = [
-            { $match: query },
+            { $match: matchQuery },
+            { $sort: { createdAt: -1 } },
             {
-                $lookup: {
-                    from: "users",
-                    localField: "uploadedBy",
-                    foreignField: "_id",
-                    as: "uploadedBy"
+                $group: {
+                    _id: "$entityId",
+                    latestActivity: { $first: "$$ROOT" }
                 }
             },
-            { $unwind: { path: "$uploadedBy", preserveNullAndEmptyArrays: true } },
             {
                 $addFields: {
-                    latestActivity: { $arrayElemAt: ["$activityLog", -1] }
-                }
-            },
-            {
-                $match: {
-                    latestActivity: { $ne: null },
-                    "latestActivity.performedBy": { $ne: user._id }
+                    entityObjectId: {
+                        $cond: [
+                            { $eq: [{ $type: "$_id" }, "string"] },
+                            { $toObjectId: "$_id" },
+                            "$_id"
+                        ]
+                    }
                 }
             },
             {
                 $lookup: {
                     from: "users",
-                    localField: "latestActivity.performedBy",
+                    localField: "latestActivity.actorId",
                     foreignField: "_id",
-                    as: "latestActivity.performedBy"
+                    as: "actor"
                 }
             },
+            { $unwind: { path: "$actor", preserveNullAndEmptyArrays: true } },
             {
-                $unwind: {
-                    path: "$latestActivity.performedBy",
-                    preserveNullAndEmptyArrays: true
+                $lookup: {
+                    from: "files",
+                    localField: "entityObjectId",
+                    foreignField: "_id",
+                    as: "file"
                 }
             },
-            { $sort: { "latestActivity.timestamp": -1, updatedAt: -1 } },
+            { $unwind: { path: "$file", preserveNullAndEmptyArrays: true } },
             { $skip: skip },
             { $limit: limit },
             {
                 $project: {
                     _id: 1,
-                    originalName: 1,
-                    fileSize: 1,
-                    fileType: 1,
-                    createdAt: 1,
-                    updatedAt: 1,
-                    uploadedBy: {
-                        _id: "$uploadedBy._id",
-                        name: "$uploadedBy.name",
-                        email: "$uploadedBy.email"
-                    },
-                    latestActivity: 1
+                    latestActivity: 1,
+                    actor: { _id: 1, name: 1, email: 1 },
+                    file: { originalName: 1, fileSize: 1, fileType: 1 }
                 }
             }
         ];
 
-        // Run aggregation
-        const files = await File.aggregate(pipeline).option({ allowDiskUse: true });
+        const results = await ActivityLog.aggregate(pipeline);
 
-        // Count total filtered documents
-        const countPipeline = pipeline.slice(0, -3); // Remove sort, skip, limit
-        countPipeline.push({ $count: "total" });
-        const countResult = await File.aggregate(countPipeline);
-        const totalCount = countResult[0]?.total || 0;
+        const countPipeline = [
+            { $match: matchQuery },
+            { $group: { _id: "$entityId" } },
+            { $count: "total" }
+        ];
+        const countResult = await ActivityLog.aggregate(countPipeline);
+        const totalCount = countResult?.[0]?.total || 0;
 
-        // Helper: file size formatting
-        const formatFileSize = (bytes) => {
-            if (!bytes) return "0 Bytes";
-            const k = 1024;
-            const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
-        };
+        // Format response with file size and icon
+        const formattedFiles = results.map(item => {
+            const act = item.latestActivity;
+            const file = item.file;
 
-        // Status mapping
-        const statusTextMap = {
-            opened: "Opened the file",
-            modified: "Modified the file",
-            downloaded: "Downloaded the file",
-            shared: "Shared the file",
-            closed: "Closed the file",
-            uploaded: "Uploaded the file",
-        };
-
-        // Map final response
-        const formattedFiles = files.map(file => {
-            const activity = file.latestActivity;
             return {
-                _id: file._id,
-                name: file.originalName,
-                fileSize: formatFileSize(file.fileSize),
-                status: activity?.action
-                    ? statusTextMap[activity.action] || activity.action
-                    : "No activity yet",
-                icon: getFileIcon(file.fileType),
-                lastActionTime: activity?.timestamp || file.createdAt,
-                performedBy: activity?.performedBy
-                    ? {
-                        name: activity.performedBy.name,
-                        email: activity.performedBy.email,
-                    }
-                    : file.uploadedBy
-                        ? {
-                            name: file.uploadedBy.name,
-                            email: file.uploadedBy.email,
-                        }
-                        : null,
+                _id: item._id,
+                name: file?.originalName || "Unknown File",
+                fileSize: formatFileSize(file?.fileSize || 0),
+                fileType: file?.fileType || "unknown",
+                icon: getFileIcon(file?.fileType || ""),
+                status: act.action,
+                lastActionTime: act.createdAt,
+                performedBy: item.actor
+                    ? { name: item.actor.name, email: item.actor.email }
+                    : null
             };
         });
 
-        // Send correct pagination
-        res.status(200).json({
+        return res.status(200).json({
             success: true,
             count: formattedFiles.length,
             total: totalCount,
-            totalPages: Math.ceil(totalCount / limit) || 1,
+            totalPages: Math.ceil(totalCount / limit),
             currentPage: page,
             hasNextPage: page < Math.ceil(totalCount / limit),
             hasPrevPage: page > 1,
-            files: formattedFiles,
+            files: formattedFiles
         });
 
     } catch (error) {
@@ -250,7 +218,7 @@ export const getFileStatus = async (req, res) => {
         res.status(500).json({
             success: false,
             message: "Failed to fetch file activity list",
-            error: process.env.NODE_ENV === "development" ? error.message : undefined,
+            error: process.env.NODE_ENV === "development" ? error.message : undefined
         });
     }
 };
@@ -262,88 +230,38 @@ export const getRecentActivities = async (req, res) => {
         const userId = req.user?._id;
         const profile_type = req.user?.profile_type;
 
-        const matchDoc = { isDeleted: false, isArchived: false };
-        const matchFile = { status: "active" };
+        const matchQuery = {};
 
+        // Non-superadmins only see their own activity
         if (profile_type !== "superadmin") {
-            matchDoc.$or = [{ owner: userId }, { sharedWithUsers: userId }];
-            matchFile.$or = [
-                { uploadedBy: userId },
-                { sharedWithUsers: userId }, // optional if sharing tracked on file
-            ];
+            matchQuery.actorId = userId;
         }
 
-        // --- Fetch document version activities ---
-        const docActivities = await Document.aggregate([
-            { $match: matchDoc },
-            { $unwind: "$versionHistory" },
-            { $sort: { "versionHistory.timestamp": -1 } },
+        const activities = await ActivityLog.aggregate([
+            { $match: matchQuery },
+
+            { $sort: { updatedAt: -1 } },
             { $limit: Number(limit) },
-            {
-                $lookup: {
-                    from: "users",
-                    localField: "versionHistory.changedBy",
-                    foreignField: "_id",
-                    as: "user",
-                },
-            },
-            { $unwind: { path: "$user", preserveNullAndEmptyArrays: true } },
+
             {
                 $project: {
                     _id: 0,
-                    type: { $literal: "document" },
-                    documentId: "$_id",
-                    documentName: "$metadata.fileName",
-                    activity: "$versionHistory.changes",
-                    timestamp: "$versionHistory.timestamp",
-                    userName: "$user.name",
-                    userId: "$user._id",
-                    version: "$versionHistory.version",
-                },
-            },
+                    details: 1,                // ONLY details
+                    timestamp: "$updatedAt"    // ONLY updatedAt
+                }
+            }
         ]);
 
-        // --- Fetch file activity logs ---
-        const fileActivities = await File.aggregate([
-            { $match: matchFile },
-            { $unwind: "$activityLog" },
-            { $sort: { "activityLog.timestamp": -1 } },
-            { $limit: Number(limit) },
-            {
-                $lookup: {
-                    from: "users",
-                    localField: "activityLog.performedBy",
-                    foreignField: "_id",
-                    as: "user",
-                },
-            },
-            { $unwind: { path: "$user", preserveNullAndEmptyArrays: true } },
-            {
-                $project: {
-                    _id: 0,
-                    type: { $literal: "file" },
-                    fileId: "$_id",
-                    fileName: "$originalName",
-                    activity: "$activityLog.action",
-                    details: "$activityLog.details",
-                    timestamp: "$activityLog.timestamp",
-                    userName: "$user.name",
-                    userId: "$user._id",
-                },
-            },
-        ]);
-
-        // --- Merge and sort both types by timestamp ---
-        const allActivities = [...docActivities, ...fileActivities].sort(
-            (a, b) => new Date(b.timestamp) - new Date(a.timestamp)
-        );
-
-        res.status(200).json({ recentActivities: allActivities.slice(0, limit) });
+        res.status(200).json({ recentActivities: activities });
     } catch (error) {
         console.error("Error fetching recent activities:", error);
-        res.status(500).json({ message: "Server error", error: error.message });
+        res.status(500).json({
+            message: "Server error",
+            error: error.message
+        });
     }
 };
+
 
 
 /**

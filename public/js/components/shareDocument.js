@@ -3,6 +3,7 @@
     let currentDocId = null;
     let currentFileId = null;
     let customFlatpickr = null;
+    let downloadFileId = null;
     let restoreTarget = {};
     const baseUrl = window.location.origin;
 
@@ -444,6 +445,67 @@
             });
         });
     });
+
+    // When opening the download modal
+    $(document).on("show.bs.modal", "#downloaddoc-modal", function (event) {
+        const button = $(event.relatedTarget);
+        downloadFileId = button.data("file-id");
+
+        if (!downloadFileId) {
+            showToast("Invalid file", "error");
+            return;
+        }
+
+        // Load file info for display
+        $.get(`${baseUrl}/api/documents/file/${downloadFileId}/info`)
+            .done(res => {
+                $("#downloadFileLabel").text(res.data.originalName || "Original File");
+                $("#downloadFileSize").text(res.data.size || "(—)");
+                $("#downloadFileIcon").attr("src", res.data.icon || "/img/icons/fn2big.png");
+            })
+            .fail(() => {
+                $("#downloadFileLabel").text("Original File");
+                $("#downloadFileSize").text("(—)");
+            });
+    });
+
+    // Confirm download
+    $(document).on("click", "#confirmDownload", function () {
+        if (!downloadFileId) {
+            showToast("No file selected", "error");
+            return;
+        }
+
+        const downloadBtn = $(this);
+        downloadBtn.prop("disabled", true).text("Downloading...");
+
+        fetch(`${baseUrl}/api/download/file/${downloadFileId}`, {
+            method: "GET",
+            credentials: "include"
+        })
+            .then(res => {
+                if (!res.ok) throw new Error("Download failed");
+                return res.blob();
+            })
+            .then(blob => {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = "file"; // Filename is controlled by backend headers
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(url);
+
+                $("#downloaddoc-modal").modal("hide");
+                showToast("Downloaded", "success");
+            })
+            .catch(() => showToast("Failed to download file", "error"))
+            .finally(() => {
+                downloadBtn.prop("disabled", false).text("Download");
+            });
+    });
+
 
     // -------------------------
     // Trash (Delete) Document

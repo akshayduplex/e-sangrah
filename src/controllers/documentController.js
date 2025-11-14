@@ -24,6 +24,7 @@ import { PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { s3Client } from "../config/S3Client.js";
 import { deleteObject } from "../utils/s3Helpers.js";
 import { generateEmailTemplate } from "../helper/emailTemplate.js";
+import { activityLogger } from "../helper/activityLogger.js";
 
 //Page Controllers
 
@@ -187,7 +188,7 @@ export const viewDocumentFiles = async (req, res) => {
         let expiredMessage = null;
         let docExpired = false;
 
-        // 🔹 PUBLIC document logic only
+        // PUBLIC document logic only
         if (!document.ispublic) {
             expiredMessage = "Access restricted. This document is private.";
         } else if (document.docExpiresAt && now > document.docExpiresAt) {
@@ -244,7 +245,7 @@ export const viewDocumentFiles = async (req, res) => {
         });
 
     } catch (error) {
-        console.error("❌ viewDocumentFiles Error:", error);
+        console.error(" viewDocumentFiles Error:", error);
         res.render("pages/viewDocumentFiles", {
             expiredMessage: "Server error while fetching file.",
             documentTitle: "Document",
@@ -1013,7 +1014,8 @@ export const createDocument = async (req, res) => {
             wantApprovers,
             fileIds
         } = req.body;
-
+        const userId = req.user?._id || null;
+        const userName = req.user?.name || "Unknown User";
         // ------------------- Parse and Validate Inputs -------------------
         const validFolderId =
             folderId && mongoose.Types.ObjectId.isValid(folderId) ? folderId : null;
@@ -1126,7 +1128,7 @@ export const createDocument = async (req, res) => {
             documentVendor: documentVendor || null,
             folderId: validFolderId,
             owner: req.user._id,
-            status: "Approved",
+            status: parsedWantApprovers ? "Pending" : "Approved",
             tags: parsedTags,
             metadata: parsedMetadata,
             description,
@@ -1137,7 +1139,6 @@ export const createDocument = async (req, res) => {
             link: link || null,
             comment: comment || null,
             wantApprovers: parsedWantApprovers,
-            // FIX: Add approval authority if wantApprovers is true
             documentApprovalAuthority: documentApprovalAuthority,
             versioning: {
                 currentVersion: mongoose.Types.Decimal128.fromString("1.0"),
@@ -1155,7 +1156,6 @@ export const createDocument = async (req, res) => {
                 },
             ],
         });
-
         // ------------------- Process Files in Parallel -------------------
         let fileDocs = [];
         if (parsedFileIds.length > 0) {
@@ -1200,7 +1200,7 @@ export const createDocument = async (req, res) => {
             }
             document.signature = {
                 fileName: file.originalname,
-                fileUrl: file.location, // multer-s3 gives you the S3 URL
+                fileUrl: file.location,
                 uploadedAt: new Date(),
             };
         } else if (req.body.signature?.startsWith("data:image/")) {
@@ -1234,7 +1234,14 @@ export const createDocument = async (req, res) => {
 
         // ------------------- Save Document -------------------
         await document.save();
-
+        await activityLogger({
+            actorId: userId,
+            entityId: document._id,
+            entityType: "Document",
+            action: "ADDED DOCUMENT",
+            details: `${userName} added document ${document?.metadata?.fileName}`,
+            meta: { changes: ["Document added"] }
+        });
         // ------------------- Populate and Respond -------------------
         await document.populate([
             { path: "department", select: "name" },
@@ -1258,9 +1265,6 @@ export const createDocument = async (req, res) => {
     }
 };
 
-/**
- Update document with versioning
- */
 /**
  * Update document with versioning - FIXED DATE HANDLING
  */
@@ -1497,7 +1501,14 @@ export const updateDocument = async (req, res) => {
 
             await createVersionHistory(document, req.user, changeReason, changedFields);
             await document.save();
-
+            await activityLogger({
+                actorId: userId,
+                entityId: document._id,
+                entityType: "Document",
+                action: "UPDATED DOCUMENT",
+                details: `${userName} updated document ${document.metadata.fileName}`,
+                meta: { changes: [`Updated ${hasContentChanges}`] }
+            });
             const populatedDoc = await Document.findById(document._id)
                 .populate('files')
                 .populate('owner', 'name email')
@@ -1724,6 +1735,14 @@ export const restoreVersion = async (req, res) => {
             changes: `Document restored to version ${version}`,
             snapshot: snapshot,
         });
+        await activityLogger({
+            actorId: req.user?._id,
+            entityId: document._id,
+            entityType: "Document",
+            action: "RESTORE DOCUMENT",
+            details: ` ${req.user?.name} restore document from version ${prevVersion} to ${version}`,
+            meta: { prevVersion, version }
+        });
 
         // --- Save atomically ---
         await document.save({ validateBeforeSave: true });
@@ -1935,11 +1954,22 @@ export const softDeleteDocument = async (req, res) => {
             return failResponse(res, "Only the owner can delete this document", 403);
         }
 
+        // Soft delete
         const updatedDocument = await Document.findByIdAndUpdate(
             id,
             { isDeleted: true, deletedAt: new Date() },
             { new: true }
         );
+
+        // Activity Logger
+        await activityLogger({
+            actorId: req.user._id,
+            entityId: updatedDocument._id,
+            entityType: "Document",
+            action: "SOFT_DELETE",
+            details: `Document '${document?.metadata?.fileName ?? "Untitled"}' moved to recycle bin by ${req.user?.name ?? "User"}`,
+            meta: { changes: ["Document Soft Deleted"] }
+        });
 
         return successResponse(res, { document: updatedDocument }, "Document moved to recycle-bin");
     } catch (error) {
@@ -1950,15 +1980,16 @@ export const softDeleteDocument = async (req, res) => {
 
 /**
  * Delete document(s) permanently
- * 1️⃣ Single delete: via query ?id=<documentId>
- * 2️⃣ Multiple delete: via body { ids: [] }
- * 3️⃣ Empty trash: via query ?empty=true
+ * Single delete: via query ?id=<documentId>
+ * Multiple delete: via body { ids: [] }
+ * Empty trash: via query ?empty=true
  */
 export const deleteDocument = async (req, res) => {
     const session = await mongoose.startSession();
     try {
         session.startTransaction();
-
+        const userId = req.user?._id ?? null
+        const userName = req.user?.name ?? 'Guest'
         const { ids } = req.body;
         if (!ids || !Array.isArray(ids) || ids.length === 0) {
             await session.abortTransaction();
@@ -2029,7 +2060,20 @@ export const deleteDocument = async (req, res) => {
                 })
             );
         }
+        await Promise.allSettled(
+            docs.map(async (doc) => {
+                const fileName = doc?.metadata?.fileName || "Unnamed Document";
 
+                return activityLogger({
+                    actorId: userId,
+                    entityId: doc._id,
+                    entityType: "Document",
+                    action: "DELETE",
+                    details: `Document '${fileName}' permanently deleted by ${userName}`,
+                    meta: { changes: ["Document Deleted"] }
+                });
+            })
+        );
         return res.status(200).json({
             success: true,
             message: `${docs.length} document(s) and their dependencies permanently deleted.`,
@@ -2091,7 +2135,14 @@ export const updateDocumentStatus = async (req, res) => {
         });
 
         await document.save();
-
+        await activityLogger({
+            actorId: req.user._id,
+            entityId: id,
+            entityType: "Document",
+            action: "UPDATE STATUS",
+            details: `${req.user.name} updated status from ${previousStatus} → ${status}`,
+            meta: { previousStatus, newStatus: status, comment }
+        });
         return successResponse(res, { document }, "Document status updated successfully");
     } catch (error) {
         return errorResponse(res, error, "Failed to update document status");
@@ -2102,7 +2153,8 @@ export const updateShareSettings = async (req, res) => {
     try {
         const { id } = req.params;
         const { ispublic, duration, start, end } = req.query;
-
+        const userId = req.user?._id || null;
+        const userName = req.user?.name || "Unknown User";
         if (!mongoose.Types.ObjectId.isValid(id)) {
             return res.status(400).json({ success: false, message: "Invalid document ID" });
         }
@@ -2171,7 +2223,18 @@ export const updateShareSettings = async (req, res) => {
         }
 
         await document.save();
-
+        await activityLogger({
+            actorId: userId,
+            entityId: document._id,
+            entityType: "Document",
+            action: "UPDATE SHARE SETTINGS",
+            details: `${userName} updated share settings for '${document.metadata.fileName}'`,
+            meta: {
+                ispublic: document.ispublic,
+                expiration: document.docExpiresAt,
+                duration: document.docExpireDuration
+            }
+        });
         return res.status(200).json({
             success: true,
             message: "Document share settings updated successfully",
@@ -2302,6 +2365,20 @@ export const shareDocument = async (req, res) => {
         if (!updatedShares.length) {
             return res.status(404).json({ success: false, message: "No share records found or created" });
         }
+        // ACTIVITY LOG
+        await activityLogger({
+            actorId: req.user._id,
+            entityId: id,
+            entityType: "Document",
+            action: "SHARE DOCUMENT",
+            details: `${req.user.name} updated share permissions for document '${doc.metadata.fileName}'`,
+            meta: {
+                accessLevel,
+                duration,
+                userIds,
+                generalAccess
+            }
+        });
 
         return res.json({ success: true, message: "Share data updated successfully", data: updatedShares });
     } catch (err) {
@@ -2356,7 +2433,14 @@ export const bulkPermissionUpdate = async (req, res) => {
         }
 
         const bulkResult = await SharedWith.bulkWrite(operations);
-
+        await activityLogger({
+            actorId: req.user._id,
+            entityId: documentId,
+            entityType: "Document",
+            action: "BULK PERMISSION UPDATE",
+            details: `${req.user.name} updated permissions for multiple users`,
+            meta: { updates: users }
+        });
         res.json({
             success: true,
             message: "Bulk permission update completed",
@@ -2391,7 +2475,14 @@ export const updateSharedUser = async (req, res) => {
         if (canDownload !== undefined) share.canDownload = canDownload;
 
         await share.save();
-
+        await activityLogger({
+            actorId: req.user._id,
+            entityId: documentId,
+            entityType: "Document",
+            action: "UPDATE USER SHARE",
+            details: `${req.user.name} updated access for user ${userId}`,
+            meta: { accessLevel, canDownload }
+        });
         res.json({ success: true, message: "User access updated successfully", data: share });
     } catch (err) {
         console.error(err);
@@ -2417,7 +2508,14 @@ export const removeSharedUser = async (req, res) => {
 
         await SharedWith.deleteOne({ document: documentId, user: userId });
         await Document.findByIdAndUpdate(documentId, { $pull: { sharedWithUsers: userId } });
-
+        await activityLogger({
+            actorId: req.user._id,
+            entityId: documentId,
+            entityType: "Document",
+            action: "REMOVE SHARED USER",
+            details: `${req.user.name} removed user ${userId} from shared list`,
+            meta: { removedUser: userId }
+        });
         res.json({ success: true, message: "User removed from shared list" });
     } catch (err) {
         console.error(err);
@@ -2577,6 +2675,15 @@ export const inviteUser = async (req, res) => {
         );
 
         await Document.findByIdAndUpdate(documentId, { $addToSet: { sharedWithUsers: user._id } });
+        await activityLogger({
+            actorId: inviterId,
+            entityId: documentId,
+            entityType: "Document",
+            action: "INVITE_USER",
+            details: `Invited ${userEmail} with ${accessLevel} access`,
+            meta: { duration, expiresAt }
+        });
+
         const inviteLink = `${API_CONFIG.baseUrl}/api/documents/${documentId}/invite/${user._id}/auto-accept`;
 
         const data = {
@@ -2627,7 +2734,13 @@ export const autoAcceptInvite = async (req, res) => {
             share.acceptedAt = new Date();
             await share.save();
         }
-
+        await activityLogger({
+            actorId: userId,
+            entityId: documentId,
+            entityType: "Document",
+            action: "INVITE_ACCEPTED",
+            details: "User auto-accepted document invitation"
+        });
         await Document.findByIdAndUpdate(documentId, { $addToSet: { sharedWithUsers: userId } });
         req.session.user = await User.findById(userId);
 
@@ -2706,7 +2819,13 @@ export const requestAccessAgain = async (req, res) => {
             html,
             fromName: "E-Sangrah Team",
         });
-
+        await activityLogger({
+            actorId: userId || null,
+            entityId: documentId,
+            entityType: "Document",
+            action: "REQUEST_ACCESS",
+            details: `${email || req.user?.email} requested access to document`,
+        });
         // Log request in PermissionLogs
         await PermissionLogs.findOneAndUpdate(
             {
@@ -2786,6 +2905,14 @@ export const grantAccessViaToken = async (req, res) => {
             },
             { new: true }
         );
+        await activityLogger({
+            actorId: doc.owner._id,
+            entityId: docId,
+            entityType: "Document",
+            action: "ACCESS_GRANTED",
+            details: `Access granted to ${userEmail}`,
+            meta: { duration, isExternal }
+        });
 
         // Send EJS-based email notification for internal users
         if (!isExternal && user) {
@@ -3121,6 +3248,14 @@ export const createOrUpdateApprovalRequest = async (req, res) => {
                 document.status = "Pending";
                 await document.save();
             }
+            await activityLogger({
+                actorId: req.user?._id,
+                entityId: documentId,
+                entityType: "Document",
+                action: "UPDATE_APPROVAL_REQUEST",
+                details: `Updated approval request for approver ${approverId}`,
+                meta: { priority, remark }
+            });
 
             return res.status(200).json({
                 success: true,
@@ -3152,6 +3287,14 @@ export const createOrUpdateApprovalRequest = async (req, res) => {
         }
 
         await document.save();
+        await activityLogger({
+            actorId: req.user?._id,
+            entityId: documentId,
+            entityType: "Document",
+            action: "CREATE_APPROVAL_REQUEST",
+            details: `created approval request for approver ${approverId}`,
+            meta: { priority, remark }
+        });
 
         res.status(201).json({
             success: true,
@@ -3170,8 +3313,7 @@ export const updateApprovalStatus = async (req, res) => {
         const userId = req.user._id;
         const { documentId } = req.params;
         const { action, comment } = req.body;
-        const approved = action === 'approve'; // define this once
-
+        const approved = action === 'approve';
         // Fetch document
         const document = await Document.findById(documentId)
             .populate('documentApprovalAuthority.userId', 'name email')
@@ -3224,6 +3366,14 @@ export const updateApprovalStatus = async (req, res) => {
         }
 
         await document.save();
+        await activityLogger({
+            actorId: userId,
+            entityId: documentId,
+            entityType: "Document",
+            action: 'UPDATE APPROVAL STATUS',
+            details: `Approver performed ${action} action on document`,
+            meta: { comment }
+        });
 
         /** ---------------- Notifications ---------------- **/
         const otherApprovers = document.documentApprovalAuthority
@@ -3400,6 +3550,14 @@ export const sendApprovalMail = async (req, res) => {
             html,
             fromName: "Support Team",
         });
+        await activityLogger({
+            actorId: req.user?._id,
+            entityId: documentId,
+            entityType: "Document",
+            action: "SEND_APPROVAL_MAIL",
+            details: `Approval email sent to approver ${approverId}`
+        });
+
         // Mark as mail sent
         approverEntry.isMailSent = true;
         await document.save();
@@ -3488,6 +3646,13 @@ export const verifyApprovalMail = async (req, res) => {
                     nextApprover.isMailSent = true;
                 }
             }
+            await activityLogger({
+                actorId: approverId,
+                entityId: documentId,
+                entityType: "Document",
+                action: "APPROVAL_MAIL_VERIFIED",
+                details: "Approver verified via email link"
+            });
 
             await document.save();
         })();
@@ -3607,6 +3772,14 @@ export const createApprovalRequest = async (req, res) => {
         document.approvalHistory = document.approvalHistory || [];
         document.approvalHistory.push(approval._id);
         await document.save();
+        await activityLogger({
+            actorId: req.user?._id,
+            entityId: documentId,
+            entityType: "Document",
+            action: "CREATE_APPROVAL_REQUEST",
+            details: `Approval created for approver ${approverId}`,
+            meta: { level, dueDate }
+        });
 
         // Respond success
         res.status(201).json({

@@ -7,7 +7,7 @@ import Folder from "../models/Folder.js";
 import File from "../models/File.js";
 import mongoose from "mongoose";
 import logger from "../utils/logger.js";
-
+import { activityLogger } from "../helper/activityLogger.js";
 
 export const showFileStatusPage = async (req, res) => {
     try {

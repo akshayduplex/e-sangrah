@@ -3,7 +3,7 @@ import { successResponse, failResponse, errorResponse } from '../utils/responseH
 import Designation from '../models/Designation.js';
 import Menu from '../models/Menu.js';
 import MenuAssignment from '../models/MenuAssignment.js';
-
+import { activityLogger } from "../helper/activityLogger.js";
 //Page Controllers
 
 // Render Add Designation page
@@ -150,6 +150,14 @@ export const createDesignation = async (req, res) => {
         // Commit transaction
         await session.commitTransaction();
         session.endSession();
+        await activityLogger({
+            actorId: req.user._id,
+            entityId: designation._id,
+            entityType: "Designation",
+            action: "CREATE",
+            details: `Designation '${designation.name}' created by ${req.user.name}`,
+            meta: designationData
+        });
 
         return successResponse(res, designation, 'Designation created successfully and menus assigned');
     } catch (err) {
@@ -191,6 +199,15 @@ export const updateDesignation = async (req, res) => {
         });
 
         if (!designation) return failResponse(res, 'Designation not found', 404);
+        await activityLogger({
+            actorId: req.user._id,
+            entityId: id,
+            entityType: "Designation",
+            action: "UPDATE",
+            details: `Designation '${designation.name}' updated by ${req.user.name}`,
+            meta: updateData
+        });
+
         return successResponse(res, designation, 'Designation updated successfully');
     } catch (err) {
         // Handle duplicate name error
@@ -211,6 +228,14 @@ export const deleteDesignation = async (req, res) => {
 
         const deleted = await Designation.findByIdAndDelete(id);
         if (!deleted) return failResponse(res, 'Designation not found', 404);
+        await activityLogger({
+            actorId: req.user?._id || null,
+            entityId: id,
+            entityType: "Designation",
+            action: "DELETE",
+            details: `Designation '${deleted.name}' deleted`,
+            meta: {}
+        });
 
         return successResponse(res, {}, 'Designation deleted successfully');
     } catch (err) {

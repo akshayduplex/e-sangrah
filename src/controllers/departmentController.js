@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 import Department from '../models/Departments.js';
 import { successResponse, failResponse, errorResponse } from "../utils/responseHandler.js";
 import logger from '../utils/logger.js';
-
+import { activityLogger } from "../helper/activityLogger.js";
 //Page Controllers
 
 // Render Add Department page
@@ -113,6 +113,14 @@ export const createDepartment = async (req, res) => {
 
         const department = new Department(departmentData);
         await department.save();
+        await activityLogger({
+            actorId: req.user._id,
+            entityId: department._id,
+            entityType: "Department",
+            action: "CREATE",
+            details: `Department '${department.name}' created by ${req.user.name}`,
+            meta: departmentData
+        });
 
         res.status(200).json({ message: 'Department added successfully!' });
     } catch (err) {
@@ -144,6 +152,15 @@ export const updateDepartment = async (req, res) => {
         });
 
         if (!department) return failResponse(res, 'Department not found', 404);
+        await activityLogger({
+            actorId: req.user._id,
+            entityId: id,
+            entityType: "Department",
+            action: "UPDATE",
+            details: `Department updated by ${req.user.name}`,
+            meta: updateData
+        });
+
         return successResponse(res, department, 'Department updated successfully');
     } catch (err) {
         logger.error(err);
@@ -159,6 +176,14 @@ export const deleteDepartment = async (req, res) => {
 
         const deleted = await Department.findByIdAndDelete(id);
         if (!deleted) return failResponse(res, 'Department not found', 404);
+        await activityLogger({
+            actorId: req.user?._id || null,
+            entityId: id,
+            entityType: "Department",
+            action: "DELETE",
+            details: `Department '${deleted.name}' deleted`,
+            meta: {}
+        });
 
         return successResponse(res, {}, 'Department deleted successfully');
     } catch (err) {

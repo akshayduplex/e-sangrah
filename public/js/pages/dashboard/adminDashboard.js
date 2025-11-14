@@ -28,7 +28,7 @@ $(document).ready(function () {
 
     function initializeDonorSelect2() {
         $('#dashboardDonor').select2({
-            placeholder: ' Select Donor Name ',
+            placeholder: 'Donor Name ',
             allowClear: true,
             width: '180px',
             ajax: {
@@ -70,7 +70,7 @@ $(document).ready(function () {
     // Initialize Vendor Select2 with proper configuration
     function initializeVendorSelect2() {
         $('#dashboardVendor').select2({
-            placeholder: ' Select Vendor Name ',
+            placeholder: 'Vendor Name ',
             allowClear: true,
             width: '180px',
             ajax: {
@@ -308,30 +308,26 @@ $(document).ready(function () {
             }
 
             result.recentActivities.forEach(activity => {
-                const user = activity.userName || 'Unknown User';
-                const action = activity.activity || 'performed an action';
-                const itemType = activity.type === 'document' ? 'document' : 'file';
-                const itemName = activity.type === 'document' ? activity.documentName : activity.fileName || 'Unnamed';
-                const version = activity.version?.$numberDecimal ? `(v${activity.version.$numberDecimal})` : '';
+                const details = activity.details || 'Activity performed';
                 const formattedDateTime = formatDateTime(activity.timestamp);
 
                 const cardItem = `
-                    <div class="dflexbtwn mb-2 align-items-start">
-                        <div class="flxtblleft d-flex align-items-start">
-                            <span class="mb-2">
-                                <img src="/img/icons/usrround.png" alt="${itemType}">
-                            </span>
-                            <div class="flxtbltxt ms-3">
-                                <p class="fs-16 mb-1 fw-normal">
-                                    ${user} ${action.toLowerCase()} the ${itemType} <strong>${itemName}</strong> ${version}
-                                </p>
-                            </div>
-                        </div>
-                        <div class="text-end text-muted fs-13" style="white-space: nowrap;">
-                            ${formattedDateTime}
+                <div class="dflexbtwn mb-2 align-items-start">
+                    <div class="flxtblleft d-flex align-items-start">
+                        <span class="mb-2">
+                            <img src="/img/icons/usrround.png" alt="activity">
+                        </span>
+                        <div class="flxtbltxt ms-3">
+                            <p class="fs-16 mb-1 fw-normal">
+                                ${details}
+                            </p>
                         </div>
                     </div>
-                `;
+                    <div class="text-end text-muted fs-13" style="white-space: nowrap;">
+                        ${formattedDateTime}
+                    </div>
+                </div>
+            `;
 
                 container.append(cardItem);
             });
@@ -341,6 +337,7 @@ $(document).ready(function () {
             $('#recentActivityContainer').html('<div class="text-center text-danger mt-3"><p>Failed to load</p></div>');
         }
     }
+
 
     // Upload Department Select
     function initializeUploadDepartment() {
@@ -755,8 +752,8 @@ $(document).ready(function () {
                                     <li><a class="dropdown-item" href="${doc.link || '#'}"><i class="ti ti-eye"></i> View</a></li>
                                     <li><a class="dropdown-item" href="/documents/edit/${doc._id}"><i class="ti ti-pencil-minus"></i> Edit</a></li>
                                     <li><a class="dropdown-item share-btn" href="#" data-doc-id="${doc._id}" data-file-id="${firstFile?._id || ''}" data-bs-toggle="modal" data-bs-target="#sharedoc-modal"><i class="ti ti-share"></i> Share</a></li>
-                                    <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#versionhistory-modal"><i class="ti ti-history"></i> Version History</a></li>
-                                    <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#downloaddoc-modal"><i class="ti ti-download"></i> Download</a></li>
+                                    <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-id="${doc._id}" data-bs-target="#versionhistory-modal"><i class="ti ti-history"></i> Version History</a></li>
+                                    <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-file-id="${doc.files?.[0]?._id || ''}" data-bs-target="#downloaddoc-modal"><i class="ti ti-download"></i> Download</a></li>
                                     <li><a class="dropdown-item btn-delete" href="#" data-id="${doc._id}" data-bs-toggle="modal" data-bs-target="#trashdoc-modal"><i class="ti ti-trash"></i> Move to Trash</a></li>
                                     <li><a class="dropdown-item archive-document" href="#" data-id="${doc._id}" data-bs-toggle="modal" data-bs-target="#archivedoc-modal"><i class="ti ti-archive"></i> Move to Archive</a></li>
                                 </ul>

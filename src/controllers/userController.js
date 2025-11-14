@@ -11,7 +11,7 @@ import Menu from "../models/Menu.js";
 import { parseDateDDMMYYYY } from "../utils/formatDate.js";
 import { API_CONFIG } from "../config/ApiEndpoints.js";
 import { generateEmailTemplate } from "../helper/emailTemplate.js";
-
+import { activityLogger } from "../helper/activityLogger.js";
 //page routes controllers
 
 // GET /users/list
@@ -146,7 +146,12 @@ export const registerUser = async (req, res) => {
             html: htmlContent,
             fromName: "E-Sangrah Team",
         });
-
+        await activityLogger({
+            actorId: req.user._id,
+            action: "ADDED_USER",
+            details: `User Added by ${req.user?.name}`,
+            meta: { email }
+        });
         res.status(201).json({
             success: true,
             message: "User registered successfully and assigned all menu permissions.",
@@ -409,6 +414,12 @@ export const deleteUser = async (req, res) => {
         await user.deleteOne();
 
         // await User.findByIdAndDelete(req.params.id);
+        await activityLogger({
+            actorId: req.user._id,
+            action: "DELETE_USER",
+            details: `User Deleted by${req.user?.name}`,
+            meta: { user }
+        });
 
         res.status(200).json({
             success: true,

@@ -2,6 +2,7 @@ import { API_CONFIG } from "../config/ApiEndpoints.js";
 import { generateRandomPassword } from "../helper/GenerateRandomPassword.js";
 import User from "../models/User.js";
 import { sendEmail } from "../services/emailService.js";
+import { activityLogger } from "../helper/activityLogger.js";
 import ejs from "ejs";
 import path from "path";
 //Page controller for Donor and Vendor Registration
@@ -184,7 +185,12 @@ export const registerDonorVendor = async (req, res, next) => {
             html: htmlContent,
             fromName: "E-Sangrah Team",
         });
-
+        await activityLogger({
+            actorId: req.user._id,
+            action: "ADDED_USER",
+            details: `Donor Added by ${req.user?.name}`,
+            meta: { email_id }
+        });
         return res.status(201).json({ success: true, message: "Registration successful", data: newUser });
 
     } catch (error) {
@@ -268,7 +274,12 @@ export const registerVendor = async (req, res, next) => {
             if (uploadedProfileImage) updateDoc.profile_image = uploadedProfileImage;
 
             const updated = await User.findByIdAndUpdate(id, { $set: updateDoc }, { new: true });
-
+            await activityLogger({
+                actorId: req.user._id,
+                action: "ADDED_USER",
+                details: `Vendor Added by ${req.user?.name}`,
+                meta: { vendor_email }
+            });
             return res.status(200).json({ success: true, message: "Vendor updated successfully", data: updated });
         }
 

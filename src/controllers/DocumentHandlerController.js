@@ -1,7 +1,7 @@
 
 import mongoose from "mongoose";
 import SharedWith from "../models/SharedWith.js";
-
+import { activityLogger } from "../helper/activityLogger.js";
 // Renew expiration controller
 export const renewAccess = async (req, res) => {
     try {
@@ -50,6 +50,14 @@ export const renewAccess = async (req, res) => {
         shared.expiresAt = newExpiryDate;
 
         await shared.save();
+        await activityLogger({
+            actorId: req.user._id,
+            entityId: shared.document,
+            entityType: "DocumentShare",
+            action: "RENEW_ACCESS",
+            details: `Share access renewed to '${newDuration}'`,
+            meta: { expiresAt: newExpiryDate }
+        });
 
         res.status(200).json({ message: "Share expiration renewed successfully.", shared });
 

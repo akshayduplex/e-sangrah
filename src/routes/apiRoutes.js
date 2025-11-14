@@ -76,6 +76,9 @@ router.post("/auth/send-reset-link", AuthValidators.sendResetLinkValidator, vali
 router.get("/auth/verify-reset/:token", AuthValidators.verifyResetTokenValidator, validators, AuthController.verifyResetLink);
 
 
+//public routes
+router.get('/file/pdf/:fileId', CommonController.servePDF);
+
 // Apply authentication to all routes
 router.use(authenticate);
 
@@ -112,7 +115,6 @@ router.post("/auth/logout", authenticate, AuthController.logout);
 // ---------------------------
 // Common routes
 // ---------------------------
-router.get('/file/pdf/:fileId', CommonController.servePDF);
 // Route to Download Folder
 router.get("/download/:folderId", authenticate, CommonController.downloadFolderAsZip);
 router.get("/download/file/:fileId", authenticate, CommonController.downloadFile);

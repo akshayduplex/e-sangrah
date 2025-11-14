@@ -2,7 +2,6 @@ import mongoose from "mongoose";
 import Designation from "../models/Designation.js"
 import Menu from "../models/Menu.js";
 import MenuAssignment from "../models/MenuAssignment.js";
-
 import { buildMenuTree } from "../utils/buildMenuTree.js";
 import logger from "../utils/logger.js";
 import { profile_type } from "../constant/Constant.js";
@@ -10,7 +9,7 @@ import Department from "../models/Departments.js";
 import User from "../models/User.js";
 import UserPermission from "../models/UserPermission.js";
 import { API_CONFIG } from "../config/ApiEndpoints.js";
-
+import { activityLogger } from "../helper/activityLogger.js";
 //Page Controllers
 
 // Assign Permissions page
@@ -232,7 +231,14 @@ export const assignMenusToDesignation = async (req, res) => {
 
             await MenuAssignment.insertMany(assignments);
         }
-
+        await activityLogger({
+            actorId: req.user._id,
+            entityId: designation_id,
+            entityType: "Designation",
+            action: "ASSIGN_MENUS",
+            details: ` ${req.user?.name} assigned menus to designation`,
+            meta: { menus }
+        });
         // incrementGlobalPermissionsVersion(designation_id);
         res.json({
             success: true,
@@ -271,7 +277,14 @@ export const unAssignMenu = async (req, res) => {
             },
             updated_date: Date.now()
         });
-
+        await activityLogger({
+            actorId: req.user._id,
+            entityId: designation_id,
+            entityType: "Designation",
+            action: "UNASSIGN_MENUS",
+            details: `${req.user?.name} unassigned menus`,
+            meta: { menu_ids, deletedCount: result.deletedCount }
+        });
         return res.json({
             success: true,
             message: "Menus unassigned successfully",

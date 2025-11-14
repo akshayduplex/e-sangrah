@@ -20,7 +20,7 @@ import Project from '../models/Project.js';
 import Department from '../models/Departments.js';
 import { getSessionFilters } from '../helper/sessionHelpers.js';
 import { generateEmailTemplate } from '../helper/emailTemplate.js';
-
+import { activityLogger } from "../helper/activityLogger.js";
 //Page controlers
 
 // Folder list by ID
@@ -163,13 +163,21 @@ export const viewFile = async (req, res) => {
 
         // --- Log the file view activity (non-blocking) ---
         const userId = req.user?._id || null;
-        file.activityLog.push({
-            action: "opened",
-            performedBy: userId,
-            details: `File "${file.originalName}" viewed by ${userId || "unknown user"}`
-        });
+        // file.activityLog.push({
+        //     action: "opened",
+        //     performedBy: userId,
+        //     details: `File "${file.originalName}" viewed by ${userId || "unknown user"}`
+        // });
 
         file.save().catch(err => console.error("Failed to log file view:", err));
+        // Log the file view
+        await activityLogger({
+            actorId: req.user?._id,
+            entityId: file._id,
+            entityType: "File",
+            action: "VIEW",
+            details: `${req.user?.name} viewed: ${file.originalName} file`
+        });
 
         // Render view page
         res.render("pages/folders/viewFile", {
@@ -224,6 +232,14 @@ export const createFolder = async (req, res) => {
             updatedBy: ownerId
         });
         await folder.save();
+        await activityLogger({
+            actorId: req.user._id,
+            entityId: folder._id,
+            entityType: "Folder",
+            action: "CREATE",
+            details: `Folder created: ${folder.name} by ${req.user?.name}`,
+            meta: { parent: folder.parent }
+        });
 
         res.status(201).json({
             success: true,
@@ -360,6 +376,14 @@ export const automaticProjectDepartmentFolderCreate = async (req, res) => {
                 }
             }
         }
+        await activityLogger({
+            actorId: req.user._id,
+            entityId: folder._id,
+            entityType: "Folder",
+            action: "SYSTEM",
+            details: `Automatically Folder created ${departmentName} by system`,
+            meta: {}
+        });
 
         // --- Success response ---
         return res.status(200).json({
@@ -571,6 +595,14 @@ export const renameFolder = async (req, res) => {
         folder.name = name;
         folder.updatedBy = ownerId;
         await folder.save();
+        await activityLogger({
+            actorId: req.user._id,
+            entityId: folder._id,
+            entityType: "Folder",
+            action: "RENAME",
+            details: `Folder renamed to: ${folder.name} by ${req.user?.name}`,
+            meta: {}
+        });
 
         res.json({
             success: true,
@@ -629,6 +661,20 @@ export const updateFolderStatus = async (req, res) => {
                 }
             );
         }
+        await activityLogger({
+            actorId: req.user._id,
+            entityId: folder._id,
+            entityType: "Folder",
+            action: markDeleted ? "RECYCLE" : "RESTORE",
+            details: markDeleted
+                ? `Folder moved to recycle bin${cascadeBool ? " with all subfolders" : ""}: ${folder.name} by ${req.user?.name}`
+                : `Folder restored${cascadeBool ? " with all subfolders" : ""}: ${folder.name} by ${req.user?.name}`,
+            meta: {
+                cascade: cascadeBool,
+                previousStatus: markDeleted ? "active" : "inactive",
+                newStatus: markDeleted ? "inactive" : "active"
+            }
+        });
 
         return res.json({
             message: markDeleted
@@ -667,6 +713,15 @@ export const deleteFolder = async (req, res) => {
 
         // Folder is empty → permanently delete
         await Folder.deleteOne({ _id: id, owner: ownerId });
+        await activityLogger({
+            actorId: req.user._id,
+            entityId: folder._id,
+            entityType: "Folder",
+            action: "SOFT_DELETE",
+            details: `Folder moved to recycle bin: ${folder.name} by ${req.user?.name}`,
+            meta: {}
+        });
+
         return res.json({ success: true, message: "Folder permanently deleted" });
 
     } catch (err) {
@@ -708,7 +763,14 @@ export const emptyRecycleBin = async (req, res) => {
 
         // Permanently delete all folders in the recycle bin
         await Folder.deleteMany({ owner: ownerId, isDeleted: true });
-
+        await activityLogger({
+            actorId: req.user._id,
+            entityId: folder._id,
+            entityType: "Folder",
+            action: "DELETE",
+            details: `Folder permanently deleted: ${folder.name} by ${req.user?.name}`,
+            meta: {}
+        });
         res.json({ success: true, message: "Recycle bin emptied successfully." });
     } catch (err) {
         console.error("Error emptying recycle bin:", err);
@@ -772,6 +834,14 @@ export const uploadToFolder = async (req, res) => {
         const totalSize = uploadedFiles.reduce((sum, f) => sum + (f.size || 0), 0);
         folder.size += totalSize;
         await folder.save();
+        await activityLogger({
+            actorId: req.user._id,
+            entityId: folder._id,
+            entityType: "Folder",
+            action: "UPLOAD",
+            details: `${uploadedFiles.length} files uploaded to folder: ${folder.name} by ${req.user?.name}`,
+            meta: { files: uploadedFiles }
+        });
 
         res.status(201).json({
             success: true,
@@ -983,6 +1053,14 @@ export const archiveFolder = async (req, res) => {
         folder.isArchived = isArchived;
         folder.updatedBy = ownerId;
         await folder.save();
+        await activityLogger({
+            actorId: req.user._id,
+            entityId: folder._id,
+            entityType: "Folder",
+            action: isArchived ? "ARCHIVE" : "UNARCHIVE",
+            details: `${isArchived ? "Archived" : "Unarchived"} folder: ${folder.name} by ${req.user?.name}`,
+            meta: {}
+        });
 
         res.json({
             success: true,
@@ -1158,6 +1236,14 @@ export const restoreFolder = async (req, res) => {
                 }
             );
         }
+        await activityLogger({
+            actorId: req.user._id,
+            entityId: folder._id,
+            entityType: "Folder",
+            action: "RESTORE",
+            details: `Folder restored: ${folder.name} by ${req.user?.name}`,
+            meta: { cascade: cascadeBool }
+        });
 
         return res.json({
             success: true,
@@ -1172,9 +1258,6 @@ export const restoreFolder = async (req, res) => {
         });
     }
 };
-
-
-
 
 /**
  * Get folder details for sharing
@@ -1263,6 +1346,14 @@ export const shareFolder = async (req, res) => {
         }
 
         await folder.save();
+        await activityLogger({
+            actorId: req.user._id,
+            entityId: folder._id,
+            entityType: "Folder",
+            action: "SHARE",
+            details: `Folder shared with user: ${user.name} by ${req.user?.name}`,
+            meta: { access }
+        });
 
         const html = generateEmailTemplate("folderShared", data)
 
@@ -1303,6 +1394,15 @@ export const unshareFolder = async (req, res) => {
         );
 
         await folder.save();
+        await activityLogger({
+            actorId: req.user._id,
+            entityId: folder._id,
+            entityType: "Folder",
+            action: "UNSHARE",
+            details: `Folder access revoked for user: ${userId} by ${req.user?.name}`,
+            meta: {}
+        });
+
         res.json({ message: 'Access revoked successfully', folder });
     } catch (err) {
         console.error(err);
@@ -1405,6 +1505,14 @@ export const accessViaToken = async (req, res) => {
         );
 
         if (!link) return res.status(403).json({ error: 'Invalid or expired link' });
+        await activityLogger({
+            actorId: req.user._id,
+            entityId: folder._id,
+            entityType: "Folder",
+            action: "ACCESS_REQUEST",
+            details: `Requested access to folder: ${folder.name} by ${req.user?.name}`,
+            meta: {}
+        });
 
         res.json({
             success: true,
@@ -1495,6 +1603,14 @@ export const updateFolderLogPermission = async (req, res) => {
         }
 
         await log.save();
+        await activityLogger({
+            actorId: req.user._id,
+            entityId: folder._id,
+            entityType: "Folder",
+            action: "UPDATE_LOG_PERMISSION",
+            details: `Updated log Permissions for folder: ${folder.name} by ${req.user?.name}`,
+            meta: { permissions }
+        });
 
         // send approval email
         const folderLink = `${API_CONFIG.baseUrl}/folders/${access}er/${folder._id}`;
@@ -1609,6 +1725,14 @@ export const updateFolderPermission = async (req, res) => {
 
         folder.updatedBy = updatedBy;
         await folder.save();
+        await activityLogger({
+            actorId: req.user._id,
+            entityId: folder._id,
+            entityType: "Folder",
+            action: "UPDATE_FOLDER_PERMISSION",
+            details: `Permissions updated for folder: ${folder.name} by ${req.user?.name}`,
+            meta: { permissions }
+        });
 
         // ---------- 4. Response ----------
         return res.json({
@@ -1687,7 +1811,7 @@ export const requestFolderAccess = async (req, res) => {
         );
 
         if (!isInternal) {
-            const baseUrl = API_CONFIG.baseUrl || "http://localhost:5000";
+            const baseUrl = API_CONFIG.baseUrl;
             const manageLink = `${baseUrl}/admin/folders/permission`;
             const data = {
                 user,
@@ -1702,6 +1826,14 @@ export const requestFolderAccess = async (req, res) => {
                 fromName: "E-Sangrah Team",
             });
         }
+        await activityLogger({
+            actorId: req.user._id,
+            entityId: folder._id,
+            entityType: "Folder",
+            action: "FOLDER_ACCESS_REQUEST",
+            details: `Requested access to folder: ${folder.name} by ${req.user.name}`,
+            meta: {}
+        });
 
         return res.json({
             success: true,
@@ -1795,6 +1927,14 @@ export const grantFolderAccess = async (req, res) => {
             subject: `Folder Access Approved: ${folder.name}`,
             html,
             fromName: "E-sangrah",
+        });
+        await activityLogger({
+            actorId: req.user._id,
+            entityId: folder._id,
+            entityType: "FolderPermissionLogs",
+            action: "ACCESS_APPROVED",
+            details: `Approved folder access for user: ${userEmail}`,
+            meta: { access, duration }
         });
 
         return res.json({ success: true, message: "Access granted successfully." });
@@ -1918,6 +2058,14 @@ export const updateFolderPermissionlog = async (req, res) => {
 
         if (!updated)
             return res.status(404).json({ success: false, message: "Permission not found" });
+        await activityLogger({
+            actorId: req.user._id,
+            entityId: folder._id,
+            entityType: "FolderPermissionLogs",
+            action: "UPDATE_FOLDER_PERMISSION",
+            details: `Log Permissions updated for folder: ${folder.name} by ${req.user?.name}`,
+            meta: { permissions }
+        });
 
         res.status(200).json({ success: true, data: updated });
     } catch (error) {
@@ -1933,7 +2081,14 @@ export const deleteFolderPermission = async (req, res) => {
         const removed = await FolderPermissionLogs.findByIdAndDelete(logId);
         if (!removed)
             return res.status(404).json({ success: false, message: "Permission not found" });
-
+        await activityLogger({
+            actorId: req.user._id,
+            entityId: folder._id,
+            entityType: "FolderPermissionLogs",
+            action: "REMOVE_FOLDER_PERMISSION",
+            details: `Removed Permission for folder: ${folder.name} by ${req.user.name}`,
+            meta: { permissions }
+        });
         res.status(200).json({ success: true, message: "Permission log deleted" });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });

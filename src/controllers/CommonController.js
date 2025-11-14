@@ -9,6 +9,7 @@ import PDFDocument from 'pdfkit';
 import { Parser } from 'json2csv';
 import { API_CONFIG } from "../config/ApiEndpoints.js";
 import mongoose from "mongoose";
+import { activityLogger } from "../helper/activityLogger.js";
 function sanitize(str) {
     return String(str)
         .replace(/[^a-zA-Z0-9_-]/g, '_')
@@ -40,7 +41,7 @@ export const servePDF = async (req, res) => {
         }
 
         const command = new GetObjectCommand({
-            Bucket: process.env.AWS_BUCKET,
+            Bucket: API_CONFIG.AWS_BUCKET,
             Key: file.file,
         });
 
@@ -55,12 +56,18 @@ export const servePDF = async (req, res) => {
 
         // --- Log file open activity (non-blocking) ---
         const userId = req.user?._id || null;
-        file.activityLog.push({
-            action: "opened",
-            performedBy: userId,
-            details: `PDF "${file.originalName}" viewed in browser by ${userId || "unknown user"}`
+        // file.activityLog.push({
+        //     action: "opened",
+        //     performedBy: userId,
+        //     details: `PDF "${file.originalName}" viewed in browser by ${userId || "unknown user"}`
+        // });
+        await activityLogger({
+            actorId: req.user._id || null,
+            entityId: fileId,
+            entityType: 'File',
+            action: 'VIEW',
+            details: `PDF "${file.originalName}" viewed in browser by ${req.user?.name || "unknown user"}`
         });
-
         // Save the log without delaying the response
         file.save().catch(err => console.error("Failed to log PDF view:", err));
 
@@ -139,7 +146,7 @@ export const downloadFile = async (req, res) => {
         if (!file) return res.status(404).json({ message: "File not found" });
 
         const command = new GetObjectCommand({
-            Bucket: API_CONFIG.Bucket,
+            Bucket: API_CONFIG.AWS_BUCKET,
             Key: file.file
         });
 
@@ -154,12 +161,18 @@ export const downloadFile = async (req, res) => {
 
         // --- Add activity log entry asynchronously ---
         const userId = req.user?._id; // assuming auth middleware sets req.user
-        file.activityLog.push({
-            action: "downloaded",
-            performedBy: userId || null,
-            details: `File "${file.originalName}" downloaded by user ${userId || "unknown"}`
+        // file.activityLog.push({
+        //     action: "downloaded",
+        //     performedBy: userId || null,
+        //     details: `File "${file.originalName}" downloaded by user ${userId || "unknown"}`
+        // });
+        await activityLogger({
+            actorId: userId || null,
+            entityId: req.params.fileId,
+            entityType: 'File',
+            action: 'DOWNLOAD',
+            details: `File "${file.originalName}" downloaded by user ${req.user?.name || "unknown"}`
         });
-
         await file.save();
 
     } catch (error) {
@@ -191,6 +204,7 @@ export const exportDocuments = async (req, res) => {
         } = filters;
 
         const userId = req.user?._id;
+        const userName = req.user?.name;
         const profile_type = req.user?.profile_type;
 
         // --- Base filter (SAME as getDocuments) ---
@@ -353,7 +367,11 @@ export const exportDocuments = async (req, res) => {
 
         const documents = exportAll ? await docsQuery : await docsQuery.limit(1000);
         const exportData = formatExportData(documents);
-
+        await activityLogger({
+            actorId: userId || null,
+            action: 'EXPORT',
+            details: `Report exported by ${userName || "unknown user"}`
+        });
         // ----- file name -------------------------------------------------
         const parts = [];
         if (filters.role) parts.push(`Role_${sanitize(filters.role)}`);

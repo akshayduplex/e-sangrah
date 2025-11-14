@@ -8,7 +8,7 @@ import { normalizeToArray, validateObjectIdArray } from "../helper/ValidateObjec
 import logger from "../utils/logger.js";
 import { parseDateDDMMYYYY } from "../utils/formatDate.js";
 import { renderProjectDetails } from "../utils/renderProjectDetails.js";
-
+import { activityLogger } from "../helper/activityLogger.js";
 //Page controllers
 
 // Projects List page
@@ -172,6 +172,13 @@ export const createProject = async (req, res) => {
         // Save project
         const project = new Project(projectData);
         await project.save();
+        await activityLogger({
+            actorId: req.user._id,
+            entityId: project._id,
+            entityType: "Project",
+            action: "CREATE",
+            details: `Project '${project.projectName}' created by ${req.user.name}`
+        });
 
         return successResponse(res, project, "Project created successfully", 201);
     } catch (err) {
@@ -325,6 +332,14 @@ export const updateProject = async (req, res) => {
 
         Object.assign(project, body);
         await project.save();
+        await activityLogger({
+            actorId: req.user._id,
+            entityId: project._id,
+            entityType: "Project",
+            action: "UPDATE",
+            details: `Project '${project.projectName}' updated by ${req.user.name}`,
+            meta: body
+        });
 
         return successResponse(res, project, "Project updated successfully");
     } catch (err) {
@@ -347,6 +362,15 @@ export const deleteProject = async (req, res) => {
         }
 
         await project.deleteOne();
+        await activityLogger({
+            actorId: req.user?._id || null,
+            entityId: project._id,
+            entityType: "Project",
+            action: "DELETE",
+            details: `Project '${project.projectName}' deleted`,
+            meta: {}
+        });
+
         return successResponse(res, null, "Project deleted successfully");
     } catch (err) {
         return errorResponse(res, err);
