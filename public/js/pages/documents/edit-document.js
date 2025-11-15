@@ -351,8 +351,6 @@ function initializeFormData() {
 }
 function validateDates() {
     const expiryDate = $('input[name="expiryDate"]').val();
-    const documentDate = $('input[name="documentDate"]').val();
-
     if (expiryDate && expiryDate.trim() !== '') {
         const formattedExpiry = formatDateForSubmission(expiryDate);
         if (!formattedExpiry) {
@@ -360,56 +358,37 @@ function validateDates() {
             return false;
         }
     }
-
-    if (documentDate && documentDate.trim() !== '') {
-        const formattedDocDate = formatDateForSubmission(documentDate);
-        if (!formattedDocDate) {
-            showToast('Please enter a valid document date in DD-MM-YYYY format', 'error');
-            return false;
-        }
-    }
-
     return true;
 }
 function formatDateForSubmission(dateString) {
     if (!dateString || dateString.trim() === '') return '';
-
-    console.log('📅 Formatting date for submission:', dateString);
-
     try {
-        // Handle DD-MM-YYYY format (from datetimepicker)
-        if (dateString.includes('-')) {
-            const parts = dateString.split('-');
-            if (parts.length === 3) {
-                const day = parts[0].padStart(2, '0');
-                const month = parts[1].padStart(2, '0');
-                const year = parts[2];
+        // Normalize: change / to -
+        let normalized = dateString.replace(/\//g, '-');
 
-                // Create date in YYYY-MM-DD format for proper parsing
-                const isoDate = `${year}-${month}-${day}`;
-                const date = new Date(isoDate);
+        // Validate DD-MM-YYYY format
+        const regex = /^(\d{2})-(\d{2})-(\d{4})$/;
+        const match = normalized.match(regex);
 
-                if (!isNaN(date.getTime())) {
-                    // Return in ISO format for backend
-                    const result = date.toISOString();
-                    return result;
-                }
+        if (match) {
+            const [_, day, month, year] = match;
+
+            // Build ISO date string
+            const isoDate = `${year}-${month}-${day}`;
+            const date = new Date(isoDate);
+
+            if (!isNaN(date.getTime())) {
+                return date.toISOString();
             }
-        }
 
-        // Handle other formats or return original if already valid
-        const date = new Date(dateString);
-        if (!isNaN(date.getTime())) {
-            return date.toISOString();
+            return '';
         }
-
-        console.warn('⚠️ Invalid date format, returning empty:', dateString);
         return '';
     } catch (error) {
-        console.error('❌ Date formatting error:', error, 'for date:', dateString);
         return '';
     }
 }
+
 
 function validateSignature(signatureData) {
     if (!signatureData) return true; // No signature is valid

@@ -596,6 +596,7 @@
                     versionList.innerHTML = '<p class="text-danger">Failed to load version history.</p>';
                 });
         }
+
         const shareModal = document.getElementById('sharedoc-modal');
         const versionModal = document.getElementById('versionhistory-modal');
 

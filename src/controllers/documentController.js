@@ -612,7 +612,7 @@ export const getDocuments = async (req, res) => {
         const documents = await Document.find(filter)
             .select(`
                 files updatedAt createdAt wantApprovers signature isDeleted isArchived 
-                comment sharedWithUsers compliance status metadata tags owner 
+                comment sharedWithUsers compliance status metadata tags owner versioning
                 documentVendor documentDonor department project description
                 documentApprovalAuthority
             `)
@@ -620,7 +620,7 @@ export const getDocuments = async (req, res) => {
             .populate("project", "projectName")
             .populate({
                 path: "owner",
-                select: "name email profile_image userDetails.role userDetails.designation",
+                select: "name email profile_image profile_type userDetails.employee_id userDetails.designation",
                 populate: { path: "userDetails.designation", select: "name" },
             })
             .populate("documentDonor", "name profile_image")
@@ -629,7 +629,7 @@ export const getDocuments = async (req, res) => {
             .populate("files", "originalName version fileSize")
             .populate({
                 path: "documentApprovalAuthority.userId",
-                select: "name email profile_image"
+                select: "name email profile_image profile_type userDetails.employee_id"
             })
             .sort({ [sortField]: sortOrder })
             .skip(skip)
@@ -1502,11 +1502,11 @@ export const updateDocument = async (req, res) => {
             await createVersionHistory(document, req.user, changeReason, changedFields);
             await document.save();
             await activityLogger({
-                actorId: userId,
+                actorId: req.user?.id,
                 entityId: document._id,
                 entityType: "Document",
                 action: "UPDATED DOCUMENT",
-                details: `${userName} updated document ${document.metadata.fileName}`,
+                details: `${req.user?.name} updated document ${document.metadata.fileName}`,
                 meta: { changes: [`Updated ${hasContentChanges}`] }
             });
             const populatedDoc = await Document.findById(document._id)
@@ -1728,13 +1728,13 @@ export const restoreVersion = async (req, res) => {
         // document.versioning.nextVersion = mongoose.Types.Decimal128.fromString(nextVersion);
 
         // --- Add restoration event to history ---
-        document.versionHistory.push({
-            version: mongoose.Types.Decimal128.fromString(restoredVersion.toString()),
-            timestamp: new Date(),
-            changedBy: userId || null,
-            changes: `Document restored to version ${version}`,
-            snapshot: snapshot,
-        });
+        // document.versionHistory.push({
+        //     version: mongoose.Types.Decimal128.fromString(restoredVersion.toString()),
+        //     timestamp: new Date(),
+        //     changedBy: userId || null,
+        //     changes: `Document restored to version ${version}`,
+        //     snapshot: snapshot,
+        // });
         await activityLogger({
             actorId: req.user?._id,
             entityId: document._id,
@@ -1897,7 +1897,7 @@ export const viewDocumentVersion = async (req, res) => {
             .populate("documentDonor", "name")
             .populate("documentVendor", "name")
             .populate("sharedWithUsers", "name email")
-            .populate("files", "originalName")
+            .populate("files", "originalName fileSize fileType")
             .lean();
 
         if (!document) {
@@ -1926,7 +1926,15 @@ export const viewDocumentVersion = async (req, res) => {
             changes: versionItem.changes,
             document: documentAtVersion
         };
-
+        // Activity Logger
+        await activityLogger({
+            actorId: req.user._id,
+            entityId: document._id,
+            entityType: "Document",
+            action: "VIEW",
+            details: `Document ${document?.metadata?.fileName ?? "Untitled"} viewd by ${req.user?.name ?? "User"}`,
+            meta: { action: ["Document Viewd"] }
+        });
         return res.json(response);
     } catch (error) {
         console.error(error);
@@ -1967,7 +1975,7 @@ export const softDeleteDocument = async (req, res) => {
             entityId: updatedDocument._id,
             entityType: "Document",
             action: "SOFT_DELETE",
-            details: `Document '${document?.metadata?.fileName ?? "Untitled"}' moved to recycle bin by ${req.user?.name ?? "User"}`,
+            details: `Document ${document?.metadata?.fileName ?? "Untitled"} moved to recycle bin by ${req.user?.name ?? "User"}`,
             meta: { changes: ["Document Soft Deleted"] }
         });
 

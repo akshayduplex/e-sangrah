@@ -124,6 +124,10 @@
 				const folderInput = document.getElementById("folderInput");
 				const fileInput = document.getElementById("fileInput");
 				let uploadChoiceModal = null;
+				function removePendingItem(uploadId) {
+					const div = document.querySelector(`[data-upload-id="${uploadId}"]`);
+					if (div) div.remove();
+				}
 
 				// FIXED: Properly handle the session selected project ID
 				const sessionSelectedProjectId = "<%= typeof selectedProjectId !== 'undefined' ? selectedProjectId : '' %>";
@@ -622,12 +626,22 @@
 							}
 						};
 
-						xhr.onload = function () {
+						xhr.onload = async function () {
 							if (xhr.status >= 200 && xhr.status < 300) {
 								progressCallback(100);
 								resolve(true);
+
+								// 🟢 REMOVE FILE FROM PENDING LIST
+								removePendingItem(fileItem.uploadId);
+
+								// 🟢 REFRESH FOLDER VIEW
+								await loadFolders(
+									folderState.currentFolderId,
+									folderState.selectedFolders,
+									window.selectedProjectId
+								);
+
 							} else {
-								console.error('Upload failed:', xhr.responseText);
 								progressCallback(100, true);
 								resolve(false);
 							}
@@ -641,6 +655,8 @@
 						xhr.send(formData);
 					});
 				}
+
+
 
 				// ---------------- FOLDER UPLOAD ----------------
 				async function uploadFolderToServer(folderItems) {

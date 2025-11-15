@@ -1,3 +1,4 @@
+// models/Document.js
 import mongoose from "mongoose";
 const { Decimal128 } = mongoose.Schema.Types;
 const documentSchema = new mongoose.Schema({
@@ -85,6 +86,10 @@ const documentSchema = new mongoose.Schema({
     // Flattened sharedWith for safe indexing
     sharedWithUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     comment: { type: String, trim: true, maxlength: 1000 },
+
+    currentVersionNumber: { type: Number, default: 1 },   // sequential int: 1,2,3...
+    currentVersionLabel: { type: String, default: "1.0" }, // human readable label
+    hasDraftVersion: { type: Boolean, default: false },   // optional flag
 
     versioning: {
         currentVersion: {

@@ -176,7 +176,7 @@ export const viewFile = async (req, res) => {
             entityId: file._id,
             entityType: "File",
             action: "VIEW",
-            details: `${req.user?.name} viewed: ${file.originalName} file`
+            details: `${req.user?.name} viewed ${file.originalName} file`
         });
 
         // Render view page

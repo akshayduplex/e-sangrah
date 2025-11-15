@@ -5,11 +5,13 @@ import { ListObjectsV2Command, GetObjectCommand } from "@aws-sdk/client-s3";
 import archiver from "archiver";
 import Document from '../models/Document.js';
 import ExcelJS from 'exceljs';
+import XLSX from "xlsx";
 import PDFDocument from 'pdfkit';
 import { Parser } from 'json2csv';
 import { API_CONFIG } from "../config/ApiEndpoints.js";
 import mongoose from "mongoose";
 import { activityLogger } from "../helper/activityLogger.js";
+import { toProperCase } from "../helper/Common.js";
 function sanitize(str) {
     return String(str)
         .replace(/[^a-zA-Z0-9_-]/g, '_')
@@ -66,7 +68,7 @@ export const servePDF = async (req, res) => {
             entityId: fileId,
             entityType: 'File',
             action: 'VIEW',
-            details: `PDF "${file.originalName}" viewed in browser by ${req.user?.name || "unknown user"}`
+            details: `PDF ${file.originalName} viewed in browser by ${req.user?.name || "unknown user"}`
         });
         // Save the log without delaying the response
         file.save().catch(err => console.error("Failed to log PDF view:", err));
@@ -171,7 +173,7 @@ export const downloadFile = async (req, res) => {
             entityId: req.params.fileId,
             entityType: 'File',
             action: 'DOWNLOAD',
-            details: `File "${file.originalName}" downloaded by user ${req.user?.name || "unknown"}`
+            details: `File ${file.originalName} downloaded by user ${req.user?.name || "unknown"}`
         });
         await file.save();
 
@@ -344,7 +346,7 @@ export const exportDocuments = async (req, res) => {
         const docsQuery = Document.find(query)
             .select(`
                 files updatedAt createdAt wantApprovers signature isDeleted isArchived 
-                comment sharedWithUsers compliance status metadata tags owner 
+                comment sharedWithUsers compliance status metadata tags owner versioning
                 documentVendor documentDonor department project description
                 documentApprovalAuthority
             `)
@@ -352,7 +354,7 @@ export const exportDocuments = async (req, res) => {
             .populate("project", "projectName")
             .populate({
                 path: "owner",
-                select: "name email profile_image userDetails.role userDetails.designation",
+                select: "name email profile_image profile_type userDetails.employee_id userDetails.designation",
                 populate: { path: "userDetails.designation", select: "name" },
             })
             .populate("documentDonor", "name profile_image")
@@ -361,7 +363,7 @@ export const exportDocuments = async (req, res) => {
             .populate("files", "originalName version fileSize")
             .populate({
                 path: "documentApprovalAuthority.userId",
-                select: "name email profile_image"
+                select: "name email profile_image profile_type userDetails.employee_id"
             })
             .sort({ updatedAt: -1 });
 
@@ -458,31 +460,36 @@ function formatExportData(documents) {
 
         return {
             fileName: doc.metadata?.fileName || "",
+            fileSize: file.fileSize
+                ? `${(file.fileSize / 1024).toFixed(2)} KB`
+                : "",
             owner: doc.owner?.name || "",
-            designation: doc.owner?.userDetails?.designation?.name || "",
-            department: doc.department?.name || "",
-            role: "Admin",                                 // keep your default
-            approver: buildApproverString(doc),            // <-- NEW
+            empcode: doc.owner?.profile_type === "user"
+                ? doc.owner?.userDetails?.employee_id || ""
+                : "",
+            designation: doc.owner?.userDetails?.designation?.name || "N/A",
+            department: doc.department?.name || "N/A",
+            approver: buildApproverString(doc),
             lastModified: doc.updatedAt
                 ? new Date(doc.updatedAt).toLocaleString()
                 : "",
             tags: doc.tags?.join(", ") || "",
-            metadata: doc.metadata?.fileDescription || "",
+            metadata: doc.metadata?.fileDescription || "N/A",
             sharedWith: doc.sharedWithUsers
                 ?.map(u => u.name)
-                .join(", ") || "",
+                .join(", ") || "N/A",
             createdOn: doc.createdAt
                 ? new Date(doc.createdAt).toLocaleString()
-                : "",
+                : "N/A",
             description: doc.description
                 ? doc.description.replace(/<\/?[^>]+(>|$)/g, "").trim()
-                : "",
-            signature: doc.signature?.fileUrl ? "Yes" : "No",
-            status: doc.status || "",
-            fileSize: file.fileSize
-                ? `${(file.fileSize / 1024).toFixed(2)} KB`
-                : "",
-            fileType: file.originalName?.split(".").pop()?.toUpperCase() || ""
+                : "N/A",
+            signature: doc.signature?.fileUrl
+                ? `Signature Attached`
+                : "No Signature",
+
+            signatureUrl: doc.signature?.fileUrl || "N/A",
+
         };
     });
 }
@@ -525,7 +532,7 @@ async function generateExcel(data, res, fileName) {
     ws.getCell("A2").font = { italic: true };
 
     if (data.length) {
-        const headers = Object.keys(data[0]);
+        const headers = Object.keys(data[0]).map(h => toProperCase(h.replace(/([A-Z])/g, " $1")));
         ws.addRow([]);                     // empty row after title
         const headerRow = ws.addRow(headers);
         headerRow.font = { bold: true };
@@ -535,8 +542,24 @@ async function generateExcel(data, res, fileName) {
             fgColor: { argb: "FFE6E6FA" }
         };
 
-        data.forEach(r => ws.addRow(Object.values(r)));
+        data.forEach(row => {
+            const newRow = ws.addRow(Object.values(row));
 
+            // Make signature column hyperlink
+            const sigTextIndex = Object.keys(row).indexOf("signature") + 1;
+            const sigUrl = row.signatureUrl;
+
+            if (sigUrl) {
+                newRow.getCell(sigTextIndex).value = {
+                    text: row.signature,
+                    hyperlink: sigUrl
+                };
+                newRow.getCell(sigTextIndex).font = {
+                    color: { argb: "FF0000FF" },
+                    underline: true
+                };
+            }
+        });
         ws.columns.forEach(col => {
             let max = 0;
             col.eachCell({ includeEmpty: true }, c => {
@@ -562,7 +585,11 @@ function generateCSV(data, res, fileName) {
             .status(400)
             .json({ success: false, message: "No data to export" });
     }
-    const parser = new Parser({ fields: Object.keys(data[0]) });
+    const fields = Object.keys(data[0]).map(h =>
+        formatHeader(h.replace(/([A-Z])/g, " $1"))
+    );
+    const parser = new Parser({ fields });
+
     const csv = parser.parse(data);
 
     res.setHeader("Content-Type", "text/csv");
@@ -571,51 +598,126 @@ function generateCSV(data, res, fileName) {
 }
 
 async function generatePDF(data, res, fileName) {
-    const doc = new PDFDocument({ margin: 50 });
+    const doc = new PDFDocument({
+        margins: { top: 50, left: 50, right: 50, bottom: 50 }
+    });
+
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
     doc.pipe(res);
 
+    // ---------- HEADER ----------
     doc.fontSize(20).font("Helvetica-Bold").text("Documents Report", { align: "center" });
-    doc.fontSize(10)
-        .font("Helvetica")
-        .text(`Exported on: ${new Date().toLocaleString()}`, { align: "center" });
+    doc.moveDown(0.5);
+    doc.fontSize(10).font("Helvetica").text(`Exported on: ${new Date().toLocaleString()}`, { align: "center" });
+    doc.moveDown(1.5);
 
-    let y = 120;
+    let y = doc.y;
+
+    const addNewPageIfNeeded = () => {
+        if (y > 720) {
+            doc.addPage();
+            y = 50;
+        }
+    };
+
+    // ---------- DOCUMENT LOOP ----------
     data.forEach((row, i) => {
-        if (y > 700) { doc.addPage(); y = 50; }
-        doc.fontSize(12).font("Helvetica-Bold").text(`Document ${i + 1}:`, 50, y);
+        addNewPageIfNeeded();
+
+        doc.fontSize(12)
+            .font("Helvetica-Bold")
+            .text(`Document ${i + 1}`, 50, y);
+
         y += 20;
 
-        Object.entries(row).forEach(([k, v]) => {
-            if (y > 700) { doc.addPage(); y = 50; }
+        Object.entries(row).forEach(([key, value]) => {
+
+            // Skip raw URL field
+            if (key === "signatureUrl") return;
+
+            addNewPageIfNeeded();
+
             doc.fontSize(10)
                 .font("Helvetica-Bold")
-                .text(`${k}:`, 70, y);
-            doc.font("Helvetica").text(String(v || ""), 200, y);
-            y += 15;
+                .text(`${formatHeader(key.replace(/([A-Z])/g, " $1"))}:`, 50, y);
+
+            // ---------- SIGNATURE TEXT + HYPERLINK ----------
+            if (key === "signature" && row.signatureUrl) {
+                doc.font("Helvetica")
+                    .fillColor("blue")
+                    .text(value, 140, y, {
+                        link: row.signatureUrl,
+                        underline: true,
+                        width: 400
+                    })
+                    .fillColor("black");
+
+                y += 15;
+                return;
+            }
+
+            // ---------- NORMAL TEXT ----------
+            const cleanVal = value ? String(value) : "";
+            const height = doc.font("Helvetica").fontSize(10).heightOfString(cleanVal, { width: 400 });
+
+            doc.font("Helvetica").text(cleanVal, 140, y, { width: 400 });
+
+            y += height + 5;
         });
-        y += 10;
+
+        y += 10; // separation between documents
     });
 
     doc.end();
 }
 
 async function generateODS(data, res, fileName) {
-    const workbook = new ExcelJS.Workbook();
-    const ws = workbook.addWorksheet("Documents Report");
+    try {
+        if (!data.length) {
+            return res.status(400).json({
+                success: false,
+                message: "No data to export"
+            });
+        }
 
-    if (data.length) {
-        ws.addRow(Object.keys(data[0]));
-        data.forEach(r => ws.addRow(Object.values(r)));
+        // Remove signatureUrl from ODS completely (ODS cannot hyperlink)
+        const cleanData = data.map(row => {
+            const copy = { ...row };
+            delete copy.signatureUrl;
+            return copy;
+        });
+
+        const worksheet = XLSX.utils.json_to_sheet(cleanData);
+        const workbook = XLSX.utils.book_new();
+
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Documents Report");
+
+        const odsBuffer = XLSX.write(workbook, {
+            bookType: "ods",
+            type: "buffer"
+        });
+
+        res.setHeader(
+            "Content-Type",
+            "application/vnd.oasis.opendocument.spreadsheet"
+        );
+        res.setHeader(
+            "Content-Disposition",
+            `attachment; filename="${fileName}"`
+        );
+
+        return res.send(odsBuffer);
+
+    } catch (err) {
+        console.error("ODS Export Error:", err);
+        return res.status(500).json({
+            success: false,
+            message: "Failed to export ODS",
+            error: err.message
+        });
     }
-
-    res.setHeader("Content-Type", "application/vnd.oasis.opendocument.spreadsheet");
-    res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
-    await workbook.ods.write(res);
-    res.end();
 }
-
 
 // Get available export formats
 export const getExportFormats = async (req, res) => {

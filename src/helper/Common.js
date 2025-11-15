@@ -16,3 +16,12 @@ export const formatFileSize = (bytes) => {
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
 };
+
+export function toProperCase(str = "") {
+    if (!str) return "";
+    return str
+        .toLowerCase()
+        .replace(/\b\w/g, ch => ch.toUpperCase())         // Capitalize first letter
+        .replace(/\s+/g, " ")                              // Remove extra spaces
+        .trim();
+}

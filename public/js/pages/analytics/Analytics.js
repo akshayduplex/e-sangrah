@@ -144,7 +144,7 @@ async function loadDocuments() {
                     </button>
                     <!-- 1. DROPDOWN MENU – add the two new items -->
 <ul class="dropdown-menu">
-                    <li><a class="dropdown-item" href="${doc.link || '#'}"><i class="ti ti-eye"></i> View</a></li>
+                    <li><a class="dropdown-item" href="/documents/${doc._id}/versions/view?version=${doc.versioning?.currentVersion?.$numberDecimal || '1.0'}"><i class="ti ti-eye"></i> View</a></li>
                     <li><a class="dropdown-item" href="/documents/edit/${doc._id}"><i class="ti ti-pencil-minus"></i> Edit</a></li>
                     <li>
                         <a class="dropdown-item share-btn" href="#" data-doc-id="${doc._id}"  data-file-id="${doc.files?.[0]?._id || ''}"  data-bs-toggle="modal" data-bs-target="#sharedoc-modal">

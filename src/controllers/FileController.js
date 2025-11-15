@@ -36,12 +36,11 @@ export const uploadFile = async (req, res, folder) => {
             return res.status(400).json({ success: false, message: "No files uploaded" });
 
         const uploadedFiles = [];
-        let totalSize = 0;
 
         for (const file of req.files) {
             const { originalname, mimetype, size, key, location } = file;
 
-            //Create file record
+            // Create file record
             const newFile = await File.create({
                 file: key,
                 s3Url: location,
@@ -54,9 +53,14 @@ export const uploadFile = async (req, res, folder) => {
                 fileSize: size,
             });
 
-            // Push file reference to folder
-            folder.files.push(newFile._id);
-            totalSize += size;
+            // ATOMIC MONGO UPDATE
+            await Folder.updateOne(
+                { _id: folder._id },
+                {
+                    $push: { files: newFile._id },
+                    $inc: { size: size }
+                }
+            );
 
             uploadedFiles.push({
                 _id: newFile._id,
@@ -67,16 +71,13 @@ export const uploadFile = async (req, res, folder) => {
             });
         }
 
-        // Update folder metadata
-        folder.size += totalSize;
-        await folder.save();
-
         return res.status(201).json({
             success: true,
             message: "Files uploaded successfully",
             folderId: folder._id,
             files: uploadedFiles,
         });
+
     } catch (err) {
         console.error("Upload to folder error:", err);
         return res.status(500).json({
