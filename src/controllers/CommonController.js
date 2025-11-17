@@ -12,6 +12,38 @@ import { API_CONFIG } from "../config/ApiEndpoints.js";
 import mongoose from "mongoose";
 import { activityLogger } from "../helper/activityLogger.js";
 import { toProperCase } from "../helper/Common.js";
+import User from "../models/User.js";
+
+// Check duplicate fields
+export const checkDuplicate = async (req, res) => {
+    try {
+        const { email, phone_number, employee_id } = req.query;
+
+        let query = {};
+
+        if (email) query.email = email.toLowerCase();
+        if (phone_number) query.phone_number = phone_number;
+        if (employee_id) query["userDetails.employee_id"] = employee_id;
+
+        const user = await User.findOne(query);
+
+        if (user) {
+            return res.json({
+                exists: true,
+                field: email ? 'email' :
+                    phone_number ? 'phone_number' :
+                        'employee_id'
+            });
+        }
+
+        return res.json({ exists: false });
+
+    } catch (err) {
+        res.status(500).json({ success: false, message: "Server error" });
+    }
+};
+
+
 function sanitize(str) {
     return String(str)
         .replace(/[^a-zA-Z0-9_-]/g, '_')

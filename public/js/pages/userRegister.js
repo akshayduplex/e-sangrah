@@ -1,42 +1,101 @@
 $(document).ready(function () {
-    const preview = $('#preview');
-    const uploadIcon = $('#uploadprofileBox .upload-icon');
-    /**
-     * Email validation on input
-     */
-    $('#email').on('input', function () {
-        const email = $(this).val();
+
+    // ------------------------------
+    // DUPLICATE CHECK FUNCTION
+    // ------------------------------
+    function checkDuplicate(field, value, inputElement) {
+        if (!value) return;
+
+        $.ajax({
+            url: `${baseUrl}/api/check`,
+            method: 'GET',
+            data: { [field]: value },
+            success: function (res) {
+
+                // Remove any old message
+                inputElement.next(".duplicate-msg").remove();
+
+                if (res.exists) {
+                    inputElement
+                        .addClass("is-invalid")
+                        .removeClass("is-valid");
+
+                    inputElement.after(
+                        `<small class="duplicate-msg text-danger">${field.replace('_', ' ')} already exists</small>`
+                    );
+                } else {
+                    inputElement
+                        .addClass("is-valid")
+                        .removeClass("is-invalid");
+                }
+            },
+            error: function () {
+                console.log("Error checking duplicates");
+            }
+        });
+    }
+
+    // ------------------------------
+    // REAL-TIME VALIDATION
+    // ------------------------------
+
+    // EMAIL VALIDATION & DUPLICATE CHECK
+    $('#email').on('blur input', function () {
+        const email = $(this).val().trim();
         const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (emailPattern.test(email)) {
-            $(this).removeClass('is-invalid').addClass('is-valid');
-        } else {
-            $(this).removeClass('is-valid').addClass('is-invalid');
+
+        $(this).next(".duplicate-msg").remove();
+
+        if (!emailPattern.test(email)) {
+            $(this).addClass('is-invalid').removeClass('is-valid');
+            return;
         }
+
+        $(this).addClass('is-valid').removeClass('is-invalid');
+        checkDuplicate('email', email, $(this));
     });
 
-    /**
-     * Phone number validation on input
-     */
-    $('#phone_number').on('input', function () {
-        let mobile = $(this).val().replace(/\D/g, '').slice(0, 10);
-        $(this).val(mobile);
+    // PHONE NUMBER VALIDATION & DUPLICATE CHECK
+    $('#phone_number').on('blur input', function () {
+        let phone = $(this).val().replace(/\D/g, '').slice(0, 10);
+        $(this).val(phone);
 
-        const mobilePattern = /^\d{10}$/;
-        if (mobilePattern.test(mobile)) {
-            $(this).removeClass('is-invalid').addClass('is-valid');
-        } else {
-            $(this).removeClass('is-valid').addClass('is-invalid');
+        $(this).next(".duplicate-msg").remove();
+
+        if (!/^\d{10}$/.test(phone)) {
+            $(this).addClass('is-invalid').removeClass('is-valid');
+            return;
         }
+
+        $(this).addClass('is-valid').removeClass('is-invalid');
+        checkDuplicate('phone_number', phone, $(this));
     });
 
-    /**
-     * Form submit
-     */
+    // EMPLOYEE ID VALIDATION & DUPLICATE CHECK
+    $('#employee_id').on('blur input', function () {
+        const emp = $(this).val().trim().toUpperCase();
+        $(this).val(emp);
+
+        $(this).next(".duplicate-msg").remove();
+
+        if (!emp) {
+            $(this).addClass('is-invalid').removeClass('is-valid');
+            return;
+        }
+
+        $(this).addClass('is-valid').removeClass('is-invalid');
+        checkDuplicate('employee_id', emp, $(this));
+    });
+
+    // ------------------------------
+    // FORM SUBMIT
+    // ------------------------------
     $('#registerForm').on('submit', async function (e) {
         e.preventDefault();
 
-        // Basic required field check
         let isValid = true;
+
+        // Required field validation
         $(this).find('[required]').each(function () {
             if (!$(this).val().trim()) {
                 $(this).addClass('is-invalid');
@@ -46,23 +105,9 @@ $(document).ready(function () {
             }
         });
 
-        // Email format
-        const email = $('#email').val().trim();
-        const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailPattern.test(email)) {
-            $('#email').addClass('is-invalid');
-            isValid = false;
-        }
-
-        // Phone: 10 digits
-        const phone = $('#phone_number').val();
-        if (!/^\d{10}$/.test(phone)) {
-            $('#phone_number').addClass('is-invalid');
-            isValid = false;
-        }
-
-        if (!isValid) {
-            showToast('Please fill all fields correctly.', 'info');
+        // If any duplicate exists → block submit
+        if ($('.is-invalid').length > 0) {
+            showToast('Please fix highlighted fields before submitting.', 'error');
             return;
         }
 
@@ -77,26 +122,40 @@ $(document).ready(function () {
             const result = await response.json();
 
             if (response.ok && result.success) {
-                // Success
                 const successModal = new bootstrap.Modal(document.getElementById('data-success-register'));
                 successModal.show();
 
                 this.reset();
                 $('#preview').empty();
-                $('#uploadprofileBox .upload-icon').show();
                 $('.is-valid, .is-invalid').removeClass('is-valid is-invalid');
             } else {
-                // Show exact server message in toast
-                const message = result.message || 'Registration failed!';
-                showToast(message, 'error');
-
-                // Optional: highlight email if duplicate
-                if (message.toLowerCase().includes('email')) {
-                    $('#email').addClass('is-invalid');
-                }
+                showToast(result.message || 'Registration failed!', 'error');
             }
+
         } catch (err) {
             showToast('Network error. Please try again.', 'error');
+        }
+    });
+
+    // ------------------------------
+    // PROFILE PREVIEW
+    // ------------------------------
+    $('#uploadprofileBox').click(function () {
+        $('#fileInput').click();
+    });
+
+    $('#fileInput').on('change', function (e) {
+        const preview = $('#preview');
+        preview.empty();
+
+        const file = e.target.files[0];
+
+        if (file) {
+            const img = document.createElement("img");
+            img.src = URL.createObjectURL(file);
+            img.style.maxWidth = "100px";
+            img.classList.add("img-thumbnail");
+            preview.append(img);
         }
     });
 });

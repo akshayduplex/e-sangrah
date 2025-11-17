@@ -91,37 +91,37 @@ const documentSchema = new mongoose.Schema({
     currentVersionLabel: { type: String, default: "1.0" }, // human readable label
     hasDraftVersion: { type: Boolean, default: false },   // optional flag
 
-    versioning: {
-        currentVersion: {
-            type: Decimal128,
-            default: () => mongoose.Types.Decimal128.fromString("1.0")
-        },
-        previousVersion: {
-            type: Decimal128,
-            default: null
-        },
-        nextVersion: {
-            type: Decimal128,
-            default: () => mongoose.Types.Decimal128.fromString("1.1")
-        },
-        firstVersion: {
-            type: Decimal128,
-            default: () => mongoose.Types.Decimal128.fromString("1.0")
-        }
-    },
+    // versioning: {
+    //     currentVersion: {
+    //         type: Decimal128,
+    //         default: () => mongoose.Types.Decimal128.fromString("1.0")
+    //     },
+    //     previousVersion: {
+    //         type: Decimal128,
+    //         default: null
+    //     },
+    //     nextVersion: {
+    //         type: Decimal128,
+    //         default: () => mongoose.Types.Decimal128.fromString("1.1")
+    //     },
+    //     firstVersion: {
+    //         type: Decimal128,
+    //         default: () => mongoose.Types.Decimal128.fromString("1.0")
+    //     }
+    // },
 
-    versionHistory: [{
-        version: {
-            type: Decimal128,
-            required: true,
-            default: () => mongoose.Types.Decimal128.fromString("1.0")
-        },
-        timestamp: { type: Date, default: Date.now },
-        changedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-        changes: { type: String },
-        file: { type: mongoose.Schema.Types.ObjectId, ref: "File" },
-        snapshot: { type: mongoose.Schema.Types.Mixed }
-    }],
+    // versionHistory: [{
+    //     version: {
+    //         type: Decimal128,
+    //         required: true,
+    //         default: () => mongoose.Types.Decimal128.fromString("1.0")
+    //     },
+    //     timestamp: { type: Date, default: Date.now },
+    //     changedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    //     changes: { type: String },
+    //     file: { type: mongoose.Schema.Types.ObjectId, ref: "File" },
+    //     snapshot: { type: mongoose.Schema.Types.Mixed }
+    // }],
 
 }, { timestamps: true });
 

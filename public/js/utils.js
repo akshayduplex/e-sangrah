@@ -116,3 +116,28 @@ const statusClass = {
     underreview: 'bg-soft-warning',
     archived: 'bg-soft-secondary'
 };
+
+// GLOBAL UNIQUE KEY CHECK FUNCTION
+function checkDuplicateValue(field, value, $input) {
+    if (!value) return;
+
+    $.ajax({
+        url: `${baseUrl}/api/check`,
+        type: 'GET',
+        data: { [field]: value },
+        success: function (res) {
+
+            // Remove old duplicate message
+            $input.next(".duplicate-msg").remove();
+
+            if (res.exists) {
+                // mark as invalid
+                $input.addClass("is-invalid").removeClass("is-valid");
+                $input.after(`<small class="duplicate-msg text-danger">${field.replace('_', ' ')} already exists</small>`);
+            } else {
+                // mark as valid
+                $input.addClass("is-valid").removeClass("is-invalid");
+            }
+        }
+    });
+}

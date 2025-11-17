@@ -303,7 +303,6 @@
                         const approveBtn = document.getElementById('approveBtn');
                         const declineBtn = document.getElementById('declineBtn');
                         const discussionBtn = document.getElementById('needDiscussionBtn');
-                        console.log("clciked initally", discussionBtn)
                         // Reset active states
                         approveBtn.classList.add('active');
                         declineBtn.classList.remove('active');
@@ -386,7 +385,6 @@
                     const declineBtn = document.getElementById('declineBtn');
                     const discussionBtn = document.getElementById('needDiscussionBtn');
                     const comment = document.getElementById('modalComment').value.trim();
-                    console.log("Clciked nedd", discussionBtn)
                     // Detect which action user selected
                     let action = 'approve';
                     if (declineBtn.classList.contains('active')) {

@@ -25,6 +25,7 @@ import { s3Client } from "../config/S3Client.js";
 import { deleteObject } from "../utils/s3Helpers.js";
 import { generateEmailTemplate } from "../helper/emailTemplate.js";
 import { activityLogger } from "../helper/activityLogger.js";
+import DocumentVersion from "../models/DocumentVersion.js";
 
 //Page Controllers
 
@@ -426,7 +427,6 @@ export const getDocuments = async (req, res) => {
 
         const userId = req.user?._id;
         const profile_type = req.user?.profile_type;
-        console.log("status", status)
         // --- Base filter ---
         const filter = {
             isDeleted: false,
@@ -1352,7 +1352,6 @@ export const updateDocument = async (req, res) => {
                 case "expiryDate":
                     if (value && value.trim() !== '') {
                         try {
-                            // Simple approach: Let MongoDB handle the date parsing
                             const newExpiry = new Date(value);
 
                             if (!isNaN(newExpiry.getTime())) {
@@ -1370,7 +1369,6 @@ export const updateDocument = async (req, res) => {
                             console.warn("Expiry date error, skipping:", error.message);
                         }
                     } else if (value === '' || value === null) {
-                        // Clear expiry date
                         if (document.compliance.expiryDate !== null) {
                             document.compliance.expiryDate = null;
                             hasChanges = true;
@@ -1386,23 +1384,15 @@ export const updateDocument = async (req, res) => {
                             let newDocumentDate;
 
                             if (value.includes('-')) {
-                                // Handle DD-MM-YYYY format from frontend
                                 const [d, m, y] = value.split("-");
-                                if (d && m && y) {
-                                    newDocumentDate = new Date(`${y}-${m}-${d}`);
-                                }
+                                if (d && m && y) newDocumentDate = new Date(`${y}-${m}-${d}`);
                             } else if (value.includes('/')) {
-                                // Handle DD/MM/YYYY format
                                 const [d, m, y] = value.split("/");
-                                if (d && m && y) {
-                                    newDocumentDate = new Date(`${y}-${m}-${d}`);
-                                }
+                                if (d && m && y) newDocumentDate = new Date(`${y}-${m}-${d}`);
                             } else {
-                                // Handle ISO format or other formats
                                 newDocumentDate = new Date(value);
                             }
 
-                            // Validate the date
                             if (newDocumentDate && !isNaN(newDocumentDate.getTime())) {
                                 const currentDocDate = document.documentDate;
                                 if (!currentDocDate || currentDocDate.getTime() !== newDocumentDate.getTime()) {
@@ -1412,10 +1402,10 @@ export const updateDocument = async (req, res) => {
                                     changedFields.push("documentDate");
                                 }
                             } else {
-                                console.warn("Invalid document date format:", value);
+                                console.warn("Invalid document date:", value);
                             }
                         } catch (error) {
-                            console.warn("Document date parsing error:", error.message, "Value:", value);
+                            console.warn("Document date parsing error:", error.message);
                         }
                     }
                     break;
@@ -1433,7 +1423,7 @@ export const updateDocument = async (req, res) => {
                                 changedFields.push("files");
                             }
                         } catch (error) {
-                            console.warn("Invalid fileIds format:", error.message);
+                            console.warn("Invalid fileIds:", error.message);
                         }
                     }
                     break;
@@ -1472,7 +1462,7 @@ export const updateDocument = async (req, res) => {
             }
         }
 
-        // Handle project, department, projectManager, documentDonor, documentVendor
+        // Handle reference fields
         const referenceFields = ['project', 'department', 'projectManager', 'documentDonor', 'documentVendor'];
         for (const field of referenceFields) {
             if (req.body[field] !== undefined) {
@@ -1491,24 +1481,35 @@ export const updateDocument = async (req, res) => {
         if (hasChanges) {
             if (fileUpdates) changeReason = "Files and content updated";
 
-            // Bump version only if there are actual content changes (not just metadata)
-            const contentFields = ['description', 'files', 'signature', 'documentName', 'documentType', 'metadata', 'comment', 'tags'];
-            const hasContentChanges = changedFields.some(field => contentFields.includes(field));
+            const contentFields = [
+                'description', 'files', 'signature', 'documentName',
+                'documentType', 'metadata', 'comment', 'tags'
+            ];
+
+            const hasContentChanges = changedFields.some(f => contentFields.includes(f));
 
             if (hasContentChanges) {
                 bumpVersion(document);
             }
 
-            await createVersionHistory(document, req.user, changeReason, changedFields);
             await document.save();
-            await activityLogger({
-                actorId: req.user?.id,
-                entityId: document._id,
-                entityType: "Document",
-                action: "UPDATED DOCUMENT",
-                details: `${req.user?.name} updated document ${document.metadata.fileName}`,
-                meta: { changes: [`Updated ${hasContentChanges}`] }
+
+            // NEW VERSION SNAPSHOT (replaces push into document.versionHistory)
+            await DocumentVersion.create({
+                documentId: document._id,
+                versionNumber: document.currentVersionNumber,
+                versionLabel: document.currentVersionLabel,
+                createdBy: req.user?._id || null,
+                changeReason,
+                snapshot: changedFields.reduce((acc, field) => {
+                    acc[field] = JSON.parse(JSON.stringify(document[field]));
+                    return acc;
+                }, {}),
+                files: document.files || []
             });
+
+            // =====================================================================
+
             const populatedDoc = await Document.findById(document._id)
                 .populate('files')
                 .populate('owner', 'name email')
@@ -1517,26 +1518,24 @@ export const updateDocument = async (req, res) => {
                 .populate('department', 'name')
                 .populate('projectManager', 'name')
                 .populate('documentDonor', 'name')
-                .populate('documentVendor', 'name')
-                .populate('versionHistory.changedBy', 'name email');
+                .populate('documentVendor', 'name');
 
             return successResponse(res, {
                 document: populatedDoc,
                 changes: changeReason,
-                version: document.versioning.currentVersion.toString(),
-                changedFields: changedFields
+                version: document.currentVersionLabel,
+                changedFields
             }, "Document updated successfully");
-        } else {
-            const populatedDoc = await Document.findById(document._id)
-                .populate('files')
-                .populate('owner', 'name email')
-                .populate('project', 'projectName name')
-                .populate('department', 'name');
-
-            return successResponse(res, {
-                document: populatedDoc
-            }, "No changes detected");
         }
+
+        // No changes
+        const populatedDoc = await Document.findById(document._id)
+            .populate('files')
+            .populate('owner', 'name email')
+            .populate('project', 'projectName name')
+            .populate('department', 'name');
+
+        return successResponse(res, { document: populatedDoc }, "No changes detected");
 
     } catch (error) {
         console.error("Update document error:", error);
@@ -1644,121 +1643,72 @@ const handleSignatureUpdate = async (document, req) => {
 /**
  * Create version history entry
  */
-const createVersionHistory = async (document, user, changes, changedFields) => {
+export const createDocumentVersion = async (document, user, reason, changedFields) => {
     const snapshot = {};
+
     changedFields.forEach(field => {
         if (document[field] !== undefined) {
-            snapshot[field] = JSON.parse(JSON.stringify(document[field])); // deep copy
+            snapshot[field] = JSON.parse(JSON.stringify(document[field]));
         }
     });
 
-    document.versionHistory.push({
-        version: document.versioning.currentVersion,
-        timestamp: new Date(),
-        changedBy: user._id,
-        changes,
-        snapshot
+    await DocumentVersion.create({
+        documentId: document._id,
+        versionNumber: document.currentVersionNumber,
+        versionLabel: document.currentVersionLabel,
+        createdBy: user?._id || null,
+        changeReason: reason,
+        snapshot,
+        files: document.files || []
     });
-
-    if (document.versionHistory.length > 50) {
-        document.versionHistory = document.versionHistory.slice(-50);
-    }
 };
+
+
 /**
  * Restore to specific version
  */
 export const restoreVersion = async (req, res) => {
-    const { id, version } = req.params;
-    const userId = req.user?._id;
-
-    // --- Validate Inputs ---
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-        return res.status(400).json({ message: "Invalid document ID" });
-    }
-    if (!version || isNaN(parseFloat(version))) {
-        return res.status(400).json({ message: "A valid version number is required" });
-    }
-
     try {
+        const { id, version } = req.params;
+
         const document = await Document.findById(id);
-        if (!document) {
-            return res.status(404).json({ message: "Document not found" });
-        }
+        if (!document) return failResponse(res, "Document not found", 404);
 
-        // --- Find Target Version in History ---
-        const targetVersion = document.versionHistory.find(
-            (v) => parseFloat(v.version.toString()) === parseFloat(version)
-        );
-        if (!targetVersion) {
-            return res.status(404).json({ message: `Version ${version} not found in history` });
-        }
+        const versionQuery = isNaN(version)
+            ? { versionLabel: version }
+            : { versionNumber: Number(version) };
 
-        // --- Validate Snapshot ---
-        const snapshot = targetVersion.snapshot;
-        if (!snapshot || typeof snapshot !== "object") {
-            return res.status(500).json({ message: "Snapshot data missing or invalid" });
-        }
-
-        // --- Define allowed fields to restore (to prevent tampering) ---
-        const restorableFields = [
-            "description",
-            "files",
-            "signature",
-            "metadata",
-            "comment",
-            "tags",
-            "link",
-            "compliance"
-        ];
-
-        // --- Apply snapshot safely ---
-        restorableFields.forEach((key) => {
-            if (snapshot[key] !== undefined) {
-                document[key] = snapshot[key];
-            }
+        const entry = await DocumentVersion.findOne({
+            documentId: id,
+            ...versionQuery
         });
 
-        // --- Update version tracking ---
-        const prevVersion = parseFloat(document.versioning.currentVersion.toString());
-        const restoredVersion = parseFloat(version);
-        const nextVersion = (restoredVersion + 0.1).toFixed(1);
+        if (!entry) return failResponse(res, "Version not found", 404);
 
-        // document.versioning.previousVersion = mongoose.Types.Decimal128.fromString(prevVersion.toString());
-        // document.versioning.currentVersion = mongoose.Types.Decimal128.fromString(restoredVersion.toString());
-        // document.versioning.nextVersion = mongoose.Types.Decimal128.fromString(nextVersion);
+        const snapshot = entry.snapshot || {};
 
-        // --- Add restoration event to history ---
-        // document.versionHistory.push({
-        //     version: mongoose.Types.Decimal128.fromString(restoredVersion.toString()),
-        //     timestamp: new Date(),
-        //     changedBy: userId || null,
-        //     changes: `Document restored to version ${version}`,
-        //     snapshot: snapshot,
-        // });
-        await activityLogger({
-            actorId: req.user?._id,
-            entityId: document._id,
-            entityType: "Document",
-            action: "RESTORE DOCUMENT",
-            details: ` ${req.user?.name} restore document from version ${prevVersion} to ${version}`,
-            meta: { prevVersion, version }
-        });
+        Object.assign(document, snapshot);
 
-        // --- Save atomically ---
-        await document.save({ validateBeforeSave: true });
+        bumpVersion(document);
+        await document.save();
 
-        res.status(200).json({
-            message: `Document successfully restored to version ${version}`,
+        await createDocumentVersion(
             document,
-        });
-    } catch (error) {
-        console.error("RestoreVersion Error:", error);
-        res.status(500).json({
-            message: "An unexpected error occurred while restoring document version",
-            error: error.message,
-        });
+            req.user,
+            `Restored to version ${version}`,
+            Object.keys(snapshot)
+        );
+
+        return successResponse(res, { document }, "Version restored successfully");
+
+    } catch (err) {
+        console.error(err);
+        return errorResponse(res, err, "Failed to restore version");
     }
 };
+
+
+
 
 
 
@@ -1769,57 +1719,37 @@ export const viewVersion = async (req, res) => {
     try {
         const { id, version } = req.params;
 
-        const document = await Document.findById(id);
-        if (!document) {
-            return failResponse(res, "Document not found", 404);
-        }
+        const document = await Document.findById(id).lean();
+        if (!document) return failResponse(res, "Document not found", 404);
 
-        const versionData = document.versioning.versionHistory.find(
-            v => v.version === parseFloat(version)
-        );
+        const versionEntry = await DocumentVersion.findOne({
+            documentId: id,
+            $or: [
+                { versionLabel: version },
+                { versionNumber: Number(version) }
+            ]
+        })
+            .populate("createdBy", "name email")
+            .lean();
 
-        if (!versionData) {
-            return failResponse(res, `Version ${version} not found`, 404);
-        }
+        if (!versionEntry) return failResponse(res, "Version not found", 404);
 
-        // Get files associated with this version
-        const versionFiles = await File.find({
-            _id: { $in: versionData.snapshot.files || [] }
-        }).select('originalName s3Url version uploadedAt');
-
-        const versionDocument = {
-            _id: document._id,
-            ...versionData.snapshot,
-            version: versionData.version,
-            versionInfo: {
-                timestamp: versionData.timestamp,
-                changedBy: versionData.changedBy,
-                changes: versionData.changes,
-                changesDetail: versionData.changesDetail
-            },
-            files: versionFiles
-        };
-
-        await Document.populate(versionDocument, [
-            { path: 'department', select: 'name' },
-            { path: 'project', select: 'projectName' },
-            { path: 'projectManager', select: 'name email' },
-            { path: 'documentDonor', select: 'name email' },
-            { path: 'documentVendor', select: 'name email' },
-            { path: 'versionInfo.changedBy', select: 'name email' }
-        ]);
+        const mergedDoc = { ...document, ...versionEntry.snapshot };
 
         return successResponse(res, {
-            document: versionDocument,
-            isHistorical: true,
-            currentVersion: document.versioning.currentVersion
-        }, `Viewing version ${version}`);
+            versionLabel: versionEntry.versionLabel,
+            versionNumber: versionEntry.versionNumber,
+            timestamp: versionEntry.createdAt,
+            changedBy: versionEntry.createdBy,
+            document: mergedDoc
+        });
 
-    } catch (error) {
-        logger.error("View version error:", error);
-        return errorResponse(res, error, "Failed to retrieve version");
+    } catch (err) {
+        console.error(err);
+        return errorResponse(res, err, "Failed to view version");
     }
 };
+
 
 
 /**
@@ -1829,46 +1759,24 @@ export const getVersionHistory = async (req, res) => {
     try {
         const { id } = req.params;
 
-        const document = await Document.findById(id)
-            .populate('versionHistory.changedBy', 'name email')
-            .select('versioning metadata.mainHeading description versionHistory');
+        const document = await Document.findById(id);
+        if (!document) return failResponse(res, "Document not found", 404);
 
-        if (!document) {
-            return failResponse(res, "Document not found", 404);
-        }
-
-        const enhancedHistory = document.versionHistory.map((version, index, arr) => {
-            const previousVersion = index > 0 ? arr[index - 1].version?.toString() : null;
-            const nextVersion = index < arr.length - 1 ? arr[index + 1].version?.toString() : null;
-
-            return {
-                previousVersion,
-                version: version.version?.toString(),
-                nextVersion,
-                timestamp: version.timestamp,
-                changedBy: version.changedBy,
-                changes: version.changes,
-                files: version.file ? [{ _id: version.file }] : [],
-                isCurrent: version.version?.toString() === document.versioning.currentVersion?.toString(),
-                snapshotPreview: {
-                    description: version.snapshot?.description,
-                    mainHeading: version.snapshot?.metadata?.mainHeading,
-                    tags: version.snapshot?.tags
-                }
-            };
-        });
+        const versions = await DocumentVersion.find({ documentId: id })
+            .populate("createdBy", "name email")
+            .sort({ versionNumber: 1 });
 
         return successResponse(res, {
             documentId: document._id,
-            documentName: document.metadata?.mainHeading || document.description || 'Untitled',
-            currentVersion: document.versioning.currentVersion?.toString(),
-            versionHistory: enhancedHistory,
-            totalVersions: enhancedHistory.length
-        }, "Version history retrieved successfully");
+            currentVersionLabel: document.currentVersionLabel,
+            currentVersionNumber: document.currentVersionNumber,
+            versionHistory: versions,
+            total: versions.length
+        });
 
-    } catch (error) {
-        console.error("Get version history error:", error);
-        return errorResponse(res, error, "Failed to retrieve version history");
+    } catch (err) {
+        console.error(err);
+        return errorResponse(res, err, "Failed to retrieve version history");
     }
 };
 
@@ -1878,69 +1786,48 @@ export const viewDocumentVersion = async (req, res) => {
         const { id } = req.params;
         const { version } = req.query;
 
-        if (!mongoose.Types.ObjectId.isValid(id)) {
+        if (!mongoose.Types.ObjectId.isValid(id))
             return res.status(400).json({ message: "Invalid document ID" });
-        }
 
-        if (!version) {
-            return res.status(400).json({ message: "Version query parameter is required" });
-        }
+        if (!version)
+            return res.status(400).json({ message: "Version query parameter required" });
 
-        const document = await Document.findById(id)
-            .select("description project department folderId projectManager documentDonor documentVendor owner status tags metadata compliance files documentDate link sharedWithUsers comment versioning versionHistory createdAt updatedAt ")
-            .populate("versionHistory.changedBy", "name email")
-            .populate("projectManager", "name email")
+        const baseDoc = await Document.findById(id)
+            .populate("files")
             .populate("owner", "name email")
-            .populate("project", "projectName")
-            .populate("department", "name")
-            .populate("folderId", "name")
-            .populate("documentDonor", "name")
-            .populate("documentVendor", "name")
-            .populate("sharedWithUsers", "name email")
-            .populate("files", "originalName fileSize fileType")
             .lean();
 
-        if (!document) {
-            return res.status(404).json({ message: "Document not found" });
-        }
+        if (!baseDoc) return res.status(404).json({ message: "Document not found" });
 
-        const Decimal128 = mongoose.Types.Decimal128;
-        const requestedVersion = Decimal128.fromString(version);
+        const entry = await DocumentVersion.findOne({
+            documentId: id,
+            $or: [
+                { versionLabel: version },
+                { versionNumber: Number(version) }
+            ]
+        })
+            .populate("createdBy", "name email")
+            .lean();
 
-        const versionItem = document.versionHistory.find(v =>
-            v.version.toString() === requestedVersion.toString()
-        );
+        if (!entry) return res.status(404).json({ message: "Version not found" });
 
-        if (!versionItem) {
-            return res.status(404).json({ message: `Version ${version} not found` });
-        }
+        const mergedDoc = { ...baseDoc, ...entry.snapshot };
 
-        const snapshot = versionItem.snapshot || {};
-        const documentAtVersion = _.cloneDeep(document);
-        _.merge(documentAtVersion, snapshot);
-
-        const response = {
-            version: versionItem.version.toString(),
-            timestamp: versionItem.timestamp,
-            changedBy: versionItem.changedBy,
-            changes: versionItem.changes,
-            document: documentAtVersion
-        };
-        // Activity Logger
-        await activityLogger({
-            actorId: req.user._id,
-            entityId: document._id,
-            entityType: "Document",
-            action: "VIEW",
-            details: `Document ${document?.metadata?.fileName ?? "Untitled"} viewd by ${req.user?.name ?? "User"}`,
-            meta: { action: ["Document Viewd"] }
+        return res.json({
+            versionLabel: entry.versionLabel,
+            versionNumber: entry.versionNumber,
+            timestamp: entry.createdAt,
+            changedBy: entry.createdBy,
+            changeReason: entry.changeReason,
+            document: mergedDoc
         });
-        return res.json(response);
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({ message: "Server error", error: error.message });
+
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ message: "Server error", error: err.message });
     }
 };
+
 
 /**
  * Soft Delete document (Recycle Bin)
@@ -3679,10 +3566,10 @@ export const getApprovals = async (req, res) => {
         const document = await Document.findById(documentId)
             .select('owner files description createdAt updatedAt documentApprovalAuthority slug isDeleted status isArchived compliance files comment versioning project')
             .populate("owner files")
-            .populate({
-                path: "versionHistory.changedBy",
-                model: "User"
-            })
+            // .populate({
+            //     path: "versionHistory.changedBy",
+            //     model: "User"
+            // })
             .populate({
                 path: "documentApprovalAuthority.userId",
                 model: "User",

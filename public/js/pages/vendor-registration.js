@@ -27,6 +27,29 @@ $(document).ready(function () {
         if (typeof showToast === 'function') { try { showToast(message, 'error'); return; } catch (e) { } }
         showToast('ERROR:' + message, 'error');
     }
+    // VENDOR EMAIL DUPLICATE CHECK
+    $('#vendor_email').on('blur', function () {
+        const email = $(this).val().trim();
+        if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            checkDuplicateValue('email', email, $(this));
+        }
+    });
+
+    // VENDOR MOBILE DUPLICATE CHECK
+    $('#vendor_mobile').on('blur', function () {
+        const mobile = $(this).val().trim();
+        if (/^\d{10}$/.test(mobile)) {
+            checkDuplicateValue('phone_number', mobile, $(this));
+        }
+    });
+
+    // VENDOR GST DUPLICATE CHECK (Optional but recommended)
+    $('#gst_number').on('blur', function () {
+        const gst = $(this).val().trim().toUpperCase();
+        if (gst.length > 5) {
+            checkDuplicateValue('employee_id', gst, $(this)); // Change if you’re checking GST separately
+        }
+    });
 
     // Email validation (same pattern used in donor form)
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

@@ -88,7 +88,7 @@ export const getApprovalRequests = async (req, res) => {
         const filter = {
             isDeleted: { $ne: true },
             isArchived: { $ne: true },
-            wantApprovers: { $ne: false }
+            wantApprovers: true
         };
 
         if (profileType !== "superadmin") {
@@ -134,7 +134,7 @@ export const getApprovalRequests = async (req, res) => {
 
         const [documents, total] = await Promise.all([
             Document.find(filter)
-                .select('department createdAt status files documentApprovalAuthority comment versioning ')
+                .select('department createdAt status wantApprovers files documentApprovalAuthority comment versioning ')
                 .populate("department", "name")
                 .populate("owner", "name email profile_image")
                 .populate("projectManager", "name email profile_image")

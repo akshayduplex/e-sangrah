@@ -1,5 +1,24 @@
 $(document).ready(function () {
 
+    // DONOR EMAIL DUPLICATE CHECK
+    $('#email_id').on('blur', function () {
+        const email = $(this).val().trim();
+        const pattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+        if (pattern.test(email)) {
+            checkDuplicateValue('email', email, $(this));
+        }
+    });
+
+    // DONOR MOBILE DUPLICATE CHECK
+    $('#user_mobile').on('blur', function () {
+        const mobile = $(this).val().trim();
+        if (/^\d{10}$/.test(mobile)) {
+            checkDuplicateValue('phone_number', mobile, $(this));
+        }
+    });
+
+
     /**
      * Email validation on input
      */

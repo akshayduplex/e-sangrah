@@ -115,6 +115,9 @@ router.post("/auth/logout", authenticate, AuthController.logout);
 // ---------------------------
 // Common routes
 // ---------------------------
+
+router.get('/check', CommonController.checkDuplicate);
+
 // Route to Download Folder
 router.get("/download/:folderId", authenticate, CommonController.downloadFolderAsZip);
 router.get("/download/file/:fileId", authenticate, CommonController.downloadFile);

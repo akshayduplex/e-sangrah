@@ -1990,8 +1990,6 @@ export const getFolderPermissions = async (req, res) => {
             query.requestStatus = status;
         }
 
-        console.log("FolderPermissions Query:", query);
-
         const total = await FolderPermissionLogs.countDocuments(query);
 
         const logs = await FolderPermissionLogs.find(query)
