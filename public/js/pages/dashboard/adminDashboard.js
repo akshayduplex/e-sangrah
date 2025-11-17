@@ -749,7 +749,7 @@ $(document).ready(function () {
                                     <i class="ti ti-settings"></i>
                                 </button>
                                 <ul class="dropdown-menu">
-                                    <li><a class="dropdown-item" href="/documents/${doc._id}/versions/view?version=${doc.versioning?.currentVersion?.$numberDecimal || '1.0'}"><i class="ti ti-eye"></i> View</a></li>
+                                    <li><a class="dropdown-item" href="/documents/${doc._id}/versions/view?version=""><i class="ti ti-eye"></i> View</a></li>
                                     <li><a class="dropdown-item" href="/documents/edit/${doc._id}"><i class="ti ti-pencil-minus"></i> Edit</a></li>
                                     <li><a class="dropdown-item share-btn" href="#" data-doc-id="${doc._id}" data-file-id="${firstFile?._id || ''}" data-bs-toggle="modal" data-bs-target="#sharedoc-modal"><i class="ti ti-share"></i> Share</a></li>
                                     <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-id="${doc._id}" data-bs-target="#versionhistory-modal"><i class="ti ti-history"></i> Version History</a></li>

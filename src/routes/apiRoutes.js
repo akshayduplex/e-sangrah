@@ -247,7 +247,7 @@ router.get('/documents/:id/versions/view', DocumentController.viewDocumentVersio
 router.get('/documents/:id/versions/:version/view', DocumentController.viewVersion);
 
 // Restore a previous version
-router.patch('/documents/:id/versions/:version/restore', DocumentValidators.restoreVersionValidator, validators, DocumentController.restoreVersion);
+router.patch('/documents/:id/versions/:versionId/restore', DocumentController.restoreVersion);
 
 
 /**

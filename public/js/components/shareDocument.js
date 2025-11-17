@@ -4,7 +4,7 @@
     let currentFileId = null;
     let customFlatpickr = null;
     let downloadFileId = null;
-    let prevVersion = null;
+    let restoreVerionId = null;
     let restoreTarget = {};
     const baseUrl = window.location.origin;
 
@@ -562,67 +562,83 @@
                     return response.json();
                 })
                 .then(res => {
-                    if (!res.success || !res.data?.versionHistory) {
+                    if (!res.success || !res.data?.versions) {
                         versionList.innerHTML = '<p class="text-danger">No version history found.</p>';
                         return;
                     }
 
-                    versionList.innerHTML = '';
-                    res.data.versionHistory.forEach(item => {
+                    const versions = res.data.versions;
+                    const currentVersion = res.data.currentVersion;
 
-                        const versionValue = item.versionLabel || item.versionNumber;
+                    versionList.innerHTML = '';
+
+                    versions.forEach(item => {
+                        const documentName = item.documentName;
+                        const versionValue = item.versionLabel;  // "1.1"
                         const modifiedDate = new Date(item.createdAt).toLocaleString();
                         const changedBy = item.createdBy?.name || "Unknown";
                         const changeReason = item.changeReason || "Updated";
 
-                        // Detect current version
-                        const isCurrent = res.data.currentVersionLabel == item.versionLabel;
+                        // Convert "1.1" → 1.1
+                        const versionNumber = parseFloat(versionValue);
 
-                        prevVersion = getPreviousVersion(item.versionLabel);
+                        // Simple logic: previous = version - 0.1
+                        const previousVersion = (versionNumber - 0.1).toFixed(1);
 
-                        const restoreButton = !isCurrent
-                            ? `<button class="btn btn-outline-light rounded-pill btn-restore-version"
-            data-version="${prevVersion}">
-            Restore to v${prevVersion}
-       </button>`
-                            : '';
+                        // 🔥 Only hide restore for version 1.0 — NOT current version
+                        const hideRestore = versionNumber <= 1.0;
 
+                        const restoreButton = hideRestore ? '' : `
+                    <button class="btn btn-outline-light rounded-pill btn-restore-version"
+                        data-version="${versionValue}"
+                        data-versionid="${item.versionId}"
+                        data-prev="${previousVersion}">
+                        Restore to v${previousVersion}
+                    </button>`;
 
+                        // Build HTML block
                         const html = `
-        <div class="version-item border-bottom pb-3 mb-3">
-            <div class="dflexbtwn align-items-start">
-                <div class="flxtblleft">
-                    <span class="avatar rounded bg-light mb-2">
-                        <img src="/img/icons/fn2.png" alt="User">
-                    </span>
-                    <div class="flxtbltxt">
-                        <p class="fs-18 mb-1 fw-normal">
-                            Version v${versionValue}
-                            ${isCurrent ? '<span class="badge bg-success ms-2">Current</span>' : ''}
-                        </p>
-                        <span class="fs-16 fw-normal d-block mb-2">
-                            Modified by ${changedBy}
-                        </span>
-                        <h5 class="fs-18 fw-light text-black mb-3">
-                            ${changeReason}
-                        </h5>
-                        <div class="version-actions">
-                            <button class="site-btnmd fw-light btn-view-version"
-                                    data-version="${item.versionLabel}">
-                                View
-                            </button>
-                            ${restoreButton}
+                <div class="version-item border-bottom pb-3 mb-3">
+                    <div class="dflexbtwn align-items-start">
+                        <div class="flxtblleft">
+                            <span class="avatar rounded bg-light mb-2">
+                                <img src="/img/icons/fn2.png" alt="User">
+                            </span>
+
+                            <div class="flxtbltxt">
+                                <p class="fs-18 mb-1 fw-normal">
+                                    ${documentName} v${versionValue}
+                                    ${currentVersion === versionValue
+                                ? '<span class="badge bg-success ms-2">Current</span>'
+                                : ''}
+                                </p>
+
+                                <span class="fs-16 fw-normal d-block mb-2">
+                                    Modified by ${changedBy}
+                                </span>
+
+                                <h5 class="fs-18 fw-light text-black mb-3">
+                                    ${changeReason}
+                                </h5>
+
+                                <div class="version-actions">
+                                    <button class="site-btnmd fw-light btn-view-version"
+                                            data-version="${versionValue}">
+                                        View
+                                    </button>
+
+                                    ${restoreButton}
+                                </div>
+                            </div>
                         </div>
+
+                        <p class="text-muted">Modified on ${modifiedDate}</p>
                     </div>
                 </div>
-                <p class="text-muted">Modified on ${modifiedDate}</p>
-            </div>
-        </div>`;
+                `;
 
                         versionList.insertAdjacentHTML('beforeend', html);
                     });
-
-
                 })
                 .catch(error => {
                     console.error('Error loading version history:', error);
@@ -667,68 +683,67 @@
         }
     });
     // Handle View Version button
+    // Handle View Version button
     document.addEventListener('click', function (e) {
         if (e.target.classList.contains('btn-view-version')) {
             const version = e.target.getAttribute('data-version');
             if (!currentDocId || !version) return;
 
-            // Open the version view page
-            window.location.href = `/documents/${currentDocId}/versions/view?version=${prevVersion}`;
+            // Correct URL: pass selected version only
+            window.location.href = `/documents/${currentDocId}/versions/view?version=${version}`;
         }
     });
-
-
     document.addEventListener('click', function (e) {
         if (e.target.classList.contains('btn-restore-version')) {
-            const version = e.target.getAttribute('data-version');
-            if (!currentDocId || !version) return;
 
-            restoreTarget = { docId: currentDocId, version };
+            const versionId = e.target.getAttribute('data-versionid');
+            const previousVersion = e.target.getAttribute('data-prev');
 
-            const restoreModal = document.getElementById('restore-folder-modal');
-            if (restoreModal) {
-                restoreModal.querySelector('.modal-title').innerHTML = `
-                <img src="/img/icons/restore.png" width="32" class="me-2"> Restore Version
-            `;
-                restoreModal.querySelector('.modal-body').textContent =
-                    `Are you sure you want to restore this document to version ${version}?`;
+            if (!currentDocId || !versionId) return;
 
-                const bsModal = new bootstrap.Modal(restoreModal);
-                bsModal.show();
-            }
+            restoreTarget = {
+                docId: currentDocId,
+                versionId,
+                targetVersion: previousVersion
+            };
+
+            const modal = document.getElementById('restore-folder-modal');
+            modal.querySelector('.modal-body').textContent =
+                `Are you sure you want to restore this document to version ${previousVersion}?`;
+
+            new bootstrap.Modal(modal).show();
         }
     });
+
 
 
     // Confirm restore action
     document.getElementById('confirm-restore-folder')?.addEventListener('click', function () {
-        if (!restoreTarget.docId || !restoreTarget.version) return;
 
-        fetch(`/api/documents/${restoreTarget.docId}/versions/${restoreTarget.version}/restore`, {
+        if (!restoreTarget.docId || !restoreTarget.versionId) return;
+
+        fetch(`/api/documents/${restoreTarget.docId}/versions/${restoreTarget.versionId}/restore`, {
             method: 'PATCH',
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        })
-            .then(response => response.json())
-            .then(res => {
-                showToast(res.message || `Restored to version ${restoreTarget.version}`, 'success');
-
-                // Hide modal
-                const restoreModal = document.getElementById('restore-folder-modal');
-                if (restoreModal) {
-                    const bsModal = bootstrap.Modal.getInstance(restoreModal);
-                    bsModal.hide();
-                }
-
-                // Reload documents
-                loadDocuments();
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                targetVersion: restoreTarget.targetVersion
             })
-            .catch(error => {
-                console.error('Error restoring version:', error);
-                showToast('Failed to restore version', 'error');
-            });
+        })
+            .then(res => res.json())
+            .then(res => {
+                showToast(res.message || 'Version restored successfully', 'success');
+
+                const modal = bootstrap.Modal.getInstance(
+                    document.getElementById('restore-folder-modal')
+                );
+                modal.hide();
+
+                // reload document list if exists
+                if (typeof loadDocuments === 'function') loadDocuments();
+            })
+            .catch(() => showToast('Failed to restore version', 'error'));
     });
+
 
     // Search functionality for versions
     document.getElementById('versionSearch')?.addEventListener('input', function (e) {

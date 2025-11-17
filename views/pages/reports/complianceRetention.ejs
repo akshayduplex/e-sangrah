@@ -82,14 +82,18 @@
                 <i class="ti ti-settings"></i>
             </button>
             <ul class="dropdown-menu dropdown-menu-end">
-                <li><a class="dropdown-item" href="#" data-id="${docId}" data-action="view"><i class="ti ti-eye"></i> View</a></li>
-                <li><a class="dropdown-item" href="add-document.php?id=${docId}"><i class="ti ti-pencil-minus"></i> Edit</a></li>
-                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#sharedoc-modal"><i class="ti ti-share"></i> Share</a></li>
-                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#versionhistory-modal"><i class="ti ti-history"></i> Version History</a></li>
-                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#downloaddoc-modal"><i class="ti ti-download"></i> Download</a></li>
-                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#trashdoc-modal"><i class="ti ti-trash"></i> Move to Trash</a></li>
-                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#archivedoc-modal"><i class="ti ti-archive"></i> Move to Archive</a></li>
-            </ul>
+                <li><a class="dropdown-item" href="#" data-id="${docId}" href="/documents/${docId}/versions/view?version="" data-action="view"><i class="ti ti-eye"></i> View</a></li>
+                <li><a class="dropdown-item"  href="/documents/edit/${docId}"><i class="ti ti-pencil-minus"></i> Edit</a></li>
+               <li>
+                        <a class="dropdown-item share-btn" href="#" data-doc-id="${docId}"  data-file-id="${docId.files?.[0]?._id || ''}"  data-bs-toggle="modal" data-bs-target="#sharedoc-modal">
+                            <i class="ti ti-share"></i> Share
+                        </a>
+                    </li>
+                    <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-id="${docId}" data-bs-target="#versionhistory-modal"><i class="ti ti-history"></i> Version History</a></li>
+                    <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-file-id="${docId.files?.[0]?._id || ''}" data-bs-target="#downloaddoc-modal"><i class="ti ti-download"></i> Download</a></li>
+                    <li><a class="dropdown-item btn-delete" href="#" data-id="${docId}" data-bs-toggle="modal" data-bs-target="#trashdoc-modal"><i class="ti ti-trash"></i> Move to Trash</a></li>
+                    <li><a class="dropdown-item archive-document" href="#"  data-id="${docId}" data-bs-toggle="modal" data-bs-target="#archivedoc-modal"><i class="ti ti-archive"></i> Move to Archive</a></li>
+                </ul>
         </div>`;
             }
 

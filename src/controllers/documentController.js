@@ -28,6 +28,14 @@ import { activityLogger } from "../helper/activityLogger.js";
 import DocumentVersion from "../models/DocumentVersion.js";
 
 //Page Controllers
+const VERSIONED_FIELDS = [
+    "description",
+    "comment",
+    "link",
+    "files",
+    "signature",
+    "compliance"
+];
 
 // Document List page
 // In your showDocumentListPage controller
@@ -991,6 +999,61 @@ export const restoreDocument = async (req, res) => {
         return res.status(500).json({ message: "Server error while restoring document." });
     }
 };
+/**
+ * Compare old & new document values.
+ */
+/**
+ * Compute old/new diffs for changed fields
+ */
+const computeDiff = (oldDoc, newDoc, changedFields) => {
+    const diff = {};
+
+    changedFields.forEach(field => {
+        const oldVal = _.get(oldDoc, field);
+        const newVal = _.get(newDoc, field);
+
+        diff[field] = {
+            old: oldVal,
+            new: newVal
+        };
+    });
+
+    return diff;
+};
+
+
+/**
+ * Convert versioned changes into human-readable text
+ */
+const createReadableChangeReason = (diff) => {
+    let reasons = [];
+
+    for (const field in diff) {
+        const change = diff[field];
+
+        // Simple string fields: description, comment, link
+        if (typeof change.old === "string" || typeof change.new === "string") {
+            reasons.push(`${field} changed`);
+        }
+
+        // Tags
+        else if (field === "tags") {
+            reasons.push(`Tags changed`);
+        }
+
+        // Compliance (nested)
+        else if (field.startsWith("compliance")) {
+            reasons.push(`${field} updated`);
+        }
+
+        // Files
+        else if (field === "files") {
+            reasons.push(`Files updated`);
+        }
+    }
+
+    return reasons.join(" | ");   // combine all changes
+};
 
 /**
  * Create new document
@@ -1266,282 +1329,247 @@ export const createDocument = async (req, res) => {
 };
 
 /**
- * Update document with versioning - FIXED DATE HANDLING
+ * Utility: Create version snapshot
+ */
+/**
+ * Create version snapshot with change diffs
+ */
+const createVersionSnapshot = async (documentId, versionData, changesMade) => {
+    try {
+        const document = await Document.findById(documentId).lean();
+        if (!document) throw new Error("Document not found for snapshot");
+
+        const snapshot = {
+            description: document.description,
+            metadata: document.metadata,
+            tags: document.tags,
+            compliance: document.compliance,
+            files: document.files,
+            signature: document.signature,
+            link: document.link,
+            comment: document.comment,
+            status: document.status,
+            wantApprovers: document.wantApprovers,
+            folderId: document.folderId,
+            project: document.project,
+            department: document.department,
+            projectManager: document.projectManager,
+            documentDonor: document.documentDonor,
+            documentVendor: document.documentVendor,
+            updatedAt: document.updatedAt
+        };
+
+        return await DocumentVersion.create({
+            documentId,
+            snapshot,
+            changesMade,
+            ...versionData
+        });
+
+    } catch (error) {
+        console.error("Error creating version snapshot:", error);
+        throw error;
+    }
+};
+
+/**
+ * Update document with proper version handling
  */
 export const updateDocument = async (req, res) => {
+    const session = await mongoose.startSession();
+
     try {
+        session.startTransaction();
         const { id } = req.params;
 
         if (!mongoose.Types.ObjectId.isValid(id)) {
-            return failResponse(res, "Invalid document ID", 400);
+            await session.abortTransaction();
+            return res.status(400).json({ success: false, message: "Invalid id" });
         }
 
-        const document = await Document.findById(id);
+        const document = await Document.findById(id).session(session);
         if (!document) {
-            return failResponse(res, "Document not found", 404);
+            await session.abortTransaction();
+            return res.status(404).json({ success: false, message: "Document not found" });
         }
 
-        let hasChanges = false;
-        let changeReason = "Document updated";
-        let changedFields = [];
-        let fileUpdates = false;
-
-        // Update folder if provided
-        if (req.body.folderId && mongoose.Types.ObjectId.isValid(req.body.folderId)) {
-            if (document.folderId?.toString() !== req.body.folderId) {
-                document.folderId = req.body.folderId;
-                hasChanges = true;
-                changeReason = "Folder updated";
-                changedFields.push("folderId");
-            }
+        // Permission check
+        if (!req.user || document.owner.toString() !== req.user._id.toString()) {
+            await session.abortTransaction();
+            return res.status(403).json({ success: false, message: "Unauthorized" });
         }
 
-        for (const [key, value] of Object.entries(req.body)) {
-            if (value === undefined || value === null || key === 'folderId') continue;
+        const originalDoc = document.toObject();
+        const updateData = { ...req.body };
+
+        const changedFields = [];
+        const versionedChanges = [];
+
+        const VERSIONED_FIELDS = [
+            "description",
+            "comment",
+            "link",
+            "files",
+            "signature",
+            "compliance"
+        ];
+
+        // ------------------------
+        // PROCESS STANDARD FIELDS
+        // ------------------------
+        for (const [key, value] of Object.entries(updateData)) {
+            if (value === undefined || value === null) continue;
 
             switch (key) {
                 case "metadata":
                     try {
-                        const newMetadata = typeof value === "string" ? JSON.parse(value) : value;
-                        const mergedMetadata = { ...document.metadata, ...newMetadata };
-                        if (JSON.stringify(document.metadata) !== JSON.stringify(mergedMetadata)) {
-                            document.metadata = mergedMetadata;
-                            hasChanges = true;
-                            changeReason = "Metadata updated";
+                        const newMeta = typeof value === "string" ? JSON.parse(value) : value;
+                        if (JSON.stringify(document.metadata) !== JSON.stringify(newMeta)) {
+                            document.metadata = { ...document.metadata, ...newMeta };
                             changedFields.push("metadata");
                         }
-                    } catch (error) {
-                        console.warn("Invalid metadata format:", error.message);
-                    }
-                    break;
-
-                case "wantApprovers":
-                    const newWantApprovers = value === "true" || value === true;
-
-                    if (document.wantApprovers !== newWantApprovers) {
-                        document.wantApprovers = newWantApprovers;
-                        hasChanges = true;
-                        changeReason = "Approver preference updated";
-                        changedFields.push("wantApprovers");
+                    } catch (e) {
+                        console.warn("Invalid metadata format");
                     }
                     break;
 
                 case "tags":
-                    let newTags = Array.isArray(value)
-                        ? value.map(tag => tag.trim().toLowerCase()).filter(tag => tag)
-                        : value.split(",").map(tag => tag.trim().toLowerCase()).filter(tag => tag);
+                    const newTags = Array.isArray(value)
+                        ? value.map(x => x.trim().toLowerCase())
+                        : value.split(",").map(x => x.trim().toLowerCase());
 
                     if (JSON.stringify([...document.tags].sort()) !== JSON.stringify([...newTags].sort())) {
                         document.tags = newTags;
-                        hasChanges = true;
-                        changeReason = "Tags updated";
                         changedFields.push("tags");
-                    }
-                    break;
-
-                case "compliance":
-                    const newCompliance = value === "yes" || value === "true" || value === true;
-                    if (document.compliance.isCompliance !== newCompliance) {
-                        document.compliance.isCompliance = newCompliance;
-                        hasChanges = true;
-                        changeReason = "Compliance status updated";
-                        changedFields.push("compliance");
-                    }
-                    break;
-
-                case "expiryDate":
-                    if (value && value.trim() !== '') {
-                        try {
-                            const newExpiry = new Date(value);
-
-                            if (!isNaN(newExpiry.getTime())) {
-                                const currentExpiry = document.compliance.expiryDate;
-                                if (!currentExpiry || currentExpiry.getTime() !== newExpiry.getTime()) {
-                                    document.compliance.expiryDate = newExpiry;
-                                    hasChanges = true;
-                                    changeReason = "Expiry date updated";
-                                    changedFields.push("compliance");
-                                }
-                            } else {
-                                console.warn("Invalid expiry date, skipping:", value);
-                            }
-                        } catch (error) {
-                            console.warn("Expiry date error, skipping:", error.message);
-                        }
-                    } else if (value === '' || value === null) {
-                        if (document.compliance.expiryDate !== null) {
-                            document.compliance.expiryDate = null;
-                            hasChanges = true;
-                            changeReason = "Expiry date removed";
-                            changedFields.push("compliance");
-                        }
-                    }
-                    break;
-
-                case "documentDate":
-                    if (value && value.trim() !== '') {
-                        try {
-                            let newDocumentDate;
-
-                            if (value.includes('-')) {
-                                const [d, m, y] = value.split("-");
-                                if (d && m && y) newDocumentDate = new Date(`${y}-${m}-${d}`);
-                            } else if (value.includes('/')) {
-                                const [d, m, y] = value.split("/");
-                                if (d && m && y) newDocumentDate = new Date(`${y}-${m}-${d}`);
-                            } else {
-                                newDocumentDate = new Date(value);
-                            }
-
-                            if (newDocumentDate && !isNaN(newDocumentDate.getTime())) {
-                                const currentDocDate = document.documentDate;
-                                if (!currentDocDate || currentDocDate.getTime() !== newDocumentDate.getTime()) {
-                                    document.documentDate = newDocumentDate;
-                                    hasChanges = true;
-                                    changeReason = "Document date updated";
-                                    changedFields.push("documentDate");
-                                }
-                            } else {
-                                console.warn("Invalid document date:", value);
-                            }
-                        } catch (error) {
-                            console.warn("Document date parsing error:", error.message);
-                        }
-                    }
-                    break;
-
-                case "fileIds":
-                    if (value && value.length > 0) {
-                        try {
-                            const parsedIds = Array.isArray(value) ? value : JSON.parse(value);
-                            const validIds = parsedIds.filter(id => mongoose.Types.ObjectId.isValid(id));
-                            if (validIds.length > 0) {
-                                await processFileUpdates(document, validIds, req.user, changedFields);
-                                hasChanges = true;
-                                fileUpdates = true;
-                                changeReason = "Files updated";
-                                changedFields.push("files");
-                            }
-                        } catch (error) {
-                            console.warn("Invalid fileIds:", error.message);
-                        }
                     }
                     break;
 
                 case "description":
                 case "comment":
                 case "link":
-                case "signature":
-                    // Handle these fields separately or let default case handle them
+                    if (document[key] !== value) {
+                        document[key] = value;
+                        changedFields.push(key);
+                        versionedChanges.push(key);
+                    }
+                    break;
+
+                case "compliance":
+                    const compUpdates = [];
+                    Object.keys(value).forEach(subKey => {
+                        if (document.compliance[subKey] !== value[subKey]) {
+                            document.compliance[subKey] = value[subKey];
+                            compUpdates.push(`compliance.${subKey}`);
+                        }
+                    });
+
+                    if (compUpdates.length) {
+                        changedFields.push(...compUpdates);
+                        versionedChanges.push("compliance");
+                    }
+                    break;
+
+                case "files":
+                case "fileIds":
+                    if (Array.isArray(value)) {
+                        await processFileUpdates(document, value, req.user, changedFields);
+                        versionedChanges.push("files");
+                    }
                     break;
 
                 default:
                     if (document.schema.path(key) && document[key] !== value) {
                         document[key] = value;
-                        hasChanges = true;
                         changedFields.push(key);
                     }
+                    break;
             }
         }
 
-        // Handle signature
+        // ------------------------
+        // SIGNATURE HANDLING
+        // ------------------------
         const signatureUpdated = await handleSignatureUpdate(document, req);
         if (signatureUpdated) {
-            hasChanges = true;
-            changeReason = "Signature updated";
             changedFields.push("signature");
+            versionedChanges.push("signature");
         }
 
-        // Handle description, comment, link fields that might have been missed
-        const textFields = ['description', 'comment', 'link', 'documentName', 'documentType', 'documentStatus', 'documentPriority', 'documentReference', 'documentVersion'];
-        for (const field of textFields) {
-            if (req.body[field] !== undefined && document[field] !== req.body[field]) {
-                document[field] = req.body[field];
-                hasChanges = true;
-                changedFields.push(field);
+        // ------------------------
+        // NO CHANGES DETECTED
+        // ------------------------
+        if (changedFields.length === 0) {
+            await session.abortTransaction();
+            return res.status(200).json({ success: true, message: "No changes detected", data: document });
+        }
+
+        // Save doc changes
+        document.updatedAt = new Date();
+        await document.save({ session });
+        const updatedDoc = document.toObject();
+
+        // ------------------------
+        // VERSIONING (ONLY IF CONTENT CHANGED)
+        // ------------------------
+
+        if (versionedChanges.length > 0) {
+            const diff = computeDiff(originalDoc, updatedDoc, versionedChanges);
+            const readableReason = createReadableChangeReason(diff);
+            const { versionLabel, versionNumber } = bumpVersion(document.currentVersionLabel);
+            document.previousVersionLabel = document.currentVersionLabel;
+            document.currentVersionLabel = versionLabel;
+            document.currentVersionNumber = versionNumber;
+
+            await document.save({ session });
+
+            await createVersionSnapshot(
+                document._id,
+                {
+                    versionLabel,
+                    versionNumber,
+                    changeReason: readableReason,
+                    createdBy: req.user._id,
+                    files: document.files
+                },
+                diff
+            );
+        }
+
+        await session.commitTransaction();
+
+        const responseDoc = await Document.findById(document._id)
+            .populate("files")
+            .populate("owner", "name email")
+            .populate("folderId", "name")
+            .populate("project", "projectName name")
+            .populate("department", "name")
+            .populate("projectManager", "name email")
+            .populate("documentDonor", "name email")
+            .populate("documentVendor", "name email");
+
+        return res.status(200).json({
+            success: true,
+            message: "Document updated successfully",
+            data: {
+                document: responseDoc,
+                changes: changedFields,
+                version: document.currentVersionLabel
             }
-        }
-
-        // Handle reference fields
-        const referenceFields = ['project', 'department', 'projectManager', 'documentDonor', 'documentVendor'];
-        for (const field of referenceFields) {
-            if (req.body[field] !== undefined) {
-                const newValue = req.body[field] === '' ? null : req.body[field];
-                const currentValue = document[field]?.toString();
-
-                if (currentValue !== newValue?.toString()) {
-                    document[field] = newValue && mongoose.Types.ObjectId.isValid(newValue) ? newValue : null;
-                    hasChanges = true;
-                    changedFields.push(field);
-                }
-            }
-        }
-
-        // Save and create version history
-        if (hasChanges) {
-            if (fileUpdates) changeReason = "Files and content updated";
-
-            const contentFields = [
-                'description', 'files', 'signature', 'documentName',
-                'documentType', 'metadata', 'comment', 'tags'
-            ];
-
-            const hasContentChanges = changedFields.some(f => contentFields.includes(f));
-
-            if (hasContentChanges) {
-                bumpVersion(document);
-            }
-
-            await document.save();
-
-            // NEW VERSION SNAPSHOT (replaces push into document.versionHistory)
-            await DocumentVersion.create({
-                documentId: document._id,
-                versionNumber: document.currentVersionNumber,
-                versionLabel: document.currentVersionLabel,
-                createdBy: req.user?._id || null,
-                changeReason,
-                snapshot: changedFields.reduce((acc, field) => {
-                    acc[field] = JSON.parse(JSON.stringify(document[field]));
-                    return acc;
-                }, {}),
-                files: document.files || []
-            });
-
-            // =====================================================================
-
-            const populatedDoc = await Document.findById(document._id)
-                .populate('files')
-                .populate('owner', 'name email')
-                .populate('folderId', 'name')
-                .populate('project', 'projectName name')
-                .populate('department', 'name')
-                .populate('projectManager', 'name')
-                .populate('documentDonor', 'name')
-                .populate('documentVendor', 'name');
-
-            return successResponse(res, {
-                document: populatedDoc,
-                changes: changeReason,
-                version: document.currentVersionLabel,
-                changedFields
-            }, "Document updated successfully");
-        }
-
-        // No changes
-        const populatedDoc = await Document.findById(document._id)
-            .populate('files')
-            .populate('owner', 'name email')
-            .populate('project', 'projectName name')
-            .populate('department', 'name');
-
-        return successResponse(res, { document: populatedDoc }, "No changes detected");
+        });
 
     } catch (error) {
-        console.error("Update document error:", error);
-        return errorResponse(res, error, "Failed to update document");
+        await session.abortTransaction();
+        console.error("Update error:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Error updating document",
+            error: error.message
+        });
+    } finally {
+        session.endSession();
     }
 };
+
 
 
 /**
@@ -1663,94 +1691,235 @@ export const createDocumentVersion = async (document, user, reason, changedField
     });
 };
 
-
 /**
  * Restore to specific version
  */
 export const restoreVersion = async (req, res) => {
+    const session = await mongoose.startSession();
+
     try {
-        const { id, version } = req.params;
+        session.startTransaction();
 
-        const document = await Document.findById(id);
-        if (!document) return failResponse(res, "Document not found", 404);
+        const { id, versionId } = req.params;
+        console.log("RESTORE:", id, versionId);
 
-        const versionQuery = isNaN(version)
-            ? { versionLabel: version }
-            : { versionNumber: Number(version) };
+        // Validate Document ID
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid document ID"
+            });
+        }
 
-        const entry = await DocumentVersion.findOne({
-            documentId: id,
-            ...versionQuery
+        // Load document
+        const document = await Document.findById(id).session(session);
+        if (!document) {
+            return res.status(404).json({
+                success: false,
+                message: "Document not found"
+            });
+        }
+
+        // Load version (accepts ObjectId OR versionNumber)
+        let version;
+
+        if (mongoose.Types.ObjectId.isValid(versionId)) {
+            version = await DocumentVersion.findById(versionId).session(session);
+        } else {
+            version = await DocumentVersion.findOne({
+                documentId: id,
+                versionNumber: Number(versionId)
+            }).session(session);
+        }
+
+        if (!version) {
+            return res.status(404).json({
+                success: false,
+                message: "Version not found"
+            });
+        }
+
+        // Permission check
+        if (!req.user || document.owner.toString() !== req.user._id.toString()) {
+            return res.status(403).json({
+                success: false,
+                message: "Unauthorized"
+            });
+        }
+
+        // Apply snapshot to current document
+        const snapshot = version.snapshot;
+
+        Object.keys(snapshot).forEach(field => {
+            if (document[field] !== undefined) {
+                document[field] = snapshot[field];
+            }
         });
 
-        if (!entry) return failResponse(res, "Version not found", 404);
+        // Update the current version pointer ONLY
+        document.currentVersion = version._id;
+        document.latestVersion = version._id;
+        document.currentVersionLabel = version.versionLabel;
+        document.currentVersionNumber = version.versionNumber;
 
-        const snapshot = entry.snapshot || {};
+        await document.save({ session });
 
-        Object.assign(document, snapshot);
+        await session.commitTransaction();
 
-        bumpVersion(document);
-        await document.save();
-
-        await createDocumentVersion(
-            document,
-            req.user,
-            `Restored to version ${version}`,
-            Object.keys(snapshot)
-        );
-
-        return successResponse(res, { document }, "Version restored successfully");
+        return res.status(200).json({
+            success: true,
+            message: `Document restored to version ${version.versionLabel} successfully`,
+            data: {
+                currentVersionLabel: version.versionLabel,
+                currentVersionNumber: version.versionNumber,
+                versionId: version._id
+            }
+        });
 
     } catch (err) {
-        console.error(err);
-        return errorResponse(res, err, "Failed to restore version");
+        await session.abortTransaction();
+        console.error("Restore error:", err);
+
+        return res.status(500).json({
+            success: false,
+            message: "Failed to restore document version",
+            error: err.message
+        });
+    } finally {
+        session.endSession();
     }
 };
-
-
-
-
-
 
 /**
  * View specific version of document
  */
 export const viewVersion = async (req, res) => {
     try {
-        const { id, version } = req.params;
+        const { id, versionId } = req.params;
 
-        const document = await Document.findById(id).lean();
-        if (!document) return failResponse(res, "Document not found", 404);
+        // Validate IDs
+        if (!mongoose.Types.ObjectId.isValid(id) || !mongoose.Types.ObjectId.isValid(versionId)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid document or version ID"
+            });
+        }
 
-        const versionEntry = await DocumentVersion.findOne({
-            documentId: id,
-            $or: [
-                { versionLabel: version },
-                { versionNumber: Number(version) }
-            ]
-        })
-            .populate("createdBy", "name email")
-            .lean();
+        // Get version with populated data
+        const version = await DocumentVersion.findById(versionId)
+            .populate('createdBy', 'name email avatar')
+            .populate('files');
 
-        if (!versionEntry) return failResponse(res, "Version not found", 404);
+        if (!version || version.documentId.toString() !== id) {
+            return res.status(404).json({
+                success: false,
+                message: "Version not found"
+            });
+        }
 
-        const mergedDoc = { ...document, ...versionEntry.snapshot };
-
-        return successResponse(res, {
-            versionLabel: versionEntry.versionLabel,
-            versionNumber: versionEntry.versionNumber,
-            timestamp: versionEntry.createdAt,
-            changedBy: versionEntry.createdBy,
-            document: mergedDoc
+        return res.status(200).json({
+            success: true,
+            message: "Version details retrieved successfully",
+            data: {
+                version: {
+                    id: version._id,
+                    versionNumber: version.versionNumber,
+                    versionLabel: version.versionLabel,
+                    changeReason: version.changeReason,
+                    createdAt: version.createdAt,
+                    createdBy: version.createdBy,
+                    snapshot: version.snapshot,
+                    files: version.files
+                }
+            }
         });
 
-    } catch (err) {
-        console.error(err);
-        return errorResponse(res, err, "Failed to view version");
+    } catch (error) {
+        console.error('View version error:', error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Failed to retrieve version details",
+            error: process.env.NODE_ENV === 'production' ? 'Internal server error' : error.message
+        });
     }
 };
 
+export const compareVersions = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { fromVersion, toVersion } = req.query;
 
+        if (!fromVersion || !toVersion) {
+            return res.status(400).json({
+                success: false,
+                message: "Both fromVersion and toVersion parameters are required"
+            });
+        }
+
+        // Get both versions
+        const [version1, version2] = await Promise.all([
+            DocumentVersion.findOne({
+                documentId: id,
+                $or: [
+                    { versionLabel: fromVersion },
+                    { versionNumber: parseInt(fromVersion) }
+                ]
+            }),
+            DocumentVersion.findOne({
+                documentId: id,
+                $or: [
+                    { versionLabel: toVersion },
+                    { versionNumber: parseInt(toVersion) }
+                ]
+            })
+        ]);
+
+        if (!version1 || !version2) {
+            return res.status(404).json({
+                success: false,
+                message: "One or both versions not found"
+            });
+        }
+
+        // Simple field comparison (you can enhance this with deep diff)
+        const changes = {};
+        const snapshot1 = version1.snapshot || {};
+        const snapshot2 = version2.snapshot || {};
+
+        Object.keys(snapshot2).forEach(key => {
+            if (JSON.stringify(snapshot1[key]) !== JSON.stringify(snapshot2[key])) {
+                changes[key] = {
+                    from: snapshot1[key],
+                    to: snapshot2[key]
+                };
+            }
+        });
+
+        return res.status(200).json({
+            success: true,
+            message: "Versions compared successfully",
+            data: {
+                fromVersion: version1.versionLabel,
+                toVersion: version2.versionLabel,
+                changes,
+                summary: {
+                    changedFields: Object.keys(changes),
+                    totalChanges: Object.keys(changes).length
+                }
+            }
+        });
+
+    } catch (error) {
+        console.error('Compare versions error:', error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Failed to compare versions",
+            error: process.env.NODE_ENV === 'production' ? 'Internal server error' : error.message
+        });
+    }
+};
 
 /**
  * Get complete version history for a document
@@ -1758,28 +1927,80 @@ export const viewVersion = async (req, res) => {
 export const getVersionHistory = async (req, res) => {
     try {
         const { id } = req.params;
+        const { page = 1, limit = 20, search } = req.query;
 
+        // Validate document ID
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid document ID"
+            });
+        }
+
+        // Check if document exists
         const document = await Document.findById(id);
-        if (!document) return failResponse(res, "Document not found", 404);
+        if (!document) {
+            return res.status(404).json({
+                success: false,
+                message: "Document not found"
+            });
+        }
 
-        const versions = await DocumentVersion.find({ documentId: id })
-            .populate("createdBy", "name email")
-            .sort({ versionNumber: 1 });
+        // Build query
+        const query = { documentId: id };
+        if (search) {
+            query.$or = [
+                { changeReason: { $regex: search, $options: 'i' } },
+                { versionLabel: { $regex: search, $options: 'i' } }
+            ];
+        }
 
-        return successResponse(res, {
-            documentId: document._id,
-            currentVersionLabel: document.currentVersionLabel,
-            currentVersionNumber: document.currentVersionNumber,
-            versionHistory: versions,
-            total: versions.length
+        // Get paginated version history
+        const options = {
+            page: parseInt(page),
+            limit: parseInt(limit),
+            sort: { versionNumber: -1 },
+            populate: {
+                path: 'createdBy',
+                select: 'name email avatar'
+            }
+        };
+
+        const versions = await DocumentVersion.paginate(query, options);
+
+        return res.status(200).json({
+            success: true,
+            message: "Version history retrieved successfully",
+            data: {
+                documentId: document._id,
+                currentVersion: document.currentVersionLabel,
+                totalVersions: versions.totalDocs,
+                currentPage: versions.page,
+                totalPages: versions.totalPages,
+                hasNext: versions.hasNextPage,
+                hasPrev: versions.hasPrevPage,
+                versions: versions.docs.map(version => ({
+                    versionId: version._id,
+                    documentName: version.snapshot?.metadata?.fileName || null,
+                    versionLabel: version.versionLabel,
+                    changeReason: version.changeReason,
+                    createdAt: version.createdAt,
+                    createdBy: version.createdBy,
+                    fileCount: version.files?.length || 0
+                }))
+            }
         });
 
-    } catch (err) {
-        console.error(err);
-        return errorResponse(res, err, "Failed to retrieve version history");
+    } catch (error) {
+        console.error('Get version history error:', error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Failed to retrieve version history",
+            error: process.env.NODE_ENV === 'production' ? 'Internal server error' : error.message
+        });
     }
 };
-
 
 export const viewDocumentVersion = async (req, res) => {
     try {
@@ -1789,15 +2010,61 @@ export const viewDocumentVersion = async (req, res) => {
         if (!mongoose.Types.ObjectId.isValid(id))
             return res.status(400).json({ message: "Invalid document ID" });
 
-        if (!version)
-            return res.status(400).json({ message: "Version query parameter required" });
+        /** --------------------------------------------------
+         *  CASE 1: NO VERSION GIVEN → return base Document
+         * -------------------------------------------------- */
+        if (!version) {
+            const document = await Document.findById(id)
+                .populate("project", 'projectName')
+                .populate("department", 'name priority')
+                .populate("folderId", 'name')
+                .populate("projectManager", 'name email profile_image')
+                .populate("documentDonor", 'name email profile_image')
+                .populate("documentVendor", 'name email profile_image')
+                .populate("files", 'originalName fileType fileSize')
+                .populate({
+                    path: "owner",
+                    select: "name email userDetails",
+                    populate: [
+                        { path: "userDetails.designation", select: "name" },
+                        { path: "userDetails.department", select: "name" }
+                    ]
+                })
+                .lean();
 
+            if (!document)
+                return res.status(404).json({ message: "Document not found" });
+
+            return res.json({
+                versionLabel: document.currentVersionLabel,
+                versionNumber: document.currentVersionNumber,
+                document
+            });
+        }
+
+        /** --------------------------------------------------
+         *  CASE 2: VERSION PROVIDED → Return DocumentVersion
+         * -------------------------------------------------- */
         const baseDoc = await Document.findById(id)
-            .populate("files")
-            .populate("owner", "name email")
+            .populate("project", 'projectName')
+            .populate("department", 'name priority')
+            .populate("folderId", 'name')
+            .populate("projectManager", 'name email profile_image')
+            .populate("documentDonor", 'name email profile_image')
+            .populate("documentVendor", 'name email profile_image')
+            .populate("files", 'originalName fileType fileSize')
+            .populate({
+                path: "owner",
+                select: "name email userDetails",
+                populate: [
+                    { path: "userDetails.designation", select: "name" },
+                    { path: "userDetails.department", select: "name" }
+                ]
+            })
             .lean();
 
-        if (!baseDoc) return res.status(404).json({ message: "Document not found" });
+        if (!baseDoc)
+            return res.status(404).json({ message: "Document not found" });
 
         const entry = await DocumentVersion.findOne({
             documentId: id,
@@ -1809,8 +2076,10 @@ export const viewDocumentVersion = async (req, res) => {
             .populate("createdBy", "name email")
             .lean();
 
-        if (!entry) return res.status(404).json({ message: "Version not found" });
+        if (!entry)
+            return res.status(404).json({ message: "Version not found" });
 
+        // Merge snapshot with live document data
         const mergedDoc = { ...baseDoc, ...entry.snapshot };
 
         return res.json({
@@ -1827,6 +2096,8 @@ export const viewDocumentVersion = async (req, res) => {
         return res.status(500).json({ message: "Server error", error: err.message });
     }
 };
+
+
 
 
 /**
