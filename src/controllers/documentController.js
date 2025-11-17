@@ -1012,10 +1012,30 @@ const computeDiff = (oldDoc, newDoc, changedFields) => {
         const oldVal = _.get(oldDoc, field);
         const newVal = _.get(newDoc, field);
 
-        diff[field] = {
-            old: oldVal,
-            new: newVal
-        };
+        // Deep comparison for arrays and objects
+        if (Array.isArray(oldVal) && Array.isArray(newVal)) {
+            if (JSON.stringify(oldVal.sort()) !== JSON.stringify(newVal.sort())) {
+                diff[field] = {
+                    old: oldVal,
+                    new: newVal,
+                    type: 'array'
+                };
+            }
+        } else if (_.isObject(oldVal) && _.isObject(newVal)) {
+            if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
+                diff[field] = {
+                    old: oldVal,
+                    new: newVal,
+                    type: 'object'
+                };
+            }
+        } else if (oldVal !== newVal) {
+            diff[field] = {
+                old: oldVal,
+                new: newVal,
+                type: 'primitive'
+            };
+        }
     });
 
     return diff;
@@ -1203,21 +1223,8 @@ export const createDocument = async (req, res) => {
             comment: comment || null,
             wantApprovers: parsedWantApprovers,
             documentApprovalAuthority: documentApprovalAuthority,
-            versioning: {
-                currentVersion: mongoose.Types.Decimal128.fromString("1.0"),
-                previousVersion: null,
-                nextVersion: null,
-                firstVersion: mongoose.Types.Decimal128.fromString("1.0"),
-            },
-            versionHistory: [
-                {
-                    version: mongoose.Types.Decimal128.fromString("1.0"),
-                    timestamp: new Date(),
-                    changedBy: req.user._id,
-                    changes: "Initial document creation",
-                    snapshot: {},
-                },
-            ],
+            currentVersionNumber: mongoose.Types.Decimal128.fromString("1.0"),
+            currentVersionLabel: "1.0",
         });
         // ------------------- Process Files in Parallel -------------------
         let fileDocs = [];
@@ -1316,7 +1323,8 @@ export const createDocument = async (req, res) => {
                 select: "name email"
             },
         ]);
-
+        // Create initial version snapshot
+        await createVersionSnapshot(document, {}, userId, "Initial document creation");
         return successResponse(res, { document }, "Document created successfully", 201);
     } catch (error) {
         logger.error("Document creation error:", error);
@@ -1334,17 +1342,14 @@ export const createDocument = async (req, res) => {
 /**
  * Create version snapshot with change diffs
  */
-const createVersionSnapshot = async (documentId, versionData, changesMade) => {
+const createVersionSnapshot = async (document, changesMade, userId, reason) => {
     try {
-        const document = await Document.findById(documentId).lean();
-        if (!document) throw new Error("Document not found for snapshot");
-
         const snapshot = {
             description: document.description,
             metadata: document.metadata,
             tags: document.tags,
             compliance: document.compliance,
-            files: document.files,
+            files: document.files, // Ensure files are included
             signature: document.signature,
             link: document.link,
             comment: document.comment,
@@ -1356,18 +1361,28 @@ const createVersionSnapshot = async (documentId, versionData, changesMade) => {
             projectManager: document.projectManager,
             documentDonor: document.documentDonor,
             documentVendor: document.documentVendor,
-            updatedAt: document.updatedAt
+            updatedAt: document.updatedAt,
         };
 
-        return await DocumentVersion.create({
-            documentId,
+        const versionNumber = document.currentVersionNumber;
+        const versionLabel = document.currentVersionLabel;
+
+        const versionDoc = await DocumentVersion.create({
+            documentId: document._id,
             snapshot,
-            changesMade,
-            ...versionData
+            changesMade, // This should be the diff object
+            createdBy: userId,
+            changeReason: reason,
+            versionNumber,
+            versionLabel,
+            files: document.files || [], // Double ensure files are included
+            timestamp: new Date(),
         });
 
+        console.log(`✅ Version ${versionLabel} created for document ${document._id}`);
+        return versionDoc;
     } catch (error) {
-        console.error("Error creating version snapshot:", error);
+        console.error('❌ Error creating version snapshot:', error);
         throw error;
     }
 };
@@ -1384,7 +1399,7 @@ export const updateDocument = async (req, res) => {
 
         if (!mongoose.Types.ObjectId.isValid(id)) {
             await session.abortTransaction();
-            return res.status(400).json({ success: false, message: "Invalid id" });
+            return res.status(400).json({ success: false, message: "Invalid document ID" });
         }
 
         const document = await Document.findById(id).session(session);
@@ -1401,21 +1416,43 @@ export const updateDocument = async (req, res) => {
 
         const originalDoc = document.toObject();
         const updateData = { ...req.body };
-
         const changedFields = [];
         const versionedChanges = [];
 
         const VERSIONED_FIELDS = [
-            "description",
-            "comment",
-            "link",
-            "files",
-            "signature",
-            "compliance"
+            "description", "comment", "link", "files",
+            "signature", "compliance", "tags", "metadata"
         ];
 
         // ------------------------
-        // PROCESS STANDARD FIELDS
+        // PROCESS FILE UPDATES FIRST
+        // ------------------------
+        if (updateData.fileIds) {
+            try {
+                let fileIds = [];
+                if (typeof updateData.fileIds === 'string') {
+                    fileIds = JSON.parse(updateData.fileIds);
+                } else if (Array.isArray(updateData.fileIds)) {
+                    fileIds = updateData.fileIds;
+                }
+
+                console.log('📤 Processing file IDs:', fileIds);
+
+                if (fileIds.length > 0) {
+                    await processFileUpdates(document, fileIds, req.user, changedFields, session);
+                    versionedChanges.push("files");
+                }
+
+                // Remove processed field to avoid reprocessing
+                delete updateData.fileIds;
+            } catch (error) {
+                console.error('❌ Error processing fileIds:', error);
+                throw new Error('Invalid fileIds format');
+            }
+        }
+
+        // ------------------------
+        // PROCESS OTHER FIELDS
         // ------------------------
         for (const [key, value] of Object.entries(updateData)) {
             if (value === undefined || value === null) continue;
@@ -1424,12 +1461,16 @@ export const updateDocument = async (req, res) => {
                 case "metadata":
                     try {
                         const newMeta = typeof value === "string" ? JSON.parse(value) : value;
-                        if (JSON.stringify(document.metadata) !== JSON.stringify(newMeta)) {
+                        const currentMetaStr = JSON.stringify(document.metadata);
+                        const newMetaStr = JSON.stringify({ ...document.metadata, ...newMeta });
+
+                        if (currentMetaStr !== newMetaStr) {
                             document.metadata = { ...document.metadata, ...newMeta };
                             changedFields.push("metadata");
+                            versionedChanges.push("metadata");
                         }
                     } catch (e) {
-                        console.warn("Invalid metadata format");
+                        console.warn("Invalid metadata format:", e);
                     }
                     break;
 
@@ -1438,9 +1479,13 @@ export const updateDocument = async (req, res) => {
                         ? value.map(x => x.trim().toLowerCase())
                         : value.split(",").map(x => x.trim().toLowerCase());
 
-                    if (JSON.stringify([...document.tags].sort()) !== JSON.stringify([...newTags].sort())) {
+                    const currentTags = document.tags.map(t => t.toLowerCase()).sort();
+                    const newTagsSorted = [...newTags].sort();
+
+                    if (JSON.stringify(currentTags) !== JSON.stringify(newTagsSorted)) {
                         document.tags = newTags;
                         changedFields.push("tags");
+                        versionedChanges.push("tags");
                     }
                     break;
 
@@ -1455,25 +1500,21 @@ export const updateDocument = async (req, res) => {
                     break;
 
                 case "compliance":
-                    const compUpdates = [];
-                    Object.keys(value).forEach(subKey => {
-                        if (document.compliance[subKey] !== value[subKey]) {
-                            document.compliance[subKey] = value[subKey];
-                            compUpdates.push(`compliance.${subKey}`);
+                    if (typeof value === 'string') {
+                        const isCompliance = value.toLowerCase() === 'yes';
+                        if (document.compliance.isCompliance !== isCompliance) {
+                            document.compliance.isCompliance = isCompliance;
+                            changedFields.push("compliance.isCompliance");
+                            versionedChanges.push("compliance");
                         }
-                    });
-
-                    if (compUpdates.length) {
-                        changedFields.push(...compUpdates);
-                        versionedChanges.push("compliance");
-                    }
-                    break;
-
-                case "files":
-                case "fileIds":
-                    if (Array.isArray(value)) {
-                        await processFileUpdates(document, value, req.user, changedFields);
-                        versionedChanges.push("files");
+                    } else if (typeof value === 'object') {
+                        Object.keys(value).forEach(subKey => {
+                            if (document.compliance[subKey] !== value[subKey]) {
+                                document.compliance[subKey] = value[subKey];
+                                changedFields.push(`compliance.${subKey}`);
+                                versionedChanges.push("compliance");
+                            }
+                        });
                     }
                     break;
 
@@ -1481,6 +1522,9 @@ export const updateDocument = async (req, res) => {
                     if (document.schema.path(key) && document[key] !== value) {
                         document[key] = value;
                         changedFields.push(key);
+                        if (VERSIONED_FIELDS.includes(key)) {
+                            versionedChanges.push(key);
+                        }
                     }
                     break;
             }
@@ -1500,21 +1544,26 @@ export const updateDocument = async (req, res) => {
         // ------------------------
         if (changedFields.length === 0) {
             await session.abortTransaction();
-            return res.status(200).json({ success: true, message: "No changes detected", data: document });
+            return res.status(200).json({
+                success: true,
+                message: "No changes detected",
+                data: document
+            });
         }
 
-        // Save doc changes
+        // Update timestamp and save
         document.updatedAt = new Date();
         await document.save({ session });
-        const updatedDoc = document.toObject();
 
         // ------------------------
         // VERSIONING (ONLY IF CONTENT CHANGED)
         // ------------------------
-
         if (versionedChanges.length > 0) {
+            const updatedDoc = document.toObject();
             const diff = computeDiff(originalDoc, updatedDoc, versionedChanges);
             const readableReason = createReadableChangeReason(diff);
+
+            // Bump version
             const { versionLabel, versionNumber } = bumpVersion(document.currentVersionLabel);
             document.previousVersionLabel = document.currentVersionLabel;
             document.currentVersionLabel = versionLabel;
@@ -1522,21 +1571,23 @@ export const updateDocument = async (req, res) => {
 
             await document.save({ session });
 
+            // FIXED: Correct parameter order for createVersionSnapshot
             await createVersionSnapshot(
-                document._id,
-                {
-                    versionLabel,
-                    versionNumber,
-                    changeReason: readableReason,
-                    createdBy: req.user._id,
-                    files: document.files
-                },
-                diff
+                document, // Pass document object
+                diff,     // Pass changes/diff
+                req.user._id,
+                readableReason
             );
+
+            console.log(`🔄 Created version ${versionLabel} for document ${document._id}`);
         }
 
         await session.commitTransaction();
+        console.log('✅ Document update transaction committed');
 
+        // ------------------------
+        // POPULATE AND RESPOND
+        // ------------------------
         const responseDoc = await Document.findById(document._id)
             .populate("files")
             .populate("owner", "name email")
@@ -1553,13 +1604,14 @@ export const updateDocument = async (req, res) => {
             data: {
                 document: responseDoc,
                 changes: changedFields,
-                version: document.currentVersionLabel
+                version: document.currentVersionLabel,
+                filesUpdated: versionedChanges.includes("files")
             }
         });
 
     } catch (error) {
         await session.abortTransaction();
-        console.error("Update error:", error);
+        console.error("❌ Document update error:", error);
         return res.status(500).json({
             success: false,
             message: "Error updating document",
@@ -1571,42 +1623,106 @@ export const updateDocument = async (req, res) => {
 };
 
 
-
 /**
  * Process file updates and versioning
  */
-const processFileUpdates = async (document, fileIds, user, changedFields) => {
-    for (const tempId of fileIds) {
-        const tempFile = await TempFile.findById(tempId);
-        if (!tempFile || tempFile.status !== "temp") continue;
+const processFileUpdates = async (document, fileIds, user, changedFields, session = null) => {
+    try {
+        console.log('🔄 Processing file updates:', {
+            documentId: document._id,
+            fileIds,
+            existingFiles: document.files.length
+        });
 
-        tempFile.status = "permanent";
-        await tempFile.save();
+        const validFileIds = fileIds.filter(id => mongoose.Types.ObjectId.isValid(id));
 
+        if (validFileIds.length === 0) {
+            console.log('⚠️ No valid file IDs to process');
+            return;
+        }
+
+        // Find temp files
+        const tempFiles = await TempFile.find({
+            _id: { $in: validFileIds },
+            status: "temp"
+        }).session(session);
+
+        console.log(`📁 Found ${tempFiles.length} temp files to process`);
+
+        if (tempFiles.length === 0) {
+            console.log('⚠️ No temp files found');
+            return;
+        }
+
+        // Deactivate current primary files
         await File.updateMany(
-            { document: document._id, isPrimary: true, status: "active" },
-            { $set: { isPrimary: false, status: "inactive" } }
+            {
+                document: document._id,
+                isPrimary: true,
+                status: "active"
+            },
+            {
+                $set: {
+                    isPrimary: false,
+                    status: "inactive",
+                    deactivatedAt: new Date()
+                }
+            },
+            { session }
         );
 
-        const newFile = await File.create({
+        // Create new file entries
+        const fileCreatePromises = tempFiles.map((tempFile, index) => ({
             document: document._id,
             file: tempFile.s3Filename,
             s3Url: tempFile.s3Url,
             originalName: tempFile.originalName,
-            version: document.versioning.currentVersion,
+            fileType: tempFile.fileType,
+            folder: document.folderId || null,
+            projectId: document.project || null,
+            departmentId: document.department || null,
+            version: document.currentVersionNumber || 1,
             uploadedBy: user._id,
             uploadedAt: new Date(),
-            isPrimary: true,
+            fileSize: tempFile.size,
+            hash: tempFile.hash || null,
+            isPrimary: index === 0, // First file is primary
             status: "active",
-            mimeType: tempFile.mimeType,
-            size: tempFile.size
-        });
+            mimeType: tempFile.mimeType || tempFile.fileType
+        }));
 
-        if (!document.files.includes(newFile._id)) {
-            document.files.push(newFile._id);
+        const newFiles = await File.insertMany(fileCreatePromises, { session });
+        console.log(`✅ Created ${newFiles.length} new file records`);
+
+        // Update temp files status
+        await TempFile.updateMany(
+            { _id: { $in: tempFiles.map(t => t._id) } },
+            { $set: { status: "permanent", linkedDocument: document._id } },
+            { session }
+        );
+
+        // CRITICAL FIX: Properly update document files array
+        const newFileIds = newFiles.map(f => f._id);
+
+        // Add new files to document (avoid duplicates)
+        const existingFileIds = document.files.map(id => id.toString());
+        const uniqueNewFileIds = newFileIds.filter(id => !existingFileIds.includes(id.toString()));
+
+        if (uniqueNewFileIds.length > 0) {
+            document.files.push(...uniqueNewFileIds);
+            console.log(`📋 Added ${uniqueNewFileIds.length} new files to document`);
         }
 
-        if (!changedFields.includes("files")) changedFields.push("files");
+        // Mark files as changed
+        if (!changedFields.includes("files")) {
+            changedFields.push("files");
+        }
+
+        console.log('✅ File processing completed successfully');
+
+    } catch (error) {
+        console.error('❌ Error in processFileUpdates:', error);
+        throw error;
     }
 };
 

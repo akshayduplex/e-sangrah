@@ -11,7 +11,7 @@ const documentSchema = new Schema({
     documentDonor: { type: Schema.Types.ObjectId, ref: "User", default: null },
     documentVendor: { type: Schema.Types.ObjectId, ref: "User", default: null },
     owner: { type: Schema.Types.ObjectId, ref: "User", required: true },
-
+    startDate: { type: Date, default: Date.now },
     status: { type: String, enum: ["Draft", "Pending", "Approved", "Rejected"], default: "Draft" },
 
     tags: [{ type: String, lowercase: true, trim: true }],

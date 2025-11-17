@@ -574,26 +574,20 @@
 
                     versions.forEach(item => {
                         const documentName = item.documentName;
-                        const versionValue = item.versionLabel;  // "1.1"
+                        const versionValue = item.versionLabel;
                         const modifiedDate = new Date(item.createdAt).toLocaleString();
                         const changedBy = item.createdBy?.name || "Unknown";
                         const changeReason = item.changeReason || "Updated";
 
-                        // Convert "1.1" → 1.1
                         const versionNumber = parseFloat(versionValue);
-
-                        // Simple logic: previous = version - 0.1
-                        const previousVersion = (versionNumber - 0.1).toFixed(1);
-
-                        // 🔥 Only hide restore for version 1.0 — NOT current version
                         const hideRestore = versionNumber <= 1.0;
 
                         const restoreButton = hideRestore ? '' : `
                     <button class="btn btn-outline-light rounded-pill btn-restore-version"
                         data-version="${versionValue}"
                         data-versionid="${item.versionId}"
-                        data-prev="${previousVersion}">
-                        Restore to v${previousVersion}
+                        data-prev="${versionValue}">
+                        Restore to v${versionValue}
                     </button>`;
 
                         // Build HTML block
@@ -718,6 +712,7 @@
 
 
     // Confirm restore action
+    // Confirm restore action
     document.getElementById('confirm-restore-folder')?.addEventListener('click', function () {
 
         if (!restoreTarget.docId || !restoreTarget.versionId) return;
@@ -733,17 +728,26 @@
             .then(res => {
                 showToast(res.message || 'Version restored successfully', 'success');
 
-                const modal = bootstrap.Modal.getInstance(
+                // Hide restore confirmation modal
+                const restoreModalInstance = bootstrap.Modal.getInstance(
                     document.getElementById('restore-folder-modal')
                 );
-                modal.hide();
+                restoreModalInstance?.hide();
 
-                // reload document list if exists
+                // Hide version history modal
+                const versionModalInstance = bootstrap.Modal.getInstance(
+                    document.getElementById('versionhistory-modal')
+                );
+                versionModalInstance?.hide();
+
+                // Optionally reload document list
                 if (typeof loadDocuments === 'function') loadDocuments();
+
+                // Clear restoreTarget
+                restoreTarget = {};
             })
             .catch(() => showToast('Failed to restore version', 'error'));
     });
-
 
     // Search functionality for versions
     document.getElementById('versionSearch')?.addEventListener('input', function (e) {

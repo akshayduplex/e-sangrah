@@ -171,7 +171,7 @@ router.get("/documents/search", DocumentController.searchDocuments);
 router.post("/documents", upload.fields([{ name: "signatureFile", maxCount: 1 }]), DocumentValidators.createDocumentValidator, validators, DocumentController.createDocument);
 
 // Update a document (with optional signature update)
-router.patch("/documents/:id", upload.fields([{ name: "signature", maxCount: 1 }]), DocumentValidators.updateDocumentValidator, validators, DocumentController.updateDocument);
+router.patch("/documents/:id", upload.fields([{ name: "signature", maxCount: 1 }]), DocumentController.updateDocument);
 
 router.patch('/documents/:id/sharelink', DocumentController.updateShareSettings);
 // Hard delete (permanent removal)

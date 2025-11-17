@@ -316,12 +316,15 @@ function initializeFormData() {
     }
 
     // Set signature if exists
-    if (window.documentData.signature) {
-        $('#signatureData').val(window.documentData.signature);
-        $('#signaturePreview').html(`<img src="${window.documentData.signature}" alt="Signature" style="max-height:140px; max-width:100%; object-fit:contain;">`);
+    if (window.documentData.signature && window.documentData.signature.fileUrl) {
+        const signatureUrl = window.documentData.signature.fileUrl;
+        $('#signatureData').val(signatureUrl);
+        $('#signaturePreview').html(`
+        <img src="${signatureUrl}" alt="Signature" style="max-height:140px; max-width:100%; object-fit:contain;">
+    `);
         $('#uploadSignBtn').text("Update Signature");
 
-        // Show clear signature button
+        // Show clear button
         if (!$('#clearSignBtn').length) {
             $('.signupld').append('<button type="button" class="btn btn-warning rounded-pill" id="clearSignBtn">Clear Signature</button>');
         }
@@ -586,9 +589,6 @@ function getChangedFormData() {
 function initializeEditFormSubmission() {
     $('#documentForm').on('submit', async function (e) {
         e.preventDefault();
-
-        console.log('📤 Submitting edit form...');
-
         // Validate dates first
         if (!validateDates()) {
             return;
@@ -613,9 +613,6 @@ function initializeEditFormSubmission() {
                 showToast('No changes detected to update.', 'info');
                 return;
             }
-
-            // Debug: Log what's being sent
-            console.log('📤 Sending form data with fields:', Array.from(formData.keys()));
             for (let [key, value] of formData.entries()) {
                 if (key === 'expiryDate' || key === 'documentDate') {
                     console.log(`📅 ${key}:`, value);
@@ -634,20 +631,86 @@ function initializeEditFormSubmission() {
             });
 
             const data = await response.json();
-            console.log('📨 Response received:', data);
-
             if (data.success) {
-                // ... success handling
+                storeOriginalFormData();
+
+                // Update uploaded/existing file tracking
+                window.existingFileIds = [...window.uploadedFileIds];
+
+                showToast('Document updated successfully!', 'success');
+                setTimeout(() => {
+                    window.location.href = '/documents/list';
+                }, 1500);
+
+                return;
             } else {
                 throw new Error(data.message || 'Unknown error occurred during update');
             }
         } catch (error) {
-            console.error('❌ Form submission error:', error);
             showToast('Error updating document: ' + error.message, 'error');
         } finally {
             $('#submitBtn').prop('disabled', false).html("Update Document");
         }
     });
+}
+
+/**
+ * Update file display after changes
+ */
+function updateFileDisplay() {
+    const totalFiles = window.uploadedFileIds.length;
+    console.log(`📊 Current file count: ${totalFiles}`);
+
+    if (totalFiles === 0) {
+        document.getElementById('existingFilesList').innerHTML = '<p class="text-muted">No files uploaded</p>';
+    }
+}
+
+function removeUploadedFile(fileId, fileName, fileElement) {
+    const trashModal = new bootstrap.Modal(document.getElementById("trashdoc-modal"));
+    const trashModalTitle = document.querySelector("#trashdocLabel");
+    const trashModalBody = document.querySelector("#trashdoc-modal .modal-body");
+    const confirmTrashBtn = document.getElementById("confirm-trash-folder");
+
+    trashModalTitle.innerHTML = `
+        <img src="/img/icons/bin.png" class="me-2" style="width:24px; height:24px;">
+        Delete File
+    `;
+    trashModalBody.innerHTML = `
+        You are about to delete <strong>"${fileName}"</strong>.<br>
+        This action cannot be undone. Are you sure you want to proceed?
+    `;
+
+    // Remove previous event listeners and add new one
+    confirmTrashBtn.replaceWith(confirmTrashBtn.cloneNode(true));
+    const newConfirmBtn = document.getElementById("confirm-trash-folder");
+
+    newConfirmBtn.addEventListener('click', async function () {
+        try {
+            console.log('🗑️ Deleting file:', fileId);
+
+            // Remove from uploadedFileIds array
+            window.uploadedFileIds = window.uploadedFileIds.filter(id => id !== fileId);
+
+            // Remove from DOM
+            if (fileElement && fileElement.parentNode) {
+                fileElement.parentNode.remove();
+            }
+
+            trashModal.hide();
+            showToast("File removed successfully!", 'success');
+
+            // Update file display
+            updateFileDisplay();
+
+        } catch (err) {
+            console.error('❌ Error in file removal:', err);
+            showToast("Error removing file: " + err.message, 'error');
+            trashModal.hide();
+        }
+    });
+
+    trashModal.show();
 }
 
 function initializeFileUpload() {
@@ -708,24 +771,24 @@ function initializeFileUpload() {
             const fileItem = document.createElement("div");
             fileItem.className = "col-sm-6 col-md-4 mb-3";
             fileItem.innerHTML = `
-                <div class="file-item card p-3" data-file-id="${tempId}">
-                    <div class="file-info d-flex align-items-center">
-                        <i class="fa-solid fa-file fa-2x me-3 text-primary"></i>
-                        <div class="flex-grow-1">
-                            <h6 class="mb-0 text-truncate">${file.name}</h6>
-                            <small class="text-muted">${(file.size / 1024 / 1024).toFixed(2)} MB</small>
-                        </div>
+            <div class="file-item card p-3" data-file-id="${tempId}">
+                <div class="file-info d-flex align-items-center">
+                    <i class="fa-solid fa-file fa-2x me-3 text-primary"></i>
+                    <div class="flex-grow-1">
+                        <h6 class="mb-0 text-truncate">${file.name}</h6>
+                        <small class="text-muted">${(file.size / 1024 / 1024).toFixed(2)} MB</small>
                     </div>
-                    <div class="file-progress mt-2">
-                        <div class="progress">
-                            <div class="progress-bar bg-success" role="progressbar" style="width:0%">0%</div>
-                        </div>
-                    </div>
-                    <button class="remove-btn btn btn-sm btn-danger mt-2" data-file-id="${tempId}" disabled>
-                        <i class="fa-solid fa-xmark"></i> Remove
-                    </button>
                 </div>
-            `;
+                <div class="file-progress mt-2">
+                    <div class="progress">
+                        <div class="progress-bar bg-success" role="progressbar" style="width:0%">0%</div>
+                    </div>
+                </div>
+                <button class="remove-btn btn btn-sm btn-danger mt-2" data-file-id="${tempId}" disabled>
+                    <i class="fa-solid fa-xmark"></i> Remove
+                </button>
+            </div>
+        `;
             newFilesContainer.appendChild(fileItem);
 
             const fileItemDiv = fileItem.querySelector('.file-item');
@@ -742,13 +805,17 @@ function initializeFileUpload() {
                     method: 'POST',
                     body: formData
                 });
+
                 const data = await res.json();
 
                 if (!data.success) throw new Error(data.message || "Upload failed");
 
                 const uploadedFile = data.files[0];
                 const fileId = uploadedFile.fileId;
+
+                // CRITICAL: Add to uploadedFileIds array immediately
                 window.uploadedFileIds.push(fileId);
+
                 fileItemDiv.setAttribute("data-file-id", fileId);
                 removeBtn.setAttribute("data-file-id", fileId);
                 removeBtn.disabled = false;
@@ -756,53 +823,12 @@ function initializeFileUpload() {
                 progressBar.style.width = "100%";
                 progressBar.textContent = "Uploaded";
 
-                // Update remove button to work with the new file
+                console.log(`✅ File uploaded successfully: ${file.name} (ID: ${fileId})`);
+
+                // Update remove button handler
                 removeBtn.addEventListener('click', function () {
                     const fileId = this.getAttribute('data-file-id');
-                    const fileItem = this.closest('.col-sm-6');
-
-                    // Show confirmation modal
-                    const trashModal = new bootstrap.Modal(document.getElementById("trashdoc-modal"));
-                    const trashModalTitle = document.querySelector("#trashdocLabel");
-                    const trashModalBody = document.querySelector("#trashdoc-modal .modal-body");
-                    const confirmTrashBtn = document.getElementById("confirm-trash-folder");
-
-                    trashModalTitle.innerHTML = `
-                        <img src="/img/icons/bin.png" class="me-2" style="width:24px; height:24px;">
-                        Delete File
-                    `;
-                    trashModalBody.innerHTML = `
-                        You are about to delete <strong>"${file.name}"</strong>.<br>
-                        This action cannot be undone. Are you sure you want to proceed?
-                    `;
-
-                    // Store reference for confirmation
-                    let fileToDelete = fileItem;
-
-                    // Remove previous event listeners and add new one
-                    confirmTrashBtn.replaceWith(confirmTrashBtn.cloneNode(true));
-                    const newConfirmBtn = document.getElementById("confirm-trash-folder");
-
-                    newConfirmBtn.addEventListener('click', async function () {
-                        try {
-                            const res = await fetch(`/api/files/${fileId}`, { method: "DELETE" });
-                            const data = await res.json();
-
-                            if (data.success) {
-                                fileToDelete.remove();
-                                window.uploadedFileIds = window.uploadedFileIds.filter(id => id !== fileId);
-                                trashModal.hide();
-                                showToast("File removed successfully!", 'success');
-                            } else {
-                                throw new Error(data.message || "Delete failed");
-                            }
-                        } catch (err) {
-                            showToast("Error deleting file: " + err.message, 'error');
-                            trashModal.hide();
-                        }
-                    });
-
-                    trashModal.show();
+                    removeUploadedFile(fileId, file.name, fileItem);
                 });
 
             } catch (err) {
@@ -814,6 +840,7 @@ function initializeFileUpload() {
             }
         }
     }
+
 }
 
 function initializeSignature() {

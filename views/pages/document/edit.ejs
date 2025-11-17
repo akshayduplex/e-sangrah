@@ -257,8 +257,8 @@
                                                                         || 'Unnamed file' %>
                                                                 </h6>
                                                                 <small class="text-muted">
-                                                                    <%= file.size ? (file.size / 1024 / 1024).toFixed(2)
-                                                                        + ' MB' : 'Size unknown' %>
+                                                                    <%= file.fileSize ? (file.fileSize / 1024 /
+                                                                        1024).toFixed(2) + ' MB' : 'Size unknown' %>
                                                                 </small>
                                                                 <div class="mt-1">
                                                                     <small class="text-success">
@@ -275,12 +275,12 @@
                                                                     <i class="fa-solid fa-eye"></i> View
                                                                 </a>
                                                                 <% } %>
-                                                                    <button
+                                                                    <!-- <button
                                                                         class="remove-existing-btn btn btn-sm btn-danger flex-fill"
                                                                         data-file-id="<%= file._id %>"
                                                                         data-file-name="<%= file.originalName || file.filename %>">
                                                                         <i class="fa-solid fa-trash"></i> Remove
-                                                                    </button>
+                                                                    </button> -->
                                                         </div>
                                                     </div>
                                                 </div>
@@ -305,7 +305,7 @@
                                     <div class="signbox form-control" id="signaturePreview"
                                         style="width:70%; min-height: 150px; display: flex; align-items: center; justify-content: center;">
                                         <% if (document.signature) { %>
-                                            <img src="<%= document.signature %>" alt="Signature"
+                                            <img src="<%= document.signature.fileUrl %>" alt="Signature"
                                                 style="max-height: 140px; max-width: 100%; object-fit: contain;">
                                             <% } else { %>
                                                 <div class="text-muted">No signature uploaded</div>
@@ -328,7 +328,7 @@
                                             <% } %>
                                     </div>
                                     <input type="hidden" name="signature" id="signatureData"
-                                        value="<%= document.signature || '' %>">
+                                        value="<%= document.signature ? document.signature.fileUrl : '' %>">
                                 </div>
                             </div>
                         </div>

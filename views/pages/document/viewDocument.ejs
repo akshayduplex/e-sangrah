@@ -30,6 +30,10 @@
                             <h5 class="mb-0 fw-bold">
                                 <i class="bi bi-file-earmark-text me-2"></i>
                                 <span id="fileNameDisplay">-</span>
+                                <span id="currentVersionDisplay" class="text-success fw-semibold ms-2"
+                                    style="display:none;">
+                                    v1.2 (Current Version)
+                                </span>
                             </h5>
                         </div>
                         <div class="card-body p-4">
@@ -339,7 +343,13 @@
 
                     // Update Header
                     document.getElementById('fileNameDisplay').textContent = doc.metadata?.fileName || 'Unknown Document';
-
+                    // Show green "Current" only if viewing the latest version
+                    const currentVersionDisplay = document.getElementById('currentVersionDisplay');
+                    if (version == doc.currentVersionNumber || version == doc.currentVersionLabel) {
+                        currentVersionDisplay.style.display = 'inline';
+                    } else {
+                        currentVersionDisplay.style.display = 'none';
+                    }
                     // Document Info
                     document.getElementById('fileName').value = doc.metadata?.fileName || '-';
                     document.getElementById('description').innerHTML = (doc.description || doc.metadata?.fileDescription || 'N/A').replace(/\n/g, '<br>');
