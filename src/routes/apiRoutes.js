@@ -78,6 +78,7 @@ router.get("/auth/verify-reset/:token", AuthValidators.verifyResetTokenValidator
 
 //public routes
 router.get('/file/pdf/:fileId', CommonController.servePDF);
+router.get('/documents/:id/versions/view', DocumentController.viewDocumentVersion);
 
 // Apply authentication to all routes
 router.use(authenticate);
@@ -243,7 +244,6 @@ router.get("/documents/:id/access-logs", DocumentController.getDocumentAccessLog
 router.get('/documents/:id/versions/history', DocumentController.getVersionHistory);
 
 // View a specific version
-router.get('/documents/:id/versions/view', DocumentController.viewDocumentVersion);
 router.get('/documents/:id/versions/:version/view', DocumentController.viewVersion);
 
 // Restore a previous version

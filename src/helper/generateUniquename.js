@@ -8,10 +8,10 @@ import { encrypt } from './SymmetricEncryption.js';
 //     return `${base}_${id}${ext}`;
 // }
 
-export function generateShareLink(documentId, fileId) {
-    const payload = JSON.stringify({ id: documentId, fileId });
+export function generateShareLink(documentId, fileId, version) {
+    const payload = JSON.stringify({ id: documentId, fileId, version });
     const token = encrypt(payload);
-    return `${process.env.BASE_URL || 'http://localhost:5000'}/documents/view/${encodeURIComponent(token)}`;
+    return `${process.env.BASE_URL || 'http://localhost:5000'}/documents/view?token=${encodeURIComponent(token)}`;
 }
 
 // utils/fileUtils.js

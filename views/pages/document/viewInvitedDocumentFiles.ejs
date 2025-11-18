@@ -3,163 +3,150 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>File Preview - <%= file ? file.originalName : "No File" %>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>
+        <%= documentTitle %>
     </title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <style>
-        html,
         body {
-            margin: 0;
-            padding: 0;
-            height: 100%;
-            background-color: #000;
+            background: #f8f9fa;
+            padding: 30px 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         }
 
-        iframe,
-        img {
-            width: 100%;
-            height: 100%;
-            border: none;
+        .container-fluid {
+            max-width: 1200px;
         }
 
-        img {
-            object-fit: contain;
-            background-color: #000;
+        .main-header {
+            font-size: 2.2rem;
+            font-weight: 300;
+            color: #1a1a1a;
         }
 
-        .fallback {
+        .version-badge {
+            font-size: 0.9rem;
+            color: #555;
+        }
+
+        #files-list {
             display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100%;
-            color: #fff;
-            font-family: Arial, sans-serif;
-            text-align: center;
-            padding: 20px;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-top: 30px;
         }
 
-        .btn {
-            padding: 10px 20px;
-            background: #007bff;
-            color: #fff;
+        .file-card {
+            width: 180px;
+            padding: 18px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .file-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);
+        }
+
+        .file-icon {
+            width: 64px;
+            height: 74px;
+            margin: 0 auto 12px;
+        }
+
+        .file-name {
+            font-weight: 600;
+            font-size: 0.95rem;
+            text-align: center;
+            color: #222;
+            margin: 8px 0 4px;
+        }
+
+        .file-size {
+            font-size: 0.8rem;
+            color: #777;
+            text-align: center;
+        }
+
+        .dropdown-btn {
+            background: none;
             border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 15px;
+            font-size: 1.4rem;
+            color: #555;
         }
     </style>
-
 </head>
 
 <body>
+    <div class="container-fluid">
+        <h1 class="main-header">
+            <%= documentTitle %>
+        </h1>
+        <div class="version-badge mb-4">Version <%= currentVersionLabel %>
+        </div>
+        <hr class="my-4">
 
-    <% const expired=sharedAccess && sharedAccess.expiresAt && new Date()> sharedAccess.expiresAt; %>
+        <% if (expiredMessage) { %>
+            <div class="alert alert-warning">
+                <strong>Access Denied:</strong>
+                <%= expiredMessage %>
+                    <% if (canRenew) { %>
 
-        <% if (!sharedAccess || expired) { %>
-
-            <!-- Access Not Granted UI -->
-            <div class="fallback">
-                <div>
-                    <h2>Access Restricted</h2>
-                    <p>You do not have permission to view this file.</p>
-
-                    <form id="requestAccessForm" action="/api/documents/<%= documentId %>/request-access" method="POST">
-                        <% if (!user) { %>
-                            <input type="email" name="email" placeholder="Enter your email" required
-                                style="margin-bottom:10px; padding:5px;" />
-                            <% } %>
-                                <button type="submit" class="btn">Request Access</button>
-                    </form>
-
-                    <div id="message" style="display:none; margin-top:15px; color:#0af;"></div>
-                </div>
-            </div>
-
-
-            <% } else { %>
-
-                <!-- Access Granted Info -->
-                <% if (sharedAccess.expiresAt) { %>
-                    <p style="color:#fff; text-align:center;">
-                        Access granted until: <%= sharedAccess.expiresAt.toLocaleString() %>
-                    </p>
-                    <% } else { %>
-                        <p style="color:#fff; text-align:center;">Lifetime access granted</p>
                         <% } %>
-
-                            <!-- Preview Section -->
-                            <% if (!file || !file.fileUrl) { %>
-                                <div class="fallback">
-                                    <h2>File not available</h2>
+            </div>
+            <% } else if (files && files.length> 0) { %>
+                <div id="files-list">
+                    <% files.forEach(file=> { %>
+                        <% let icon='/img/icons/fn1.png' ; if (file.fileType.isPDF) icon='/img/icons/fn4.png' ; else if
+                            (file.fileType.isWord) icon='/img/icons/fn2.png' ; else if (file.fileType.isExcel)
+                            icon='/img/icons/fn3.png' ; else if (file.fileType.isPowerPoint) icon='/img/icons/fn1.png' ;
+                            %>
+                            <div class="file-card">
+                                <div class="text-center">
+                                    <img src="<%= icon %>" alt="icon" class="file-icon">
+                                    <p class="file-name" title="<%= file.originalName %>">
+                                        <%= file.originalName.length> 20 ? file.originalName.slice(0,20)+'...' :
+                                            file.originalName %>
+                                    </p>
+                                    <p class="file-size">
+                                        <%= file.formattedSize %>
+                                    </p>
                                 </div>
 
-                                <% } else if (file.fileType.isPDF) { %>
-                                    <iframe src="/api/file/pdf/<%= file._id %>" title="PDF Preview"></iframe>
-
-                                    <% } else if (file.fileType.isWord || file.fileType.isExcel ||
-                                        file.fileType.isPowerPoint) { %>
-                                        <iframe
-                                            src="https://view.officeapps.live.com/op/embed.aspx?src=<%= encodeURIComponent(file.fileUrl) %>"
-                                            title="Office Preview">
-                                        </iframe>
-
-                                        <% } else if (/\.(jpg|jpeg|png|gif|webp)$/i.test(file.originalName)) { %>
-                                            <img src="<%= file.fileUrl %>" alt="Image Preview">
-
+                                <div class="position-absolute top-0 end-0 mt-2 me-2">
+                                    <button class="dropdown-btn" data-bs-toggle="dropdown">
+                                        <i class="bi bi-three-dots-vertical"></i>
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-end shadow">
+                                        <% if (file.fileUrl) { %>
+                                            <li><a class="dropdown-item" href="<%= file.fileUrl %>" target="_blank">
+                                                    <i class="bi bi-eye me-2"></i> View
+                                                </a></li>
+                                            <li><a class="dropdown-item" href="<%= file.fileUrl %>" download>
+                                                    <i class="bi bi-download me-2"></i> Download
+                                                </a></li>
                                             <% } else { %>
-                                                <div class="fallback">
-                                                    <h2>Preview not available</h2>
-                                                    <p>This file type cannot be previewed.</p>
-                                                    <p><a href="<%= file.fileUrl %>" target="_blank"
-                                                            style="color:#0af;">Download file</a></p>
-                                                </div>
+                                                <li><span class="dropdown-item text-muted">File unavailable</span></li>
                                                 <% } %>
+                                    </ul>
+                                </div>
+                            </div>
+                            <% }) %>
+                </div>
+                <% } else { %>
+                    <div class="text-center py-5 text-muted">
+                        <i class="bi bi-folder-x" style="font-size: 4rem;"></i>
+                        <p class="mt-3">No files attached to this version.</p>
+                    </div>
+                    <% } %>
+    </div>
 
-                                                    <% } %>
-                                                        <script>
-                                                            document.getElementById("requestAccessForm").addEventListener("submit", async function (e) {
-                                                                e.preventDefault(); // prevent normal form submit
-
-                                                                const form = e.target;
-                                                                const button = form.querySelector("button");
-
-                                                                // Prepare JSON body
-                                                                const emailInput = form.querySelector('input[name="email"]');
-                                                                const body = emailInput ? { email: emailInput.value } : {};
-
-                                                                button.disabled = true;
-                                                                button.innerText = "Sending...";
-
-                                                                try {
-                                                                    const response = await fetch(form.action, {
-                                                                        method: "POST",
-                                                                        headers: { "Content-Type": "application/json" },
-                                                                        body: JSON.stringify(body)
-                                                                    });
-
-                                                                    const result = await response.json();
-
-                                                                    const messageBox = document.getElementById("message");
-                                                                    messageBox.style.display = "block";
-
-                                                                    if (result.success) {
-                                                                        messageBox.innerHTML = `<h3>${result.message}</h3>`;
-                                                                        button.innerText = "Request Sent";
-                                                                    } else {
-                                                                        messageBox.innerHTML = `<h3 style="color:red;">${result.message}</h3>`;
-                                                                        button.disabled = false;
-                                                                        button.innerText = "Request Access";
-                                                                    }
-                                                                } catch (err) {
-                                                                    const messageBox = document.getElementById("message");
-                                                                    messageBox.style.display = "block";
-                                                                    messageBox.innerHTML = `<h3 style="color:red;">Server error. Try again later.</h3>`;
-                                                                    button.disabled = false;
-                                                                    button.innerText = "Request Access";
-                                                                    console.error(err);
-                                                                }
-                                                            });
-                                                        </script>
-
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 
 </html>

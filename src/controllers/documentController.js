@@ -159,111 +159,119 @@ export const showArchivedDocumentPage = async (req, res) => {
  * GET /documents/:id/view
  * Render a page to view files of a document
  */
+
+
 export const viewDocumentFiles = async (req, res) => {
     try {
-        const { token } = req.params;
+        const { token } = req.query;
+
         if (!token) throw new Error("Invalid link");
 
         let decrypted;
         try {
             decrypted = JSON.parse(decrypt(token));
-        } catch (err) {
-            return res.render("pages/viewDocumentFiles", {
-                expiredMessage: "Invalid or corrupted link.",
-                documentTitle: "Document",
-                file: null,
-                document: null,
-                documentId: null,
-                docExpired: true
-            });
+        } catch {
+            return renderExpiredPage(res, "Invalid or corrupted link.", req.user);
         }
 
-        const { id: documentId, fileId } = decrypted;
+        const { id: documentId, fileId, version } = decrypted;
+        // const version = version;
         const now = new Date();
 
-        // Fetch the document
-        const document = await Document.findById(documentId);
+        const document = await Document.findById(documentId).lean();
         if (!document) {
-            return res.render("pages/viewDocumentFiles", {
-                expiredMessage: "Document not found.",
-                documentTitle: "Document",
-                file: null,
-                document: null,
-                documentId,
-                docExpired: true
-            });
+            return renderExpiredPage(res, "Document not found.", req.user, version, documentId);
         }
 
+        // ------------------------
+        // Restriction checks
+        // ------------------------
         let expiredMessage = null;
         let docExpired = false;
 
-        // PUBLIC document logic only
-        if (!document.ispublic) {
-            expiredMessage = "Access restricted. This document is private.";
-        } else if (document.docExpiresAt && now > document.docExpiresAt) {
+        if (document.isDeleted) {
+            expiredMessage = "This document has been deleted.";
             docExpired = true;
+        } else if (document.isArchived) {
+            expiredMessage = "This document is archived and cannot be accessed.";
+            docExpired = true;
+        } else if (!document.ispublic) {
+            expiredMessage = "Access restricted. This document is private.";
+            docExpired = true;
+        } else if (document.docExpiresAt && now > document.docExpiresAt) {
             expiredMessage = "This public document link has expired.";
+            docExpired = true;
+        } else if (document.docExpireDuration === "custom") {
+            if (document.DoccustomStart && document.DoccustomEnd &&
+                (now < document.DoccustomStart || now > document.DoccustomEnd)) {
+                expiredMessage = "This document is not available in the current date range.";
+                docExpired = true;
+            }
+        } else if (document.compliance?.expiryDate && now > document.compliance.expiryDate) {
+            expiredMessage = "This document has expired due to compliance rules.";
+            docExpired = true;
         }
 
-        // --- Fetch file only if access is valid ---
-        let file = null;
-        if (!expiredMessage && !docExpired) {
-            file = await File.findById(fileId).exec();
+        // ------------------------
+        // Load version & files if allowed
+        // ------------------------
+        let versionData = null;
+
+        if (!docExpired) {
+            versionData = await DocumentVersion.findOne({
+                documentId,
+                versionLabel: version
+            })
+                .populate("files")
+                .lean();
         }
 
-        let fileUrl = null;
-        if (file) {
-            fileUrl = file.s3Url || (file.file ? await getObjectUrl(file.file, 3600) : null);
-        }
-
-        // --- Helpers ---
-        const formatFileSize = (bytes) => {
-            if (!bytes) return "0 Bytes";
-            const k = 1024;
-            const sizes = ["Bytes", "KB", "MB", "GB"];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
-        };
-
-        const getFileType = (filename) => {
-            const ext = filename.split(".").pop().toLowerCase();
-            return {
-                isPDF: ext === "pdf",
-                isWord: ["doc", "docx"].includes(ext),
-                isExcel: ["xls", "xlsx"].includes(ext),
-                isPowerPoint: ["ppt", "pptx"].includes(ext),
-                isText: ["txt", "md", "json", "xml", "html", "csv"].includes(ext),
-                extension: ext
-            };
-        };
-
-        res.render("pages/viewDocumentFiles", {
-            expiredMessage,
-            documentTitle: document.metadata?.fileName || "Document",
-            document,
-            documentId,
-            docExpired,
-            file: file
-                ? {
-                    ...file.toObject(),
-                    formattedSize: formatFileSize(file.fileSize),
-                    fileUrl,
-                    fileType: getFileType(file.originalName)
+        // For files, populate s3Url if needed
+        if (versionData?.files) {
+            for (let file of versionData.files) {
+                if (!file.s3Url && file.file) {
+                    file.fileUrl = await getObjectUrl(file.file, 3600);
+                } else {
+                    file.fileUrl = file.s3Url;
                 }
-                : null
+            }
+        }
+
+        // ------------------------
+        // Render page
+        // ------------------------
+        res.render("pages/document/publicDocumentView", {
+            expiredMessage,
+            docExpired,
+            version,
+            documentId,
+            user: req.user,
+            document,
+            versionData,
+            documentTitle: document?.metadata?.fileName || "Document"
         });
 
     } catch (error) {
-        console.error(" viewDocumentFiles Error:", error);
-        res.render("pages/viewDocumentFiles", {
-            expiredMessage: "Server error while fetching file.",
-            documentTitle: "Document",
-            file: null,
-            document: null,
-            documentId: null,
-            docExpired: true
-        });
+        console.error("viewDocumentFiles Error:", error);
+        renderExpiredPage(res, "Server error while fetching file.", req.user);
     }
+};
+
+// ------------------------
+// Helper
+// ------------------------
+const renderExpiredPage = (res, message, user, version = null, documentId = null) => {
+    return res.render("pages/document/publicDocumentView", {
+        expiredMessage: message,
+        documentTitle: "Document",
+        file: null,
+        user,
+        version,
+        document: null,
+        documentId,
+        versionData: null,
+        docExpired: true
+    });
 };
 
 /**
@@ -285,108 +293,122 @@ export const viewInvitedDocumentFiles = async (req, res) => {
                 documentTitle: "Document",
                 user: req.user,
                 sharedAccess: null,
-                file: null,
-                sharedId: null,
-                documentId: null
+                document: null,
+                versionData: null,
+                files: []
             });
         }
 
-        const { id: documentId, fileId } = decrypted;
+        const { id: documentId } = decrypted;
         const userId = req.user?._id;
+        const now = new Date();
 
-        // --- Check if user has valid shared access ---
+        // Check shared access
         let sharedAccess = await SharedWith.findOne({
             document: documentId,
             user: userId,
             generalAccess: true
         }).populate("document");
 
-        const now = new Date();
         let expiredMessage = null;
 
         if (!sharedAccess) {
             expiredMessage = "You don't have access to this document.";
         } else {
-            // Check expiration
             const isExpired = sharedAccess.expiresAt && now > sharedAccess.expiresAt;
             const isUsed = sharedAccess.duration === "onetime" && sharedAccess.used;
 
             if (isExpired) expiredMessage = "This link has expired.";
             if (isUsed) expiredMessage = "This one-time link has already been used.";
 
-            // Mark one-time link as used
             if (sharedAccess.duration === "onetime" && !sharedAccess.used) {
                 sharedAccess.used = true;
                 await sharedAccess.save();
             }
         }
 
-        // --- Fetch file if access exists ---
-        let file = null;
+        // Fetch document + current version
+        let document = null;
+        let versionData = null;
+        let files = [];
+
         if (sharedAccess && !expiredMessage) {
-            file = await File.findById(fileId)
-                .populate("document")
-                .populate("uploadedBy", "name email")
-                .exec();
+            document = await Document.findById(documentId)
+                .populate({
+                    path: "currentVersion",
+                    populate: { path: "files", model: "File" }
+                })
+                .lean(); // Important: use .lean() for performance + clean objects
+
+            versionData = document?.currentVersion || null;
+
+            if (versionData?.files?.length > 0) {
+                files = await Promise.all(
+                    versionData.files.map(async (file) => {
+                        let fileUrl = null;
+                        try {
+                            fileUrl = file.s3Url || (file.file ? await getObjectUrl(file.file, 3600) : null);
+                        } catch (err) {
+                            console.error("Failed to generate S3 URL for file:", file.originalName, err);
+                        }
+
+                        const ext = (file.originalName.split(".").pop() || "").toLowerCase();
+
+                        return {
+                            _id: file._id,
+                            originalName: file.originalName,
+                            fileSize: file.fileSize || 0,
+                            formattedSize: formatFileSize(file.fileSize),
+                            fileUrl,
+                            fileType: {
+                                isPDF: ext === "pdf",
+                                isWord: ["doc", "docx"].includes(ext),
+                                isExcel: ["xls", "xlsx"].includes(ext),
+                                isPowerPoint: ["ppt", "pptx"].includes(ext),
+                                isText: ["txt", "md", "json", "xml", "html", "csv"].includes(ext),
+                                extension: ext
+                            }
+                        };
+                    })
+                );
+            }
         }
-
-        let fileUrl = null;
-        if (file) {
-            fileUrl = file.s3Url || (file.file ? await getObjectUrl(file.file, 3600) : null);
-        }
-
-        // --- Helpers ---
-        const formatFileSize = (bytes) => {
-            if (!bytes) return "0 Bytes";
-            const k = 1024;
-            const sizes = ["Bytes", "KB", "MB", "GB"];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
-        };
-
-        const getFileType = (filename) => {
-            const ext = filename.split(".").pop().toLowerCase();
-            return {
-                isPDF: ext === "pdf",
-                isWord: ["doc", "docx"].includes(ext),
-                isExcel: ["xls", "xlsx"].includes(ext),
-                isPowerPoint: ["ppt", "pptx"].includes(ext),
-                isText: ["txt", "md", "json", "xml", "html", "csv"].includes(ext),
-                extension: ext
-            };
-        };
 
         res.render("pages/document/viewInvitedDocumentFiles", {
             expiredMessage,
-            canRenew: expiredMessage ? true : false,
-            documentTitle: sharedAccess?.document?.title || "Document",
+            canRenew: !!expiredMessage,
+            documentTitle: document?.metadata?.fileName || "Document",
+            currentVersionLabel: document?.currentVersionLabel || "N/A",
             user: req.user,
-            sharedAccess,       // Pass sharedAccess to EJS
-            sharedId: sharedAccess?._id || null,
-            documentId,
-            file: file
-                ? {
-                    ...file.toObject(),
-                    formattedSize: formatFileSize(file.fileSize),
-                    fileUrl,
-                    fileType: getFileType(file.originalName)
-                }
-                : null
+            sharedAccess,
+            document,
+            files
         });
+
     } catch (error) {
-        console.error(error);
+        console.error("Error in viewInvitedDocumentFiles:", error);
         res.render("pages/document/viewInvitedDocumentFiles", {
-            expiredMessage: "Server error while fetching file.",
+            expiredMessage: "Server error while loading the document.",
             canRenew: false,
             documentTitle: "Document",
             user: req.user,
             sharedAccess: null,
-            file: null,
-            sharedId: null,
-            documentId: null
+            document: null,
+            files: []
         });
     }
 };
+
+// Helper
+const formatFileSize = (bytes) => {
+    if (!bytes) return "0 Bytes";
+    const k = 1024;
+    const sizes = ["Bytes", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+};
+
+
 export const viewGrantAccessPage = async (req, res) => {
     try {
         const { token } = req.params;
@@ -3231,12 +3253,31 @@ export const grantAccessViaToken = async (req, res) => {
 
 export const generateShareableLink = async (req, res) => {
     const { documentId, fileId } = req.params;
+
     try {
-        const link = await generateShareLink(documentId, fileId);
+
+        const document = await Document.findById(documentId).select("currentVersionLabel");
+
+        if (!document) {
+            return res.status(404).json({
+                success: false,
+                message: "Document not found"
+            });
+        }
+
+
+        const versionLabel = document.currentVersionLabel;
+
+        const link = await generateShareLink(documentId, fileId, versionLabel);
+
         res.json({ success: true, link });
+
     } catch (err) {
         console.error(err);
-        res.status(500).json({ success: false, message: 'Failed to generate share link' });
+        res.status(500).json({
+            success: false,
+            message: "Failed to generate share link"
+        });
     }
 };
 /**

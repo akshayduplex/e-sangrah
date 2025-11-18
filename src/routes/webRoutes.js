@@ -158,6 +158,7 @@ router.get("/designations/list", authenticate, DesignationController.showDesigna
 router.get("/documents/list", authenticate, checkPermissions, DocumentController.showDocumentListPage);
 
 // View Document page
+
 router.get("/documents/:id/versions/view", authenticate, authorize('admin', 'superadmin', 'user'), DocumentController.showViewDocumentPage);
 router.get("/documents/archived", authenticate, DocumentController.showArchivedDocumentPage);
 
@@ -167,7 +168,7 @@ router.get("/documents/add", authenticate, DocumentController.showAddDocumentPag
 
 // Edit Document page
 router.get("/documents/edit/:id", authenticate, DocumentController.showEditDocumentPage);
-router.get('/documents/view/:token', DocumentController.viewDocumentFiles);
+router.get('/documents/view', DocumentController.viewDocumentFiles);
 router.get('/documents/invited/:token', authenticate, DocumentController.viewInvitedDocumentFiles);
 router.get('/documents/approve-access/:token', authenticate, DocumentController.viewGrantAccessPage);
 
