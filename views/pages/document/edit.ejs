@@ -106,7 +106,7 @@
                                     <div class="input-icon-end position-relative">
                                         <input type="text" name="documentDate" class="form-control datetimepicker"
                                             placeholder="dd/mm/yyyy"
-                                            value="<%= document.documentDate ? new Date(document.documentDate).toLocaleDateString('en-GB') : '' %>">
+                                            value="<%= document.startDate ? new Date(document.startDate).toLocaleDateString('en-GB') : '' %>">
                                         <span class="input-icon-addon"><i class="ti ti-calendar text-gray-7"></i></span>
                                     </div>
                                 </div>
@@ -239,59 +239,9 @@
                                     <small class="text-muted">Max 10GB total storage. DOCX / PPTX / CSV / PDF</small>
                                     <input type="file" class="form-control d-none" id="fileInput" name="files" multiple>
                                 </div>
-
-                                <!-- Existing Files Display -->
-                                <div id="existingFilesList" class="mb-3">
-                                    <% if (document.files && document.files.length) { %>
-                                        <h6 class="mb-2">Existing Files:</h6>
-                                        <div class="row">
-                                            <% document.files.forEach(file=> { %>
-                                                <div class="col-sm-6 col-md-4 mb-3">
-                                                    <div class="file-item card p-3" data-file-id="<%= file._id %>">
-                                                        <div class="file-info d-flex align-items-center">
-                                                            <i class="fa-solid fa-file fa-2x me-3 text-primary"></i>
-                                                            <div class="flex-grow-1">
-                                                                <h6 class="mb-0 text-truncate"
-                                                                    title="<%= file.originalName || file.filename || 'Unnamed file' %>">
-                                                                    <%= file.originalName || file.filename
-                                                                        || 'Unnamed file' %>
-                                                                </h6>
-                                                                <small class="text-muted">
-                                                                    <%= file.fileSize ? (file.fileSize / 1024 /
-                                                                        1024).toFixed(2) + ' MB' : 'Size unknown' %>
-                                                                </small>
-                                                                <div class="mt-1">
-                                                                    <small class="text-success">
-                                                                        <i class="fa-solid fa-check-circle"></i> Already
-                                                                        uploaded
-                                                                    </small>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                        <div class="file-actions mt-2 d-flex gap-2">
-                                                            <% if (file.file) { %>
-                                                                <a href="/folders/view/<%= file._id %>" target="_blank"
-                                                                    class="btn btn-sm btn-info flex-fill">
-                                                                    <i class="fa-solid fa-eye"></i> View
-                                                                </a>
-                                                                <% } %>
-                                                                    <!-- <button
-                                                                        class="remove-existing-btn btn btn-sm btn-danger flex-fill"
-                                                                        data-file-id="<%= file._id %>"
-                                                                        data-file-name="<%= file.originalName || file.filename %>">
-                                                                        <i class="fa-solid fa-trash"></i> Remove
-                                                                    </button> -->
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <% }) %>
-                                        </div>
-                                        <% } %>
-                                </div>
-
                                 <!-- New Files Upload Area -->
                                 <div id="fileList" class="mt-3">
-                                    <h6 class="mb-2">New Files:</h6>
+                                    <h6 class="mb-2">Uplaoded Files:</h6>
                                     <div class="row" id="newFilesContainer">
                                         <!-- New files will be added here -->
                                     </div>

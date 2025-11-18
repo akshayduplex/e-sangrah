@@ -6,7 +6,10 @@ const fileSchema = new mongoose.Schema({
     file: { type: String, required: true }, // S3 key
     s3Url: { type: String },
     originalName: { type: String, required: true },
-    version: { type: Number, default: 1 },
+    version: {
+        type: mongoose.Schema.Types.Decimal128,
+        default: mongoose.Types.Decimal128.fromString("1.0")
+    },
     uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     fileType: { type: String, required: true },
     folder: { type: mongoose.Schema.Types.ObjectId, ref: "Folder" },

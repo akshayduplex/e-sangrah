@@ -121,6 +121,9 @@
                                 <tr>
                                     <th></th>
                                     <th>File Name</th>
+                                    <th>Versions</th>
+                                    <th>Tags</th>
+                                    <th>Metadata</th>
                                     <th>Last Modified on</th>
                                     <th>Owner</th>
                                     <th>Department</th>
@@ -128,8 +131,6 @@
                                     <th>Shared With</th>
                                     <th>Donor</th>
                                     <th>Vendor</th>
-                                    <th>Tags</th>
-                                    <th>Metadata</th>
                                     <th>Description</th>
                                     <th>Remark</th>
                                     <th>Signature</th>
@@ -342,6 +343,9 @@
                         columns: [
                             { title: '', orderable: false },
                             { title: 'File Name', orderable: true },
+                            { title: 'Version', orderable: false },
+                            { title: 'Metadata', orderable: true },
+                            { title: 'Tags', orderable: true },
                             { title: 'Last Modified on', orderable: true },
                             { title: 'Owner', orderable: true },
                             { title: 'Department', orderable: true },
@@ -349,8 +353,6 @@
                             { title: 'Shared With', orderable: false },
                             { title: 'Donor', orderable: true },
                             { title: 'Vendor', orderable: true },
-                            { title: 'Tags', orderable: true },
-                            { title: 'Metadata', orderable: true },
                             { title: 'Description', orderable: false },
                             { title: 'Remark', orderable: false },
                             { title: 'Signature', orderable: false },
@@ -486,6 +488,7 @@
                                 return text.length > 100 ? text.substring(0, 30) + '....' : text;
                             })()
                             : '-';
+
                         const metadata = doc.metadata ? `${doc.metadata.fileName || '-'}, ${doc.metadata.fileDescription || '-'}` : '-';
                         const sharedWith = doc.sharedWithUsers?.length
                             ? (() => {
@@ -515,13 +518,42 @@
                             'archived': 'bg-soft-secondary'
                         }[(doc.status || '').toLowerCase().replace(/\s+/g, '')] || 'bg-soft-secondary';
 
+                        const currentVersion = doc.currentVersionLabel
+                            ? `v${doc.currentVersionLabel}`
+                            : '-';
+
+                        let allVersions = [];
+                        if (doc.files && doc.files.length > 0) {
+                            allVersions = doc.files
+                                .map(f => {
+                                    const versionNum = f.version?.$numberDecimal
+                                        ? parseFloat(f.version.$numberDecimal)
+                                        : null;
+                                    return versionNum !== null ? versionNum : null;
+                                })
+                                .filter(v => v !== null);
+
+                            allVersions = [...new Set(allVersions)];
+
+                            allVersions.sort((a, b) => b - a);
+
+                            allVersions = allVersions.map(v => `v${v}`);
+                        }
+
+                        const versionDisplay = `
+    <div>
+        <div><strong>Current Version:</strong> ${currentVersion}</div>
+        <div><strong>Versions:</strong> ${allVersions.join(', ')}</div>
+    </div>
+`;
+
                         const filesInfo = doc.files?.[0]
                             ? `<div class="d-flex align-items-center">
                     <span class="avatar rounded bg-light me-2">
                         <img src="${fileIcons[doc.files[0].originalName.split('.').pop().toLowerCase()] || fileIcons.default}" style="height:30px;">
                     </span>
                     <div>
-                        <p class="mb-0 text-dark">${doc.files[0].originalName}</p>
+                         <p class="mb-0 text-dark">${doc.metadata.fileName}-${doc.metadata.mainHeading}</p>
                         <small class="text-muted">${fileSizeKB}</small>
                     </div>
                 </div>`
@@ -549,6 +581,9 @@
                         return [
                             dropdown,
                             filesInfo,
+                            versionDisplay,
+                            metadata,
+                            tags,
                             lastModified,
                             owner,
                             departmentName,
@@ -556,8 +591,6 @@
                             sharedWith,
                             donor,
                             vendor,
-                            tags,
-                            metadata,
                             description,
                             doc.comment || '-',
                             doc.signature?.fileUrl ? `<img src="${doc.signature.fileUrl}" style="height:40px;">` : '-',
@@ -670,483 +703,6 @@
                             });
                         });
                     });
-
-                    // -------------------------
-                    // Share document modal
-                    // -------------------------
-                    //     $('#sharedoc-modal').on('show.bs.modal', function (event) {
-                    //         const button = $(event.relatedTarget);
-                    //         currentDocId = button.data('doc-id');
-                    //         const fileId = button.data('file-id');
-                    //         const modal = $(this);
-
-                    //         // Reset form
-                    //         modal.find('#userInviteSelect').val('');
-                    //         modal.find('#accessLevelSelect').val('view');
-                    //         modal.find('input[name="time"]').prop('checked', false);
-                    //         modal.find('#customDateWrapper').hide();
-                    //         modal.find('#startDate').val('');
-                    //         modal.find('#endDate').val('');
-
-                    //         // Clear previous dynamic rows
-                    //         const container = modal.find('#usersWithAccessContainer');
-                    //         container.empty();
-
-                    //         // Validate inputs
-                    //         if (!currentDocId || !fileId) {
-                    //             showToast('Invalid document or file ID', 'error');
-                    //             return;
-                    //         }
-
-                    //         // Fetch share link
-                    //         // $.ajax({
-                    //         //     url: `${baseUrl}/api/documents/${currentDocId}/${fileId}/share-link`,
-                    //         //     method: 'GET',
-                    //         //     success: function (res) {
-                    //         //         modal.find('#accessType').val('anyone');
-                    //         //         modal.find('#roleType').val('viewer');
-                    //         //         if (res.success && res.link) {
-                    //         //             modal.find('#sharelink').val(res.link);
-                    //         //         } else {
-                    //         //             modal.find('#sharelink').val('');
-                    //         //             showToast('Failed to load share link', 'warning');
-                    //         //         }
-                    //         //     },
-                    //         //     error: function (err) {
-                    //         //         console.error('Failed to load share link:', err);
-                    //         //         showToast('Failed to load share link', 'error');
-                    //         //     }
-                    //         // });
-
-                    //         // Load shared users
-                    //         $.ajax({
-                    //             url: `${baseUrl}/api/documents/${currentDocId}/shared-users`,
-                    //             method: 'GET',
-                    //             success: function (res) {
-                    //                 if (!res.success || !res.data || !Array.isArray(res.data)) {
-                    //                     container.append('<div class="text-muted">No users found.</div>');
-                    //                     return;
-                    //                 }
-
-                    //                 // Build HTML for all rows at once
-                    //                 let rows = '';
-                    //                 res.data.forEach(user => {
-                    //                     const checkboxId = `download-${user.userId}`;
-                    //                     const isOwner = user.accessLevel === 'owner';
-                    //                     rows += `
-                    //     <div class="user-accssrow dynamic d-flex justify-content-between align-items-center mb-2 p-2">
-                    //         <div class="empname_eml flex-grow-1">
-                    //             <div class="fw-normal">${user.name}</div>
-                    //             <small class="text-muted">${user.email}</small>
-                    //             ${user.inviteStatus === 'pending' ? '<span class="badge bg-warning ms-2">Pending</span>' : ''}
-                    //         </div>
-                    //         <div class="d-flex align-items-center gap-2">
-                    //             ${!isOwner ? `
-                    //                 <div class="form-check form-switch me-2">
-                    //                     <input class="form-check-input download-access" type="checkbox" id="${checkboxId}" 
-                    //                         data-user-id="${user.userId}" ${user.canDownload ? 'checked' : ''}>
-                    //                     <label class="form-check-label" for="${checkboxId}">Download</label>
-                    //                 </div>
-                    //                 <select class="form-select form-select-sm access-level" data-user-id="${user.userId}">
-                    //                     <option value="edit" ${user.accessLevel === 'edit' ? 'selected' : ''}>Edit</option>
-                    //                     <option value="view" ${user.accessLevel === 'view' ? 'selected' : ''}>View</option>
-                    //                 </select>
-                    //                 <button class="btn btn-sm remvaccessbtn  remove-user" data-user-id="${user.userId}">Remove</button>
-                    //             ` : `
-                    //                 <div class="fw-bold text-primary">Owner</div>
-                    //             `}
-                    //         </div>
-                    //     </div>
-                    // `;
-                    //                 });
-                    //                 container.html(rows); // Append all rows at once
-                    //             },
-                    //             error: function (err) {
-                    //                 console.error('Failed to load shared users:', err);
-                    //                 container.append('<div class="text-danger">Failed to load shared users.</div>');
-                    //                 showToast('Failed to load shared users', 'error');
-                    //             }
-                    //         });
-
-                    //         // Load users for invite dropdown
-                    //         loadUsersForInvite();
-                    //     });
-
-
-                    // Time duration radio buttons
-                    // Initialize Flatpickr when "Custom" is selected
-                    // $('#sharedoc-modal input[name="time"]').on('change', function () {
-                    //     if ($(this).attr('id') === 'custom') {
-                    //         $('#customDateWrapper').show();
-
-                    //         if (!customFlatpickr) {
-                    //             customFlatpickr = flatpickr("#flatpickr-range", {
-                    //                 mode: "range",
-                    //                 dateFormat: "Y-m-d"
-                    //             });
-                    //         }
-
-                    //     } else {
-                    //         $('#customDateWrapper').hide();
-                    //     }
-                    // });
-
-                    // // Access type change handler
-                    // $('#sharedoc-modal #accessType').on('change', function () {
-                    //     const accessType = $(this).val();
-                    //     const infoText = $('#infoText');
-
-                    //     if (accessType === 'anyone') {
-                    //         infoText.text('Anyone on the internet with the link can view');
-                    //         $('#roleType').prop('disabled', false);
-                    //     } else {
-                    //         infoText.text('Only people with access can view');
-                    //         $('#roleType').prop('disabled', false);
-                    //     }
-                    // });
-
-                    // // Role type change handler
-                    // $('#sharedoc-modal #roleType').on('change', function () {
-                    //     const roleType = $(this).val();
-                    //     const infoText = $('#infoText');
-                    //     const accessType = $('#accessType').val();
-
-                    //     if (accessType === 'anyone') {
-                    //         if (roleType === 'viewer') {
-                    //             infoText.text('Anyone on the internet with the link can view');
-                    //         } else {
-                    //             infoText.text('Anyone on the internet with the link can edit');
-                    //         }
-                    //     }
-                    // });
-
-                    // Invite user button
-                    $('#sharedoc-modal').on('click', '#inviteUserBtn', function () {
-                        const $btn = $(this);
-                        const originalText = $btn.html();
-
-                        // Set button to loading state
-                        $btn.prop('disabled', true)
-                            .addClass('btn-light')
-                            .removeClass('btn-primary')
-                            .html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true">');
-
-                        const userEmail = $('#userInviteSelect').val();
-                        const accessLevel = $('#accessLevelSelect').val();
-                        const duration = $('input[name="time"]:checked').attr('id');
-
-                        let customStart = null;
-                        let customEnd = null;
-
-                        // Read dates from Flatpickr range if "Custom" is selected
-                        if (duration === 'custom' && customFlatpickr?.selectedDates.length === 2) {
-                            customStart = customFlatpickr.selectedDates[0].toISOString();
-                            customEnd = customFlatpickr.selectedDates[1].toISOString();
-                        }
-
-                        if (!currentDocId) {
-                            showToast('No document selected', 'info');
-                            resetBtn();
-                            return;
-                        }
-
-                        if (!userEmail) {
-                            showToast('Please enter user email', 'info');
-                            resetBtn();
-                            return;
-                        }
-
-                        if (!$('input[name="time"]:checked').length) {
-                            showToast('Please select a time duration', 'info');
-                            resetBtn();
-                            return;
-                        }
-
-                        if (duration === 'custom' && (!customStart || !customEnd)) {
-                            showToast('Please select a start and end date for custom duration', 'info');
-                            resetBtn();
-                            return;
-                        }
-
-                        const inviteData = {
-                            userEmail: userEmail,
-                            accessLevel: accessLevel,
-                            duration: duration
-                        };
-
-                        if (duration === 'custom') {
-                            inviteData.customStart = customStart;
-                            inviteData.customEnd = customEnd;
-                        }
-
-                        $.ajax({
-                            url: `${baseUrl}/api/documents/${currentDocId}/invite`,
-                            method: 'POST',
-                            contentType: 'application/json',
-                            data: JSON.stringify(inviteData),
-                            success: function (response) {
-                                showToast('Invitation sent successfully!', 'success');
-                                $('#userInviteSelect').val(''); // Clear the input
-                                $('#sharedoc-modal').modal('hide');
-                            },
-                            error: function (err) {
-                                const errorMsg = err.responseJSON?.message || 'Failed to send invitation';
-                                showToast(errorMsg, 'error');
-                            },
-                            complete: function () {
-                                resetBtn();
-                            }
-                        });
-
-                        function resetBtn() {
-                            $btn.prop('disabled', false)
-                                .removeClass('btn-light')
-                                .addClass('btn-primary')
-                                .html(originalText);
-                        }
-                    });
-                    // Remove user access using custom confirmation modal
-                    //                 $('#sharedoc-modal').on('click', '.remove-user', function () {
-                    //                     const userId = $(this).data('user-id');
-                    //                     const userRow = $(this).closest('.user-accssrow');
-
-                    //                     if (!currentDocId || !userId) {
-                    //                         userRow.remove();
-                    //                         return;
-                    //                     }
-
-                    //                     // Update modal content dynamically for removing user access
-                    //                     $('#trashdocLabel').html(`
-                    //     <img src="/img/icons/bin.png" alt="Remove User" width="40" class="mb-2"><br>
-                    //     Remove User Access
-                    // `);
-                    //                     $('#trashdoc-modal .modal-body').text(
-                    //                         'Are you sure you want to remove this user’s access to the document? This action cannot be undone.'
-                    //                     );
-                    //                     $('#confirm-trash-folder').text('Yes, Remove');
-
-                    //                     // Show confirmation modal
-                    //                     $('#trashdoc-modal').modal('show');
-
-                    //                     // Ensure previous click handler is removed before reattaching
-                    //                     $('#confirm-trash-folder').off('click').on('click', function () {
-                    //                         $.ajax({
-                    //                             url: `${baseUrl}/api/documents/share/${currentDocId}`,
-                    //                             method: 'DELETE',
-                    //                             contentType: 'application/json',
-                    //                             data: JSON.stringify({ userId: userId }),
-                    //                             success: function () {
-                    //                                 userRow.remove();
-                    //                                 $('#trashdoc-modal').modal('hide'); // Hide modal after success
-                    //                                 showToast('User access removed successfully!', 'success');
-                    //                             },
-                    //                             error: function (err) {
-                    //                                 $('#trashdoc-modal').modal('hide');
-                    //                                 showToast(
-                    //                                     err.responseJSON?.message || 'Failed to remove user access',
-                    //                                     'error'
-                    //                                 );
-                    //                             }
-                    //                         });
-                    //                     });
-                    //                 });
-
-
-                    //                 // Share button in footer
-                    //                 $('#sharedoc-modal .modal-footer .site-btnmd').on('click', function () {
-                    //                     if (!currentDocId) {
-                    //                         showToast('No document selected', 'info');
-                    //                         return;
-                    //                     }
-
-                    //                     // Collect all users with access from modal
-                    //                     const users = $('#usersWithAccessContainer .user-accssrow').map(function () {
-                    //                         const userId = $(this).find('.access-level').data('user-id');
-                    //                         const accessLevel = $(this).find('.access-level').val();
-                    //                         const canDownload = $(this).find('.download-access').is(':checked');
-                    //                         return { userId, accessLevel, canDownload };
-                    //                     }).get(); // convert to plain array
-
-                    //                     if (users.length === 0) {
-                    //                         showToast('Please add at least one user to share with', 'info');
-                    //                         return;
-                    //                     }
-
-                    //                     // Prepare general access info
-                    //                     const accessType = $('#accessType').val();
-                    //                     const roleType = $('#roleType').val();
-                    //                     const generalAccess = accessType === 'anyone';
-                    //                     const generalRole = roleType; // 'viewer' or 'editor'
-
-                    //                     const data = {
-                    //                         users,
-                    //                         generalAccess,
-                    //                         generalRole
-                    //                     };
-
-                    //                     $.ajax({
-                    //                         url: `${baseUrl}/api/documents/${currentDocId}/permissions`,
-                    //                         method: 'PATCH',
-                    //                         contentType: 'application/json',
-                    //                         data: JSON.stringify(data),
-                    //                         success: function (res) {
-                    //                             showToast(res.message || 'Permissions updated successfully!', 'success');
-                    //                             $('#sharedoc-modal').modal('hide');
-
-                    //                             if (typeof table !== 'undefined' && table.ajax?.reload) {
-                    //                                 table.ajax.reload(null, false); // reload table without resetting pagination
-                    //                             }
-                    //                         },
-                    //                         error: function (err) {
-                    //                             showToast(err.responseJSON?.message || 'Failed to update permissions', 'error');
-                    //                         }
-                    //                     });
-                    //                 });
-
-
-                    //                 // -------------------------
-                    //                 // Load version history into modal
-                    //                 // -------------------------
-                    //                 $('#versionhistory-modal').on('show.bs.modal', function (event) {
-                    //                     const button = $(event.relatedTarget);
-                    //                     const docId = button.closest('tr').find('.btn-delete').data('id');
-                    //                     if (!docId) return;
-
-                    //                     currentDocId = docId;
-                    //                     const versionList = $(this).find('.version-list');
-                    //                     versionList.html('<p class="text-center">Loading...</p>');
-
-                    //                     $.ajax({
-                    //                         url: `${baseUrl}/api/documents/${docId}/versions/history`,
-                    //                         method: 'GET',
-                    //                         success: function (res) {
-                    //                             if (!res.success || !res.data) {
-                    //                                 versionList.html('<p class="text-danger">No version history found.</p>');
-                    //                                 return;
-                    //                             }
-
-                    //                             versionList.empty();
-                    //                             res.data.versionHistory.forEach(item => {
-                    //                                 const modifiedDate = new Date(item.timestamp).toLocaleString();
-
-                    //                                 // Only show restore button if not version 1.0
-                    //                                 const restoreButton = item.version !== "1.0"
-                    //                                     ? `<button class="btn btn-outline-light rounded-pill btn-restore-version" 
-                    //     data-version="${item.version}" 
-                    //     data-previous-version="${item.previousVersion}">
-                    //     Restore to v${item.previousVersion}
-                    // </button>`
-                    //                                     : '';
-
-                    //                                 const html = `
-                    //     <div class="version-item border-bottom pb-3 mb-3">
-                    //         <div class="dflexbtwn align-items-start">
-                    //             <div class="flxtblleft">
-                    //                 <span class="avatar rounded bg-light mb-2">
-                    //                     <img src="${item.changedBy?.avatar || '/img/icons/fn2.png'}" alt="User">
-                    //                 </span>
-                    //                 <div class="flxtbltxt">
-                    //                     <p class="fs-18 mb-1 fw-normal">
-                    //                         ${res.data.documentName} v${item.version}
-                    //                         ${item.isCurrent ? '<span class="badge bg-success ms-2">Current</span>' : ''}
-                    //                     </p>
-                    //                     <span class="fs-16 fw-normal d-block mb-2">
-                    //                         Modified by ${item.changedBy?.name || 'Unknown'}
-                    //                     </span>
-                    //                     <h5 class="fs-18 fw-light text-black mb-3">
-                    //                         ${item.changes || 'Updated document'}
-                    //                     </h5>
-                    //                     <div class="version-actions">
-                    //                         <button class="site-btnmd fw-light btn-view-version" data-version="${item.version}">
-                    //                             View
-                    //                         </button>
-                    //                         ${restoreButton}
-                    //                     </div>
-                    //                 </div>
-                    //             </div>
-                    //             <p class="text-muted">Modified on ${modifiedDate}</p>
-                    //         </div>
-                    //     </div>
-                    // `;
-                    //                                 versionList.append(html);
-                    //                             });
-                    //                         },
-                    //                         error: function () {
-                    //                             versionList.html('<p class="text-danger">Failed to load version history.</p>');
-                    //                         }
-                    //                     });
-                    //                 });
-                    //                 // -------------------------
-                    //                 // Handle View & Restore buttons
-                    //                 // -------------------------
-                    //                 $(document).on('click', '.btn-view-version', function () {
-                    //                     const version = $(this).data('version');
-                    //                     if (!currentDocId || !version) return;
-
-                    //                     // Open the version view page
-                    //                     window.location.href = `/documents/${currentDocId}/versions/view?version=${version}`;
-                    //                 });
-
-                    //                 let restoreTarget = {}; // Temporarily store doc ID and version
-
-                    //                 $(document).on('click', '.btn-restore-version', function () {
-                    //                     const version = $(this).data('version');
-                    //                     const previousVersion = $(this).data('previous-version');
-                    //                     if (!currentDocId || !previousVersion) return;
-
-                    //                     restoreTarget = { docId: currentDocId, version: previousVersion };
-
-                    //                     // Update modal title and body dynamically
-                    //                     $('#restore-folder-modal .modal-title').html(`
-                    //     <img src="/img/icons/restore.png" alt="Restore Icon" width="32" class="me-2">
-                    //     Restore Version
-                    // `);
-
-                    //                     $('#restore-folder-modal .modal-body').text(
-                    //                         `Are you sure you want to restore this document to version ${previousVersion}?`
-                    //                     );
-
-                    //                     // Show the modal
-                    //                     $('#restore-folder-modal').modal('show');
-                    //                 });
-                    //                 $('#confirm-restore-folder').on('click', function () {
-                    //                     if (!restoreTarget.docId || !restoreTarget.version) return;
-
-                    //                     $.ajax({
-                    //                         url: `${baseUrl}/api/documents/${restoreTarget.docId}/versions/${restoreTarget.version}/restore`,
-                    //                         method: 'PATCH',
-                    //                         success: function (res) {
-                    //                             showToast(res.message || `Restored to version ${restoreTarget.version}`, 'success');
-                    //                             $('#restore-folder-modal').modal('hide');
-                    //                             table.ajax.reload(); // reload table so status/files update
-                    //                         },
-                    //                         error: function (err) {
-                    //                             showToast(err.responseJSON?.message || 'Failed to restore version', 'error');
-                    //                         }
-                    //                     });
-                    //                 });
-
-                    // // Copy share link to clipboard
-                    // $('#sharedoc-modal').on('click', '#copyLinkBtn', function () {
-                    //     const linkInput = $('#sharelink');
-                    //     if (!linkInput.val()) {
-                    //         showToast('No link available to copy', 'info');
-                    //         return;
-                    //     }
-
-                    //     // Select the text
-                    //     linkInput.select();
-                    //     linkInput[0].setSelectionRange(0, 99999); // For mobile devices
-
-                    //     // Copy to clipboard
-                    //     navigator.clipboard.writeText(linkInput.val())
-                    //         .then(() => {
-                    //             showToast('Link copied to clipboard!', 'success');
-                    //         })
-                    //         .catch(() => {
-                    //             showToast('Failed to copy link', 'error');
-                    //         });
-                    // });
 
                     // Function to load users for invite dropdown
                     function loadUsersForInvite() {

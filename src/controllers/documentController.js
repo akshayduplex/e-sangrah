@@ -622,7 +622,7 @@ export const getDocuments = async (req, res) => {
                 files updatedAt createdAt wantApprovers signature isDeleted isArchived 
                 comment sharedWithUsers compliance status metadata tags owner versioning
                 documentVendor documentDonor department project description
-                documentApprovalAuthority
+                documentApprovalAuthority currentVersionLabel
             `)
             .populate("department", "name")
             .populate("project", "projectName")
@@ -1209,7 +1209,7 @@ export const createDocument = async (req, res) => {
             .filter((id) => mongoose.Types.ObjectId.isValid(id))
             .map((id) => new mongoose.Types.ObjectId(id));
         // ------------------- Create Document -------------------
-        const document = await Documents.create({
+        const document = await Document.create({
             project: project || null,
             department,
             projectManager: projectManager || null,
@@ -1230,8 +1230,8 @@ export const createDocument = async (req, res) => {
             comment: comment || null,
             wantApprovers: parsedWantApprovers,
             documentApprovalAuthority: documentApprovalAuthority,
-            currentVersionNumber: mongoose.Types.Decimal128.fromString("1.0"),
             currentVersionLabel: "1.0",
+            currentVersionNumber: mongoose.Types.Decimal128.fromString("1.0"),
         });
         // ------------------- Process Files in Parallel -------------------
         let fileDocs = [];
@@ -1250,7 +1250,7 @@ export const createDocument = async (req, res) => {
                 folder: tempFile.folder || folderId || null,
                 projectId: document.project || null,
                 departmentId: document.department || null,
-                version: 1,
+                version: mongoose.Types.Decimal128.fromString("1.0"),
                 uploadedBy: req.user._id,
                 uploadedAt: new Date(),
                 fileSize: tempFile.size,
@@ -1356,7 +1356,6 @@ const createVersionSnapshot = async (document, changesMade, userId, reason) => {
             metadata: document.metadata,
             tags: document.tags,
             compliance: document.compliance,
-            files: document.files, // Ensure files are included
             signature: document.signature,
             link: document.link,
             comment: document.comment,
@@ -1370,7 +1369,7 @@ const createVersionSnapshot = async (document, changesMade, userId, reason) => {
             documentVendor: document.documentVendor,
             updatedAt: document.updatedAt,
         };
-
+        const newFiles = document.__newFiles || [];
         const versionNumber = document.currentVersionNumber;
         const versionLabel = document.currentVersionLabel;
 
@@ -1382,11 +1381,9 @@ const createVersionSnapshot = async (document, changesMade, userId, reason) => {
             changeReason: reason,
             versionNumber,
             versionLabel,
-            files: document.files || [], // Double ensure files are included
+            files: newFiles,
             timestamp: new Date(),
         });
-
-        console.log(`✅ Version ${versionLabel} created for document ${document._id}`);
         return versionDoc;
     } catch (error) {
         console.error('❌ Error creating version snapshot:', error);
@@ -1443,11 +1440,16 @@ export const updateDocument = async (req, res) => {
                     fileIds = updateData.fileIds;
                 }
 
-                console.log('📤 Processing file IDs:', fileIds);
+                console.log('Processing file IDs:', fileIds);
 
                 if (fileIds.length > 0) {
-                    await processFileUpdates(document, fileIds, req.user, changedFields, session);
-                    versionedChanges.push("files");
+                    const newFiles = await processFileUpdates(document, fileIds, req.user, changedFields, session);
+
+                    if (newFiles?.length) {
+                        document.__newFiles = newFiles; // store ONLY new files
+                        versionedChanges.push("files");
+                    }
+
                 }
 
                 // Remove processed field to avoid reprocessing
@@ -1679,6 +1681,12 @@ const processFileUpdates = async (document, fileIds, user, changedFields, sessio
         );
 
         // Create new file entries
+        const currentVersion = document.currentVersionNumber
+            ? parseFloat(document.currentVersionNumber.toString())
+            : 1.0;
+
+        const newVersion = (currentVersion + 0.1).toFixed(1);
+
         const fileCreatePromises = tempFiles.map((tempFile, index) => ({
             document: document._id,
             file: tempFile.s3Filename,
@@ -1688,15 +1696,16 @@ const processFileUpdates = async (document, fileIds, user, changedFields, sessio
             folder: document.folderId || null,
             projectId: document.project || null,
             departmentId: document.department || null,
-            version: document.currentVersionNumber || 1,
+            version: mongoose.Types.Decimal128.fromString(newVersion),
             uploadedBy: user._id,
             uploadedAt: new Date(),
             fileSize: tempFile.size,
             hash: tempFile.hash || null,
-            isPrimary: index === 0, // First file is primary
+            isPrimary: index === 0,          // First file is primary
             status: "active",
             mimeType: tempFile.mimeType || tempFile.fileType
         }));
+
 
         const newFiles = await File.insertMany(fileCreatePromises, { session });
         console.log(`✅ Created ${newFiles.length} new file records`);
@@ -1721,11 +1730,16 @@ const processFileUpdates = async (document, fileIds, user, changedFields, sessio
         }
 
         // Mark files as changed
+        // Mark files as changed
         if (!changedFields.includes("files")) {
             changedFields.push("files");
         }
 
         console.log('✅ File processing completed successfully');
+
+        // RETURN only newly created file IDs
+        return newFiles.map(f => f._id);
+
 
     } catch (error) {
         console.error('❌ Error in processFileUpdates:', error);
@@ -1770,7 +1784,7 @@ const handleSignatureUpdate = async (document, req) => {
                 ContentType: "image/png",
             };
 
-            await S3Client.send(new PutObjectCommand(uploadParams));
+            await s3Client.send(new PutObjectCommand(uploadParams));
 
             const fileUrl = `https://${API_CONFIG.AWS_BUCKET}.s3.amazonaws.com/${fileName}`;
 
@@ -1798,11 +1812,11 @@ export const createDocumentVersion = async (document, user, reason, changedField
     const snapshot = {};
 
     changedFields.forEach(field => {
-        if (document[field] !== undefined) {
+        if (document[field] !== undefined && field !== "files") {
             snapshot[field] = JSON.parse(JSON.stringify(document[field]));
         }
     });
-
+    const newFiles = document.__newFiles || [];
     await DocumentVersion.create({
         documentId: document._id,
         versionNumber: document.currentVersionNumber,
@@ -1810,7 +1824,7 @@ export const createDocumentVersion = async (document, user, reason, changedField
         createdBy: user?._id || null,
         changeReason: reason,
         snapshot,
-        files: document.files || []
+        files: newFiles
     });
 };
 
@@ -2128,46 +2142,14 @@ export const getVersionHistory = async (req, res) => {
 export const viewDocumentVersion = async (req, res) => {
     try {
         const { id } = req.params;
-        const { version } = req.query;
+        let { version } = req.query;
 
         if (!mongoose.Types.ObjectId.isValid(id))
             return res.status(400).json({ message: "Invalid document ID" });
 
-        /** --------------------------------------------------
-         *  CASE 1: NO VERSION GIVEN → return base Document
-         * -------------------------------------------------- */
-        if (!version) {
-            const document = await Document.findById(id)
-                .populate("project", 'projectName')
-                .populate("department", 'name priority')
-                .populate("folderId", 'name')
-                .populate("projectManager", 'name email profile_image')
-                .populate("documentDonor", 'name email profile_image')
-                .populate("documentVendor", 'name email profile_image')
-                .populate("files", 'originalName fileType fileSize')
-                .populate({
-                    path: "owner",
-                    select: "name email userDetails",
-                    populate: [
-                        { path: "userDetails.designation", select: "name" },
-                        { path: "userDetails.department", select: "name" }
-                    ]
-                })
-                .lean();
-
-            if (!document)
-                return res.status(404).json({ message: "Document not found" });
-
-            return res.json({
-                versionLabel: document.currentVersionLabel,
-                versionNumber: document.currentVersionNumber,
-                document
-            });
-        }
-
-        /** --------------------------------------------------
-         *  CASE 2: VERSION PROVIDED → Return DocumentVersion
-         * -------------------------------------------------- */
+        /** ---------------------------------------------------
+         *  STEP 1: Fetch base document (always needed)
+         * --------------------------------------------------- */
         const baseDoc = await Document.findById(id)
             .populate("project", 'projectName')
             .populate("department", 'name priority')
@@ -2175,7 +2157,7 @@ export const viewDocumentVersion = async (req, res) => {
             .populate("projectManager", 'name email profile_image')
             .populate("documentDonor", 'name email profile_image')
             .populate("documentVendor", 'name email profile_image')
-            .populate("files", 'originalName fileType fileSize')
+            .populate("files", 'originalName fileType fileSize fileUrl')
             .populate({
                 path: "owner",
                 select: "name email userDetails",
@@ -2189,6 +2171,16 @@ export const viewDocumentVersion = async (req, res) => {
         if (!baseDoc)
             return res.status(404).json({ message: "Document not found" });
 
+        /** ---------------------------------------------------
+         *  STEP 2: If version not provided → use current version
+         * --------------------------------------------------- */
+        if (!version) {
+            version = baseDoc.currentVersionLabel || baseDoc.currentVersionNumber;
+        }
+
+        /** ---------------------------------------------------
+         *  STEP 3: Fetch document version entry
+         * --------------------------------------------------- */
         const entry = await DocumentVersion.findOne({
             documentId: id,
             $or: [
@@ -2196,14 +2188,21 @@ export const viewDocumentVersion = async (req, res) => {
                 { versionNumber: Number(version) }
             ]
         })
+            .populate("files", 'originalName fileType fileSize fileUrl')
             .populate("createdBy", "name email")
             .lean();
 
         if (!entry)
             return res.status(404).json({ message: "Version not found" });
 
-        // Merge snapshot with live document data
-        const mergedDoc = { ...baseDoc, ...entry.snapshot };
+        /** ---------------------------------------------------
+         *  STEP 4: Merge snapshot with base (snapshot overrides)
+         * --------------------------------------------------- */
+        const mergedDoc = {
+            ...baseDoc,
+            ...entry.snapshot,
+            files: entry.files || baseDoc.files
+        };
 
         return res.json({
             versionLabel: entry.versionLabel,
@@ -2219,8 +2218,6 @@ export const viewDocumentVersion = async (req, res) => {
         return res.status(500).json({ message: "Server error", error: err.message });
     }
 };
-
-
 
 
 /**

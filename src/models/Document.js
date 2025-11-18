@@ -72,7 +72,10 @@ const documentSchema = new Schema({
     comment: { type: String, trim: true, maxlength: 1000 },
 
     /** -------- CURRENT VERSION METADATA -------- **/
-    currentVersionNumber: { type: Number, default: 1 },
+    currentVersionNumber: {
+        type: mongoose.Schema.Types.Decimal128,
+        default: mongoose.Types.Decimal128.fromString("1.0")
+    },
     currentVersionLabel: { type: String, default: "1.0" },
 
     /** -------- HIGH-SCALE VERSION TRACKING -------- **/

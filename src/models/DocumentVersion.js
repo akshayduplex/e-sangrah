@@ -11,7 +11,7 @@ const documentVersionSchema = new Schema({
     },
 
     versionNumber: {
-        type: Number,
+        type: mongoose.Schema.Types.Decimal128,
         required: true,
         index: true
     },

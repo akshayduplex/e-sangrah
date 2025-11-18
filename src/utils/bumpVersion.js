@@ -1,16 +1,12 @@
+import mongoose from "mongoose";
+
 export const bumpVersion = (currentVersion) => {
-    // Simple version bump - you can enhance this for major/minor versions
-    const versionParts = currentVersion.split('.').map(Number);
-    versionParts[1] += 1; // Bump minor version
+    let [major, minor] = currentVersion.split('.').map(v => parseInt(v));
 
-    // Handle carry-over
-    if (versionParts[1] >= 10) {
-        versionParts[0] += 1;
-        versionParts[1] = 0;
-    }
+    minor += 1;
 
-    const versionLabel = versionParts.join('.');
-    const versionNumber = parseFloat(versionLabel);
+    const versionLabel = `${major}.${minor}`;
+    const versionNumber = mongoose.Types.Decimal128.fromString(versionLabel);
 
     return { versionLabel, versionNumber };
 };
