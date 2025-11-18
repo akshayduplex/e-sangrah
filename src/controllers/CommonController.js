@@ -110,59 +110,71 @@ export const servePDF = async (req, res) => {
         res.status(500).send("Error loading PDF");
     }
 };
-
 export const downloadFolderAsZip = async (req, res) => {
     try {
+        const userId = req.user._id;
         const { folderId } = req.params;
 
         const folder = await Folder.findById(folderId);
         if (!folder) return res.status(404).json({ message: "Folder not found" });
 
-        const folderName = folder.slug;
+        // --- Permission Check ---
+        const canDownload = folder.permissions?.some(p =>
+            String(p.principal) === String(userId) &&
+            p.canDownload === true
+        );
 
-
-        const listParams = {
-            Bucket: process.env.AWS_BUCKET,
-            Prefix: `folders/${folderName}/`,
-        };
-
-        const listedObjects = await s3Client.send(new ListObjectsV2Command(listParams));
-
-        if (!listedObjects.Contents || listedObjects.Contents.length === 0) {
-            return res.status(404).json({ message: "No files in folder" });
+        if (!canDownload) {
+            return res.status(403).json({ message: "You do not have permission to download this folder" });
         }
 
-        res.setHeader("Content-Type", "application/zip");
-        res.setHeader("Content-Disposition", `attachment; filename=${folderName}.zip`);
+        // --- Get allowed files ---
+        const files = await File.find({ folder: folderId, status: "active" });
 
+        if (files.length === 0) {
+            return res.status(404).json({ message: "No accessible files in folder" });
+        }
+
+        // --- Generate filename strictly from folderId ---
+        const zipName = `${folderId}.zip`;
+
+        res.setHeader("Content-Type", "application/zip");
+        res.setHeader("Content-Disposition", `attachment; filename=${zipName}`);
+
+        // --- Initialize ZIP stream ---
         const archive = archiver("zip", { zlib: { level: 9 } });
+
         archive.on("error", (err) => {
             console.error("Archive error:", err);
-            res.status(500).send({ message: "Error creating ZIP" });
+            return res.status(500).send({ message: "Error creating ZIP" });
         });
+
         archive.pipe(res);
 
-        const concurrency = 5; y
-        const queue = new PQueue({ concurrency });
+        const queue = new PQueue({ concurrency: 5 });
 
-        listedObjects.Contents.forEach((file) => {
+        // --- Append files to ZIP ---
+        for (const file of files) {
             queue.add(async () => {
                 const command = new GetObjectCommand({
                     Bucket: process.env.AWS_BUCKET,
-                    Key: file.Key,
+                    Key: file.file, // S3 key from DB
                 });
+
                 const signedUrl = await getSignedUrl(s3Client, command, { expiresIn: 300 });
+
                 const response = await axios({
                     method: "GET",
                     url: signedUrl,
                     responseType: "stream",
                 });
 
+                // human-friendly filename inside the ZIP:
                 archive.append(response.data, {
-                    name: file.Key.replace(`folders/${folderName}/`, ""),
+                    name: file.originalName || "file",
                 });
             });
-        });
+        }
 
         await queue.onIdle();
         await archive.finalize();
@@ -172,6 +184,7 @@ export const downloadFolderAsZip = async (req, res) => {
         return res.status(500).json({ message: "Failed to download folder" });
     }
 };
+
 
 // Download file
 export const downloadFile = async (req, res) => {

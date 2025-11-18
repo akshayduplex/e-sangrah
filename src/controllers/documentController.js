@@ -1092,6 +1092,7 @@ export const createDocument = async (req, res) => {
             compliance,
             expiryDate,
             folderId,
+            documentDate,
             comment,
             link,
             wantApprovers,
@@ -1100,6 +1101,7 @@ export const createDocument = async (req, res) => {
         const userId = req.user?._id || null;
         const userName = req.user?.name || "Unknown User";
         // ------------------- Parse and Validate Inputs -------------------
+
         const validFolderId =
             folderId && mongoose.Types.ObjectId.isValid(folderId) ? folderId : null;
         const parsedWantApprovers = wantApprovers === "true";
@@ -1110,6 +1112,11 @@ export const createDocument = async (req, res) => {
                     ? tags
                     : [];
 
+        let parsedStartDate = null;
+        if (documentDate) {
+            const [day, month, year] = documentDate.split(/[\/\-]/);
+            parsedStartDate = new Date(`${year}-${month}-${day}`);
+        }
         let parsedMetadata = {};
         if (metadata) {
             try {
@@ -1201,9 +1208,8 @@ export const createDocument = async (req, res) => {
         parsedFileIds = [...new Set(parsedFileIds)]
             .filter((id) => mongoose.Types.ObjectId.isValid(id))
             .map((id) => new mongoose.Types.ObjectId(id));
-
         // ------------------- Create Document -------------------
-        const document = await Document.create({
+        const document = await Documents.create({
             project: project || null,
             department,
             projectManager: projectManager || null,
@@ -1214,6 +1220,7 @@ export const createDocument = async (req, res) => {
             status: parsedWantApprovers ? "Pending" : "Approved",
             tags: parsedTags,
             metadata: parsedMetadata,
+            parsedStartDate,
             description,
             compliance: {
                 isCompliance,
@@ -1628,7 +1635,7 @@ export const updateDocument = async (req, res) => {
  */
 const processFileUpdates = async (document, fileIds, user, changedFields, session = null) => {
     try {
-        console.log('🔄 Processing file updates:', {
+        console.log(' Processing file updates:', {
             documentId: document._id,
             fileIds,
             existingFiles: document.files.length

@@ -458,7 +458,7 @@
         }
 
         // Load file info for display
-        $.get(`${baseUrl}/api/documents/file/${downloadFileId}/info`)
+        $.get(`${baseUrl}/api/download/file/${downloadFileId}`)
             .done(res => {
                 $("#downloadFileLabel").text(res.data.originalName || "Original File");
                 $("#downloadFileSize").text(res.data.size || "(—)");

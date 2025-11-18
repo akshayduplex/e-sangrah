@@ -265,62 +265,131 @@
 					return data.tree || [];
 				};
 
+				// =======================
+				// FOLDER DOWNLOAD HANDLING
+				// =======================
 
+				let pendingFolderName = null;
 
-				function openDownloadModal(folderId, folderName) {
-					// Set modal content
-					document.getElementById("downloadModalTitle").textContent = `Download "${folderName}"`;
-					document.getElementById("downloadFileLabel").textContent = `Folder: ${folderName}`;
-					document.getElementById("downloadFileSize").textContent = `(Preparing ZIP...)`;
-
-					// Store the folder ID for later use
-					pendingFolderId = folderId;
-
-					// Remove any existing event listeners and attach new one
-					const downloadBtn = document.getElementById("confirmDownload");
-					downloadBtn.onclick = function () {
-						initiateFolderDownload(folderId);
-					};
+				// Safe element selector function
+				function getElement(id) {
+					const element = document.getElementById(id);
+					if (!element) {
+						console.error(`Element with id '${id}' not found`);
+					}
+					return element;
 				}
-				function initiateFolderDownload(folderId) {
-					if (!folderId) {
-						showToast("No folder selected for download", "error");
-						return;
+
+				// Detect dropdown "Download" click
+				document.addEventListener("click", function (e) {
+					const item = e.target.closest("a.dropdown-item");
+					if (!item) return;
+
+					if (item.textContent.includes("Download")) {
+						const folderBox = item.closest(".folderbox");
+						if (!folderBox) {
+							showToast("Could not find folder", "error");
+							return;
+						}
+
+						const folderId = folderBox.dataset.id;
+						const folderName = folderBox.querySelector(".fldrname p")?.textContent || "Folder";
+
+						if (!folderId) {
+							showToast("No folder ID found", "error");
+							return;
+						}
+
+						console.log("Preparing download for folder:", folderId, folderName);
+
+						// Store both ID and name
+						pendingFolderId = folderId;
+						pendingFolderName = folderName;
+
+						// Safely update modal content
+						const modalTitle = getElement("downloadModalTitle");
+						const fileLabel = getElement("downloadFileLabel");
+						const fileSize = getElement("downloadFileSize");
+
+						if (modalTitle) modalTitle.textContent = `Download "${folderName}"`;
+						if (fileLabel) fileLabel.textContent = `Folder: ${folderName}`;
+						if (fileSize) fileSize.textContent = "Click Download to start";
+
+						// Show modal
+						const modalElement = getElement("downloaddoc-modal");
+						if (modalElement) {
+							const modal = new bootstrap.Modal(modalElement);
+							modal.show();
+						} else {
+							showToast("Download modal not found", "error");
+						}
 					}
+				});
 
-					// Close modal - use different approach to handle modal instance
-					const modalElement = document.getElementById("downloaddoc-modal");
-					const modal = bootstrap.Modal.getInstance(modalElement);
-					if (modal) {
-						modal.hide();
-					} else {
-						// Fallback: hide the modal directly
-						const modalEl = document.getElementById('folder-modal');
-						const modalInstance = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
-						modalInstance.hide();
+				// Confirm download button
+				const confirmDownloadBtn = getElement("confirmDownload");
+				if (confirmDownloadBtn) {
+					confirmDownloadBtn.addEventListener("click", async function () {
+						if (!pendingFolderId || !pendingFolderName) {
+							showToast("No folder selected to download", "error");
+							return;
+						}
 
-					}
+						console.log("Starting download process for:", pendingFolderId);
 
-					// Show loading using sweetalert
-					Swal.fire({
-						title: "Preparing your download...",
-						text: "Please wait while we compress the folder.",
-						allowOutsideClick: false,
-						didOpen: () => Swal.showLoading()
+						// Close modal first
+						const modalElement = getElement("downloaddoc-modal");
+						if (modalElement) {
+							const modal = bootstrap.Modal.getInstance(modalElement);
+							if (modal) modal.hide();
+						}
+
+						// Show loading message
+						showToast(`Preparing download: ${pendingFolderName}`, "info");
+
+						try {
+							const downloadUrl = `/api/folders/download/${pendingFolderId}?t=${Date.now()}`;
+							console.log("Download URL:", downloadUrl);
+
+							// Method 1: Use iframe for reliable download
+							const iframe = document.createElement('iframe');
+							iframe.style.display = 'none';
+							iframe.src = downloadUrl;
+							document.body.appendChild(iframe);
+
+							// Method 2: Traditional link method as backup
+							setTimeout(() => {
+								const link = document.createElement('a');
+								link.href = downloadUrl;
+								link.setAttribute('download', `${pendingFolderName}.zip`);
+								document.body.appendChild(link);
+								link.click();
+								document.body.removeChild(link);
+							}, 100);
+
+							// Show success message
+							setTimeout(() => {
+								showToast(`Download started: ${pendingFolderName}.zip`, "success");
+							}, 1000);
+
+							// Clean up iframe
+							setTimeout(() => {
+								if (iframe.parentNode) {
+									iframe.parentNode.removeChild(iframe);
+								}
+							}, 10000);
+
+						} catch (error) {
+							console.error("Download failed:", error);
+							showToast(`Download failed: ${error.message}`, "error");
+						} finally {
+							// Reset pending folder data
+							pendingFolderId = null;
+							pendingFolderName = null;
+						}
 					});
-
-					const link = document.createElement("a");
-					link.href = `/api/folders/download/${folderId}`;
-					link.setAttribute("download", "");
-					document.body.appendChild(link);
-					link.click();
-					link.remove();
-
-
-					// Close SweetAlert after a delay (optional - you might want to keep it open until download starts)
-					setTimeout(() => {
-						Swal.close();
-					}, 2000);
+				} else {
+					console.error("Confirm download button not found");
 				}
 
 				const getSubfolders = (folders, targetFolderId) => {
@@ -385,7 +454,7 @@
             <li><a class="dropdown-item rename-folder" href="#"><i class="ti ti-pencil-minus"></i> Rename</a></li>
             <li><a class="dropdown-item toggle-block" href="#" data-id="${folder._id}"><i class="ti ti-lock${folder.status === "inactive" ? "-open" : ""}"></i><span class="block-text" style="margin-left: 5px;">${folder.status === "inactive" ? "Unblock" : "Block"}</span></a></li>
             <li><a class="dropdown-item share-btn" href="#" data-doc-id="${folder._id}" data-bs-toggle="modal" data-bs-target="#sharedoc-modal"><i class="ti ti-share"></i> Share</a></li>
-            <li><a class="dropdown-item download-folder"><i class="ti ti-download"></i> Download</a></li>
+                                <li><a class="dropdown-item download-folder" href="#" data-bs-toggle="modal" data-folder-id="${folder._id}" data-bs-target="#downloaddoc-modal"><i class="ti ti-download"></i> Download</a></li>
             <li><a class="dropdown-item delete-folder" href="#" data-bs-toggle="modal" data-bs-target="#trashdoc-modal"><i class="ti ti-trash"></i> Move to Trash</a></li>
             <li><a class="dropdown-item archive-folder" href="#" data-bs-toggle="modal" data-bs-target="#archivedoc-modal"><i class="ti ti-archive"></i> Move to Archive</a></li>
           </ul>
@@ -496,22 +565,32 @@
 				elements.container.addEventListener("click", (e) => {
 					const link = e.target.closest("a");
 					const downloadBtn = e.target.closest(".download-folder");
+
+					// If the clicked thing isn't a link, ignore
 					if (!link) return;
+
+					// Find the folder container (VERY IMPORTANT)
 					const folderBox = link.closest(".folderbox");
 					if (!folderBox) return;
+
 					const id = folderBox.dataset.id;
 
+					// RENAME FOLDER HANDLER
 					if (link.classList.contains("rename-folder")) {
 						editingFolderId = id;
-						document.getElementById("folderName").value = folderBox.querySelector(".fldrname p").textContent;
+						document.getElementById("folderName").value =
+							folderBox.querySelector(".fldrname p").textContent;
 						document.getElementById("folder-modal-title").textContent = "Rename Folder";
 						document.getElementById("folderFormSubmit").textContent = "Save";
 						new bootstrap.Modal("#folder-modal").show();
 					}
+
+					// DELETE / ARCHIVE FOLDER HANDLERS
 					if (link.classList.contains("delete-folder")) pendingFolderId = id;
 					if (link.classList.contains("archive-folder")) pendingFolderId = id;
+
+					// 🔥 FINAL DOWNLOAD HANDLER (NO MODAL NEEDED)
 					if (downloadBtn) {
-						const folderBox = downloadBtn.closest(".folderbox");
 						const folderId = folderBox.dataset.id;
 
 						Swal.fire({
@@ -521,16 +600,17 @@
 							didOpen: () => Swal.showLoading()
 						});
 
-						const link = document.createElement("a");
-						link.href = `/api/folders/download/${folderId}`;
-						link.setAttribute("download", "");
-						document.body.appendChild(link);
-						link.click();
-						link.remove();
+						// Auto-trigger download
+						const tempLink = document.createElement("a");
+						tempLink.href = `/api/folders/download/${folderId}`;
+						tempLink.setAttribute("download", "");
+						document.body.appendChild(tempLink);
+						tempLink.click();
+						tempLink.remove();
 
-						setTimeout(() => Swal.close(), 2000);
+						// Close SweetAlert after a moment
+						setTimeout(() => Swal.close(), 1800);
 					}
-
 				});
 
 				document.getElementById("folderForm")?.addEventListener("submit", async (e) => {
@@ -1055,6 +1135,7 @@
 						new bootstrap.Modal("#folder-modal").show();
 					});
 				});
+
 
 				// Handle confirm delete button
 				document.getElementById("confirmDeleteBtn").addEventListener("click", async () => {
