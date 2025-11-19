@@ -65,8 +65,8 @@ const app = express();
             store: MongoStore.create({
                 mongoUrl: API_CONFIG.MONGO_URI,
                 collectionName: "sessions",
-                ttl: 60 * 60,          // 1 hour
-                touchAfter: 24 * 3600, // avoid rewriting unchanged sessions
+                ttl: 60 * 60,
+                touchAfter: 24 * 3600,
             }),
             cookie: {
                 maxAge: 1000 * 60 * 60,

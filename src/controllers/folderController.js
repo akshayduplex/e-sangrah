@@ -169,14 +169,14 @@ export const viewFile = async (req, res) => {
         //     details: `File "${file.originalName}" viewed by ${userId || "unknown user"}`
         // });
 
-        file.save().catch(err => console.error("Failed to log file view:", err));
+        // file.save().catch(err => console.error("Failed to log file view:", err));
         // Log the file view
         await activityLogger({
-            actorId: req.user?._id,
+            actorId: req.user?._id || null,
             entityId: file._id,
             entityType: "File",
             action: "VIEW",
-            details: `${req.user?.name} viewed ${file.originalName} file`
+            details: `${req.user ? req.user.name : "Guest User"} viewed ${file.originalName} file`
         });
 
         // Render view page
@@ -1351,9 +1351,17 @@ export const shareFolder = async (req, res) => {
             entityId: folder._id,
             entityType: "Folder",
             action: "SHARE",
-            details: `Folder shared with user: ${user.name} by ${req.user?.name}`,
+            details: `Folder shared with ${user.name} by ${req.user?.name}`,
             meta: { access }
         });
+        const data = {
+            userName: user.name,
+            senderName: req.user?.name,
+            folderName: folder.name,
+            access,
+            expiresAt: expiresAt ? new Date(expiresAt).toLocaleString() : 'N/A',
+            folderLink: shareLink || '#',
+        };
 
         const html = generateEmailTemplate("folderShared", data)
 

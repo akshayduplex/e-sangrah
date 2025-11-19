@@ -49,16 +49,6 @@ export const passwordResetOtpTemplate = (data) => {
     html += '</td>';
     html += '</tr>';
 
-    // Button
-    html += '<tr>';
-    html += '<td style="text-align:center;">';
-    html += '<div style="margin:20px 0;">';
-    html += `<a href="${BASE_URL}/reset-password" style="text-decoration:none; border-radius:7px; padding:10px 20px; color:#fff; background:${themeColor}; display:inline-block;">`;
-    html += 'Reset Password</a>';
-    html += '</div>';
-    html += '</td>';
-    html += '</tr>';
-
     // Footer
     html += '<tr>';
     html += '<td style="padding:20px 30px; background:#f2f4f7; text-align:center;">';

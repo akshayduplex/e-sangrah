@@ -168,6 +168,7 @@
 
                     // Get initial status from server-side variable
                     const initialStatus = "<%= status %>";
+                    const documentId = "<%= documentId %>";
                     let currentDocId = null;
                     let customFlatpickr = null;
                     let isModalInitializing = false;
@@ -304,7 +305,7 @@
                         serverSide: true,
                         processing: true,
                         ajax: {
-                            url: `${baseUrl}/api/documents`,
+                            url: `${baseUrl}/api/documents?documentId=${documentId}`,
                             type: 'GET',
                             data: function (d) {
                                 const filterColumns = [];

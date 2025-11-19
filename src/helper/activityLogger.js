@@ -20,13 +20,6 @@ export async function activityLogger({
     meta = {}
 }) {
     try {
-        if (!actorId || !action) {
-            console.warn('ActivityLog skipped: missing required fields:', {
-                actorId, action
-            });
-            return;
-        }
-
         await ActivityLog.create({
             actorId,
             entityId,

@@ -180,7 +180,7 @@
                 let currentDocumentId = null;
                 let currentRow = null; // To refresh only this row
                 let currentMode = 'approve'; // 'approve', 'edit', 'view'
-
+                const documentId = "<%= documentId %>";
                 // File Icons
                 const fileIcons = {
                     xls: "/img/icons/fn3.png", xlsx: "/img/icons/fn3.png",
@@ -485,7 +485,7 @@
                             sortOrder = data.order[0].dir;
                         }
 
-                        $.get('/api/my-approvals', {
+                        $.get(`/api/my-approvals?documentId=${documentId}`, {
                             page, limit,
                             status: $('.filterbtn.active').data('filter'),
                             department: $('#department').val() || '',

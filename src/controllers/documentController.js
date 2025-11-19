@@ -46,6 +46,7 @@ export const showDocumentListPage = async (req, res) => {
         const filter = req.query.filter;
         const month = req.query.month;
         const year = req.query.year;
+        const documentId = req.query.documentId
 
         const designations = await Designation.find({ status: "Active" })
             .sort({ name: 1 })
@@ -58,6 +59,7 @@ export const showDocumentListPage = async (req, res) => {
             searchQuery: searchQuery,
             status,
             filter,
+            documentId,
             month,
             year
         });
@@ -453,6 +455,7 @@ export const getDocuments = async (req, res) => {
             role,
             docType,
             designation,
+            documentId
         } = req.query;
 
         const userId = req.user?._id;
@@ -462,6 +465,10 @@ export const getDocuments = async (req, res) => {
             isDeleted: false,
             isArchived: false,
         };
+        /** -------------------- DOCUMENT ID FILTER -------------------- **/
+        if (documentId && mongoose.Types.ObjectId.isValid(documentId)) {
+            filter._id = documentId;
+        }
 
         // --- If not superadmin, restrict documents ---
         if (profile_type !== "superadmin") {
@@ -607,7 +614,7 @@ export const getDocuments = async (req, res) => {
         }
 
         /** -------------------- DOC TYPE FILTER -------------------- **/
-        if (docType?.trim()) {
+        if (!filter._id && docType?.trim()) {
             const filesByType = await mongoose
                 .model("File")
                 .find({ fileType: docType.trim() }, { document: 1 });
@@ -1333,6 +1340,27 @@ export const createDocument = async (req, res) => {
 
         // ------------------- Save Document -------------------
         await document.save();
+        // ------------------- Create Notifications for Approval Authority -------------------
+        if (parsedWantApprovers && documentApprovalAuthority.length > 0) {
+            try {
+                for (const authority of documentApprovalAuthority) {
+                    await addNotification({
+                        recipient: authority.userId._id || authority.userId,
+                        sender: userId,
+                        type: "approval_request",
+                        title: "Document Approval Required",
+                        message: `${userName} has uploaded a document that requires your approval.`,
+                        relatedDocument: document._id,
+                        relatedProject: project || null,
+                        priority: "high",
+                        actionUrl: `/documents/${document._id}?tab=approval`
+                    });
+                }
+            } catch (err) {
+                logger.error("Error creating approval notifications:", err);
+            }
+        }
+
         await activityLogger({
             actorId: userId,
             entityId: document._id,
@@ -2745,13 +2773,13 @@ export const bulkPermissionUpdate = async (req, res) => {
             actorId: req.user._id,
             entityId: documentId,
             entityType: "Document",
-            action: "BULK PERMISSION UPDATE",
+            action: "PERMISSION UPDATE",
             details: `${req.user.name} updated permissions for multiple users`,
             meta: { updates: users }
         });
         res.json({
             success: true,
-            message: "Bulk permission update completed",
+            message: "Permission update completed",
             bulkResult,
             invalidIds
         });
@@ -2988,7 +3016,7 @@ export const inviteUser = async (req, res) => {
             entityId: documentId,
             entityType: "Document",
             action: "INVITE_USER",
-            details: `Invited ${userEmail} with ${accessLevel} access`,
+            details: `Invited ${user.name} with ${accessLevel} access for document ${doc.metadata?.fileName}`,
             meta: { duration, expiresAt }
         });
 
@@ -3713,7 +3741,7 @@ export const updateApprovalStatus = async (req, res) => {
             await addNotification({
                 recipient: document.owner._id,
                 sender: userId,
-                type: 'discussion_request',
+                type: 'document',
                 title: 'Discussion Requested',
                 message: `${req.user.name} requested a discussion on document "${document.metadata?.fileName || document._id}". Remark: ${comment}`,
                 relatedDocument: documentId,
@@ -3782,7 +3810,7 @@ export const updateApprovalStatus = async (req, res) => {
                     priority: 'medium'
                 });
 
-                const verifyUrl = `${process.env.FRONTEND_URL}/document/${documentId}/review`;
+                const approvalLink = `${API_CONFIG.baseUrl}/approval-requests`;
                 // Render EJS email template
                 const data = {
                     approverName: nextApprover.userId.name,
@@ -3790,7 +3818,7 @@ export const updateApprovalStatus = async (req, res) => {
                     description: document.description || "No description provided",
                     departmentName: document.department?.name || "General",
                     requesterName: req.user.name,
-                    verifyUrl,
+                    approvalLink,
                     BASE_URL: API_CONFIG.baseUrl,
                 }
                 // Generate HTML using your central email generator
@@ -3807,7 +3835,7 @@ export const updateApprovalStatus = async (req, res) => {
         }
 
         res.json({
-            message: 'Approval successfully updated',
+            message: 'Approval successfully',
             approval: approverRecord,
             approvals: document.documentApprovalAuthority,
             status: document.status
@@ -3855,7 +3883,7 @@ export const sendApprovalMail = async (req, res) => {
         if (!approverUser?.email) {
             return res.status(400).json({ success: false, message: "Approver does not have an email address" });
         }
-        const currentVersion = document.versioning.currentVersion.toString();
+        const currentVersion = document.currentVersionLabel;
 
         const reviewUrl = `${API_CONFIG.baseUrl}/documents/${document._id}/versions/view?version=${currentVersion}`;
         const verifyUrl = `${API_CONFIG.baseUrl}/approval-requests`;
@@ -3882,7 +3910,7 @@ export const sendApprovalMail = async (req, res) => {
             entityId: documentId,
             entityType: "Document",
             action: "SEND_APPROVAL_MAIL",
-            details: `Approval email sent to approver ${approverId}`
+            details: `Approval email sent to approver ${approverUser.email}`
         });
 
         // Mark as mail sent

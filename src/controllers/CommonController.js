@@ -14,6 +14,24 @@ import { activityLogger } from "../helper/activityLogger.js";
 import { toProperCase } from "../helper/Common.js";
 import User from "../models/User.js";
 
+
+//Pages
+export const showSupportPage = (req, res) => {
+    try {
+        res.render("pages/support", {
+            title: "Support",
+            user: req.user
+        });
+    } catch (err) {
+        logger.error("support page render error:", err);
+        res.status(500).render("pages/error", {
+            user: req.user,
+            message: "Unable to load support"
+        });
+    }
+};
+
+
 // Check duplicate fields
 export const checkDuplicate = async (req, res) => {
     try {
@@ -88,22 +106,13 @@ export const servePDF = async (req, res) => {
         // Stream the PDF to the browser
         response.Body.pipe(res);
 
-        // --- Log file open activity (non-blocking) ---
-        const userId = req.user?._id || null;
-        // file.activityLog.push({
-        //     action: "opened",
-        //     performedBy: userId,
-        //     details: `PDF "${file.originalName}" viewed in browser by ${userId || "unknown user"}`
-        // });
         await activityLogger({
-            actorId: req.user._id || null,
+            actorId: null,
             entityId: fileId,
             entityType: 'File',
             action: 'VIEW',
-            details: `PDF ${file.originalName} viewed in browser by ${req.user?.name || "unknown user"}`
+            details: `PDF ${file.originalName} viewed in browser by ${req.user ? req.user.name : "Guest User"}`
         });
-        // Save the log without delaying the response
-        file.save().catch(err => console.error("Failed to log PDF view:", err));
 
     } catch (error) {
         console.error("Error serving PDF:", error);
@@ -218,9 +227,9 @@ export const downloadFile = async (req, res) => {
             entityId: req.params.fileId,
             entityType: 'File',
             action: 'DOWNLOAD',
-            details: `File ${file.originalName} downloaded by user ${req.user?.name || "unknown"}`
+            details: `File ${file.originalName} downloaded by user ${req.user ? req.user.name : "Guest User"}`
         });
-        await file.save();
+        // await file.save();
 
     } catch (error) {
         console.error("Download error:", error);

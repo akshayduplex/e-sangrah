@@ -2,7 +2,7 @@ import * as ApiEndpoints from "../config/ApiEndpoints.js";
 
 export const otpEmailTemplate = (data) => {
     const {
-        name = 'User',
+        userName = 'User',
         otp = '000000',
         expiryMinutes = 10,
         companyName = ApiEndpoints.API_CONFIG.COMPANY_NAME,
@@ -44,7 +44,7 @@ export const otpEmailTemplate = (data) => {
     // Body
     html += `<tr>`;
     html += `<td style="padding:30px; color:#333;">`;
-    html += `<p style="font-size:15px; line-height:25px;">Hello <strong>${name}</strong>,</p>`;
+    html += `<p style="font-size:15px; line-height:25px;">Hello <strong>${userName}</strong>,</p>`;
     html += `<p style="font-size:15px; line-height:25px;">Please use the following One-Time Password (OTP) to complete your verification process:</p>`;
     html += `<div style="text-align:center; margin:25px 0;">`;
     html += `<span style="display:inline-block; background:${themeColor}; color:#fff; font-size:28px; letter-spacing:5px; padding:12px 25px; border-radius:6px; font-weight:bold;">${otp}</span>`;
@@ -58,7 +58,7 @@ export const otpEmailTemplate = (data) => {
     html += `<tr>`;
     html += `<td style="background:#f2f4f7; padding:20px 30px;">`;
     html += `<p style="font-size:14px; margin:0 0 8px 0;">Best regards,</p>`;
-    html += `<h4 style="font-size:16px; font-weight:600; margin:0;">${companyName} / ${systemName}</h4>`;
+    html += `<h4 style="font-size:16px; font-weight:600; margin:0;">${companyName}</h4>`;
     html += `<p style="font-size:12px; color:#777; margin-top:10px;">© ${new Date().getFullYear()} ${companyName}. All rights reserved.</p>`;
     html += `</td>`;
     html += `</tr>`;

@@ -361,17 +361,22 @@
     });
 
     // Copy Link
-    // Copy Link and update visibility settings
     $(document).on('click', '#copyLinkBtn', function () {
         const link = $('#sharelink').val();
-        const accessType = $('#accessType').val(); // 'anyone' or 'restricted'
-        const duration = $('input[name="time"]:checked').attr('id'); // e.g., 'oneday', 'oneweek', etc.
+        const accessType = $('#accessType').val();
+        const duration = $('input[name="time"]:checked').attr('id');
         const isCustom = duration === 'custom';
 
         if (!link) return showToast('No link to copy', 'info');
         if (!currentDocId) return showToast('Invalid document ID', 'error');
 
-        // Copy link to clipboard
+        // --- Check duration BEFORE copying text ---
+        if (accessType === 'anyone' && !duration) {
+            showToast('Please select a time duration before copying the link', 'warning');
+            return;
+        }
+
+        // --- Copy link to clipboard ---
         navigator.clipboard.writeText(link)
             .then(() => showToast('Link copied!', 'success'))
             .catch(() => {
@@ -388,15 +393,9 @@
         let query = '';
 
         if (accessType === 'anyone') {
-            if (!duration) {
-                showToast('Please select a time duration before copying the link', 'info');
-                return;
-            }
-
             if (isCustom && customFlatpickr?.selectedDates.length === 2) {
                 const start = customFlatpickr.selectedDates[0].toISOString();
                 const end = customFlatpickr.selectedDates[1].toISOString();
-
                 query = `?ispublic=true&duration=custom&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
             } else {
                 query = `?ispublic=true&duration=${duration}`;

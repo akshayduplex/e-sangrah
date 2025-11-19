@@ -26,7 +26,7 @@ import * as CommonController from "../controllers/CommonController.js"
 // ---------------------------
 // Middleware imports
 // ---------------------------
-import { authenticate, authorize } from "../middlewares/authMiddleware.js";
+import { authenticate, authorize, optionalAuth } from "../middlewares/authMiddleware.js";
 import checkPermissions from '../middlewares/checkPermission.js';
 import upload from "../middlewares/fileUploads.js";
 
@@ -77,9 +77,9 @@ router.get("/auth/verify-reset/:token", AuthValidators.verifyResetTokenValidator
 
 
 //public routes
-router.get('/file/pdf/:fileId', CommonController.servePDF);
+router.get('/file/pdf/:fileId', optionalAuth, CommonController.servePDF);
 router.get('/documents/:id/versions/view', DocumentController.viewDocumentVersion);
-
+router.get("/download/file/:fileId", optionalAuth, CommonController.downloadFile);
 // Apply authentication to all routes
 router.use(authenticate);
 
@@ -121,7 +121,6 @@ router.get('/check', CommonController.checkDuplicate);
 
 // Route to Download Folder
 router.get("/download/:folderId", authenticate, CommonController.downloadFolderAsZip);
-router.get("/download/file/:fileId", authenticate, CommonController.downloadFile);
 router.post('/export', authenticate, CommonController.exportDocuments);
 router.get('/export/formats', authenticate, CommonController.getExportFormats);
 
@@ -139,6 +138,7 @@ router.get("/dashboard/documentsTypeUploads", AdminDashboard.getDocumentsTypeUpl
 router.get("/dashboard/summary", AdminDashboard.getDocumentsStatusSummary);
 router.get("/analytics/stats", AdminDashboard.getAnalyticsStats);
 router.get("/analytics/department-file-usage", AdminDashboard.getDepartmentFileUsage);
+
 // Permission Logs
 router.get("/my-approvals", AdminController.getMyApprovals);
 router.get("/permission-logs", authorize('admin', 'superadmin', 'user'), AdminController.getPermissionLogs);
@@ -455,7 +455,6 @@ router.route('/projects/:id/restore')
 // CRUD endpoints
 router.post("/notifications", NotificationController.createNotification);
 router.get("/notifications", NotificationController.getUserNotifications);
-router.get("/notifications/unread-count", NotificationController.getUnreadCount);
 router.patch("/notifications/:id/read", NotificationController.markAsRead);
 router.patch("/notifications/mark-all-read", NotificationController.markAllAsRead);
 router.delete("/notifications/:id", NotificationController.deleteNotification);

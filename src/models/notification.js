@@ -16,19 +16,15 @@ const notificationSchema = new mongoose.Schema({
         type: String,
         required: true,
         enum: [
-            "document_shared",
+            "document",
             "document_approved",
-            "document_updated",
-            "document_rejected",
-            "document_commented",
             "approval_request",
             "approval_update",
             "project_assigned",
-            "project_updated",
+            "project",
             "mention",
             "system_alert",
             "storage_warning",
-            "discussion_request"
         ]
     },
     title: {

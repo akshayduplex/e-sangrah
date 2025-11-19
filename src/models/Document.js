@@ -79,9 +79,9 @@ const documentSchema = new Schema({
     currentVersionLabel: { type: String, default: "1.0" },
 
     /** -------- HIGH-SCALE VERSION TRACKING -------- **/
-    currentVersion: { type: Schema.Types.ObjectId, ref: "DocumentVersion", index: true },
-    firstVersion: { type: Schema.Types.ObjectId, ref: "DocumentVersion", index: true },
-    latestVersion: { type: Schema.Types.ObjectId, ref: "DocumentVersion", index: true }
+    currentVersion: { type: Schema.Types.ObjectId, ref: "DocumentVersion" },
+    firstVersion: { type: Schema.Types.ObjectId, ref: "DocumentVersion" },
+    latestVersion: { type: Schema.Types.ObjectId, ref: "DocumentVersion" }
 
 }, { timestamps: true });
 

@@ -270,7 +270,7 @@ $(document).ready(function () {
                             <span class="fs-11 fw-light text-black">${file.fileSize}</span>
                         </div>
                     </div>
-                    <div class="tbl-col user-name fs-14 fw-light text-black">${file.performedBy?.name || 'N/A'}</div>
+                    <div class="tbl-col user-name fs-14 fw-light text-black">${file.performedBy?.name || 'Unknown'}</div>
                     <div class="tbl-col time fs-14 fw-light text-black">${formattedDate}</div>
                     <div class="tbl-col file-status fs-14 fw-light text-black">${file.status}</div>
                 `;

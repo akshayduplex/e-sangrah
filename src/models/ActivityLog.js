@@ -4,8 +4,7 @@ const ActivityLogSchema = new mongoose.Schema(
     {
         actorId: {
             type: mongoose.Schema.Types.ObjectId,
-            ref: 'User',
-            required: true
+            ref: 'User'
         },
 
         entityId: {
@@ -56,7 +55,7 @@ const ActivityLogSchema = new mongoose.Schema(
                 'UPDATED SHARE',
                 'UPDATE SHARE SETTINGS',
                 'SHARE DOCUMENT',
-                'BULK PERMISSION UPDATE',
+                'PERMISSION UPDATE',
                 'UPDATE USER SHARE',
                 'REMOVE SHARED USER',
                 'INVITE_USER',

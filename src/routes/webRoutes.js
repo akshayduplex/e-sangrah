@@ -2,11 +2,12 @@ import express from "express";
 import mongoose from "mongoose";
 
 // ===== Middlewares =====
-import { authenticate, authorize } from "../middlewares/authMiddleware.js";
+import { authenticate, authorize, optionalAuth } from "../middlewares/authMiddleware.js";
 import checkPermissions from "../middlewares/checkPermission.js";
 
 import * as AuthController from "../controllers/AuthController.js";
 import * as AdminController from "../controllers/AdminController.js";
+import * as CommonController from "../controllers/CommonController.js";
 import * as EmployeeController from "../controllers/EmployeeController.js";
 import * as UserController from "../controllers/UserController.js";
 import * as DonorVendorController from "../controllers/DonerVenderController.js";
@@ -62,6 +63,9 @@ router.get("/forgot-password", AuthController.getForgotPasswordPage);
 // Reset password page
 router.get("/reset-password", authenticate, AuthController.getResetPasswordPage);
 
+
+/* --- Common Pages --- */
+router.get("/support", CommonController.showSupportPage);
 
 /* --- User Management --- */
 
@@ -317,7 +321,7 @@ router.get("/folders/recyclebin", authenticate, FolderController.showRecycleBinP
 
 // Main Folders page
 router.get("/folders", authenticate, FolderController.showMainFoldersPage);
-router.get('/folders/view/:fileId', authenticate, FolderController.viewFile)
+router.get('/folders/view/:fileId', optionalAuth, FolderController.viewFile)
 router.get("/folders/:accesslevel/:folderId", authenticate, FolderController.showviewFoldersPage);
 
 /* =========================================

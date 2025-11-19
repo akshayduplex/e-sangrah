@@ -5,8 +5,10 @@ export const documentAccessRequestTemplate = (data) => {
         userName = '',
         email = '',
         doc = {},
+        approverName,
+        documentName = "Untitled Document",
+        requesterName = 'User',
         approvalLink = '#',
-        systemName = ApiEndpoints.API_CONFIG.COMPANY_NAME,
         companyName = ApiEndpoints.API_CONFIG.COMPANY_NAME,
         logoUrl = ApiEndpoints.API_CONFIG.LOGO_URL,
         bannerUrl = ApiEndpoints.API_CONFIG.EMAIL_BANNER,
@@ -48,11 +50,11 @@ export const documentAccessRequestTemplate = (data) => {
     html += `<tr>`;
     html += `<td style="padding:25px 30px; color:#333;">`;
     html += `<p style="font-size:15px; line-height:25px;">`;
-    html += `<strong>${userName || email}</strong> (${email}) has requested access to the document <strong>${fileName}</strong>.`;
+    html += `<strong>${requesterName}</strong>`;
+    html += `<strong>${userName}</strong> has requested access to the document <strong>${documentName}</strong>.`;
     html += `</p>`;
 
     html += `<p style="font-size:15px; line-height:25px;">Please review this request and approve or set an access duration using the button below:</p>`;
-
     // CTA Button
     html += `<div style="text-align:center; margin:25px 0;">`;
     html += `<a href="${approvalLink}" target="_blank" rel="noopener noreferrer" `;
@@ -70,7 +72,7 @@ export const documentAccessRequestTemplate = (data) => {
     // Footer
     html += `<tr>`;
     html += `<td style="text-align:center; padding:20px; background:#f2f4f7;">`;
-    html += `<p style="font-size:14px; line-height:22px; margin:0;">Best regards,<br><strong>${systemName}</strong></p>`;
+    html += `<p style="font-size:14px; line-height:22px; margin:0;">Best regards`;
     html += `<p style="font-size:13px; margin:5px 0 0;"><strong>${companyName}</strong></p>`;
     html += `<p style="font-size:12px; color:#777; margin-top:8px;">&copy; ${new Date().getFullYear()} ${companyName}. All rights reserved.</p>`;
     html += `</td>`;

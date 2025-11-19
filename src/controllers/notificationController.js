@@ -82,79 +82,88 @@ export const createNotification = async (req, res) => {
 // ------------------- Get User Notifications -------------------
 export const getUserNotifications = async (req, res) => {
     try {
-        const page = Math.max(1, parseInt(req.query.page) || 1);
-        const limit = Math.min(50, parseInt(req.query.limit) || 10);
-        const skip = (page - 1) * limit;
+        const userId = req.user._id;
 
-        const filter = { recipient: req.user._id };
-        if (req.query.unread === "true") filter.isRead = false;
+        const draw = parseInt(req.query.draw) || 1;
+        const limit = parseInt(req.query.length, 10) || 10;
+        const start = parseInt(req.query.start, 10) || 0;
+        const searchValue = req.query.search?.value || "";
 
-        const [notifications, total] = await Promise.all([
-            Notification.find(filter)
-                .populate("sender", "_id email name")
-                .populate("relatedDocument", "_id title")
-                .populate("relatedProject", "_id name")
-                .sort({ createdAt: -1 })
-                .skip(skip)
-                .limit(limit)
-                .lean(),
-            Notification.countDocuments(filter)
-        ]);
+        const orderColumnIndex = req.query.order?.[0]?.column || 2;
+        const orderDir = req.query.order?.[0]?.dir || "desc";
+        const columns = ["_id", "message", "createdAt", "action"];
+        const sortField = columns[orderColumnIndex] || "createdAt";
+        const sort = { [sortField]: orderDir === "asc" ? 1 : -1 };
 
-        const totalPages = Math.ceil(total / limit);
+        // Build query
+        const query = { recipient: userId };
+        if (searchValue) {
+            query.message = { $regex: searchValue, $options: 'i' };
+        }
 
-        const formattedNotifications = notifications.map(n => ({
-            _id: n._id,
-            recipient: n.recipient,
-            sender: n.sender ? {
-                _id: n.sender._id,
-                email: n.sender.email,
-                name: n.sender.name || `${n.sender.firstName || ''} ${n.sender.lastName || ''}`.trim() || undefined
-            } : null,
-            type: n.type,
-            title: n.title,
-            message: n.message,
-            relatedDocument: n.relatedDocument ? { _id: n.relatedDocument._id, title: n.relatedDocument.title } : null,
-            relatedProject: n.relatedProject ? { _id: n.relatedProject._id, name: n.relatedProject.name } : null,
-            isRead: n.isRead,
-            priority: n.priority,
-            actionUrl: n.actionUrl,
-            expiresAt: n.expiresAt,
-            createdAt: n.createdAt,
-            updatedAt: n.updatedAt
-        }));
+        const notifications = await Notification.find(query)
+            .sort(sort)
+            .skip(start)
+            .limit(limit)
+            .populate("sender", "name")
+            .populate("relatedDocument", "metadata.fileName")
+            .populate("relatedProject", "projectName")
+            .lean();
 
-        return res.status(200).json({
-            success: true,
-            message: "Notifications fetched successfully",
-            data: {
-                notifications: formattedNotifications,
-                pagination: {
-                    total,
-                    page,
-                    limit,
-                    totalPages,
-                    hasNextPage: page < totalPages,
-                    hasPrevPage: page > 1
-                }
-            }
+        const total = await Notification.countDocuments({ recipient: userId });
+        const filtered = await Notification.countDocuments(query);
+        const totalUnread = await Notification.countDocuments({ recipient: userId, isRead: false });
+
+        return res.json({
+            draw,
+            recordsTotal: total,
+            recordsFiltered: filtered,
+            data: notifications,
+            totalUnread
         });
-
     } catch (error) {
-        logger.error("Error fetching notifications:", error);
-        return errorResponse(res, error, "Failed to fetch notifications");
+        console.error(error);
+        return res.status(500).json({ success: false, message: "Server Error", error });
     }
 };
 
+
+
 // ------------------- Get Unread Count -------------------
-export const getUnreadCount = async (req, res) => {
+// Controller: getUnreadNotifications.js
+export const getUnreadNotifications = async (req, res) => {
     try {
-        const count = await Notification.countDocuments({ recipient: req.user._id, isRead: false });
-        return successResponse(res, { count }, "Unread notifications count fetched");
+        const userId = req.user._id;
+
+        // Pagination parameters
+        const page = parseInt(req.query.page, 10) || 1; // default page 1
+        const limit = parseInt(req.query.limit, 10) || 10; // default 50 per page
+        const skip = (page - 1) * limit;
+
+        // Fetch unread notifications with pagination
+        const notifications = await Notification.find({ recipient: userId, isRead: false })
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit)
+            .populate("sender", "name")
+            .populate("relatedDocument", "metadata.fileName")
+            .populate("relatedProject", "projectName");
+
+        // Total unread count
+        const totalUnread = await Notification.countDocuments({ recipient: userId, isRead: false });
+
+        return successResponse(res, {
+            page,
+            limit,
+            totalUnread,
+            totalPages: Math.ceil(totalUnread / limit),
+            notifications
+        }, "Unread notifications fetched successfully");
     } catch (error) {
         return errorResponse(res, error);
     }
 };
+
 
 // ------------------- Mark Single Notification as Read -------------------
 export const markAsRead = async (req, res) => {

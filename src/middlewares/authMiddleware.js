@@ -68,3 +68,33 @@ export const canAccessDocument = async (userId, documentId) => {
     });
     return !!shared;
 };
+
+export const optionalAuth = async (req, res, next) => {
+    try {
+        // If no session exists → public request
+        if (!req.session || !req.session.user) {
+            req.user = null;
+            return next();
+        }
+
+        // Try to load user
+        const user = await User.findById(req.session.user._id).select("-password -raw_password");
+
+        if (!user) {
+            req.user = null;
+            return next();
+        }
+
+        if (user.status !== "Active") {
+            req.user = null;
+            return next();
+        }
+
+        req.user = user;
+        next();
+    } catch (err) {
+        logger.error("Optional Auth Error:", err);
+        req.user = null;
+        next(); // DO NOT block request
+    }
+};

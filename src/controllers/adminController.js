@@ -28,9 +28,11 @@ export const showAdminDashboardPage = (req, res) => {
     }
 };
 export const showAdminApprovalPage = (req, res) => {
+    const documentId = req.query.documentId
     try {
         res.render("pages/admin/approval", {
-            user: req.user
+            user: req.user,
+            documentId
         });
     } catch (err) {
         logger.error("Dashboard render error:", err);
@@ -156,7 +158,7 @@ export const getMyApprovals = async (req, res) => {
         const userId = new mongoose.Types.ObjectId(user._id);
         const profileType = user.profile_type;
         const userDepartment = user.department ? new mongoose.Types.ObjectId(user.department) : null;
-
+        const documentId = req.query.documentId
         const {
             status,
             department,
@@ -184,6 +186,10 @@ export const getMyApprovals = async (req, res) => {
                 }
             }
         };
+        // Filter by documentId if provided
+        if (documentId && mongoose.Types.ObjectId.isValid(documentId)) {
+            filter._id = new mongoose.Types.ObjectId(documentId);
+        }
 
         if (profileType !== "superadmin") {
             const accessConditions = [

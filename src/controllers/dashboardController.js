@@ -118,20 +118,29 @@ export const getFileStatus = async (req, res) => {
         const skip = (page - 1) * limit;
 
         const matchQuery = { entityType: "File" };
-
         if (user.profile_type !== "superadmin") {
             matchQuery.actorId = user._id;
         }
 
         const pipeline = [
+            // Match files (and optionally by actorId)
             { $match: matchQuery },
+
+            // Sort by creation date descending to pick the latest per entity
             { $sort: { createdAt: -1 } },
+
+            // Group by file ID, taking the first (latest) activity
             {
                 $group: {
                     _id: "$entityId",
                     latestActivity: { $first: "$$ROOT" }
                 }
             },
+
+            // Sort final grouped results by latest activity time
+            { $sort: { "latestActivity.createdAt": -1 } },
+
+            // Ensure entityObjectId is an ObjectId
             {
                 $addFields: {
                     entityObjectId: {
@@ -143,6 +152,8 @@ export const getFileStatus = async (req, res) => {
                     }
                 }
             },
+
+            // Join with users collection for actor info
             {
                 $lookup: {
                     from: "users",
@@ -152,6 +163,8 @@ export const getFileStatus = async (req, res) => {
                 }
             },
             { $unwind: { path: "$actor", preserveNullAndEmptyArrays: true } },
+
+            // Join with files collection for file info
             {
                 $lookup: {
                     from: "files",
@@ -161,8 +174,12 @@ export const getFileStatus = async (req, res) => {
                 }
             },
             { $unwind: { path: "$file", preserveNullAndEmptyArrays: true } },
+
+            // Pagination
             { $skip: skip },
             { $limit: limit },
+
+            // Select required fields
             {
                 $project: {
                     _id: 1,
@@ -175,6 +192,7 @@ export const getFileStatus = async (req, res) => {
 
         const results = await ActivityLog.aggregate(pipeline);
 
+        // Count total unique files
         const countPipeline = [
             { $match: matchQuery },
             { $group: { _id: "$entityId" } },
@@ -183,7 +201,7 @@ export const getFileStatus = async (req, res) => {
         const countResult = await ActivityLog.aggregate(countPipeline);
         const totalCount = countResult?.[0]?.total || 0;
 
-        // Format response with file size and icon
+        // Format response
         const formattedFiles = results.map(item => {
             const act = item.latestActivity;
             const file = item.file;
@@ -222,6 +240,7 @@ export const getFileStatus = async (req, res) => {
         });
     }
 };
+
 
 /** Get Recent Activities */
 export const getRecentActivities = async (req, res) => {
