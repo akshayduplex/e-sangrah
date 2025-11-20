@@ -28736,7 +28736,7 @@ table.dataTable>thead .sorting_desc_disabled:before {
   background: transparent;
   border-color: #E5E7EB;
   border-radius: 50% !important;
-  width: 26px;
+  /* width: 26px; */
   height: 26px;
   display: flex;
   align-items: center;

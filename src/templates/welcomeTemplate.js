@@ -60,7 +60,7 @@ export const welcomeTemplate = (data) => {
     html += '<td style="text-align:center;">';
     html += '<div style="margin:20px 0;">';
     html += `<a href="${BASE_URL}/login" style="text-decoration:none;border-radius:7px;padding:10px 20px;color:#fff;background:${themeColor};">`;
-    html += 'Go to Dashboard</a>';
+    html += 'Please Login</a>';
     html += '</div>';
     html += '</td>';
     html += '</tr>';

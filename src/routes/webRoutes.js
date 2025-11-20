@@ -232,7 +232,7 @@ router.get("/permissions/user/:id", authenticate, checkPermissions, async (req, 
             return res.status(404).render("pages/error", { user: req.user, message: "User not found" });
         }
 
-        const menus = await Menu.find({ is_show: true }).sort({ priority: 1, add_date: -1 }).lean();
+        const menus = await Menu.find({ isActive: true }).sort({ priority: 1, add_date: -1 }).lean();
         const masterMenus = buildMenuTree(menus);
 
         const userPermissions = await UserPermission.find({ user_id: userId }).populate("menu_id").lean();

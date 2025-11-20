@@ -12,7 +12,7 @@ const menuSchema = new Schema({
     url: { type: String, trim: true, default: '#' }, // now non-unique for Menu
     priority: { type: Number, required: true, min: 1, default: 1 },
     is_show: { type: Boolean, default: true },
-
+    isActive: { type: Boolean, default: true },
     master_id: {
         type: Types.ObjectId,
         ref: 'Menu',

@@ -122,7 +122,6 @@ function initializeExistingFileHandlers() {
 
             newConfirmBtn.addEventListener('click', async function () {
                 try {
-                    console.log('🗑️ Deleting existing file:', fileId);
                     const res = await fetch(`/api/files/${fileId}`, { method: "DELETE" });
                     const data = await res.json();
 
@@ -161,8 +160,6 @@ function initializeExistingFileHandlers() {
 }
 
 function initializeBasicComponents() {
-    console.log('🛠️ Initializing basic components...');
-
     initializeSummernote();
     initializeSelect2();
     initializeDatepicker();
@@ -185,7 +182,6 @@ function initializeBasicComponents() {
 }
 
 function initializeFormData() {
-    console.log('📋 Initializing form data from document:', window.documentData);
 
     // Set basic form fields
     if (window.documentData.documentName) {
@@ -217,8 +213,6 @@ function initializeFormData() {
         const projectName = window.documentData.project.projectName || window.documentData.project.name;
         const projectId = window.documentData.project._id;
 
-        console.log('🏗️ Setting project:', { projectName, projectId });
-
         const projectOption = new Option(projectName, projectId, true, true);
         $('#projectName').empty().append(projectOption).trigger('change');
     }
@@ -227,9 +221,6 @@ function initializeFormData() {
     if (window.documentData.department) {
         const departmentName = window.documentData.department.name;
         const departmentId = window.documentData.department._id;
-
-        console.log('🏢 Setting department:', { departmentName, departmentId });
-
         const departmentOption = new Option(departmentName, departmentId, true, true);
         $('#department').empty().append(departmentOption).trigger('change');
     }
@@ -238,9 +229,6 @@ function initializeFormData() {
     if (window.documentData.projectManager) {
         const managerName = window.documentData.projectManager.name;
         const managerId = window.documentData.projectManager._id;
-
-        console.log('👨‍💼 Setting project manager:', { managerName, managerId });
-
         const managerOption = new Option(managerName, managerId, true, true);
         $('#projectManager').empty().append(managerOption).trigger('change');
     }
@@ -250,8 +238,6 @@ function initializeFormData() {
         const donorName = window.documentData.documentDonor.name;
         const donorId = window.documentData.documentDonor._id;
 
-        console.log('🎁 Setting donor:', { donorName, donorId });
-
         const donorOption = new Option(donorName, donorId, true, true);
         $('#documentDonor').empty().append(donorOption).trigger('change');
     }
@@ -260,9 +246,6 @@ function initializeFormData() {
     if (window.documentData.documentVendor) {
         const vendorName = window.documentData.documentVendor.name;
         const vendorId = window.documentData.documentVendor._id;
-
-        console.log('🏪 Setting vendor:', { vendorName, vendorId });
-
         const vendorOption = new Option(vendorName, vendorId, true, true);
         $('#documentVendor').empty().append(vendorOption).trigger('change');
     }
@@ -271,9 +254,6 @@ function initializeFormData() {
     if (window.documentData.folderId) {
         const folderId = window.documentData.folderId._id || window.documentData.folderId;
         const folderName = window.documentData.folderId.name || 'Selected Folder';
-
-        console.log('📁 Setting folder:', { folderId, folderName });
-
         window.selectedFolders = [{ id: folderId, name: folderName }];
         $('#selectedFolderId').val(folderId);
     }
@@ -647,7 +627,7 @@ function initializeEditFormSubmission() {
                 throw new Error(data.message || 'Unknown error occurred during update');
             }
         } catch (error) {
-            showToast('Error updating document: ' + error.message, 'error');
+            showToast(error.message, 'error');
         } finally {
             $('#submitBtn').prop('disabled', false).html("Update Document");
         }
@@ -659,7 +639,6 @@ function initializeEditFormSubmission() {
  */
 function updateFileDisplay() {
     const totalFiles = window.uploadedFileIds.length;
-    console.log(`📊 Current file count: ${totalFiles}`);
 
     if (totalFiles === 0) {
         document.getElementById('existingFilesList').innerHTML = '<p class="text-muted">No files uploaded</p>';

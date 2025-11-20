@@ -180,14 +180,14 @@
 					placeholder: '-- Select Designation --',
 					allowClear: true,
 					ajax: {
-						url: `${baseUrl}/api/designations/search`, // API endpoint
+						url: `${baseUrl}/api/designations/search`,
 						dataType: 'json',
 						delay: 250, // debounce
 						data: function (params) {
 							return {
-								search: params.term || '',  // user-typed search term
-								page: params.page || 1,     // page number for pagination
-								limit: 10                    // 10 results per request
+								search: params.term || '',
+								page: params.page || 1,
+								limit: 10
 							};
 						},
 						processResults: function (data, params) {
@@ -196,10 +196,10 @@
 							return {
 								results: data.data.map(des => ({
 									id: des._id,
-									text: des.name
+									text: des.name.charAt(0).toUpperCase() + des.name.slice(1)
 								})),
 								pagination: {
-									more: data.pagination.more // Select2 will fetch next page if true
+									more: data.pagination.more
 								}
 							};
 						},

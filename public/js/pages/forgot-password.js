@@ -7,13 +7,13 @@ document.addEventListener("DOMContentLoaded", function () {
     const resendBtn = document.querySelector(".resend-btn");
     const otpVerifiedText = otpSection.querySelector(".text-success");
     const countdownDisplay = document.getElementById("otp-timer");
+    let isResending = false;
     const baseUrl = window.baseUrl || "";
     let countdownInterval;
     let otpSent = false;
 
     // Reset all fields
     const resetAllFields = () => {
-        if (emailInput) emailInput.value = "";
         otpInputs.forEach(inp => inp.value = "");
         if (otpSection) otpSection.style.display = "none";
         if (resetForm) resetForm.style.display = "none";
@@ -44,14 +44,12 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     // Send OTP
-    const sendOtp = async () => {
+    const sendOtp = async (isResend = false) => {
         const email = emailInput.value.trim();
-        if (!email) {
-            showToast("Please enter your email", "warning");
-            return;
-        }
 
-        sendOtpBtn.disabled = true;
+        if (!isResend) {
+            sendOtpBtn.disabled = true;
+        }
 
         try {
             const response = await fetch(`${baseUrl}/api/auth/send-otp`, {
@@ -59,6 +57,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 headers: { "Content-Type": "application/x-www-form-urlencoded" },
                 body: new URLSearchParams({ email })
             });
+
             const data = await response.json();
 
             if (data.success) {
@@ -68,15 +67,31 @@ document.addEventListener("DOMContentLoaded", function () {
                 otpSent = true;
                 startCountdown(600);
                 otpInputs.forEach(inp => inp.disabled = false);
+
+                // Success → unlock resend after a small delay
+                setTimeout(() => {
+                    resendBtn.disabled = false;
+                    resendBtn.textContent = "Resend";
+                    isResending = false;
+                }, 1000);
+
+                return true;
             } else {
                 showToast(data.message || "Failed to send OTP.", "error");
-                sendOtpBtn.disabled = false;
+
+                if (!isResend) sendOtpBtn.disabled = false;
+
+                return false;
             }
         } catch (err) {
             showToast("Something went wrong. Please try again.", "error");
-            sendOtpBtn.disabled = false;
+
+            if (!isResend) sendOtpBtn.disabled = false;
+
+            return false;
         }
     };
+
 
     // Send OTP button
     sendOtpBtn.addEventListener("click", function (e) {
@@ -85,13 +100,24 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
     // Resend OTP button
-    resendBtn.addEventListener("click", function () {
+    resendBtn.addEventListener("click", async function () {
+        if (isResending) return;
+        isResending = true;
+        resendBtn.disabled = true;
+        resendBtn.textContent = "Sending...";
+
         otpInputs.forEach(inp => inp.value = "");
         resetForm.style.display = "none";
-        if (otpVerifiedText) otpVerifiedText.style.display = "none";
+        otpVerifiedText.style.display = "none";
         otpSection.style.display = "block";
         otpSent = false;
-        sendOtp();
+
+        const success = await sendOtp(true);
+        if (!success) {
+            resendBtn.disabled = false;
+            resendBtn.textContent = "Resend";
+            isResending = false;
+        }
     });
 
     // OTP auto-focus

@@ -1,53 +1,304 @@
+
 document.addEventListener("DOMContentLoaded", function () {
+    const baseUrl = window.baseUrl;
+
+    // ---------------------------
+    // MODAL BACKDROP FIX
+    // ---------------------------
+    document.addEventListener('hidden.bs.modal', () => {
+        document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+        document.body.classList.remove('modal-open');
+    });
+
+    // ---------------------------
+    // YEAR & PROJECT SELECT FIX
+    // ---------------------------
+    const $headerYearSelect = $('#selectHeaderYear');
+    const $headerProjectSelect = $('#selectHeaderProject');
+
+    // YEAR SELECT
+    if ($headerYearSelect.length) {
+        const currentYear = new Date().getFullYear();
+        const startYear = 1995;
+        $headerYearSelect.append(new Option('All', 'all', false, false));
+        for (let year = currentYear; year >= startYear; year--) {
+            $headerYearSelect.append(new Option(year, year, false, false));
+        }
+
+        $headerYearSelect.select2({ placeholder: 'Select Year', allowClear: false });
+
+        $headerYearSelect.on('change', async function () {
+            const selectedYear = $(this).val();
+            try {
+                const res = await fetch(`${baseUrl}/api/session/project`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        selectedYear: selectedYear === 'all' ? null : selectedYear,
+                        projectId: window.selectedProjectId || null
+                    })
+                });
+                if (!res.ok) throw new Error('Failed to save year selection');
+                location.reload();
+            } catch (err) { console.error('Error saving year selection:', err); }
+        });
+
+        (async function loadSavedYear() {
+            try {
+                const res = await fetch(`${baseUrl}/api/session/project`, { credentials: 'include' });
+                const data = await res.json();
+                const savedYear = data.selectedYear || 'all';
+                if (!$headerYearSelect.find(`option[value="${savedYear}"]`).length) {
+                    $headerYearSelect.append(new Option(savedYear, savedYear, true, true));
+                }
+                $headerYearSelect.val(savedYear).trigger('change.select2');
+            } catch (err) { console.error('Error loading saved year:', err); }
+        })();
+    }
+
+    // PROJECT SELECT
+    if ($headerProjectSelect.length) {
+        $headerProjectSelect.select2({
+            placeholder: 'Select Project',
+            allowClear: false,
+            width: '250px',
+            ajax: {
+                url: `${baseUrl}/api/projects`,
+                dataType: 'json',
+                delay: 250,
+                data: params => ({ search: params.term || '', page: params.page || 1, limit: 10 }),
+                processResults: function (data) {
+                    const projects = (data.data || []).map(p => ({ id: p._id, text: p.projectName || p.name }));
+                    return { results: [{ id: 'all', text: 'All Projects' }, ...projects] };
+                },
+                cache: true
+            },
+            templateSelection: data => data.text || 'All Projects'
+        });
+
+        $headerProjectSelect.on('select2:select select2:unselect', async function () {
+            const projectId = $(this).val();
+            const projectName = $(this).find('option:selected').text();
+            try {
+                const res = await fetch(`${baseUrl}/api/session/project`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        projectId: projectId === 'all' ? null : projectId,
+                        projectName: projectId === 'all' ? '' : projectName
+                    })
+                });
+                if (!res.ok) throw new Error('Failed to save project selection');
+                location.reload();
+            } catch (err) { console.error('Error saving project selection:', err); }
+        });
+
+        (async function loadSavedProject() {
+            try {
+                const res = await fetch(`${baseUrl}/api/session/project`, { credentials: 'include' });
+                const data = await res.json();
+                if (data.selectedProject) {
+                    window.selectedProjectId = data.selectedProject;
+                    window.selectedProjectName = data.selectedProjectName;
+                    if (!$headerProjectSelect.find(`option[value="${data.selectedProject}"]`).length) {
+                        $headerProjectSelect.append(new Option(data.selectedProjectName, data.selectedProject, true, true));
+                    }
+                    $headerProjectSelect.val(data.selectedProject).trigger('change.select2');
+                } else {
+                    $headerProjectSelect.append(new Option('All Projects', 'all', true, true)).trigger('change.select2');
+                }
+            } catch (err) { console.error('Error loading saved project:', err); }
+        })();
+    }
+
+    // ---------------------------
+    // SEARCH FUNCTIONALITY
+    // ---------------------------
+    (function ($) {
+        "use strict";
+
+        function debounce(func, delay) {
+            let timeout;
+            return function () {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(this, arguments), delay);
+            };
+        }
+
+        function isOnDocumentsPage() {
+            return window.location.pathname === '/documents/list' ||
+                window.location.pathname.startsWith('/documents/list?');
+        }
+
+        function getCurrentStatus() {
+            const params = new URLSearchParams(window.location.search);
+            return params.get('status') || 'all';
+        }
+
+        function updateUrl(params) {
+            const url = new URL(window.location);
+            Object.keys(params).forEach(key => params[key] ? url.searchParams.set(key, params[key]) : url.searchParams.delete(key));
+            window.history.pushState({}, '', url);
+        }
+
+        function redirectToDocuments(searchTerm = '', status = 'all') {
+            const params = new URLSearchParams();
+            if (searchTerm) params.append('q', searchTerm);
+            if (status && status !== 'all') params.append('status', status);
+            window.location.href = `/documents/list?${params.toString()}`;
+        }
+
+        function reloadTableWithSearch(searchTerm = '') {
+            if (typeof table !== 'undefined' && table.ajax?.reload) {
+                $('#searchInput').val(searchTerm);
+                table.ajax.reload(null, false);
+                updateUrl({ q: searchTerm || null });
+            }
+        }
+
+        function toggleClearButtons() {
+            $('.clear-search-global').toggle(!!$('#globalSearchInput').val().trim());
+            $('.clear-search-page').toggle(!!$('#searchInput').val().trim());
+        }
+
+        function clearSearch() {
+            $('#globalSearchInput, #searchInput').val('');
+            toggleClearButtons();
+            if (isOnDocumentsPage()) {
+                updateUrl({ q: null });
+                if (typeof table !== 'undefined') table.ajax.reload(null, false);
+            }
+        }
+
+        $(document).ready(function () {
+            if ($('#searchInput').length && $('#searchInput').closest('.position-relative').length === 0) {
+                $('#searchInput').wrap('<div class="position-relative"></div>');
+                $('#searchInput').parent().append(`
+                    <button type="button" class="btn btn-sm btn-icon clear-search-page position-absolute end-0 top-50 translate-middle-y me-2"
+                        style="display: none; z-index: 10;">
+                        <i class="ti ti-x"></i>
+                    </button>
+                `);
+            }
+
+            const params = new URLSearchParams(window.location.search);
+            const q = params.get('q') || '';
+            $('#globalSearchInput').val(q);
+            if (isOnDocumentsPage() && $('#searchInput').length) $('#searchInput').val(q);
+            toggleClearButtons();
+
+            $('#globalSearchForm').on('submit', function (e) {
+                e.preventDefault();
+                const term = $('#globalSearchInput').val().trim();
+                const status = getCurrentStatus();
+                if (isOnDocumentsPage()) reloadTableWithSearch(term);
+                else redirectToDocuments(term, status);
+            });
+
+            $('#globalSearchInput').on('keypress', function (e) {
+                if (e.which === 13) $('#globalSearchForm').trigger('submit');
+            });
+
+            $('#searchInput').on('input', debounce(function () {
+                if (isOnDocumentsPage()) reloadTableWithSearch($(this).val().trim());
+            }, 500));
+
+            $(document).on('click', '.clear-search-global', function () {
+                clearSearch(); $('#globalSearchForm').trigger('submit');
+            });
+
+            $(document).on('click', '.clear-search-page', function () {
+                clearSearch(); if (isOnDocumentsPage()) reloadTableWithSearch('');
+            });
+
+            $('#globalSearchInput, #searchInput').on('input', toggleClearButtons);
+
+            $('#globalSearchInput').on('input', function () {
+                if (isOnDocumentsPage()) $('#searchInput').val($(this).val());
+                toggleClearButtons();
+            });
+        });
+    })(jQuery);
+
+    // ---------------------------
+    // USER INVITE SELECT
+    // ---------------------------
+    $('#userInviteSelect').select2({
+        placeholder: "Select user or enter email",
+        allowClear: true,
+        width: 'resolve',
+        dropdownParent: $('#sharedoc-modal'),
+        ajax: {
+            url: `${baseUrl}/api/user/search`,
+            dataType: 'json',
+            delay: 250,
+            data: params => ({ search: params.term }),
+            processResults: data => ({
+                results: (data.users || []).map(u => ({ id: u.email, text: u.name, isNew: false }))
+            })
+        },
+        tags: true,
+        createTag: params => {
+            const email = params.term.trim();
+            if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { id: email, text: email, isNew: true };
+            return null;
+        },
+        minimumInputLength: 0
+    });
+
+    // ---------------------------
+    // TIME RADIO & ACCESS TYPE
+    // ---------------------------
+    document.querySelectorAll('input[name="time"]').forEach(radio => {
+        radio.addEventListener('change', function () {
+            if (this.id === "custom") {
+                document.getElementById("customDateWrapper").style.display = "flex";
+                document.getElementsByClassName("rangelabel")[0].style.display = "none";
+            } else {
+                document.getElementById("customDateWrapper").style.display = "none";
+                document.getElementsByClassName("rangelabel")[0].style.display = "block";
+            }
+        });
+    });
+
+    const accessType = document.getElementById("accessType");
+    const roleType = document.getElementById("roleType");
+    const infoText = document.getElementById("infoText");
+
+    accessType.addEventListener("change", function () {
+        if (this.value === "anyone") {
+            roleType.classList.remove("d-none");
+            infoText.textContent = "Anyone on the internet with the link can view";
+        } else {
+            roleType.classList.add("d-none");
+            infoText.textContent = "Only people with access can open this link";
+        }
+    });
+
+    // ---------------------------
+    // NOTIFICATIONS
+    // ---------------------------
     const notificationBtn = document.querySelector("#notification_popup");
     const dropdownMenu = document.querySelector(".notification-dropdown");
     const notificationContainer = document.querySelector(".noti-content .d-flex.flex-column");
     const notificationTitle = document.querySelector(".notification-title");
     const statusDot = document.querySelector(".notification-status-dot");
 
-    let currentPage = 1;
-    const limit = 10;
-    let totalPages = 1;
-    let isLoading = false;
     let hasLoadedOnce = false;
+    const maxNotifications = 10;
 
-    // ---------------------------------------------------------
-    // RENDER NOTIFICATIONS (UPDATED WITH approval_request LOGIC)
-    // ---------------------------------------------------------
     function renderNotifications(notifications) {
+        notificationContainer.innerHTML = "";
         notifications.forEach(n => {
-
-            const createdTime = new Date(n.createdAt).toLocaleTimeString([], {
-                hour: '2-digit', minute: '2-digit'
-            });
-
-            // 🎯 NEW: HANDLE APPROVAL REQUEST
-            let actionUrl = n.actionUrl || "#";
-            let displayButton = ""; // for Approve button
-
-            if (n.type === "approval_request") {
-                actionUrl = "/approval-requests";
-                displayButton = `
-                    <span class="badge bg-success text-white px-2 py-1 ms-2">
-                        Approve
-                    </span>
-                `;
-            }
-
-            // For document_approved → Track page
-            else if (n.type === "document_approved") {
-                actionUrl = `/document/${n.documentId}/approval/track`;
-            }
-
-            // For document → Document List
-            else if (n.type === "document") {
-                actionUrl = "/documents/list";
-            }
-
-            // For approval_update → Employee approval page
-            else if (n.type === "approval_update") {
-                actionUrl = "/employee/approval";
-            }
+            const createdTime = new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            let actionUrl = "#";
+            let displayButton = "";
+            if (n.type === "approval_request") { actionUrl = "/approval-requests"; displayButton = `<span class="badge bg-success text-white px-2 py-1 ms-2">Approve</span>`; }
+            else if (n.type === "document_approved") actionUrl = `/document/${n.documentId}/approval/track`;
+            else if (n.type === "document") actionUrl = "/documents/list";
+            else if (n.type === "approval_update") actionUrl = "/employee/approval";
 
             const html = `
                 <div class="border-bottom mb-3 ${!n.isRead ? 'unread_notf' : ''}">
@@ -61,7 +312,7 @@ document.addEventListener("DOMContentLoaded", function () {
                                     <p class="mb-1">
                                         <span class="text-dark fw-semibold">${n.sender.name}</span>
                                         ${n.message.replace(n.sender.name, '')}
-                                        ${displayButton}   <!-- ⭐ Button only for approval_request -->
+                                        ${displayButton}
                                     </p>
                                     <span>${createdTime}</span>
                                 </div>
@@ -69,83 +320,41 @@ document.addEventListener("DOMContentLoaded", function () {
                             <i class="ti ti-chevron-right fs-16 notflinkarrow"></i>
                         </div>
                     </a>
-                </div>
-            `;
-
+                </div>`;
             notificationContainer.insertAdjacentHTML("beforeend", html);
         });
     }
 
-    // ---------------------------------------------------------
-    // LOAD NOTIFICATIONS
-    // ---------------------------------------------------------
-    async function loadNotifications(page = 1) {
-        if (isLoading || page > totalPages) return;
-        isLoading = true;
-
+    async function loadNotifications() {
         const loader = document.createElement("p");
         loader.textContent = "Loading...";
         loader.classList.add("text-center", "text-muted", "py-2");
         notificationContainer.appendChild(loader);
-
         try {
-            const res = await fetch(`/api/notifications?page=${page}&limit=${limit}`);
+            const res = await fetch(`/api/notifications?limit=${maxNotifications}`);
             const data = await res.json();
-            if (!data.success) throw new Error("Failed to fetch notifications");
-
-            const { notifications, page: current, totalPages: total, totalUnread } = data.data;
-            totalPages = total;
-
-            notificationTitle.textContent = `Notifications (${totalUnread})`;
-
-            statusDot.style.display = totalUnread > 0 ? "inline-block" : "none";
-
+            const notifications = data.data || [];
+            notificationTitle.textContent = `Notifications (${data.totalUnread || 0})`;
+            statusDot.style.display = (data.totalUnread || 0) > 0 ? "inline-block" : "none";
             loader.remove();
-
-            renderNotifications(notifications);
+            renderNotifications(notifications.slice(0, maxNotifications));
         } catch (err) {
             console.error(err);
             loader.textContent = "Failed to load notifications.";
-        } finally {
-            isLoading = false;
         }
     }
 
-    // Infinite scroll
-    dropdownMenu.addEventListener("scroll", function () {
-        const scrollTop = dropdownMenu.scrollTop;
-        const scrollHeight = dropdownMenu.scrollHeight;
-        const offsetHeight = dropdownMenu.offsetHeight;
-
-        if (scrollTop + offsetHeight >= scrollHeight - 40 && currentPage < totalPages) {
-            currentPage++;
-            loadNotifications(currentPage);
-        }
-    });
-
-    // Load notifications when opening dropdown
     notificationBtn.addEventListener("click", function () {
-        if (!hasLoadedOnce) {
-            notificationContainer.innerHTML = "";
-            currentPage = 1;
-            loadNotifications(currentPage);
-            hasLoadedOnce = true;
-        }
+        if (!hasLoadedOnce) { loadNotifications(); hasLoadedOnce = true; }
     });
 
-    // MARK AS READ + REDIRECT
     document.addEventListener("click", function (e) {
         const link = e.target.closest(".notification-link");
         if (link) {
             const id = link.dataset.id;
-
-            fetch(`/api/notifications/${id}/read`, { method: "PATCH" })
-                .catch(console.error);
-
+            fetch(`/api/notifications/${id}/read`, { method: "PATCH" }).catch(console.error);
             const url = link.getAttribute("href");
-            if (url && url !== "#") {
-                window.location.href = url;
-            }
+            if (url && url !== "#") window.location.href = url;
         }
     });
 

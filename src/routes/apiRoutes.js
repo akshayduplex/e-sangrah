@@ -467,14 +467,28 @@ router.delete("/notifications/:id", NotificationController.deleteNotification);
 // Get paginated menus
 router.get("/menu", authenticate, async (req, res) => {
     try {
-        // Check if limit=0 (get all records)
+        const search = req.query.search?.trim() || "";
+        let filter = {};
+
+        if (search) {
+            filter = {
+                $or: [
+                    { name: { $regex: search, $options: "i" } },
+                    { type: { $regex: search, $options: "i" } },
+                    { url: { $regex: search, $options: "i" } }
+                ]
+            };
+        }
+
+        // If limit = 0 → return all data (no pagination)
         if (req.query.limit === "0") {
-            const menus = await Menu.find()
+            const menus = await Menu.find(filter)
                 .sort({ priority: 1, add_date: -1 })
                 .populate("added_by updated_by", "name email")
                 .lean();
 
             const total = await Menu.countDocuments();
+            const filtered = await Menu.countDocuments(filter);
 
             return res.json({
                 success: true,
@@ -483,28 +497,28 @@ router.get("/menu", authenticate, async (req, res) => {
                     page: 1,
                     limit: 0,
                     total,
+                    filtered,
                     pages: 1
                 }
             });
         }
 
-        // Get page & limit from query, default to 1 and 10
         const page = Math.max(parseInt(req.query.page) || 1, 1);
         const limit = Math.max(parseInt(req.query.limit) || 10, 1);
         const skip = (page - 1) * limit;
 
-        // Fetch paginated menus
-        const [menus, total] = await Promise.all([
-            Menu.find()
+        const [menus, total, filtered] = await Promise.all([
+            Menu.find(filter)
                 .sort({ priority: 1, add_date: -1 })
                 .skip(skip)
                 .limit(limit)
                 .populate("added_by updated_by", "name email")
                 .lean(),
-            Menu.countDocuments()
+
+            Menu.countDocuments(),
+            Menu.countDocuments(filter)
         ]);
 
-        // Send paginated response
         res.json({
             success: true,
             data: menus,
@@ -512,20 +526,23 @@ router.get("/menu", authenticate, async (req, res) => {
                 page,
                 limit,
                 total,
-                pages: Math.ceil(total / limit)
+                filtered,
+                pages: Math.ceil(filtered / limit)
             }
         });
+
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
 });
 
+
 // Create menu
 router.post("/menu", authenticate, async (req, res) => {
     try {
         const user = req.user;
-        const { type, master_id, name, icon_code, url, priority, is_show } = req.body;
-
+        const { type, master_id, name, icon_code, url, priority, is_show, isActive } = req.body;
+        console.log("All Values", req.body)
         // Pre-validation
         if (type === "SubMenu" && !master_id) {
             return res.status(400).json({ success: false, message: "SubMenu requires a master_id" });
@@ -542,6 +559,7 @@ router.post("/menu", authenticate, async (req, res) => {
             url: url || "#",
             priority: Number(priority) || 1,
             is_show: !!is_show,
+            isActive: !!isActive,
             added_by: {
                 user_id: user._id,
                 name: user.name,
@@ -573,7 +591,7 @@ router.post("/menu", authenticate, async (req, res) => {
 router.put("/menu/:id", authenticate, async (req, res) => {
     try {
         const { id } = req.params;
-        const { type, master_id, name, icon_code, url, priority, is_show } = req.body;
+        const { type, master_id, name, icon_code, url, priority, is_show, isActive } = req.body;
 
         // Pre-validation
         if (type === "SubMenu" && !master_id) {
@@ -582,6 +600,10 @@ router.put("/menu/:id", authenticate, async (req, res) => {
         if (type === "Menu" && master_id) {
             return res.status(400).json({ success: false, message: "Menu cannot have a master_id" });
         }
+
+        // Convert values to real booleans
+        const isShowBool = is_show === "true" || is_show === true;
+        const isActiveBool = isActive === "true" || isActive === true;
 
         const menu = await Menu.findByIdAndUpdate(
             id,
@@ -592,7 +614,8 @@ router.put("/menu/:id", authenticate, async (req, res) => {
                 icon_code,
                 url,
                 priority: Number(priority) || 1,
-                is_show: !!is_show,
+                is_show: isShowBool,
+                isActive: isActiveBool,
                 updated_by: {
                     user_id: req.user._id,
                     name: req.user.name,
@@ -607,18 +630,21 @@ router.put("/menu/:id", authenticate, async (req, res) => {
         }
 
         res.json({ success: true, data: menu });
+
     } catch (error) {
+
         if (error.code === 11000) {
             return res.status(400).json({ success: false, message: "URL must be unique" });
         }
+
         if (error.name === "ValidationError") {
             return res.status(400).json({ success: false, message: error.message });
         }
+
         logger.error("Error updating menu:", error);
         res.status(500).json({ success: false, message: "Error updating menu" });
     }
 });
-
 
 // Delete menu
 router.delete("/menu/:id", authenticate, async (req, res) => {
@@ -652,17 +678,28 @@ router.get("/menu/type/:type", authenticate, async (req, res) => {
 router.patch("/menu/:id/toggle-status", authenticate, async (req, res) => {
     try {
         const { id } = req.params;
+        const field = req.query.field; // field to toggle: is_show OR isActive
+
+        if (!["is_show", "isActive"].includes(field)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid field. Allowed: is_show, isActive"
+            });
+        }
 
         const menu = await Menu.findById(id);
         if (!menu) {
             return res.status(404).json({ success: false, message: "Menu not found" });
         }
 
+        // Toggle the selected field
+        const updatedValue = !menu[field];
+
         const updated = await Menu.findByIdAndUpdate(
             id,
             {
                 $set: {
-                    is_show: !menu.is_show,
+                    [field]: updatedValue,
                     updated_by: req.user
                         ? {
                             user_id: req.user._id,
@@ -677,16 +714,18 @@ router.patch("/menu/:id/toggle-status", authenticate, async (req, res) => {
 
         res.json({
             success: true,
-            message: "Menu status updated successfully",
-            data: { id: updated._id, is_show: updated.is_show }
+            message: `${field} updated successfully`,
+            data: {
+                id: updated._id,
+                [field]: updated[field]
+            }
         });
+
     } catch (error) {
         logger.error("Toggle menu status error:", error);
         res.status(500).json({ success: false, message: "Server error" });
     }
 });
-
-
 
 // ---------------------------
 // Menu Assignment Endpoints

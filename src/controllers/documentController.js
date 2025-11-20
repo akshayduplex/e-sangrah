@@ -1197,6 +1197,16 @@ export const createDocument = async (req, res) => {
                 return failResponse(res, "Invalid expiry date format", 400);
             }
         }
+        // ------------------- Validate Start Date < Expiry Date -------------------
+        if (isCompliance && parsedStartDate && parsedExpiryDate) {
+            if (parsedStartDate >= parsedExpiryDate) {
+                return failResponse(
+                    res,
+                    "Start date must be earlier than expiry date",
+                    400
+                );
+            }
+        }
 
         // ------------------- Get Project Approval Authority if wantApprovers is true -------------------
         let documentApprovalAuthority = [];
@@ -1467,7 +1477,7 @@ export const updateDocument = async (req, res) => {
             await session.abortTransaction();
             return res.status(403).json({ success: false, message: "Unauthorized" });
         }
-
+        console.log("Update document data", req.body)
         const originalDoc = document.toObject();
         const updateData = { ...req.body };
         const changedFields = [];
@@ -1489,8 +1499,6 @@ export const updateDocument = async (req, res) => {
                 } else if (Array.isArray(updateData.fileIds)) {
                     fileIds = updateData.fileIds;
                 }
-
-                console.log('Processing file IDs:', fileIds);
 
                 if (fileIds.length > 0) {
                     const newFiles = await processFileUpdates(document, fileIds, req.user, changedFields, session);
@@ -1588,6 +1596,64 @@ export const updateDocument = async (req, res) => {
                     break;
             }
         }
+        // ------------------------
+        // SAFE DATE VALIDATION (startDate < expiryDate)
+        // ------------------------
+
+        let newStartDate = document.startDate;
+        let newExpiryDate = document.compliance?.expiryDate;
+
+        // Parse startDate (documentDate)
+        if (updateData.documentDate) {
+            let parsed = new Date(updateData.documentDate);
+
+            // Fallback for DD-MM-YYYY
+            if (isNaN(parsed.getTime())) {
+                const p = updateData.documentDate.split(/[-\/]/);
+                if (p.length === 3) parsed = new Date(`${p[2]}-${p[1]}-${p[0]}`);
+            }
+
+            if (!isNaN(parsed.getTime())) newStartDate = parsed;
+        }
+
+        // Parse expiryDate (compliance.expiryDate)
+        if (updateData.compliance?.expiryDate) {
+            let exp = new Date(updateData.compliance.expiryDate);
+
+            const p = updateData.compliance.expiryDate.split(/[-\/]/);
+            if (isNaN(exp.getTime()) && p.length === 3) {
+                exp = new Date(`${p[2]}-${p[1]}-${p[0]}`);
+            }
+
+            if (!isNaN(exp.getTime())) newExpiryDate = exp;
+        }
+
+        // Validate ONLY when compliance = true
+        const isCompliance = updateData.compliance?.isCompliance ?? document.compliance.isCompliance;
+
+        if (isCompliance && newStartDate && newExpiryDate) {
+            if (newStartDate >= newExpiryDate) {
+                await session.abortTransaction();
+                return res.status(400).json({
+                    success: false,
+                    message: "Start cannot be greater than or equal to expiry date."
+                });
+            }
+        }
+
+        // If passes validation → apply updates
+        if (updateData.documentDate && newStartDate) {
+            document.startDate = newStartDate;
+            changedFields.push("startDate");
+            versionedChanges.push("startDate");
+        }
+
+        if (updateData.compliance?.expiryDate && newExpiryDate) {
+            document.compliance.expiryDate = newExpiryDate;
+            changedFields.push("compliance.expiryDate");
+            versionedChanges.push("compliance");
+        }
+
 
         // ------------------------
         // SIGNATURE HANDLING
@@ -2197,9 +2263,6 @@ export const viewDocumentVersion = async (req, res) => {
         if (!mongoose.Types.ObjectId.isValid(id))
             return res.status(400).json({ message: "Invalid document ID" });
 
-        /** ---------------------------------------------------
-         *  STEP 1: Fetch base document (always needed)
-         * --------------------------------------------------- */
         const baseDoc = await Document.findById(id)
             .populate("project", 'projectName')
             .populate("department", 'name priority')
@@ -2221,16 +2284,10 @@ export const viewDocumentVersion = async (req, res) => {
         if (!baseDoc)
             return res.status(404).json({ message: "Document not found" });
 
-        /** ---------------------------------------------------
-         *  STEP 2: If version not provided → use current version
-         * --------------------------------------------------- */
         if (!version) {
             version = baseDoc.currentVersionLabel || baseDoc.currentVersionNumber;
         }
 
-        /** ---------------------------------------------------
-         *  STEP 3: Fetch document version entry
-         * --------------------------------------------------- */
         const entry = await DocumentVersion.findOne({
             documentId: id,
             $or: [
@@ -2245,14 +2302,43 @@ export const viewDocumentVersion = async (req, res) => {
         if (!entry)
             return res.status(404).json({ message: "Version not found" });
 
-        /** ---------------------------------------------------
-         *  STEP 4: Merge snapshot with base (snapshot overrides)
-         * --------------------------------------------------- */
-        const mergedDoc = {
+        /** Merge snapshot */
+        let mergedDoc = {
             ...baseDoc,
             ...entry.snapshot,
-            files: entry.files || baseDoc.files
+            files: entry.files?.length ? entry.files : baseDoc.files
         };
+
+        /** Re-populate merged document */
+        mergedDoc = await Document.populate(mergedDoc, [
+            { path: "project", select: "projectName" },
+            { path: "department", select: "name priority" },
+            { path: "folderId", select: "name" },
+            { path: "projectManager", select: "name email profile_image" },
+            { path: "documentDonor", select: "name email profile_image" },
+            { path: "documentVendor", select: "name email profile_image" },
+            { path: "files", select: "originalName fileType fileSize fileUrl" },
+
+            {
+                path: "owner",
+                select: "name email userDetails",
+                populate: [
+                    { path: "userDetails.designation", select: "name" },
+                    { path: "userDetails.department", select: "name" }
+                ]
+            },
+
+            {
+                path: "documentApprovalAuthority.userId",
+                select: "name email profile_image"
+            },
+            {
+                path: "documentApprovalAuthority.designation",
+                select: "name"
+            },
+
+            { path: "sharedWithUsers", select: "name email profile_image" }
+        ]);
 
         return res.json({
             versionLabel: entry.versionLabel,

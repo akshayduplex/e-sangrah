@@ -48,6 +48,7 @@ $(function () {
         const formData = new FormData(this);
         const data = Object.fromEntries(formData.entries());
         data.is_show = data.is_show === 'true';
+        data.isActive = data.isActive === 'true';
         data.priority = Number(data.priority);
 
         const url = $form.data('url');

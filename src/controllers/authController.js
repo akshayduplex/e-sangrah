@@ -127,9 +127,16 @@ export const login = async (req, res) => {
                 if (decoded.email !== user.email) {
                     return failResponse(res, "Token invalid for this user", 401);
                 }
+                if (user.status === "Inactive") {
+                    return failResponse(res, "Your account is inactive. Please contact admin.", 403);
+                }
+
+                if (user.status === "Blocked") {
+                    return failResponse(res, "Your account has been blocked. Contact support.", 403);
+                }
 
                 if (user.status !== "Active") {
-                    return failResponse(res, "User is not active", 403);
+                    return failResponse(res, "User status invalid", 403);
                 }
                 req.session.user = {
                     _id: user._id,
@@ -181,7 +188,7 @@ export const login = async (req, res) => {
         });
 
         return successResponse(res, {
-            message: "OTP sent to your registered email/phone",
+            message: "OTP sent to your registered email",
         });
 
     } catch (err) {

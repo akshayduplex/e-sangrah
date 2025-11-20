@@ -42,7 +42,19 @@ removed
   border-radius: 5px;
 }
 
-
+line 28735
+.dataTables_paginate .pagination li a {
+  background: transparent;
+  border-color: #E5E7EB;
+  border-radius: 50% !important;
+  /* width: 26px; */    removed this 
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6B7280;
+  font-size: 12px;
+}
 
 
 

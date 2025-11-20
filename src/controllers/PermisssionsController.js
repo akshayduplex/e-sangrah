@@ -52,7 +52,7 @@ export const showUserPermissionsPage = async (req, res) => {
             });
         }
 
-        const menus = await Menu.find({ is_show: true })
+        const menus = await Menu.find({ isActive: true })
             .sort({ priority: 1, add_date: -1 })
             .lean();
 
@@ -305,23 +305,40 @@ export const unAssignMenu = async (req, res) => {
 export const getSidebarForUser = async (req, res) => {
     try {
         const profileType = req.user?.profile_type;
+        const designationId = req.user?.userDetails?.designation;
         let assignedMenus = [];
 
-        if (profileType === "admin" || profileType === "superadmin") {
+        // 1. Superadmin: no filtering — full access
+        if (profileType === "superadmin") {
+            assignedMenus = await Menu.find({}, {
+                name: 1,
+                url: 1,
+                icon_code: 1,
+                type: 1,
+                master_id: 1,
+                priority: 1,
+            })
+                .sort({ priority: 1 })
+                .lean();
+
+            // 2. Admin: apply is_show + isActive filters
+        } else if (profileType === "admin") {
             assignedMenus = await Menu.find(
-                { is_show: true },
+                { is_show: true, isActive: true },
                 { name: 1, url: 1, icon_code: 1, type: 1, master_id: 1, priority: 1 }
             )
                 .sort({ priority: 1 })
                 .lean();
+
+            // 3. Normal users: by assignment + isActive + is_show, plus parent chain
         } else {
-            const designationId = req.user.userDetails.designation;;
             if (!designationId) {
                 return res.status(400).json({
                     success: false,
                     message: "No designation assigned to user",
                 });
             }
+
             const assignments = await MenuAssignment.aggregate([
                 { $match: { designation_id: new mongoose.Types.ObjectId(designationId) } },
                 {
@@ -329,10 +346,14 @@ export const getSidebarForUser = async (req, res) => {
                         from: "menus",
                         localField: "menu_id",
                         foreignField: "_id",
-                        as: "menu"
-                    }
+                        as: "menu",
+                    },
                 },
                 { $unwind: "$menu" },
+
+                // Only pick assigned menus that are active and should be shown
+                { $match: { "menu.isActive": true, "menu.is_show": true } },
+
                 {
                     $project: {
                         _id: "$menu._id",
@@ -342,9 +363,10 @@ export const getSidebarForUser = async (req, res) => {
                         type: "$menu.type",
                         master_id: "$menu.master_id",
                         priority: "$menu.priority",
-                        permissions: "$permissions.read"
-                    }
+                        permissions: "$permissions.read",
+                    },
                 },
+
                 {
                     $graphLookup: {
                         from: "menus",
@@ -352,32 +374,15 @@ export const getSidebarForUser = async (req, res) => {
                         connectFromField: "master_id",
                         connectToField: "_id",
                         as: "parents",
-                        restrictSearchWithMatch: { is_show: true }
-                    }
+                        restrictSearchWithMatch: {
+                            isActive: true,
+                            is_show: true,
+                        },
+                    },
                 },
-                {
-                    $project: {
-                        _id: 1,
-                        name: 1,
-                        url: 1,
-                        icon_code: 1,
-                        type: 1,
-                        master_id: 1,
-                        priority: 1,
-                        permissions: 1,
-                        parents: {
-                            _id: 1,
-                            name: 1,
-                            url: 1,
-                            icon_code: 1,
-                            type: 1,
-                            master_id: 1,
-                            priority: 1
-                        }
-                    }
-                }
             ]);
 
+            // Build a flat list: assigned + parents
             const allMenus = [];
             for (const a of assignments) {
                 allMenus.push({
@@ -388,24 +393,41 @@ export const getSidebarForUser = async (req, res) => {
                     type: a.type,
                     master_id: a.master_id,
                     priority: a.priority,
-                    permissions: a.permissions || {}
+                    permissions: a.permissions || {},
                 });
-                if (a.parents?.length) {
-                    allMenus.push(...a.parents);
+                if (Array.isArray(a.parents) && a.parents.length) {
+                    for (const p of a.parents) {
+                        allMenus.push({
+                            _id: p._id,
+                            name: p.name,
+                            url: p.url,
+                            icon_code: p.icon_code,
+                            type: p.type,
+                            master_id: p.master_id,
+                            priority: p.priority,
+                            // parent menus don't need `permissions` here
+                            permissions: {},
+                        });
+                    }
                 }
             }
 
-            // Deduplicate menus
+            // Deduplicate by menu _id
             const menuMap = new Map();
             for (const m of allMenus) {
                 menuMap.set(m._id.toString(), m);
             }
             assignedMenus = Array.from(menuMap.values());
         }
-        const buildHierarchy = (menus, parentId = null) =>
-            menus
-                .filter(m => String(m.master_id || null) === String(parentId))
-                .sort((a, b) => a.priority - b.priority)
+
+        // Build hierarchical structure
+        const buildHierarchy = (menus, parentId = null) => {
+            return menus
+                .filter(m => {
+                    const mid = m.master_id ? m.master_id.toString() : null;
+                    return (mid === (parentId ? parentId.toString() : null));
+                })
+                .sort((a, b) => (a.priority || 0) - (b.priority || 0))
                 .map(m => ({
                     _id: m._id,
                     name: m.name,
@@ -413,17 +435,20 @@ export const getSidebarForUser = async (req, res) => {
                     icon_code: m.icon_code,
                     type: m.type,
                     permissions: m.permissions || {},
-                    children: buildHierarchy(menus, m._id)
+                    children: buildHierarchy(menus, m._id),
                 }));
+        };
 
         const sidebar = buildHierarchy(assignedMenus);
+
         return res.json({ success: true, data: sidebar });
+
     } catch (error) {
         logger.error("Error in getSidebarForUser:", error);
         return res.status(500).json({
             success: false,
             message: "Error fetching sidebar",
-            error: API_CONFIG.NODE_ENV === "development" ? error.message : {},
+            error: process.env.NODE_ENV === "development" ? error.message : {},
         });
     }
 };
@@ -463,7 +488,7 @@ export const getMenuList = async (req, res) => {
 // Render add menu form
 export const getAddMenu = async (req, res) => {
     try {
-        const masters = await Menu.find({ type: "Menu", is_show: true }).sort({ name: 1 });
+        const masters = await Menu.find({ type: "Menu", isActive: true }).sort({ name: 1 });
 
         res.render("pages/permissions/add", { masters, menu: null, user: req.user });
     } catch (error) {

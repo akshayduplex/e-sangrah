@@ -36,79 +36,97 @@ export const getDashboardStats = async (req, res) => {
         const user = req.user || req.session.user;
         const userId = new mongoose.Types.ObjectId(user._id);
         const profileType = user.profile_type;
-        const { selectedProjectId } = getSessionFilters(req);
-        const { filter } = req.query;
 
-        // Base filters
-        const matchConditions = [
+        const { selectedProjectId, selectedYear } = getSessionFilters(req);
+
+        // Use current year if no year is selected
+        const year = selectedYear ? Number(selectedYear) : new Date().getFullYear();
+
+        // Base filters for all documents
+        const baseMatch = [
             { isDeleted: { $ne: true } },
-            { isArchived: { $ne: true } },
+            { isArchived: { $ne: true } }
         ];
 
-        // Filter by project/year if available
-        if (selectedProjectId) {
-            matchConditions.push({ project: selectedProjectId });
-        }
-
-        // Date filter based on user selection
-        const now = new Date();
-        let startDate;
-
-        switch (filter) {
-            case 'today':
-                startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-                break;
-            case 'week':
-                startDate = new Date(now);
-                startDate.setDate(now.getDate() - 7);
-                break;
-            case 'month':
-                startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
-                break;
-            case 'year':
-                startDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
-                break;
-            default:
-                startDate = null;
-        }
-
-        if (startDate) {
-            matchConditions.push({ createdAt: { $gte: startDate, $lte: now } });
-        }
-
-        // Restrict access for non-superadmin users
         if (profileType !== "superadmin") {
-            matchConditions.push({ owner: userId });
+            baseMatch.push({ owner: userId });
         }
 
-        // Aggregate stats
-        const documentStats = await Document.aggregate([
-            { $match: { $and: matchConditions } },
-            {
-                $group: {
-                    _id: "$status",
-                    count: { $sum: 1 }
-                }
-            }
+        if (selectedProjectId) {
+            baseMatch.push({ project: selectedProjectId });
+        }
+
+        // Date filters for current and previous year
+        const currentStart = new Date(year, 0, 1);
+        const currentEnd = new Date(year, 11, 31, 23, 59, 59);
+        const prevStart = new Date(year - 1, 0, 1);
+        const prevEnd = new Date(year - 1, 11, 31, 23, 59, 59);
+
+        const currentMatch = [
+            ...baseMatch,
+            { createdAt: { $gte: currentStart, $lte: currentEnd } }
+        ];
+
+        const previousMatch = [
+            ...baseMatch,
+            { createdAt: { $gte: prevStart, $lte: prevEnd } }
+        ];
+
+        // Aggregate for current period
+        const currentStats = await Document.aggregate([
+            { $match: { $and: currentMatch } },
+            { $group: { _id: "$status", count: { $sum: 1 } } }
         ]);
 
-        // Format stats
-        const stats = { total: 0, draft: 0, pending: 0, approved: 0, rejected: 0 };
-        documentStats.forEach(stat => {
-            const key = stat._id?.toLowerCase();
-            if (stats.hasOwnProperty(key)) {
-                stats[key] = stat.count;
-            }
-            stats.total += stat.count;
-        });
+        // Aggregate for previous period
+        const previousStats = await Document.aggregate([
+            { $match: { $and: previousMatch } },
+            { $group: { _id: "$status", count: { $sum: 1 } } }
+        ]);
 
-        return successResponse(res, stats, "Dashboard stats fetched successfully");
+        const formatStats = (data) => {
+            const stats = { total: 0, draft: 0, pending: 0, approved: 0, rejected: 0 };
+            data.forEach(s => {
+                const key = s._id?.toLowerCase();
+                if (stats[key] !== undefined) stats[key] = s.count;
+                stats.total += s.count;
+            });
+            return stats;
+        };
+
+        const current = formatStats(currentStats);
+        const previous = formatStats(previousStats);
+
+        const getGrowth = (cur, prev) => {
+            if (prev === 0) return cur > 0 ? 100 : 0;
+            return Math.round(((cur - prev) / prev) * 100);
+        };
+
+        const response = {
+            selectedYear: year,
+
+            total: current.total,
+            totalGrowth: getGrowth(current.total, previous.total),
+
+            draft: current.draft,
+            draftGrowth: getGrowth(current.draft, previous.draft),
+
+            pending: current.pending,
+            pendingGrowth: getGrowth(current.pending, previous.pending),
+
+            approved: current.approved,
+            approvedGrowth: getGrowth(current.approved, previous.approved),
+
+            rejected: current.rejected,
+            rejectedGrowth: getGrowth(current.rejected, previous.rejected)
+        };
+
+        return successResponse(res, response, "Dashboard stats fetched successfully");
     } catch (err) {
-        console.error("Error fetching dashboard stats:", err);
-        return errorResponse(res, err, "Failed to fetch dashboard stats");
+        console.error("Dashboard Error:", err);
+        return errorResponse(res, err, "Failed to fetch stats");
     }
 };
-
 
 export const getFileStatus = async (req, res) => {
     try {

@@ -289,7 +289,7 @@ const checkPermissions = async (req, res, next) => {
         const url = normalizeUrl(req.originalUrl);
 
         const menu = await Menu.findOne({
-            is_show: true,
+            isActive: true,
             $or: [
                 { url },
                 { url: url.replace(/\/:id/g, '/:id') }

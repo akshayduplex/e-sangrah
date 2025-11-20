@@ -110,6 +110,26 @@
                                         </div>
                                     </div>
                                 </div>
+                                <div class="row mb-4">
+                                    <div class="col-md-12 d-flex align-items-center">
+                                        <label class="form-label me-3 mb-0">Is Active?</label>
+                                        <div>
+                                            <div class="form-check form-check-inline">
+                                                <input class="form-check-input" type="radio" name="isActive"
+                                                    id="isActive_yes" value="true" <%=menu?.isActive !==false
+                                                    ? "checked" : "" %>>
+                                                <label class="form-check-label" for="isActive_yes">Yes</label>
+                                            </div>
+
+                                            <div class="form-check form-check-inline">
+                                                <input class="form-check-input" type="radio" name="isActive"
+                                                    id="isActive_no" value="false" <%=menu?.isActive===false ? "checked"
+                                                    : "" %>>
+                                                <label class="form-check-label" for="isActive_no">No</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
 
 
                                 <!-- Buttons -->

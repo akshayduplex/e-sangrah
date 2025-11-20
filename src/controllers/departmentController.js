@@ -7,6 +7,7 @@ import { activityLogger } from "../helper/activityLogger.js";
 
 // Render Add Department page
 export const showAddDepartmentPage = (req, res) => {
+
     res.render("pages/department/department", {
         title: "E-Sangrah - Department",
         user: req.user,

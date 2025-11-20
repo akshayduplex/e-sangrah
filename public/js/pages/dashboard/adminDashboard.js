@@ -502,19 +502,51 @@ $(document).ready(function () {
         $.ajax({
             url: url,
             type: "GET",
+            dataType: "json",
             success: function (response) {
-                if (response.success) {
-                    $('#totalDocs').text(response.data.total);
-                    $('#approvedDocs').text(response.data.approved);
-                    $('#pendingDocs').text(response.data.pending);
-                    $('#rejectedDocs').text(response.data.rejected);
-                    $('#pendingCount').text(response.data.pending);
+                if (response.success && response.data) {
+                    const d = response.data;
+
+                    // Main numbers
+                    $('#totalDocs').text(d.total || 0);
+                    $('#approvedDocs').text(d.approved || 0);
+                    $('#pendingDocs').text(d.pending || 0);
+                    $('#rejectedDocs').text(d.rejected || 0);
+                    $('#pendingCount').text(d.pending || 0); // if you use this elsewhere
+
+                    // Dynamic growth percentages (real data instead of static +10%)
+                    updateGrowthBadge('#totalDocs', d.totalGrowth);
+                    updateGrowthBadge('#approvedDocs', d.approvedGrowth);
+                    updateGrowthBadge('#pendingDocs', d.pendingGrowth);
+                    updateGrowthBadge('#rejectedDocs', d.rejectedGrowth);
                 }
             },
-            error: function () {
-                console.error("Failed to fetch dashboard stats");
+            error: function (xhr, status, err) {
+                console.error("Failed to fetch dashboard stats:", err);
             }
         });
+    }
+
+    // Helper: replaces the static "+10%" with real growth from API
+    function updateGrowthBadge(cardSelector, growthPercent) {
+        const $card = $(cardSelector).closest('.card');
+        const $badge = $card.find('.text-success, .text-danger').first(); // the span with growth
+
+        if (growthPercent === undefined || growthPercent === null) {
+            $badge.html('<span class="sm-avatar avatar rounded bg-soft-secondary"><i class="ti ti-minus"></i></span> 0%');
+            return;
+        }
+
+        const isPositive = growthPercent >= 0;
+        const icon = isPositive ? 'ti ti-trending-up' : 'ti ti-trending-down';
+        const colorClass = isPositive ? 'bg-soft-success text-success' : 'bg-soft-danger text-danger';
+
+        $badge.html(`
+        <span class="sm-avatar avatar rounded ${colorClass.split(' ')[0]}">
+            <i class="${icon}"></i>
+        </span> 
+        ${isPositive ? '+' : ''}${growthPercent}%
+    `);
     }
 
     // Load Donor/Vendor Projects with proper period handling
@@ -699,7 +731,7 @@ $(document).ready(function () {
             tableBody.empty();
 
             if (documents.length === 0) {
-                tableBody.append('<tr><td colspan="13" class="text-center text-muted">No matching documents</td></tr>');
+                tableBody.append('<tr><td colspan="13" class="text-center text-muted">No Documents Found</td></tr>');
                 return;
             }
 

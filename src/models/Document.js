@@ -53,7 +53,7 @@ const documentSchema = new Schema({
 
     documentApprovalAuthority: [{
         userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
-        designation: { type: Schema.Types.ObjectId, ref: "Desgination", required: true },
+        designation: { type: Schema.Types.ObjectId, ref: "Designation", required: true },
         priority: { type: Number, required: true, min: 1 },
         isMailSent: { type: Boolean, default: false },
         status: {

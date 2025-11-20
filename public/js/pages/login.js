@@ -134,7 +134,7 @@ async function verifyOtp(email, otp) {
 // Optional: resend OTP
 async function resendOtp(email) {
     try {
-        const response = await fetch(`${baseUrl}/api/auth/resend-otp`, {
+        const response = await fetch(`${baseUrl}/api/auth/send-otp`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ email })
@@ -183,7 +183,7 @@ async function handleLogin({ emailInput, passwordInput, loginBtn }) {
         if (response.ok && data.success) {
             // Check if OTP is required
             if (data?.data?.message?.includes("OTP sent")) {
-                showSuccess("OTP sent to your registered email/phone");
+                showSuccess("OTP sent to your registered email");
                 showOtpSection(email); // Show OTP fields
             } else {
                 showSuccess("Login successful! Redirecting...");
