@@ -56,6 +56,32 @@ line 28735
   font-size: 12px;
 }
 
+line 6745
+added   width: fit-content;
+.progress {
+  background-color: #E9EDF4;
+  height: 0.75rem;   --> height: 1.60rem;
+  border-radius: 0.25rem;
+}
+
+
+
+mystyle
+
+line 250
+added width: fit-content;
+    .file-item {
+        background: #fff;
+        border: 1px solid #ddd;
+        border-radius: 12px;
+        padding: 15px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 15px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+    }
+
 
 
 aprrove page

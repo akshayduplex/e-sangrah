@@ -62,8 +62,8 @@ document.addEventListener("DOMContentLoaded", () => {
                         <div class="prjtxt mt-3">
                             <p class="fs-12 fw-light">${project.projectDescription ?? ''}</p>
                             <div class="dflexbtwn">
-                                <a href="project-files.php?id=${project._id}" class="site-btnmd fw-light fs-12">Access Files</a>
-                                <span>${project.tags?.length ?? 0} Tags</span>
+                                <a href="/folders?id=${project._id}" class="site-btnmd fw-light fs-12">Access Files</a>
+                                <span>${project?.totalTags ?? 0} Tags</span>
                             </div>
                         </div>
                     </div>

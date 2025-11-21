@@ -11,8 +11,9 @@ import { Parser } from 'json2csv';
 import { API_CONFIG } from "../config/ApiEndpoints.js";
 import mongoose from "mongoose";
 import { activityLogger } from "../helper/activityLogger.js";
-import { toProperCase } from "../helper/Common.js";
+import { toProperCase } from "../helper/CommonHelper.js";
 import User from "../models/User.js";
+import WebSetting from "../models/WebSetting.js";
 
 
 //Pages
@@ -31,6 +32,23 @@ export const showSupportPage = (req, res) => {
     }
 };
 
+export const showSettingPage = async (req, res) => {
+    try {
+        const settings = await WebSetting.findOne();
+
+        res.render("pages/setting", {
+            title: "Setting",
+            user: req.user,
+            settings: settings || {}   // pass to EJS
+        });
+    } catch (err) {
+        logger.error("Web settings page render error:", err);
+        res.status(500).render("pages/error", {
+            user: req.user,
+            message: "Unable to load settings"
+        });
+    }
+};
 
 // Check duplicate fields
 export const checkDuplicate = async (req, res) => {

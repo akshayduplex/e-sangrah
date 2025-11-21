@@ -128,6 +128,7 @@ const projectSchema = new mongoose.Schema(
         projectLogo: { type: String }, // URL or file path
         projectStartDate: { type: Date, required: true, index: true },
         projectEndDate: { type: Date, required: true, index: true },
+        totalTags: { type: Number, default: 0 },
         projectStatus: {
             type: String,
             enum: ["Active", "Inactive", "Closed"],

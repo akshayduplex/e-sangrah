@@ -173,7 +173,7 @@ function initializeBasicComponents() {
     initializeVendorSelect2();
     initializeFolderManagement();
     initializeEventListeners();
-
+    initializeDateRestrictions();
     $('#projectName, #department').on('change', function () {
         toggleCreateFolderBtn();
     });
@@ -690,6 +690,67 @@ function removeUploadedFile(fileId, fileName, fileElement) {
     });
 
     trashModal.show();
+}
+
+function initializeDateRestrictions() {
+    const $startDateInput = $('input[name="documentDate"]');
+    const $expiryDateInput = $('input[name="expiryDate"]');
+    const $complianceYes = $('#complianceYes');
+    const $complianceNo = $('#complianceNo');
+
+    $startDateInput.datetimepicker({
+        format: 'DD-MM-YYYY',
+        useCurrent: false
+    });
+
+    const expiryPicker = $expiryDateInput.datetimepicker({
+        format: 'DD-MM-YYYY',
+        useCurrent: false
+    });
+
+    function updateExpiryMinDate() {
+        const startDate = $startDateInput.data("DateTimePicker")?.date();
+
+        if (startDate) {
+            expiryPicker.data("DateTimePicker").minDate(startDate);
+            const currentExpiry = expiryPicker.data("DateTimePicker").date();
+            if (currentExpiry && currentExpiry.isBefore(startDate)) {
+                expiryPicker.data("DateTimePicker").clear();
+                showToast('Expiry date cleared because it was earlier than the document date.', 'warning');
+            }
+        } else {
+            expiryPicker.data("DateTimePicker").minDate(false);
+        }
+    }
+
+    $startDateInput.on('dp.change', function () {
+        if ($complianceYes.is(':checked')) {
+            updateExpiryMinDate();
+        }
+    });
+
+
+    $complianceYes.on('change', function () {
+        if (this.checked) {
+            $('#expiryDateContainer').show();
+            $('input[name="expiryDate"]').prop('required', true);
+            updateExpiryMinDate();
+        }
+    });
+
+
+    $complianceNo.on('change', function () {
+        if (this.checked) {
+            $('#expiryDateContainer').hide();
+            $('input[name="expiryDate"]').prop('required', false).val('');
+            expiryPicker.data("DateTimePicker").clear();
+        }
+    });
+
+
+    if ($complianceYes.is(':checked')) {
+        updateExpiryMinDate();
+    }
 }
 
 function initializeFileUpload() {

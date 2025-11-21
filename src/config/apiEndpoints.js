@@ -59,6 +59,6 @@ export const API_CONFIG = {
 
     //Company Details
     COMPANY_NAME: process.env.COMPANY_NAME,
-    LOGO_URL: process.env.LOGO_URL,
-    EMAIL_BANNER: process.env.EMAIL_BANNER
+    LOGO_URL: null,
+    EMAIL_BANNER: null
 };

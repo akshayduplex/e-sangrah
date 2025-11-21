@@ -786,7 +786,7 @@
                                 if (approval.isApproved) {
                                     actionCellContent = `<span class="text-success small">Already Approved</span>`;
                                 } else if (!isMailSent && priority !== highestPriority) {
-                                    actionCellContent = `<span class="text-muted small">Mail Already sent</span>`;
+                                    actionCellContent = `<span class="text-muted small">Mail not send</span>`;
                                 } else {
                                     actionCellContent = `<button class="btn btn-sm btn-success send-mail"
                     data-project-id="${projectId}"

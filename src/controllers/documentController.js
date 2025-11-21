@@ -26,6 +26,7 @@ import { deleteObject } from "../utils/s3Helpers.js";
 import { generateEmailTemplate } from "../helper/emailTemplate.js";
 import { activityLogger } from "../helper/activityLogger.js";
 import DocumentVersion from "../models/DocumentVersion.js";
+import { recomputeProjectTotalTags } from "../helper/CommonHelper.js";
 
 //Page Controllers
 const VERSIONED_FIELDS = [
@@ -75,9 +76,14 @@ export const showDocumentListPage = async (req, res) => {
 // Add Document page
 export const showAddDocumentPage = async (req, res) => {
     try {
+        console.log("page route", req.session)
         res.render("pages/document/add-document", {
             title: "E-Sangrah - Add-Document",
             user: req.user,
+            selectedProject: {
+                _id: req.session.selectedProject,
+                projectName: req.session.selectedProjectName
+            },
             isEdit: false
         });
     } catch (err) {
@@ -1129,10 +1135,9 @@ export const createDocument = async (req, res) => {
         } = req.body;
         const userId = req.user?._id || null;
         const userName = req.user?.name || "Unknown User";
-        // ------------------- Parse and Validate Inputs -------------------
 
-        const validFolderId =
-            folderId && mongoose.Types.ObjectId.isValid(folderId) ? folderId : null;
+        // ------------------- Parse Inputs -------------------
+        const validFolderId = folderId && mongoose.Types.ObjectId.isValid(folderId) ? folderId : null;
         const parsedWantApprovers = wantApprovers === "true";
         const parsedTags =
             tags && typeof tags === "string"
@@ -1141,45 +1146,41 @@ export const createDocument = async (req, res) => {
                     ? tags
                     : [];
 
-        let parsedStartDate = null;
+        // ------------------- Parse documentDate as startDate -------------------
+        let startDate = null;
         if (documentDate) {
             const [day, month, year] = documentDate.split(/[\/\-]/);
-            parsedStartDate = new Date(`${year}-${month}-${day}`);
+            startDate = new Date(`${year}-${month}-${day}`);
+            if (isNaN(startDate.getTime())) {
+                return failResponse(res, "Invalid documentDate format", 400);
+            }
         }
+
+        // ------------------- Parse metadata -------------------
         let parsedMetadata = {};
         if (metadata) {
             try {
-                parsedMetadata =
-                    typeof metadata === "string" ? JSON.parse(metadata) : metadata;
+                parsedMetadata = typeof metadata === "string" ? JSON.parse(metadata) : metadata;
             } catch (err) {
                 logger.error("Error parsing metadata:", err);
             }
         }
 
-        // ------------------- Parse Compliance and Expiry -------------------
+        // ------------------- Parse compliance and expiry -------------------
         let isCompliance = false;
         let parsedExpiryDate = null;
 
-        // FIX: Handle "yes"/"no" strings and boolean values properly
         if (typeof compliance === "string") {
             isCompliance = compliance.toLowerCase() === "yes";
         } else if (typeof compliance === "boolean") {
             isCompliance = compliance;
-        } else {
-            // Handle null/undefined by defaulting to false
-            isCompliance = false;
         }
 
-        //If compliance = "no" → ignore expiryDate safely
-        if (!isCompliance) {
-            parsedExpiryDate = null;
-        } else {
-            // Only process expiryDate when compliance = "yes"
+        if (isCompliance) {
             if (!expiryDate || expiryDate.trim() === "") {
                 return failResponse(res, "Expiry date required when compliance is 'Yes'", 400);
             }
 
-            // Validate date format (DD-MM-YYYY or YYYY-MM-DD)
             const parts = expiryDate.split("-");
             if (parts.length === 3) {
                 if (parts[0].length === 2) {
@@ -1196,19 +1197,18 @@ export const createDocument = async (req, res) => {
             if (isNaN(parsedExpiryDate.getTime())) {
                 return failResponse(res, "Invalid expiry date format", 400);
             }
-        }
-        // ------------------- Validate Start Date < Expiry Date -------------------
-        if (isCompliance && parsedStartDate && parsedExpiryDate) {
-            if (parsedStartDate >= parsedExpiryDate) {
-                return failResponse(
-                    res,
-                    "Start date must be earlier than expiry date",
-                    400
-                );
-            }
+
+            // ------------------- Validate startDate < expiryDate -------------------
+            // if (startDate && startDate > parsedExpiryDate) {
+            //     return failResponse(
+            //         res,
+            //         "Document date (start date) must be earlier than expiry date",
+            //         400
+            //     );
+            // }
         }
 
-        // ------------------- Get Project Approval Authority if wantApprovers is true -------------------
+        // ------------------- Get Project Approval Authority -------------------
         let documentApprovalAuthority = [];
         if (parsedWantApprovers && project && mongoose.Types.ObjectId.isValid(project)) {
             try {
@@ -1238,8 +1238,7 @@ export const createDocument = async (req, res) => {
         let parsedFileIds = [];
         if (fileIds) {
             try {
-                parsedFileIds =
-                    typeof fileIds === "string" ? JSON.parse(fileIds) : fileIds;
+                parsedFileIds = typeof fileIds === "string" ? JSON.parse(fileIds) : fileIds;
             } catch {
                 parsedFileIds = [fileIds];
             }
@@ -1247,6 +1246,7 @@ export const createDocument = async (req, res) => {
         parsedFileIds = [...new Set(parsedFileIds)]
             .filter((id) => mongoose.Types.ObjectId.isValid(id))
             .map((id) => new mongoose.Types.ObjectId(id));
+
         // ------------------- Create Document -------------------
         const document = await Document.create({
             project: project || null,
@@ -1259,7 +1259,7 @@ export const createDocument = async (req, res) => {
             status: parsedWantApprovers ? "Pending" : "Approved",
             tags: parsedTags,
             metadata: parsedMetadata,
-            parsedStartDate,
+            startDate,
             description,
             compliance: {
                 isCompliance,
@@ -1272,6 +1272,7 @@ export const createDocument = async (req, res) => {
             currentVersionLabel: "1.0",
             currentVersionNumber: mongoose.Types.Decimal128.fromString("1.0"),
         });
+
         // ------------------- Process Files in Parallel -------------------
         let fileDocs = [];
         if (parsedFileIds.length > 0) {
@@ -1347,27 +1348,29 @@ export const createDocument = async (req, res) => {
             }
         }
 
-
         // ------------------- Save Document -------------------
         await document.save();
-        // ------------------- Create Notifications for Approval Authority -------------------
-        if (parsedWantApprovers && documentApprovalAuthority.length > 0) {
+        if (document.project) {
             try {
-                for (const authority of documentApprovalAuthority) {
-                    await addNotification({
-                        recipient: authority.userId._id || authority.userId,
-                        sender: userId,
-                        type: "approval_request",
-                        title: "Document Approval Required",
-                        message: `${userName} has uploaded a document that requires your approval.`,
-                        relatedDocument: document._id,
-                        relatedProject: project || null,
-                        priority: "high",
-                        actionUrl: `/documents/${document._id}?tab=approval`
-                    });
-                }
+                await recomputeProjectTotalTags(document.project);
             } catch (err) {
-                logger.error("Error creating approval notifications:", err);
+                logger.error("Failed to recompute project total tags after create:", err);
+            }
+        }
+        // ------------------- Notifications -------------------
+        if (parsedWantApprovers && documentApprovalAuthority.length > 0) {
+            for (const authority of documentApprovalAuthority) {
+                await addNotification({
+                    recipient: authority.userId._id || authority.userId,
+                    sender: userId,
+                    type: "approval_request",
+                    title: "Document Approval Required",
+                    message: `${userName} has uploaded a document that requires your approval.`,
+                    relatedDocument: document._id,
+                    relatedProject: project || null,
+                    priority: "high",
+                    actionUrl: `/documents/${document._id}?tab=approval`
+                });
             }
         }
 
@@ -1379,19 +1382,18 @@ export const createDocument = async (req, res) => {
             details: `${userName} added document ${document?.metadata?.fileName}`,
             meta: { changes: ["Document added"] }
         });
+
         // ------------------- Populate and Respond -------------------
         await document.populate([
             { path: "department", select: "name" },
             { path: "project", select: "projectName" },
             { path: "owner", select: "name email" },
             { path: "files", select: "originalName fileType s3Url" },
-            {
-                path: "documentApprovalAuthority.userId",
-                select: "name email"
-            },
+            { path: "documentApprovalAuthority.userId", select: "name email" },
         ]);
-        // Create initial version snapshot
+
         await createVersionSnapshot(document, {}, userId, "Initial document creation");
+
         return successResponse(res, { document }, "Document created successfully", 201);
     } catch (error) {
         logger.error("Document creation error:", error);
@@ -1402,6 +1404,7 @@ export const createDocument = async (req, res) => {
         return errorResponse(res, error, "Failed to create document");
     }
 };
+
 
 /**
  * Utility: Create version snapshot
@@ -1477,7 +1480,6 @@ export const updateDocument = async (req, res) => {
             await session.abortTransaction();
             return res.status(403).json({ success: false, message: "Unauthorized" });
         }
-        console.log("Update document data", req.body)
         const originalDoc = document.toObject();
         const updateData = { ...req.body };
         const changedFields = [];
@@ -1695,20 +1697,37 @@ export const updateDocument = async (req, res) => {
             document.currentVersionNumber = versionNumber;
 
             await document.save({ session });
-
-            // FIXED: Correct parameter order for createVersionSnapshot
             await createVersionSnapshot(
-                document, // Pass document object
-                diff,     // Pass changes/diff
+                document,
+                diff,
                 req.user._id,
                 readableReason
             );
-
-            console.log(`🔄 Created version ${versionLabel} for document ${document._id}`);
         }
 
         await session.commitTransaction();
-        console.log('✅ Document update transaction committed');
+        try {
+
+            if (versionedChanges.includes("tags")) {
+                if (document.project) {
+                    await recomputeProjectTotalTags(document.project);
+                }
+            }
+
+            const originalProjectId = originalDoc.project ? originalDoc.project.toString() : null;
+            const newProjectId = document.project ? document.project.toString() : null;
+
+            if (originalProjectId !== newProjectId) {
+                if (originalProjectId) {
+                    await recomputeProjectTotalTags(originalProjectId);
+                }
+                if (newProjectId) {
+                    await recomputeProjectTotalTags(newProjectId);
+                }
+            }
+        } catch (err) {
+            logger.error("Failed to recompute project total tags after update:", err);
+        }
 
         // ------------------------
         // POPULATE AND RESPOND
@@ -2431,7 +2450,9 @@ export const deleteDocument = async (req, res) => {
                 $project: {
                     files: 1,
                     approvalHistory: 1,
-                    versionFiles: "$versionHistory.file"
+                    versionFiles: "$versionHistory.file",
+                    project: 1,
+                    metadata: 1
                 }
             }
         ]);
@@ -2469,6 +2490,24 @@ export const deleteDocument = async (req, res) => {
         // Commit DB changes first
         await session.commitTransaction();
         session.endSession();
+        // ----------------------------------------------
+        // Recompute project totalTags after delete
+        // ----------------------------------------------
+        try {
+            const uniqueProjectIds = [
+                ...new Set(
+                    docs
+                        .map(d => d.project?.toString())
+                        .filter(Boolean)
+                )
+            ];
+
+            for (const projectId of uniqueProjectIds) {
+                await recomputeProjectTotalTags(projectId);
+            }
+        } catch (err) {
+            console.error("Failed to recompute project totalTags after delete:", err);
+        }
 
         // Then delete from S3 (outside transaction)
         if (filesToDelete.length) {

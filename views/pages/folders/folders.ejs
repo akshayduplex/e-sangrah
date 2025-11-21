@@ -211,6 +211,7 @@
 				const copyLinkBtn = document.getElementById("copyLinkBtn");
 				const accessTypeSelect = document.getElementById("accessType");
 				const roleTypeSelect = document.getElementById("roleType");
+				const projectId = "<%= projectId %>";
 
 				let currentShareFolderId = null;
 				let allUsers = [];
@@ -251,12 +252,11 @@
 				const fetchFolders = async () => {
 					const queryParams = new URLSearchParams();
 					queryParams.append("_ts", Date.now()); // prevent caching
-
-					const response = await fetch(`/api/folders/tree/structure?${queryParams}`, {
+					console.log("projectid", projectId)
+					const response = await fetch(`/api/folders/tree/structure?${queryParams.toString()}&projectId=${projectId}`, {
 						credentials: "include",
 						cache: "no-store"
 					});
-
 					if (!response.ok) throw new Error(`HTTP error! ${response.status}`);
 
 					const data = await response.json();

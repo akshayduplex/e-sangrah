@@ -1293,7 +1293,7 @@ export const searchProjects = async (req, res) => {
             page: parseInt(page),
             limit: parseInt(limit),
             sort: { createdAt: -1 },
-            select: 'projectName projectDescription projectManager projectStatus tags createdAt',
+            select: 'projectName projectDescription projectManager projectStatus tags totalTags createdAt',
             populate: [
                 { path: 'projectManager', select: 'name email' }
             ]

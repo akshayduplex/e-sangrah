@@ -34,11 +34,7 @@
                                 <div class="mb-3">
                                     <label class="form-label">Project Name <span class="text-danger">*</span></label>
                                     <select id="projectName" name="project" class="form-select select2" required>
-                                        <% if (document.project) { %>
-                                            <option value="<%= document.project._id %>" selected>
-                                                <%= document.project.projectName || document.project.name %>
-                                            </option>
-                                            <% } %>
+
                                     </select>
                                 </div>
                             </div>

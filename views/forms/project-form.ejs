@@ -1,3 +1,4 @@
+<!-- /views/forms/project-form -->
 <% if (!viewOnly) { %>
     <form id="<%= project ? 'editProjectForm' : 'addProjectForm' %>" enctype="multipart/form-data">
         <% } %>
@@ -86,7 +87,7 @@
                                         <% } %>
                             </div>
                             <% } else { %>
-                                <input type="file" name="projectLogo" class="form-control">
+                                <input type="file" name="projectLogo" class="form-control" title="Upload project logo">
                                 <% } %>
                     </div>
 
@@ -120,6 +121,7 @@
                             <% } else { %>
                                 <div class="position-relative mb-0">
                                     <input type="text" name="projectStartDate" class="form-control datetimepicker"
+                                        placeholder="Select Start Date"
                                         value="<%= project?.projectStartDateISO || '' %>" required>
                                     <span class="input-icon-addon">
                                         <i class="ti ti-calendar text-gray-7"></i>
@@ -137,7 +139,8 @@
                             <% } else { %>
                                 <div class="position-relative mb-0">
                                     <input type="text" name="projectEndDate" class="form-control datetimepicker"
-                                        value="<%= project?.projectEndDateISO || '' %>" required>
+                                        placeholder="Select End Date" value="<%= project?.projectEndDateISO || '' %>"
+                                        required>
                                     <span class="input-icon-addon">
                                         <i class="ti ti-calendar text-gray-7"></i>
                                     </span>
@@ -153,7 +156,7 @@
                             </div>
                             <% } else { %>
                                 <input type="number" name="projectDuration" class="form-control"
-                                    value="<%= project?.projectDuration || '' %>" placeholder="Total Days">
+                                    value="<%= project?.projectDuration || '' %>" placeholder="Duration" disabled>
                                 <% } %>
                     </div>
                 </div>
@@ -167,7 +170,9 @@
                                 <%= (project?.donor || []).map(d=> d.name).join(", ") || "N/A" %>
                             </div>
                             <% } else { %>
-                                <select name="donor[]" class="form-control select2" multiple>
+                                <select name="donor[]" class="form-control select2" multiple
+                                    data-placeholder="Select Donors">
+                                    <option></option> <!-- required for placeholder -->
                                     <% donors.forEach(d=> { %>
                                         <option value="<%= d._id %>" <%=project?.donor?.some(pd=> pd._id?.toString() ===
                                             d._id.toString()) ? "selected" : "" %>>
@@ -187,7 +192,9 @@
                                 <%= (project?.vendor || []).map(v=> v.name).join(", ") || "N/A" %>
                             </div>
                             <% } else { %>
-                                <select name="vendor[]" class="form-control select2" multiple>
+                                <select name="vendor[]" class="form-control select2" multiple
+                                    data-placeholder="Select Vendors">
+                                    <option></option>
                                     <% vendors.forEach(v=> { %>
                                         <option value="<%= v._id %>" <%=project?.vendor?.some(pv=> pv._id?.toString()
                                             === v._id.toString()) ? "selected" : "" %>>
@@ -207,7 +214,9 @@
                                 <%= (project?.projectCollaborationTeam || []).map(c=> c.name).join(", ") || "N/A" %>
                             </div>
                             <% } else { %>
-                                <select name="projectCollaborationTeam[]" class="form-control select2" multiple>
+                                <select name="projectCollaborationTeam[]" class="form-control select2" multiple
+                                    data-placeholder="Select Team Members">
+                                    <option></option>
                                     <% users.forEach(u=> { %>
                                         <option value="<%= u._id %>" <%=project?.projectCollaborationTeam?.some(c=>
                                             c._id?.toString() === u._id.toString()) ? "selected" : "" %>>
@@ -294,7 +303,7 @@
                                                         <div class="col-md-3">
                                                             <input type="number"
                                                                 name="approvalAuthority[<%= index %>][priority]"
-                                                                class="form-control" placeholder="Priority"
+                                                                class="form-control" placeholder="Enter priority"
                                                                 value="<%= a.priority %>" required>
                                                         </div>
                                                         <div class="col-md-1 d-flex align-items-center">
@@ -386,7 +395,7 @@
                             <% } else { %>
                                 <textarea name="projectDescription" class="form-control" rows="4"
                                     style="resize:vertical"
-                                    placeholder="Enter about Project"><%= project?.projectDescription || '' %></textarea>
+                                    placeholder="Enter project description"><%= project?.projectDescription || '' %></textarea>
                                 <% } %>
                     </div>
                 </div>

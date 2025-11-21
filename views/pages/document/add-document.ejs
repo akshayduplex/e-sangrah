@@ -34,12 +34,18 @@
 											<label class="form-label">Project Name</label>
 											<select id="projectName" name="project" class="form-select select2"
 												required>
-												<option value="">-- Select Project Name --</option>
-												<% if (isEdit && document.project) { %>
-													<option value="<%= document.project._id %>" selected>
-														<%= document.project.projectName %>
+												<% if (!isEdit && selectedProject) { %>
+													<option value="<%= selectedProject._id %>" selected>
+														<%= selectedProject.projectName %>
 													</option>
 													<% } %>
+
+														<% if (isEdit && document.project) { %>
+															<option value="<%= document.project._id %>" selected>
+																<%= document.project.projectName %>
+															</option>
+															<% } %>
+
 											</select>
 										</div>
 									</div>
@@ -51,11 +57,7 @@
 											<label class="form-label">Department </label>
 											<select id="department" name="department" class="form-select select2"
 												required>
-												<% if (isEdit && document.department) { %>
-													<option value="<%= document.department._id %>" selected>
-														<%= document.department.name %>
-													</option>
-													<% } %>
+
 											</select>
 
 										</div>
@@ -68,11 +70,7 @@
 											<label class="form-label">Project Manager</label>
 											<select id="projectManager" name="projectManager"
 												class="form-select select2" required>
-												<% if (isEdit && document.projectManager) { %>
-													<option value="<%= document.projectManager._id %>" selected>
-														<%= document.projectManager.name %>
-													</option>
-													<% } %>
+
 											</select>
 										</div>
 									</div>
@@ -460,14 +458,5 @@
 			</div>
 		</div>
 	</div>
-	<script src="/js/pages/documents/addEditDocument.js"></script>
 	<%- include('../../partials/footer') %>
-		<!-- CHANGE THIS: Use separated script files instead of addEditDocument.js
-	
-		<!-- <% if (isEdit) { %>
-			<script src="/js/pages/documents/document-utils.js"></script>
-			<script src="/js/pages/documents/edit-document.js"></script>
-			<% } else { %>
-				<script src="/js/pages/documents/document-utils.js"></script>
-				<script src="/js/pages/documents/add-document.js"></script>
-				<% } %> --> -->
+		<script defer src="/js/pages/documents/addEditDocument.js"></script>

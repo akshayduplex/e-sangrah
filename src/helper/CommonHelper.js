@@ -1,3 +1,6 @@
+import Document from "../models/Document.js";
+import Project from "../models/Project.js";
+
 // Helper to pick an icon for each file type (optional)
 export const getFileIcon = (fileType = "") => {
     const lower = fileType.toLowerCase();
@@ -25,3 +28,21 @@ export function toProperCase(str = "") {
         .replace(/\s+/g, " ")                              // Remove extra spaces
         .trim();
 }
+
+
+
+export const recomputeProjectTotalTags = async (projectId) => {
+    if (!projectId) return;
+
+    const distinctTags = await Document.distinct("tags", { project: projectId });
+    const cleaned = (distinctTags || [])
+        .map(t => (typeof t === "string" ? t.trim().toLowerCase() : null))
+        .filter(Boolean);
+
+    const unique = [...new Set(cleaned)];
+    const totalTags = unique.length;
+
+    await Project.findByIdAndUpdate(projectId, {
+        $set: { totalTags, tags: unique },
+    }, { new: true }).exec();
+};

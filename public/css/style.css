@@ -6744,7 +6744,8 @@ svg.feather-14 {
 /****** Utils ******/
 .progress {
   background-color: #E9EDF4;
-  height: 0.75rem;
+  width: 4.6rem;
+  height: 1.60rem;
   border-radius: 0.25rem;
 }
 

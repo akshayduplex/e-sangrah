@@ -1,0 +1,126 @@
+<%- include('../partials/header') %>
+
+    <div class="page-wrapper">
+        <div class="content">
+            <!-- Breadcrumb -->
+            <div class="d-flex align-items-center justify-content-between page-breadcrumb mb-3">
+                <div class="my-auto mb-2">
+                    <h2 class="mb-1">Web Settings</h2>
+                    <nav>
+                        <ol class="breadcrumb mb-0">
+                            <li class="breadcrumb-item"><a href="#"><i class="ti ti-smart-home"></i></a></li>
+                            <li class="breadcrumb-item">Settings</li>
+                            <li class="breadcrumb-item active">Web Settings</li>
+                        </ol>
+                    </nav>
+                </div>
+            </div>
+            <!-- /Breadcrumb -->
+
+            <div class="card">
+                <!-- <div class="card-header">
+                    <h4 class="card-title">Image Settings</h4>
+                </div> -->
+                <div class="card-body">
+                    <form id="webSettingsForm" enctype="multipart/form-data">
+
+                        <!-- Logo -->
+                        <div class="mb-4">
+                            <label class="form-label">Website Logo</label>
+                            <div class="d-flex align-items-center gap-3">
+                                <img id="logoPreview" src="<%= settings.logo || '/assets/img/placeholder.png' %>"
+                                    alt="Logo Preview" class="img-thumbnail" style="width:120px; height:auto;">
+                                <input type="file" class="form-control" name="logo" accept="image/*"
+                                    onchange="previewImage(event, 'logoPreview')">
+                            </div>
+                        </div>
+
+                        <!-- Favicon -->
+                        <div class="mb-4">
+                            <label class="form-label">Favicon</label>
+                            <div class="d-flex align-items-center gap-3">
+                                <img id="faviconPreview" src="<%= settings.favicon || '/assets/img/placeholder.png' %>"
+                                    alt="Favicon Preview" class="img-thumbnail" style="width:60px; height:60px;">
+                                <input type="file" class="form-control" name="favicon" accept="image/*"
+                                    onchange="previewImage(event, 'faviconPreview')">
+                            </div>
+                        </div>
+
+                        <!-- Banner -->
+                        <div class="mb-4">
+                            <label class="form-label">Email Banner</label>
+                            <div class="d-flex align-items-center gap-3">
+                                <img id="bannerPreview"
+                                    src="<%= settings.banner || '/assets/img/placeholder-wide.png' %>"
+                                    alt="Banner Preview" class="img-thumbnail" style="width:200px; height:auto;">
+                                <input type="file" class="form-control" name="banner" accept="image/*"
+                                    onchange="previewImage(event, 'bannerPreview')">
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <div class="text-end">
+                            <button type="submit" id="saveBtn" class="btn btn-primary">
+                                <span id="btnText">Save Settings</span>
+                                <span id="btnLoader" class="spinner-border spinner-border-sm d-none"></span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        function previewImage(event, previewId) {
+            const reader = new FileReader();
+            reader.onload = function () {
+                document.getElementById(previewId).src = reader.result;
+            };
+            reader.readAsDataURL(event.target.files[0]);
+        }
+
+        const form = document.getElementById("webSettingsForm");
+        const saveBtn = document.getElementById("saveBtn");
+        const btnText = document.getElementById("btnText");
+        const btnLoader = document.getElementById("btnLoader");
+
+        form.addEventListener("submit", async function (e) {
+            e.preventDefault(); // prevent redirect
+
+            // show loader
+            btnText.textContent = "Saving...";
+            btnLoader.classList.remove("d-none");
+            saveBtn.disabled = true;
+
+            const formData = new FormData(form);
+
+            try {
+                const res = await fetch("/api/settings/web-settings", {
+                    method: "POST",
+                    body: formData
+                });
+
+                const result = await res.json();
+
+                if (result.success) {
+                    showToast(result.message || "Settings updated successfully", "success");
+                    setTimeout(() => location.reload(), 1200);
+                } else {
+                    showToast(result.message || "Update failed", "error");
+                }
+
+            } catch (err) {
+                showToast("Something went wrong", "error");
+            }
+
+            // reset button
+            btnText.textContent = "Save Settings";
+            btnLoader.classList.add("d-none");
+            saveBtn.disabled = false;
+        });
+    </script>
+
+    <%- include('../partials/footer') %>

@@ -292,7 +292,7 @@ document.addEventListener("DOMContentLoaded", function () {
     function renderNotifications(notifications) {
         notificationContainer.innerHTML = "";
         notifications.forEach(n => {
-            const createdTime = new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const createdTime = formatDateTime(n.createdAt);
             let actionUrl = "#";
             let displayButton = "";
             if (n.type === "approval_request") { actionUrl = "/approval-requests"; displayButton = `<span class="badge bg-success text-white px-2 py-1 ms-2">Approve</span>`; }

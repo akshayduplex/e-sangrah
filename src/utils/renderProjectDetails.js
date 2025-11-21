@@ -34,7 +34,7 @@ export async function renderProjectDetails(res, projectId = null, userDetails) {
             project.projectEndDateISO = formatDateDDMMYYYY(project.projectEndDate);
         }
         const [users, departments, donors, vendors, projectTypes, designations] = await Promise.all([
-            User.find({ profile_type: "user", status: "Active" }, "name").lean(),
+            User.find({ profile_type: "user", status: "Active" }).select("name userDetails").populate("userDetails.department", "name").populate("userDetails.designation", "name").lean(),
             Department.find({ status: "Active" }, "name").lean(),
             User.find({ profile_type: "donor" }, "name").lean(),
             User.find({ profile_type: "vendor" }, "name").lean(),

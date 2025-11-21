@@ -153,11 +153,16 @@ document.addEventListener("DOMContentLoaded", function () {
 
             if (data.success) {
                 clearInterval(countdownInterval);
-                countdownDisplay.style.display = "none"; // Hide OTP countdown
+                otpSection.querySelector("h5").style.display = "none";
+                document.querySelector(".otp-send-row").style.display = "none";
+                document.querySelector(".resend-btn").style.display = "none"
+                otpSection.querySelector(".otp-input-wrapper").style.display = "none";
+                countdownDisplay.style.display = "none";
                 otpVerifiedText.style.display = "block";
-                resetForm.style.display = "block";       // show password form
+                resetForm.style.display = "block";
                 document.getElementById("hiddenEmail").value = emailInput.value.trim();
-            } else {
+            }
+            else {
                 showToast(data.message || "Invalid OTP, try again.", "error");
                 otpInputs.forEach(inp => inp.value = "");
                 otpInputs[0].focus();

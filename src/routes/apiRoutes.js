@@ -22,6 +22,7 @@ import * as FolderController from "../controllers/FolderController.js";
 import * as NotificationController from "../controllers/NotificationController.js";
 import * as TempController from "../controllers/FileController.js";
 import * as CommonController from "../controllers/CommonController.js"
+import * as WebSettings from "../controllers/WebSettingController.js"
 
 // ---------------------------
 // Middleware imports
@@ -58,6 +59,7 @@ import UserFolderHistory from "../models/UserFolderHistory.js";
 import { createS3Uploader, s3uploadfolder } from "../middlewares/multer-s3.js";
 import { ParentFolderName } from "../middlewares/parentFolderName.js";
 import { validators } from "../middlewares/validate.js";
+import { uploadWebImages } from "../middlewares/imagesUpload.js";
 
 const router = express.Router();
 // ---------------------------
@@ -124,6 +126,11 @@ router.get("/download/:folderId", authenticate, CommonController.downloadFolderA
 router.post('/export', authenticate, CommonController.exportDocuments);
 router.get('/export/formats', authenticate, CommonController.getExportFormats);
 
+// ---------------------------
+// Private routes
+// ---------------------------
+router.get("/settings/web-settings", authenticate, authorize('superadmin'), WebSettings.getWebSettings);
+router.post("/settings/web-settings", authenticate, authorize('superadmin'), uploadWebImages, WebSettings.updateWebSettings);
 
 // ---------------------------
 // Admin routes

@@ -66,7 +66,7 @@ router.get("/reset-password", authenticate, AuthController.getResetPasswordPage)
 
 /* --- Common Pages --- */
 router.get("/support", CommonController.showSupportPage);
-
+router.get("/setting", authenticate, authorize('admin', 'superadmin'), CommonController.showSettingPage);
 /* --- User Management --- */
 
 // User list page

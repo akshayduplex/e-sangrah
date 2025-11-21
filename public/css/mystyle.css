@@ -248,6 +248,7 @@
     }
 
     .file-item {
+        width: fit-content;
         background: #fff;
         border: 1px solid #ddd;
         border-radius: 12px;

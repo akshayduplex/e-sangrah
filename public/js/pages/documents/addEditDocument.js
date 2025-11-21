@@ -57,6 +57,10 @@ $(document).ready(function () {
         format: 'DD-MM-YYYY',
         useCurrent: false
     });
+    // --------------------------
+    // Date Restrictions for Compliance
+    // --------------------------
+    setupEnhancedDateRestrictions();
 
     // --------------------------
     // Compliance radio buttons
@@ -369,9 +373,8 @@ $(document).ready(function () {
                 <div class="progress-bar bg-success" role="progressbar" style="width:0%">0%</div>
             </div>
         </div>
-        <button class="remove-btn btn btn-sm btn-danger mt-2" data-file-id="${tempId}" disabled>
-            <i class="fa-solid fa-xmark"></i> Remove
-        </button>
+        <button type="button" class="remove-btn btn btn-sm btn-danger mt-2" data-file-id="${tempId}" disabled><i class="fa-solid fa-xmark"></i> Remove
+       </button>
     `;
             fileList.appendChild(fileItem);
 
@@ -419,6 +422,8 @@ $(document).ready(function () {
     fileList.addEventListener("click", function (e) {
         const btn = e.target.closest(".remove-btn");
         if (!btn) return;
+        e.preventDefault();
+        e.stopPropagation();
 
         fileToDelete = btn.closest(".file-item");
         const fileId = btn.getAttribute("data-file-id");
@@ -426,13 +431,13 @@ $(document).ready(function () {
 
         // Update modal content
         trashModalTitle.innerHTML = `
-        <img src="/img/icons/bin.png" class="me-2" style="width:24px; height:24px;">
-        Delete File
-    `;
+    <img src="/img/icons/bin.png" class="me-2" style="width:24px; height:24px;">
+    Delete File
+`;
         trashModalBody.innerHTML = `
-        You are about to delete <strong>"${fileToDelete.querySelector("h6").textContent}"</strong>.<br>
-        This action cannot be undone. Are you sure you want to proceed?
-    `;
+    You are about to delete <strong>"${fileToDelete.querySelector("h6").textContent}"</strong>.<br>
+    This action cannot be undone. Are you sure you want to proceed?
+`;
 
         trashModal.show();
     });
@@ -484,7 +489,6 @@ $(document).ready(function () {
                     type: "GET",
                     success: function (res) {
                         let data = res.data || [];
-                        data.unshift({ _id: "all", projectName: "-- Select Project Name --" });
                         success(data);
                     },
                     error: failure
@@ -501,16 +505,13 @@ $(document).ready(function () {
         }
     });
 
-    // Pre-select projectName if editing
-    if (window.isEdit && window.documentData && window.documentData.project) {
-        const projectOption = new Option(
-            window.documentData.project.projectName || window.documentData.project.name,
-            window.documentData.project._id,
-            true,
-            true
-        );
-        $('#projectName').append(projectOption).trigger('change');
+    if (!window.isEdit && window.selectedProject && window.selectedProject.id) {
+        const userProj = window.selectedProject;
+
+        const option = new Option(userProj.name, userProj.id, true, true);
+        $('#projectName').append(option).trigger('change');
     }
+
 
     // --------------------------
     // Department Select2
@@ -528,7 +529,6 @@ $(document).ready(function () {
             processResults: function (data, params) {
                 params.page = params.page || 1;
                 let results = data.data.map(dep => ({ id: dep._id, text: dep.name }));
-                results.unshift({ id: 'all', text: '-- Select Department --' });
                 return { results, pagination: { more: data.pagination.more } };
             },
             cache: true
@@ -567,7 +567,6 @@ $(document).ready(function () {
             processResults: function (data, params) {
                 params.page = params.page || 1;
                 let results = data.users.map(u => ({ id: u._id, text: u.name }));
-                results.unshift({ id: 'all', text: '-- Select Project Manager --' });
                 return {
                     results,
                     pagination: { more: params.page * 10 < data.pagination.total }
@@ -674,6 +673,138 @@ $(document).ready(function () {
             $('#documentVendor').append(vendorOption).trigger('change');
         }
     }
+
+    // Date restriction for compliance expiry date
+    function setupDateRestrictions() {
+        const startDateInput = $('input[name="documentDate"]');
+        const expiryDateInput = $('input[name="expiryDate"]');
+
+        // Initialize datepickers with restrictions
+        startDateInput.datetimepicker({
+            format: 'DD-MM-YYYY',
+            useCurrent: false
+        });
+
+        expiryDateInput.datetimepicker({
+            format: 'DD-MM-YYYY',
+            useCurrent: false,
+            enabledDates: false // Initially disable all dates until start date is selected
+        });
+
+        // When start date changes, update expiry date restrictions
+        startDateInput.on('dp.change', function (e) {
+            const selectedStartDate = e.date;
+
+            if (selectedStartDate) {
+                // Enable expiry date picker and set min date
+                expiryDateInput.data("DateTimePicker").enable();
+                expiryDateInput.data("DateTimePicker").minDate(selectedStartDate);
+
+                // If expiry date is already selected and before start date, clear it
+                const currentExpiryDate = expiryDateInput.data("DateTimePicker").date();
+                if (currentExpiryDate && currentExpiryDate.isBefore(selectedStartDate)) {
+                    expiryDateInput.data("DateTimePicker").clear();
+                }
+            } else {
+                // If no start date selected, disable expiry date
+                expiryDateInput.data("DateTimePicker").disable();
+            }
+        });
+
+        // Also handle when compliance is toggled
+        $('input[name="compliance"]').change(function () {
+            if ($(this).val() === 'yes') {
+                const startDate = startDateInput.data("DateTimePicker").date();
+                if (startDate) {
+                    expiryDateInput.data("DateTimePicker").enable();
+                    expiryDateInput.data("DateTimePicker").minDate(startDate);
+                }
+            }
+        });
+    }
+
+    // Alternative solution using native HTML5 date validation (simpler approach)
+    function setupSimpleDateRestriction() {
+        const startDateInput = document.querySelector('input[name="documentDate"]');
+        const expiryDateInput = document.querySelector('input[name="expiryDate"]');
+
+        startDateInput.addEventListener('change', function () {
+            if (this.value) {
+                // Convert DD-MM-YYYY to YYYY-MM-DD for min attribute
+                const parts = this.value.split('-');
+                if (parts.length === 3) {
+                    const yyyyMmDd = `${parts[2]}-${parts[1]}-${parts[0]}`;
+                    expiryDateInput.min = yyyyMmDd;
+
+                    // If expiry date is already selected and before start date, clear it
+                    const expiryParts = expiryDateInput.value.split('-');
+                    if (expiryDateInput.value && expiryParts.length === 3) {
+                        const expiryYyyyMmDd = `${expiryParts[2]}-${expiryParts[1]}-${expiryParts[0]}`;
+                        if (expiryYyyyMmDd < yyyyMmDd) {
+                            expiryDateInput.value = '';
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // Enhanced solution with better DateTimePicker integration
+    function setupEnhancedDateRestrictions() {
+        const startDatePicker = $('input[name="documentDate"]').datetimepicker({
+            format: 'DD-MM-YYYY',
+            useCurrent: false
+        });
+
+        const expiryDatePicker = $('input[name="expiryDate"]').datetimepicker({
+            format: 'DD-MM-YYYY',
+            useCurrent: false,
+            enabledDates: false
+        });
+
+        // Disable expiry date initially
+        expiryDatePicker.data("DateTimePicker").disable();
+
+        // When start date is selected
+        startDatePicker.on('dp.change', function (e) {
+            const startDate = e.date;
+
+            if (startDate) {
+                // Enable and set min date for expiry date
+                const expiryPicker = expiryDatePicker.data("DateTimePicker");
+                expiryPicker.enable();
+                expiryPicker.minDate(startDate);
+
+                // Clear expiry date if it's before the new start date
+                const currentExpiry = expiryPicker.date();
+                if (currentExpiry && currentExpiry.isBefore(startDate)) {
+                    expiryPicker.clear();
+                    showToast('Expiry date has been cleared as it was before the start date', 'info');
+                }
+            } else {
+                // No start date selected, disable expiry date
+                expiryDatePicker.data("DateTimePicker").disable();
+            }
+        });
+
+        // Handle compliance toggle
+        $('input[name="compliance"]').change(function () {
+            if ($(this).val() === 'yes') {
+                const startDate = startDatePicker.data("DateTimePicker").date();
+                if (startDate) {
+                    const expiryPicker = expiryDatePicker.data("DateTimePicker");
+                    expiryPicker.enable();
+                    expiryPicker.minDate(startDate);
+                } else {
+                    showToast('Please select a start date first', 'warning');
+                    // Optionally uncheck compliance if no start date
+                    $('#complianceNo').prop('checked', true);
+                    $('#expiryDateContainer').hide();
+                }
+            }
+        });
+    }
+
 
     // Remove existing files in edit mode
     document.querySelectorAll('.remove-btn[data-file-id]').forEach(btn => {
@@ -870,91 +1001,115 @@ $(document).ready(function () {
 
         const submitBtn = $('#submitBtn');
 
-        // Prevent multiple submissions
-        if (submitBtn.prop('disabled')) {
-            return;
-        }
+        // Prevent double click
+        if (submitBtn.prop('disabled')) return;
 
-        // Validate required fields before submission
-        if (!validateForm()) {
-            return;
-        }
+        // Validate fields
+        if (!validateForm()) return;
 
-        // Update summernote content
+        // Update Summernote content
         $('#summernote').val($('.summernote').summernote('code'));
 
-        // Disable button and show loading state
+        // Button loading UI
         submitBtn.prop('disabled', true).html(
             '<span class="spinner-border spinner-border-sm" role="status"></span> ' +
             (window.isEdit ? "Updating..." : "Adding...")
         );
 
         try {
-            // Create fileIds input
+            // Add uploaded file IDs
             const fileIdsInput = document.createElement('input');
             fileIdsInput.type = 'hidden';
             fileIdsInput.name = 'fileIds';
             fileIdsInput.value = JSON.stringify(uploadedFileIds || []);
             this.appendChild(fileIdsInput);
 
-            // Clear the file input to prevent browser validation issues
+            // Remove required and clear old input value
             const rawFileInput = document.getElementById('fileInput');
             if (rawFileInput) {
-                rawFileInput.removeAttribute('required'); // Remove required attribute
-                rawFileInput.value = ''; // Clear the value
+                rawFileInput.removeAttribute('required');
+                rawFileInput.value = '';
             }
 
+            // Build request
             const formData = new FormData(this);
-            const url = window.isEdit ? '/api/documents/' + window.documentId : '/api/documents';
+            const url = window.isEdit
+                ? `/api/documents/${window.documentId}`
+                : `/api/documents`;
             const method = window.isEdit ? 'PATCH' : 'POST';
 
-            const response = await fetch(url, {
-                method,
-                body: formData
-            });
+            const response = await fetch(url, { method, body: formData });
 
+            // -----------------------------
+            // REAL ERROR PARSING (JSON/TEXT)
+            // -----------------------------
             if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+                let serverMessage = `HTTP ${response.status}`;
+
+                // 1. Try JSON
+                try {
+                    const json = await response.json();
+                    if (json?.message) serverMessage = json.message;
+                    else serverMessage = JSON.stringify(json);
+                } catch {
+                    // 2. Try plain text
+                    try {
+                        const text = await response.text();
+                        if (text) serverMessage = text;
+                    } catch {
+                        // 3. Give up (use default)
+                    }
+                }
+
+                throw new Error(serverMessage);
             }
 
+            // Success data
             const data = await response.json();
 
-            if (data.success) {
-                const doc = data.data.document;
-                if (doc?.metadata?.fileName) {
-                    document.getElementById('successFileName').textContent = doc.metadata.fileName;
-                }
-
-                // Show success modal
-                const successModal = new bootstrap.Modal(document.getElementById('data-success-modal'));
-                successModal.show();
-
-                if (!window.isEdit) {
-                    document.getElementById('data-success-modal').addEventListener('hidden.bs.modal', function () {
-                        window.location.href = '/documents/add';
-                    }, { once: true });
-                }
-            } else {
-                throw new Error(data.message || 'Unknown error occurred');
+            if (!data.success) {
+                throw new Error(data.message || "Unknown server error");
             }
+
+            // Display filename
+            const doc = data.data.document;
+            if (doc?.metadata?.fileName) {
+                document.getElementById('successFileName').textContent =
+                    doc.metadata.fileName;
+            }
+
+            // Show success modal
+            const successModal = new bootstrap.Modal(
+                document.getElementById('data-success-modal')
+            );
+            successModal.show();
+
+            // If adding a new one, reload add page after closing modal
+            if (!window.isEdit) {
+                document
+                    .getElementById('data-success-modal')
+                    .addEventListener(
+                        'hidden.bs.modal',
+                        () => {
+                            window.location.href = '/documents/add';
+                        },
+                        { once: true }
+                    );
+            }
+
         } catch (error) {
             console.error('Form submission error:', error);
 
-            let errorMessage = 'An error occurred while submitting the form.';
-            if (error.message.includes('HTTP error')) {
-                errorMessage = 'Network error. Please check your connection and try again.';
-            } else if (error.message) {
-                errorMessage = 'Error: ' + error.message;
-            }
+            // Show real message
+            showToast(error.message || "An unknown error occurred.", "error");
 
-            showToast(errorMessage, 'error');
-
-            // Re-enable the button on error
-            submitBtn.prop('disabled', false).html(
-                window.isEdit ? "Update Document" : "Add Document"
-            );
+            // Enable button again
+            submitBtn
+                .prop('disabled', false)
+                .html(window.isEdit ? "Update Document" : "Add Document");
         }
     });
+
 
     // Custom form validation function
     function validateForm() {

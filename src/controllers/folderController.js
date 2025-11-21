@@ -81,7 +81,8 @@ export const showRecycleBinPage = async (req, res) => {
 export const showMainFoldersPage = (req, res) => {
     res.render("pages/folders/folders", {
         title: "E-Sangrah - Folders",
-        user: req.user
+        user: req.user,
+        projectId: req.query.id
     });
 };
 export const showviewFoldersPage = async (req, res) => {
@@ -860,10 +861,11 @@ export const uploadToFolder = async (req, res) => {
 
 export const getFolderTree = async (req, res) => {
     try {
-        const { rootId, departmentId } = req.query;
+        const { rootId, departmentId, projectId } = req.query;
         const userId = req.user?._id;
         const profileType = req.user?.profile_type;
         const { selectedProjectId } = getSessionFilters(req);
+
         if (!userId) {
             return res.status(401).json({
                 success: false,
@@ -871,28 +873,44 @@ export const getFolderTree = async (req, res) => {
             });
         }
 
-        // --- Base query ---
+        /* -----------------------------------
+         * SET PROJECT FILTER PRIORITY
+         * ----------------------------------- */
+        let finalProjectId = null;
+
+        if (projectId && projectId !== "all") {
+            finalProjectId = new mongoose.Types.ObjectId(projectId);
+        } else if (selectedProjectId && selectedProjectId !== "all") {
+            finalProjectId = new mongoose.Types.ObjectId(selectedProjectId);
+        }
+
+        /* -----------------------------------
+         * BASE MATCH QUERY
+         * ----------------------------------- */
         const match = {
             isArchived: false,
-            // isDeleted: false,
             deletedAt: null,
         };
 
-        // --- Restrict to user's own or shared folders if not superadmin ---
+        if (finalProjectId) {
+            match.projectId = finalProjectId;
+        }
+
+        /* -----------------------------------
+         * PERMISSION FILTER (non-superadmin)
+         * ----------------------------------- */
         if (profileType !== "superadmin") {
             match.$or = [
-                { owner: new mongoose.Types.ObjectId(userId) },
-                { "permissions.principal": new mongoose.Types.ObjectId(userId) },
+                { owner: userId },
+                { "permissions.principal": userId },
             ];
         }
 
-        // --- Apply Project Filter ---
-        if (selectedProjectId && selectedProjectId !== "all") {
-            match.projectId = new mongoose.Types.ObjectId(selectedProjectId);
-        }
-
-        // --- Apply Department Filter ---
+        /* -----------------------------------
+         * OPTIONAL: DEPARTMENT FILTER
+         * ----------------------------------- */
         let departmentFolderId = null;
+
         if (departmentId && departmentId !== "all") {
             const departmentFilter = {
                 isArchived: false,
@@ -900,53 +918,55 @@ export const getFolderTree = async (req, res) => {
                 departmentId: new mongoose.Types.ObjectId(departmentId),
             };
 
-            if (selectedProjectId && selectedProjectId !== "all") {
-                departmentFilter.projectId = new mongoose.Types.ObjectId(selectedProjectId);
+            // department must belong to same project
+            if (finalProjectId) {
+                departmentFilter.projectId = finalProjectId;
             }
 
-            const departmentFolder = await Folder.findOne(departmentFilter).lean();
+            const deptFolder = await Folder.findOne(departmentFilter).lean();
 
-            if (!departmentFolder) {
+            if (!deptFolder) {
                 return res.json({ success: true, tree: [] });
             }
 
-            departmentFolderId = departmentFolder._id;
+            departmentFolderId = deptFolder._id;
 
-            // Extend $or filter if not superadmin
+            // Ensure department subtree is included
             if (!match.$or) match.$or = [];
             match.$or.push(
-                { _id: departmentFolder._id },
-                { ancestors: departmentFolder._id }
+                { _id: deptFolder._id },
+                { ancestors: deptFolder._id }
             );
         }
 
-        // --- Fetch Matching Folders with Lookups ---
         const folders = await Folder.aggregate([
             { $match: match },
+
             {
                 $lookup: {
                     from: "projects",
                     localField: "projectId",
                     foreignField: "_id",
-                    as: "projectId",
-                },
+                    as: "projectId"
+                }
             },
             {
                 $lookup: {
                     from: "departments",
                     localField: "departmentId",
                     foreignField: "_id",
-                    as: "departmentId",
-                },
+                    as: "departmentId"
+                }
             },
             {
                 $lookup: {
                     from: "files",
                     localField: "files",
                     foreignField: "_id",
-                    as: "files",
-                },
+                    as: "files"
+                }
             },
+
             {
                 $project: {
                     name: 1,
@@ -968,60 +988,58 @@ export const getFolderTree = async (req, res) => {
                                 originalName: "$$f.originalName",
                                 fileType: "$$f.fileType",
                                 size: "$$f.fileSize",
-                            },
-                        },
-                    },
-                },
+                            }
+                        }
+                    }
+                }
             },
-            { $sort: { name: 1 } },
+
+            { $sort: { name: 1 } }
         ]);
 
-        // --- Empty Result Check ---
         if (!folders.length) {
             return res.json({ success: true, tree: [] });
         }
 
-        // --- Add isOwner Flag ---
-        const enhancedFolders = folders.map((f) => ({
+        const enhanced = folders.map(f => ({
             ...f,
-            isOwner: f.owner?.toString() === userId.toString(),
+            isOwner: f.owner?.toString() === userId.toString()
         }));
 
-        // --- Build Folder Map for Hierarchy ---
-        const folderMap = new Map();
-        for (const folder of enhancedFolders) {
-            folderMap.set(folder._id.toString(), { ...folder, children: [] });
-        }
+        const map = new Map();
+        enhanced.forEach(f => {
+            map.set(f._id.toString(), { ...f, children: [] });
+        });
 
-        // --- Build Parent-Child Relationships ---
         const roots = [];
-        for (const folder of folderMap.values()) {
+
+        for (const folder of map.values()) {
             if (folder.parent) {
-                const parent = folderMap.get(folder.parent.toString());
+                const parent = map.get(folder.parent.toString());
                 if (parent) parent.children.push(folder);
-                else roots.push(folder); // orphaned folder, treat as root
+                else roots.push(folder);
             } else {
                 roots.push(folder);
             }
         }
 
-        // --- Determine Which Subtree to Return ---
         let tree = [];
+
         if (rootId) {
-            const rootNode = folderMap.get(rootId.toString());
-            if (rootNode) tree = [rootNode];
+            const root = map.get(rootId.toString());
+            if (root) tree = [root];
         } else if (departmentFolderId) {
-            const deptNode = folderMap.get(departmentFolderId.toString());
-            if (deptNode) tree = [deptNode];
+            const root = map.get(departmentFolderId.toString());
+            if (root) tree = [root];
         } else {
             tree = roots;
         }
 
-        // --- Final Response ---
         return res.json({
             success: true,
-            tree,
+            tree
         });
+
     } catch (err) {
         console.error("Get folder tree error:", err);
         return res.status(500).json({
@@ -1030,10 +1048,7 @@ export const getFolderTree = async (req, res) => {
             error: process.env.NODE_ENV === "development" ? err.message : undefined,
         });
     }
-
 };
-
-
 
 export const archiveFolder = async (req, res) => {
     try {

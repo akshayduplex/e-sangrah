@@ -3,7 +3,7 @@ import Document from "../models/Document.js";
 import File from "../models/File.js";
 import { successResponse, failResponse, errorResponse } from "../utils/responseHandler.js";
 import { calculateStartDate } from "../utils/calculateStartDate.js";
-import { formatFileSize, getFileIcon } from "../helper/Common.js";
+import { formatFileSize, getFileIcon } from "../helper/CommonHelper.js";
 import { FILE_TYPE_CATEGORIES, FILTER_PERIODS } from "../constant/Constant.js";
 import Project, { ProjectType } from "../models/Project.js";
 import { applyFilters, getSessionFilters } from "../helper/sessionHelpers.js";
