@@ -16,29 +16,41 @@ import { generateEmailTemplate } from "../helper/emailTemplate.js";
 export const showAdminDashboardPage = (req, res) => {
     try {
         res.render("pages/admin/adminDashboard", {
-            title: " Admin Dashboard",
+            pageTitle: "Admin Dashboard",
+            pageDescription: "Manage users, documents, permissions, and system configurations from the admin dashboard.",
+            metaKeywords: "admin dashboard, esangrah admin, document management, user management",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
             user: req.user
         });
     } catch (err) {
         logger.error("Dashboard render error:", err);
         res.status(500).render("pages/error", {
+            pageTitle: "Error",
+            pageDescription: "Unable to load the admin dashboard.",
             user: req.user,
             message: "Unable to load dashboard"
         });
     }
 };
+
 export const showAdminApprovalPage = (req, res) => {
-    const documentId = req.query.documentId
+    const documentId = req.query.documentId;
     try {
         res.render("pages/admin/approval", {
+            pageTitle: "Document Approval",
+            pageDescription: "Review and approve submitted documents in the admin panel.",
+            metaKeywords: "document approval, admin approval, workflow, esangrah",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
             user: req.user,
             documentId
         });
     } catch (err) {
-        logger.error("Dashboard render error:", err);
+        logger.error("Approval page render error:", err);
         res.status(500).render("pages/error", {
+            pageTitle: "Error",
+            pageDescription: "Unable to load document approval page.",
             user: req.user,
-            message: "Unable to load dashboard"
+            message: "Unable to load approval page"
         });
     }
 };
@@ -47,16 +59,21 @@ export const showApprovalTrackPage = async (req, res) => {
     try {
         const documentId = req.params.id;
 
-        res.render('pages/admin/approval-tracking', {
-            documentId: documentId,
+        res.render("pages/admin/approval-tracking", {
+            pageTitle: "Approval Tracking",
+            pageDescription: "Track the status and progress of document approvals.",
+            metaKeywords: "approval tracking, workflow monitoring, esangrah",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+            documentId,
             user: req.user
         });
 
     } catch (err) {
-        console.error(err);
-        res.status(500).render('pages/admin/approval-tracking', {
-            document: null,
-            approvals: [],
+        logger.error("Approval tracking render error:", err);
+        res.status(500).render("pages/admin/approval-tracking", {
+            pageTitle: "Error",
+            pageDescription: "Unable to load approval tracking page.",
+            documentId: null,
             user: req.user
         });
     }
@@ -69,14 +86,20 @@ export const showRecycleBinPage = async (req, res) => {
             .lean();
 
         res.render("pages/admin/adminRecycleBin", {
+            pageTitle: "Recycle Bin",
+            pageDescription: "View and restore deleted items from the admin recycle bin.",
+            metaKeywords: "recycle bin, deleted items, restore documents, esangrah",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
             user: req.user,
             designations
         });
     } catch (err) {
-        logger.error("Admin render error:", err);
+        logger.error("Recycle bin render error:", err);
         res.status(500).render("pages/error", {
+            pageTitle: "Error",
+            pageDescription: "Unable to load recycle bin.",
             user: req.user,
-            message: "Unable to load dashboard"
+            message: "Unable to load recycle bin"
         });
     }
 };
@@ -86,6 +109,7 @@ export const showManageAccessPage = async (req, res) => {
         const { folderId } = req.params;
         const { userEmail } = req.query;
         const owner = req.user;
+
         if (!folderId || !owner) {
             return res.status(400).send("Invalid request");
         }
@@ -96,37 +120,48 @@ export const showManageAccessPage = async (req, res) => {
 
         if (!folder) return res.status(404).send("Folder not found");
 
-        // Only owner can manage access
         if (folder.owner._id.toString() !== owner._id.toString()) {
             return res.status(403).send("Not authorized");
         }
 
         res.render("pages/admin/manage-access", {
+            pageTitle: "Manage Folder Access",
+            pageDescription: "Grant, edit, or remove folder access permissions for users.",
+            metaKeywords: "folder access, permission management, user permissions, esangrah",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
             folder,
             user: req.user,
             userEmail
         });
 
     } catch (err) {
-        logger.error("Admin render error:", err);
+        logger.error("Manage access render error:", err);
         res.status(500).render("pages/error", {
+            pageTitle: "Error",
+            pageDescription: "Unable to load manage access page.",
             user: req.user,
             message: "Unable to load manage access page"
         });
     }
 };
+
 export const showPermissionLogsPage = async (req, res) => {
     try {
         res.render("pages/reports/permissionLogs", {
-            title: "Permission Logs",
+            pageTitle: "Permission Logs",
+            pageDescription: "Review detailed logs of permission changes within the system.",
+            metaKeywords: "permission logs, access logs, audit logs, esangrah",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
             user: req.user
         });
 
     } catch (err) {
-        logger.error("render error:", err);
+        logger.error("Permission logs render error:", err);
         res.status(500).render("pages/error", {
+            pageTitle: "Error",
+            pageDescription: "Unable to load permission logs.",
             user: req.user,
-            message: "Unable to load manage access page"
+            message: "Unable to load permission logs"
         });
     }
 };
@@ -134,18 +169,24 @@ export const showPermissionLogsPage = async (req, res) => {
 export const showFolderPermissionLogsPage = async (req, res) => {
     try {
         res.render("pages/reports/folderPermissionLogs", {
-            title: "Permission Logs",
+            pageTitle: "Folder Permission Logs",
+            pageDescription: "Track folder-level permission changes and access events.",
+            metaKeywords: "folder permission logs, folder access logs, esangrah audit",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
             user: req.user
         });
 
     } catch (err) {
-        logger.error("Admin render error:", err);
+        logger.error("Folder permission logs render error:", err);
         res.status(500).render("pages/error", {
+            pageTitle: "Error",
+            pageDescription: "Unable to load folder permission logs.",
             user: req.user,
-            message: "Unable to load manage access page"
+            message: "Unable to load folder permission logs"
         });
     }
 };
+
 //API Controllers
 
 /**

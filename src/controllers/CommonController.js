@@ -20,35 +20,47 @@ import WebSetting from "../models/WebSetting.js";
 export const showSupportPage = (req, res) => {
     try {
         res.render("pages/support", {
-            title: "Support",
+            pageTitle: "Support",
+            pageDescription: "Get help, explore FAQs, and contact support for issues related to your e-Sangrah workspace.",
+            metaKeywords: "support, help center, esangrah support, customer support, faq",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
             user: req.user
         });
     } catch (err) {
         logger.error("support page render error:", err);
         res.status(500).render("pages/error", {
+            pageTitle: "Error",
+            pageDescription: "There was an issue loading the support page.",
             user: req.user,
             message: "Unable to load support"
         });
     }
 };
 
+
 export const showSettingPage = async (req, res) => {
     try {
         const settings = await WebSetting.findOne();
 
         res.render("pages/setting", {
-            title: "Setting",
+            pageTitle: "Settings",
+            pageDescription: "Manage your account, preferences, and workspace settings in e-Sangrah.",
+            metaKeywords: "settings, account settings, user preferences, esangrah settings",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
             user: req.user,
-            settings: settings || {}   // pass to EJS
+            settings
         });
     } catch (err) {
         logger.error("Web settings page render error:", err);
         res.status(500).render("pages/error", {
+            pageTitle: "Error",
+            pageDescription: "There was an issue loading the settings page.",
             user: req.user,
             message: "Unable to load settings"
         });
     }
 };
+
 
 // Check duplicate fields
 export const checkDuplicate = async (req, res) => {

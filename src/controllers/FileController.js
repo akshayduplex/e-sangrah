@@ -12,20 +12,31 @@ import { activityLogger } from "../helper/activityLogger.js";
 export const showFileStatusPage = async (req, res) => {
     try {
         const projectId = req.query.projectId || null;
+
         res.render("pages/files/fileStatusListings", {
-            title: "File Status",
+            pageTitle: "File Status",
+            pageDescription: "View and track the current status of files across projects.",
+            metaKeywords: "file status, file tracking, project files, document management",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+
             user: req.user,
-            projectId,
+            projectId
         });
 
     } catch (err) {
         logger.error("File Status render error:", err);
         res.status(500).render("pages/error", {
+            pageTitle: "Error",
+            pageDescription: "Unable to load the file status page.",
+            metaKeywords: "file status error, page load error",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+
             user: req.user,
             message: "Unable to load manage access page"
         });
     }
 };
+
 
 // Upload temporary file
 export const uploadFile = async (req, res, folder) => {

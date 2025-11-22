@@ -27,37 +27,27 @@ import { generateEmailTemplate } from "../helper/emailTemplate.js";
 import { activityLogger } from "../helper/activityLogger.js";
 import DocumentVersion from "../models/DocumentVersion.js";
 import { recomputeProjectTotalTags } from "../helper/CommonHelper.js";
+import Folder from "../models/Folder.js";
 
-//Page Controllers
-const VERSIONED_FIELDS = [
-    "description",
-    "comment",
-    "link",
-    "files",
-    "signature",
-    "compliance"
-];
 
 // Document List page
-// In your showDocumentListPage controller
 export const showDocumentListPage = async (req, res) => {
     try {
-        const status = req.query.status;
-        const searchQuery = req.query.q || '';
-        const filter = req.query.filter;
-        const month = req.query.month;
-        const year = req.query.year;
-        const documentId = req.query.documentId
+        const { status, q, filter, month, year, documentId } = req.query;
 
         const designations = await Designation.find({ status: "Active" })
             .sort({ name: 1 })
             .lean();
 
         res.render("pages/document/document-list", {
-            title: "E-Sangrah - Documents-List",
+            pageTitle: "Documents List",
+            pageDescription: "Browse, filter, and manage all documents in your workspace.",
+            metaKeywords: "documents list, document management, search documents, filter documents",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+
             designations,
             user: req.user,
-            searchQuery: searchQuery,
+            searchQuery: q || "",
             status,
             filter,
             documentId,
@@ -67,8 +57,12 @@ export const showDocumentListPage = async (req, res) => {
     } catch (err) {
         logger.error("Error loading document list:", err);
         res.status(500).render("pages/error", {
-            title: "Error",
-            message: "Unable to load documents",
+            pageTitle: "Error",
+            pageDescription: "Unable to load the document list.",
+            metaKeywords: "error, document list error",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+            user: req.user,
+            message: "Unable to load documents"
         });
     }
 };
@@ -76,9 +70,12 @@ export const showDocumentListPage = async (req, res) => {
 // Add Document page
 export const showAddDocumentPage = async (req, res) => {
     try {
-        console.log("page route", req.session)
         res.render("pages/document/add-document", {
-            title: "E-Sangrah - Add-Document",
+            pageTitle: "Add Document",
+            pageDescription: "Create a new document and upload related files.",
+            metaKeywords: "add document, create document, upload files, document creation",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+
             user: req.user,
             selectedProject: {
                 _id: req.session.selectedProject,
@@ -88,9 +85,17 @@ export const showAddDocumentPage = async (req, res) => {
         });
     } catch (err) {
         logger.error("Error loading add-document page:", err);
-        res.status(500).send("Server Error");
+        res.status(500).render("pages/error", {
+            pageTitle: "Error",
+            pageDescription: "Unable to load add document page.",
+            metaKeywords: "error, add document error",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+            user: req.user,
+            message: "Unable to load add document"
+        });
     }
 };
+
 // Edit Document page
 export const showEditDocumentPage = async (req, res) => {
     try {
@@ -98,54 +103,76 @@ export const showEditDocumentPage = async (req, res) => {
 
         if (!mongoose.Types.ObjectId.isValid(id)) {
             return res.status(400).render("pages/error", {
-                title: "Error",
-                message: "Invalid document ID",
+                pageTitle: "Invalid Document",
+                pageDescription: "The document ID provided is invalid.",
+                metaKeywords: "invalid document id, document error",
+                canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+                user: req.user,
+                message: "Invalid document ID"
             });
         }
 
-        // In your controller
-        const document = await Document.findById(req.params.id)
-            .populate('project')
-            .populate('department')
-            .populate('projectManager')
-            .populate('documentDonor')
-            .populate('documentVendor')
-            .populate('folderId')
-            .populate('files')
+        const document = await Document.findById(id)
+            .populate("project department projectManager documentDonor documentVendor folderId files")
             .lean();
 
         if (!document) {
             return res.status(404).render("pages/error", {
-                title: "Error",
-                message: "Document not found",
+                pageTitle: "Document Not Found",
+                pageDescription: "The document you are trying to access does not exist.",
+                metaKeywords: "document not found, edit document error",
+                canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+                user: req.user,
+                message: "Document not found"
             });
         }
 
         res.render("pages/document/edit", {
-            title: "E-Sangrah - Edit Document",
+            pageTitle: "Edit Document",
+            pageDescription: "Modify document details, update metadata, and manage file attachments.",
+            metaKeywords: "edit document, update document, document management",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+
             user: req.user,
             document,
             isEdit: true
         });
+
     } catch (err) {
         logger.error("Error loading edit-document page:", err);
         res.status(500).render("pages/error", {
-            title: "Error",
-            message: "Unable to load edit document page",
+            pageTitle: "Error",
+            pageDescription: "Unable to load edit document page.",
+            metaKeywords: "edit document error, page load error",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+            user: req.user,
+            message: "Unable to load edit document page"
         });
     }
 };
+
 // View Document page
 export const showViewDocumentPage = async (req, res) => {
     try {
         res.render("pages/document/viewDocument", {
-            title: "E-Sangrah - View-Document",
+            pageTitle: "View Document",
+            pageDescription: "View full details, metadata, and file attachments for the selected document.",
+            metaKeywords: "view document, document details, document preview",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+
             user: req.user,
             documentId: req.params.id
         });
     } catch (err) {
-        logger.error("Error loading add-document page:", err);
-        res.status(500).send("Server Error");
+        logger.error("Error loading view document page:", err);
+        res.status(500).render("pages/error", {
+            pageTitle: "Error",
+            pageDescription: "Unable to load document viewer.",
+            metaKeywords: "view document error, document viewer error",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+            user: req.user,
+            message: "Unable to load document"
+        });
     }
 };
 
@@ -153,12 +180,23 @@ export const showViewDocumentPage = async (req, res) => {
 export const showArchivedDocumentPage = async (req, res) => {
     try {
         res.render("pages/document/archiveDocuments", {
-            title: "E-Sangrah - Archive-Document",
-            user: req.user,
+            pageTitle: "Archived Documents",
+            pageDescription: "Browse and manage archived documents stored in the system.",
+            metaKeywords: "archived documents, archive, document archive",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+
+            user: req.user
         });
     } catch (err) {
-        logger.error("Error loading add-document page:", err);
-        res.status(500).send("Server Error");
+        logger.error("Error loading archive document page:", err);
+        res.status(500).render("pages/error", {
+            pageTitle: "Error",
+            pageDescription: "Unable to load archived documents.",
+            metaKeywords: "archived documents error, page load error",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+            user: req.user,
+            message: "Unable to load archived documents"
+        });
     }
 };
 
@@ -168,11 +206,9 @@ export const showArchivedDocumentPage = async (req, res) => {
  * Render a page to view files of a document
  */
 
-
 export const viewDocumentFiles = async (req, res) => {
     try {
         const { token } = req.query;
-
         if (!token) throw new Error("Invalid link");
 
         let decrypted;
@@ -183,7 +219,6 @@ export const viewDocumentFiles = async (req, res) => {
         }
 
         const { id: documentId, fileId, version } = decrypted;
-        // const version = version;
         const now = new Date();
 
         const document = await Document.findById(documentId).lean();
@@ -191,38 +226,26 @@ export const viewDocumentFiles = async (req, res) => {
             return renderExpiredPage(res, "Document not found.", req.user, version, documentId);
         }
 
-        // ------------------------
         // Restriction checks
-        // ------------------------
         let expiredMessage = null;
         let docExpired = false;
 
-        if (document.isDeleted) {
-            expiredMessage = "This document has been deleted.";
-            docExpired = true;
-        } else if (document.isArchived) {
-            expiredMessage = "This document is archived and cannot be accessed.";
-            docExpired = true;
-        } else if (!document.ispublic) {
-            expiredMessage = "Access restricted. This document is private.";
-            docExpired = true;
-        } else if (document.docExpiresAt && now > document.docExpiresAt) {
-            expiredMessage = "This public document link has expired.";
-            docExpired = true;
-        } else if (document.docExpireDuration === "custom") {
+        if (document.isDeleted) expiredMessage = "This document has been deleted.", docExpired = true;
+        else if (document.isArchived) expiredMessage = "This document is archived and cannot be accessed.", docExpired = true;
+        else if (!document.ispublic) expiredMessage = "Access restricted. This document is private.", docExpired = true;
+        else if (document.docExpiresAt && now > document.docExpiresAt) expiredMessage = "This public document link has expired.", docExpired = true;
+        else if (document.docExpireDuration === "custom") {
             if (document.DoccustomStart && document.DoccustomEnd &&
                 (now < document.DoccustomStart || now > document.DoccustomEnd)) {
-                expiredMessage = "This document is not available in the current date range.";
+                expiredMessage = "This document is not available in the selected date range.";
                 docExpired = true;
             }
-        } else if (document.compliance?.expiryDate && now > document.compliance.expiryDate) {
+        }
+        else if (document.compliance?.expiryDate && now > document.compliance.expiryDate) {
             expiredMessage = "This document has expired due to compliance rules.";
             docExpired = true;
         }
 
-        // ------------------------
-        // Load version & files if allowed
-        // ------------------------
         let versionData = null;
 
         if (!docExpired) {
@@ -234,29 +257,26 @@ export const viewDocumentFiles = async (req, res) => {
                 .lean();
         }
 
-        // For files, populate s3Url if needed
+        // Attach S3 file URLs
         if (versionData?.files) {
             for (let file of versionData.files) {
-                if (!file.s3Url && file.file) {
-                    file.fileUrl = await getObjectUrl(file.file, 3600);
-                } else {
-                    file.fileUrl = file.s3Url;
-                }
+                file.fileUrl = file.s3Url || (file.file ? await getObjectUrl(file.file, 3600) : null);
             }
         }
 
-        // ------------------------
-        // Render page
-        // ------------------------
         res.render("pages/document/publicDocumentView", {
+            pageTitle: document?.metadata?.fileName || "Public Document",
+            pageDescription: "View publicly shared document details and files.",
+            metaKeywords: "public document, document viewer, online file viewer",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+
             expiredMessage,
             docExpired,
             version,
             documentId,
             user: req.user,
             document,
-            versionData,
-            documentTitle: document?.metadata?.fileName || "Document"
+            versionData
         });
 
     } catch (error) {
@@ -265,13 +285,18 @@ export const viewDocumentFiles = async (req, res) => {
     }
 };
 
+
 // ------------------------
 // Helper
 // ------------------------
 const renderExpiredPage = (res, message, user, version = null, documentId = null) => {
     return res.render("pages/document/publicDocumentView", {
+        pageTitle: "Document Unavailable",
+        pageDescription: "This document link is invalid, expired, or inaccessible.",
+        metaKeywords: "document expired, restricted document, invalid document link",
+        canonicalUrl: "",
+
         expiredMessage: message,
-        documentTitle: "Document",
         file: null,
         user,
         version,
@@ -281,6 +306,7 @@ const renderExpiredPage = (res, message, user, version = null, documentId = null
         docExpired: true
     });
 };
+
 
 /**
  * GET /documents/:id/view
@@ -294,11 +320,15 @@ export const viewInvitedDocumentFiles = async (req, res) => {
         let decrypted;
         try {
             decrypted = JSON.parse(decrypt(token));
-        } catch (err) {
+        } catch {
             return res.render("pages/document/viewInvitedDocumentFiles", {
+                pageTitle: "Access Denied",
+                pageDescription: "This invitation link is invalid or corrupted.",
+                metaKeywords: "invitation link invalid, restricted document",
+                canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+
                 expiredMessage: "Invalid or corrupted link.",
                 canRenew: false,
-                documentTitle: "Document",
                 user: req.user,
                 sharedAccess: null,
                 document: null,
@@ -311,7 +341,6 @@ export const viewInvitedDocumentFiles = async (req, res) => {
         const userId = req.user?._id;
         const now = new Date();
 
-        // Check shared access
         let sharedAccess = await SharedWith.findOne({
             document: documentId,
             user: userId,
@@ -320,14 +349,14 @@ export const viewInvitedDocumentFiles = async (req, res) => {
 
         let expiredMessage = null;
 
-        if (!sharedAccess) {
-            expiredMessage = "You don't have access to this document.";
-        } else {
-            const isExpired = sharedAccess.expiresAt && now > sharedAccess.expiresAt;
-            const isUsed = sharedAccess.duration === "onetime" && sharedAccess.used;
+        // Check access expiration
+        if (!sharedAccess) expiredMessage = "You don't have access to this document.";
+        else {
+            const expired = sharedAccess.expiresAt && now > sharedAccess.expiresAt;
+            const usedOnce = sharedAccess.duration === "onetime" && sharedAccess.used;
 
-            if (isExpired) expiredMessage = "This link has expired.";
-            if (isUsed) expiredMessage = "This one-time link has already been used.";
+            if (expired) expiredMessage = "This link has expired.";
+            if (usedOnce) expiredMessage = "This one-time link has already been used.";
 
             if (sharedAccess.duration === "onetime" && !sharedAccess.used) {
                 sharedAccess.used = true;
@@ -335,7 +364,6 @@ export const viewInvitedDocumentFiles = async (req, res) => {
             }
         }
 
-        // Fetch document + current version
         let document = null;
         let versionData = null;
         let files = [];
@@ -346,21 +374,15 @@ export const viewInvitedDocumentFiles = async (req, res) => {
                     path: "currentVersion",
                     populate: { path: "files", model: "File" }
                 })
-                .lean(); // Important: use .lean() for performance + clean objects
+                .lean();
 
-            versionData = document?.currentVersion || null;
+            versionData = document?.currentVersion;
 
             if (versionData?.files?.length > 0) {
                 files = await Promise.all(
                     versionData.files.map(async (file) => {
-                        let fileUrl = null;
-                        try {
-                            fileUrl = file.s3Url || (file.file ? await getObjectUrl(file.file, 3600) : null);
-                        } catch (err) {
-                            console.error("Failed to generate S3 URL for file:", file.originalName, err);
-                        }
-
-                        const ext = (file.originalName.split(".").pop() || "").toLowerCase();
+                        let fileUrl = file.s3Url || (file.file ? await getObjectUrl(file.file, 3600) : null);
+                        const ext = file.originalName.split(".").pop().toLowerCase();
 
                         return {
                             _id: file._id,
@@ -383,9 +405,13 @@ export const viewInvitedDocumentFiles = async (req, res) => {
         }
 
         res.render("pages/document/viewInvitedDocumentFiles", {
+            pageTitle: document?.metadata?.fileName || "Invited Document",
+            pageDescription: "Access the document shared with you via invitation link.",
+            metaKeywords: "shared document, invited document, secure document access",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+
             expiredMessage,
             canRenew: !!expiredMessage,
-            documentTitle: document?.metadata?.fileName || "Document",
             currentVersionLabel: document?.currentVersionLabel || "N/A",
             user: req.user,
             sharedAccess,
@@ -396,9 +422,13 @@ export const viewInvitedDocumentFiles = async (req, res) => {
     } catch (error) {
         console.error("Error in viewInvitedDocumentFiles:", error);
         res.render("pages/document/viewInvitedDocumentFiles", {
+            pageTitle: "Document Error",
+            pageDescription: "Server error while opening invited document.",
+            metaKeywords: "document error, shared document failed",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+
             expiredMessage: "Server error while loading the document.",
             canRenew: false,
-            documentTitle: "Document",
             user: req.user,
             sharedAccess: null,
             document: null,
@@ -406,6 +436,7 @@ export const viewInvitedDocumentFiles = async (req, res) => {
         });
     }
 };
+
 
 // Helper
 const formatFileSize = (bytes) => {
@@ -427,9 +458,15 @@ export const viewGrantAccessPage = async (req, res) => {
 
         const doc = await Document.findById(docId);
         const user = await User.findById(userId);
+
         if (!doc || !user) throw new Error("Invalid document or user");
 
         res.render("pages/admin/grantAccess", {
+            pageTitle: "Grant Document Access",
+            pageDescription: "Approve or deny access to the requested document.",
+            metaKeywords: "grant access, approve document request",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+
             document: doc,
             requester: user,
             user: req.user,
@@ -440,6 +477,7 @@ export const viewGrantAccessPage = async (req, res) => {
         res.send(`<h2>Invalid or expired link</h2><p>${err.message}</p>`);
     }
 };
+
 //API Controllers
 
 
@@ -1274,41 +1312,69 @@ export const createDocument = async (req, res) => {
         });
 
         // ------------------- Process Files in Parallel -------------------
+        // ------------------- Process Files -------------------
         let fileDocs = [];
         if (parsedFileIds.length > 0) {
+            // Fetch TempFiles
             const tempFiles = await TempFile.find({
                 _id: { $in: parsedFileIds },
                 status: "temp",
             });
 
-            const fileCreatePromises = tempFiles.map((tempFile, index) => ({
-                document: document._id,
-                file: tempFile.s3Filename,
-                s3Url: tempFile.s3Url,
-                originalName: tempFile.originalName,
-                fileType: tempFile.fileType,
-                folder: tempFile.folder || folderId || null,
-                projectId: document.project || null,
-                departmentId: document.department || null,
-                version: mongoose.Types.Decimal128.fromString("1.0"),
-                uploadedBy: req.user._id,
-                uploadedAt: new Date(),
-                fileSize: tempFile.size,
-                hash: tempFile.hash || null,
-                isPrimary: index === 0,
-                status: "active",
-            }));
+            if (tempFiles.length > 0) {
+                // Create File documents
+                const fileCreateDocs = tempFiles.map((tempFile, index) => ({
+                    document: document._id,
+                    file: tempFile.s3Filename,
+                    s3Url: tempFile.s3Url,
+                    originalName: tempFile.originalName,
+                    fileType: tempFile.fileType,
+                    folder: validFolderId || tempFile.folder || null,
+                    projectId: document.project || null,
+                    departmentId: document.department || null,
+                    version: mongoose.Types.Decimal128.fromString("1.0"),
+                    uploadedBy: req.user._id,
+                    uploadedAt: new Date(),
+                    fileSize: tempFile.size,
+                    hash: tempFile.hash || null,
+                    isPrimary: index === 0,
+                    status: "active",
+                }));
 
-            fileDocs = await File.insertMany(fileCreatePromises);
+                fileDocs = await File.insertMany(fileCreateDocs);
 
-            TempFile.updateMany(
-                { _id: { $in: tempFiles.map((t) => t._id) } },
-                { $set: { status: "permanent" } }
-            ).catch((e) => logger.warn("Temp file update skipped:", e));
+                // Mark TempFiles as permanent
+                await TempFile.updateMany(
+                    { _id: { $in: tempFiles.map(t => t._id) } },
+                    { $set: { status: "permanent", linkedDocument: document._id } }
+                );
 
-            document.files = fileDocs.map((f) => f._id);
+                // -----------------------
+                // Update Document files
+                // -----------------------
+                document.files = fileDocs.map(f => f._id);
+
+                // -----------------------
+                // Update Folder files
+                // -----------------------
+                if (validFolderId) {
+                    const folder = await Folder.findById(validFolderId);
+                    if (folder) {
+                        // Remove temp file IDs if they exist
+                        folder.files = folder.files
+                            .filter(fId => !parsedFileIds.includes(fId.toString()));
+
+                        // Add new File IDs
+                        folder.files.push(...fileDocs.map(f => f._id));
+
+                        // Remove duplicates
+                        folder.files = [...new Set(folder.files.map(f => f.toString()))];
+
+                        await folder.save();
+                    }
+                }
+            }
         }
-
         // ------------------- Handle Signature (optional) -------------------
         if (req.files?.signatureFile?.[0]) {
             const file = req.files.signatureFile[0];
@@ -1770,59 +1836,43 @@ export const updateDocument = async (req, res) => {
 /**
  * Process file updates and versioning
  */
+/**
+ * Process file updates and versioning
+ * Ensures document and folder share the same File IDs
+ */
 const processFileUpdates = async (document, fileIds, user, changedFields, session = null) => {
     try {
-        console.log(' Processing file updates:', {
-            documentId: document._id,
-            fileIds,
-            existingFiles: document.files.length
-        });
 
         const validFileIds = fileIds.filter(id => mongoose.Types.ObjectId.isValid(id));
-
         if (validFileIds.length === 0) {
-            console.log('⚠️ No valid file IDs to process');
-            return;
+            return [];
         }
 
-        // Find temp files
+        // Fetch temp files
         const tempFiles = await TempFile.find({
             _id: { $in: validFileIds },
             status: "temp"
         }).session(session);
 
-        console.log(`📁 Found ${tempFiles.length} temp files to process`);
-
         if (tempFiles.length === 0) {
-            console.log('⚠️ No temp files found');
-            return;
+            return [];
         }
 
-        // Deactivate current primary files
+        // Deactivate current primary files in document
         await File.updateMany(
-            {
-                document: document._id,
-                isPrimary: true,
-                status: "active"
-            },
-            {
-                $set: {
-                    isPrimary: false,
-                    status: "inactive",
-                    deactivatedAt: new Date()
-                }
-            },
+            { document: document._id, isPrimary: true, status: "active" },
+            { $set: { isPrimary: false, status: "inactive", deactivatedAt: new Date() } },
             { session }
         );
 
-        // Create new file entries
+        // Compute new version for files
         const currentVersion = document.currentVersionNumber
             ? parseFloat(document.currentVersionNumber.toString())
             : 1.0;
-
         const newVersion = (currentVersion + 0.1).toFixed(1);
 
-        const fileCreatePromises = tempFiles.map((tempFile, index) => ({
+        // Prepare File documents
+        const fileCreateDocs = tempFiles.map((tempFile, index) => ({
             document: document._id,
             file: tempFile.s3Filename,
             s3Url: tempFile.s3Url,
@@ -1836,53 +1886,55 @@ const processFileUpdates = async (document, fileIds, user, changedFields, sessio
             uploadedAt: new Date(),
             fileSize: tempFile.size,
             hash: tempFile.hash || null,
-            isPrimary: index === 0,          // First file is primary
+            isPrimary: index === 0,
             status: "active",
             mimeType: tempFile.mimeType || tempFile.fileType
         }));
 
+        // Insert new files
+        const newFiles = await File.insertMany(fileCreateDocs, { session });
+        const newFileIds = newFiles.map(f => f._id);
 
-        const newFiles = await File.insertMany(fileCreatePromises, { session });
-        console.log(`✅ Created ${newFiles.length} new file records`);
-
-        // Update temp files status
+        // Update TempFiles to permanent
         await TempFile.updateMany(
             { _id: { $in: tempFiles.map(t => t._id) } },
             { $set: { status: "permanent", linkedDocument: document._id } },
             { session }
         );
 
-        // CRITICAL FIX: Properly update document files array
-        const newFileIds = newFiles.map(f => f._id);
-
-        // Add new files to document (avoid duplicates)
+        // -----------------------
+        // Update Document Files
+        // -----------------------
         const existingFileIds = document.files.map(id => id.toString());
         const uniqueNewFileIds = newFileIds.filter(id => !existingFileIds.includes(id.toString()));
-
         if (uniqueNewFileIds.length > 0) {
             document.files.push(...uniqueNewFileIds);
-            console.log(`📋 Added ${uniqueNewFileIds.length} new files to document`);
+            if (!changedFields.includes("files")) changedFields.push("files");
         }
 
-        // Mark files as changed
-        // Mark files as changed
-        if (!changedFields.includes("files")) {
-            changedFields.push("files");
+        // -----------------------
+        // Update Folder Files
+        // -----------------------
+        if (document.folderId) {
+            const folder = await Folder.findById(document.folderId).session(session);
+            if (folder) {
+                const folderFileIds = folder.files.map(id => id.toString());
+
+                // Remove tempFile IDs from folder
+                const filteredFolderFiles = folder.files.filter(fId => !validFileIds.includes(fId.toString()));
+
+                // Add new File IDs
+                folder.files = [...new Set([...filteredFolderFiles, ...newFileIds])];
+                await folder.save({ session });
+            }
         }
-
-        console.log('✅ File processing completed successfully');
-
-        // RETURN only newly created file IDs
-        return newFiles.map(f => f._id);
-
+        return newFileIds;
 
     } catch (error) {
-        console.error('❌ Error in processFileUpdates:', error);
+        console.error('Error in processFileUpdates:', error);
         throw error;
     }
 };
-
-
 
 /**
  * Handle signature updates

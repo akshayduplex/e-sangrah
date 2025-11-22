@@ -16,11 +16,17 @@ import ActivityLog from "../models/ActivityLog.js"
 export const showDashboard = (req, res) => {
     try {
         res.render("pages/dashboard/dashboard", {
+            pageTitle: "Dashboard",
+            pageDescription: "Access your recent documents, workspace activity, and quick navigation tools in your e-Sangrah dashboard.",
+            metaKeywords: "dashboard, esangrah dashboard, workspace overview, document management",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
             user: req.user
         });
     } catch (err) {
         logger.error("Dashboard render error:", err);
         res.status(500).render("pages/error", {
+            pageTitle: "Error",
+            pageDescription: "Unable to load the dashboard.",
             user: req.user,
             message: "Unable to load dashboard"
         });
@@ -35,18 +41,18 @@ export const getDashboardStats = async (req, res) => {
     try {
         const user = req.user || req.session.user;
         const userId = new mongoose.Types.ObjectId(user._id);
-        const profileType = user.profile_type;
+        const profileType = user.profile_type?.toLowerCase();
 
         const { selectedProjectId, selectedYear } = getSessionFilters(req);
 
-        // Use current year if no year is selected
         const year = selectedYear ? Number(selectedYear) : new Date().getFullYear();
 
-        // Base filters for all documents
+        // Base filters
         const baseMatch = [
             { isDeleted: { $ne: true } },
             { isArchived: { $ne: true } }
         ];
+
 
         if (profileType !== "superadmin") {
             baseMatch.push({ owner: userId });
@@ -56,7 +62,6 @@ export const getDashboardStats = async (req, res) => {
             baseMatch.push({ project: selectedProjectId });
         }
 
-        // Date filters for current and previous year
         const currentStart = new Date(year, 0, 1);
         const currentEnd = new Date(year, 11, 31, 23, 59, 59);
         const prevStart = new Date(year - 1, 0, 1);
@@ -72,13 +77,11 @@ export const getDashboardStats = async (req, res) => {
             { createdAt: { $gte: prevStart, $lte: prevEnd } }
         ];
 
-        // Aggregate for current period
         const currentStats = await Document.aggregate([
             { $match: { $and: currentMatch } },
             { $group: { _id: "$status", count: { $sum: 1 } } }
         ]);
 
-        // Aggregate for previous period
         const previousStats = await Document.aggregate([
             { $match: { $and: previousMatch } },
             { $group: { _id: "$status", count: { $sum: 1 } } }
@@ -99,7 +102,13 @@ export const getDashboardStats = async (req, res) => {
 
         const getGrowth = (cur, prev) => {
             if (prev === 0) return cur > 0 ? 100 : 0;
-            return Math.round(((cur - prev) / prev) * 100);
+
+            let growth = Math.round(((cur - prev) / prev) * 100);
+
+            if (growth > 300) growth = 300;
+            if (growth < -100) growth = -100;
+
+            return growth;
         };
 
         const response = {
@@ -127,6 +136,7 @@ export const getDashboardStats = async (req, res) => {
         return errorResponse(res, err, "Failed to fetch stats");
     }
 };
+
 
 export const getFileStatus = async (req, res) => {
     try {

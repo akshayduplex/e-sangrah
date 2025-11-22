@@ -759,14 +759,14 @@ $(document).ready(function () {
                 const fileIcon = firstFile
                     ? fileIcons[firstFile.originalName.split('.').pop().toLowerCase()] || fileIcons.default
                     : fileIcons.default;
-
+                const displayFileName = doc.metadata?.fileName?.trim() || 'Untitled Document';
                 const fileInfoHtml = `
                     <div class="flxtblleft d-flex align-items-center">
                         <span class="avatar rounded bg-light me-2 mb-2">
                             <img src="${fileIcon}" style="height:30px;" alt="icon">
                         </span>
                         <div class="flxtbltxt">
-                            <p class="fs-14 mb-1 fw-normal">${firstFile?.originalName || doc.metadata?.fileName || '-'}
+                            <p class="fs-14 mb-1 fw-normal">${displayFileName}
                             ${doc.files?.length > 1 ? ` +${doc.files.length - 1}` : ''}</p>
                             <span class="fs-11 fw-light text-black">${fileSizeKB}</span>
                         </div>
@@ -1071,7 +1071,7 @@ $(document).ready(function () {
     async function initializeDashboard() {
         if (isInitialized) return;
         isInitialized = true;
-
+        const selectedDeptId = $('#uploadDepartment').val() || '';
         initializeHeaderProjectSelect();
         initializeRecentActivityDepartment();
         initializeUploadDepartment();

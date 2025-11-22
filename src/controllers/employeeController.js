@@ -7,25 +7,41 @@ import Document from "../models/Document.js";
 export const showEmployeeDashboardPage = (req, res) => {
     try {
         res.render("pages/employee/employeeDashboard", {
-            title: "Employee Dashboard",
+            pageTitle: "Employee Dashboard",
+            pageDescription: "Access employee tools, manage tasks, and view activity insights.",
+            metaKeywords: "employee dashboard, employee tools, work analytics",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
             user: req.user
         });
     } catch (err) {
         logger.error("Dashboard render error:", err);
         res.status(500).render("pages/error", {
+            pageTitle: "Error",
+            pageDescription: "Unable to load employee dashboard.",
+            metaKeywords: "employee dashboard error",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
             user: req.user,
             message: "Unable to load dashboard"
         });
     }
 };
+
 export const showEmployeeApprovalPage = (req, res) => {
     try {
         res.render("pages/employee/approval", {
+            pageTitle: "Employee Approvals",
+            pageDescription: "View and manage document and task approval requests.",
+            metaKeywords: "employee approvals, approval workflow, approval requests",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
             user: req.user
         });
     } catch (err) {
-        logger.error("Dashboard render error:", err);
+        logger.error("Approval page render error:", err);
         res.status(500).render("pages/error", {
+            pageTitle: "Error",
+            pageDescription: "Unable to load approval page.",
+            metaKeywords: "approval page error",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
             user: req.user,
             message: "Unable to load dashboard"
         });
@@ -35,11 +51,19 @@ export const showEmployeeApprovalPage = (req, res) => {
 export const showEmployeeRecycleBinPage = async (req, res) => {
     try {
         res.render("pages/employee/employeeRecycleBin", {
+            pageTitle: "Recycle Bin",
+            pageDescription: "View and restore deleted files and documents.",
+            metaKeywords: "employee recycle bin, deleted files, restore items",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
             user: req.user
         });
     } catch (err) {
-        logger.error("Admin render error:", err);
+        logger.error("Recycle bin render error:", err);
         res.status(500).render("pages/error", {
+            pageTitle: "Error",
+            pageDescription: "Unable to load recycle bin.",
+            metaKeywords: "recycle bin error",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
             user: req.user,
             message: "Unable to load dashboard"
         });
@@ -49,16 +73,25 @@ export const showEmployeeRecycleBinPage = async (req, res) => {
 export const showEmployeeAnayticsPage = async (req, res) => {
     try {
         res.render("pages/employee/Anaytics", {
+            pageTitle: "Analytics",
+            pageDescription: "Review analytics, performance insights, and activity trends.",
+            metaKeywords: "employee analytics, performance insights, activity metrics",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
             user: req.user
         });
     } catch (err) {
-        logger.error("Admin render error:", err);
+        logger.error("Analytics page render error:", err);
         res.status(500).render("pages/error", {
+            pageTitle: "Error",
+            pageDescription: "Unable to load analytics page.",
+            metaKeywords: "analytics page error",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
             user: req.user,
             message: "Unable to load dashboard"
         });
     }
 };
+
 //API Controllers
 
 /**
@@ -134,7 +167,7 @@ export const getApprovalRequests = async (req, res) => {
 
         const [documents, total] = await Promise.all([
             Document.find(filter)
-                .select('department createdAt status wantApprovers files documentApprovalAuthority comment versioning ')
+                .select('department createdAt status wantApprovers metadata.fileName files documentApprovalAuthority comment versioning ')
                 .populate("department", "name")
                 .populate("owner", "name email profile_image")
                 .populate("projectManager", "name email profile_image")

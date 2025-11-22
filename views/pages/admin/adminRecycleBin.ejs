@@ -153,7 +153,7 @@
 				// Render each row
 				function renderRow(doc) {
 					const file = doc.files?.[0];
-					const fileName = file?.originalName || doc.metadata?.fileName || 'Unnamed';
+					const fileName = doc.metadata?.fileName || file?.originalName || 'Unnamed';
 					const fileSizeKB = file ? (file.fileSize / 1024).toFixed(2) + ' KB' : '-';
 
 					const filesInfo = `

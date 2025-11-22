@@ -3,24 +3,35 @@ import { generateRandomPassword } from "../helper/GenerateRandomPassword.js";
 import User from "../models/User.js";
 import { sendEmail } from "../services/emailService.js";
 import { activityLogger } from "../helper/activityLogger.js";
-import ejs from "ejs";
-import path from "path";
 //Page controller for Donor and Vendor Registration
 
 // GET /donors/register
 export const showDonorForm = async (req, res) => {
     try {
         const donor = req.query.id ? await User.findById(req.query.id).lean() : null;
+
         res.render("pages/registerations/donor-registration", {
-            title: donor ? "E-Sangrah - Edit Donor" : "E-Sangrah - Register",
+            pageTitle: donor ? "Edit Donor" : "Register Donor",
+            pageDescription: donor
+                ? "Edit donor profile information and update their details."
+                : "Register a new donor by filling in essential profile details.",
+            metaKeywords: "donor registration, add donor, edit donor, manage donors",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+
             donor,
             isEdit: Boolean(donor),
             user: req.user
         });
+
     } catch (err) {
         logger.error("Error loading donor register page:", err);
+
         res.render("pages/registerations/donor-registration", {
-            title: "E-Sangrah - Register",
+            pageTitle: "Register Donor",
+            pageDescription: "Register a new donor profile.",
+            metaKeywords: "donor registration, donor form",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+
             donor: null,
             isEdit: false,
             user: req.user
@@ -28,36 +39,65 @@ export const showDonorForm = async (req, res) => {
     }
 };
 
+
 // GET /donors/list
 export const listDonors = async (req, res) => {
     try {
         const donors = await User.find({ profile_type: "donor" }).lean();
+
         res.render("pages/registerations/donor-listing", {
-            title: "E-Sangrah - Donor List",
+            pageTitle: "Donor List",
+            pageDescription: "View all registered donors and manage their profiles.",
+            metaKeywords: "donor list, donor records, manage donors",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+
             donors,
             user: req.user
         });
+
     } catch (err) {
         logger.error("Error fetching donor list:", err);
-        res.status(500).render("pages/error", { title: "Error", message: "Unable to load donor list" });
+
+        res.status(500).render("pages/error", {
+            pageTitle: "Error",
+            pageDescription: "Unable to load donor list.",
+            metaKeywords: "donor list error",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+            user: req.user,
+            message: "Unable to load donor list"
+        });
     }
 };
+
 
 
 // GET /vendors/register
 export const showVendorForm = async (req, res) => {
     try {
         const vendor = req.query.id ? await User.findById(req.query.id).lean() : null;
+
         res.render("pages/registerations/vendor-registration", {
-            title: vendor ? "E-Sangrah - Edit Vendor" : "E-Sangrah - Register",
+            pageTitle: vendor ? "Edit Vendor" : "Register Vendor",
+            pageDescription: vendor
+                ? "Update vendor information and manage details."
+                : "Register a new vendor by filling in required information.",
+            metaKeywords: "vendor registration, add vendor, edit vendor, vendor form",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+
             vendor,
             isEdit: Boolean(vendor),
             user: req.user
         });
+
     } catch (err) {
         logger.error("Error loading vendor register page:", err);
+
         res.render("pages/registerations/vendor-registration", {
-            title: "E-Sangrah - Register",
+            pageTitle: "Register Vendor",
+            pageDescription: "Register a new vendor and add required details.",
+            metaKeywords: "vendor registration, vendor form",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+
             vendor: null,
             isEdit: false,
             user: req.user
@@ -69,16 +109,31 @@ export const showVendorForm = async (req, res) => {
 export const listVendors = async (req, res) => {
     try {
         const vendors = await User.find({ profile_type: "vendor" }).lean();
+
         res.render("pages/registerations/vendor-registration-list", {
-            title: "E-Sangrah - Vendor List",
+            pageTitle: "Vendor List",
+            pageDescription: "View and manage all registered vendors.",
+            metaKeywords: "vendor list, vendor records, manage vendors",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+
             vendors,
             user: req.user
         });
+
     } catch (err) {
         logger.error("Error fetching vendor list:", err);
-        res.status(500).render("pages/error", { title: "Error", message: "Unable to load vendor list" });
+
+        res.status(500).render("pages/error", {
+            pageTitle: "Error",
+            pageDescription: "Unable to load vendor list.",
+            metaKeywords: "vendor list error",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+            user: req.user,
+            message: "Unable to load vendor list"
+        });
     }
 };
+
 
 
 //API Controller for Donor and Vendor Registration

@@ -21,6 +21,11 @@ export const showAssignPermissionsPage = async (req, res) => {
             .lean();
 
         res.render("pages/permissions/assign-permissions", {
+            pageTitle: "Assign Permissions",
+            pageDescription: "Assign permissions to users based on their roles, departments, and designations.",
+            metaKeywords: "assign permissions, user roles, department access, designation permissions",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+
             user: req.user,
             Roles: profile_type,
             designations,
@@ -30,11 +35,17 @@ export const showAssignPermissionsPage = async (req, res) => {
     } catch (err) {
         logger.error("Error rendering assign permissions page:", err);
         res.status(500).render("pages/error", {
+            pageTitle: "Error",
+            pageDescription: "Unable to load assign permissions page.",
+            metaKeywords: "assign permissions error, page load error",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+
             user: req.user,
-            message: "Something went wrong while loading assign permissions page",
+            message: "Something went wrong while loading assign permissions page"
         });
     }
 };
+
 
 // Get user permissions page
 export const showUserPermissionsPage = async (req, res) => {
@@ -47,8 +58,13 @@ export const showUserPermissionsPage = async (req, res) => {
 
         if (!user) {
             return res.status(404).render("pages/error", {
+                pageTitle: "User Not Found",
+                pageDescription: "The requested user does not exist.",
+                metaKeywords: "user not found, permissions error",
+                canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+
                 user: req.user,
-                message: "User not found",
+                message: "User not found"
             });
         }
 
@@ -72,6 +88,11 @@ export const showUserPermissionsPage = async (req, res) => {
         });
 
         res.render("pages/permissions/assign-user-permissions", {
+            pageTitle: "User Permissions",
+            pageDescription: `View and manage permissions for ${user.name || "the user"}.`,
+            metaKeywords: "user permissions, assign permissions, access management",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+
             user: req.user,
             targetUser: user,
             masterMenus,
@@ -80,11 +101,17 @@ export const showUserPermissionsPage = async (req, res) => {
     } catch (err) {
         logger.error("Error loading user permissions page:", err);
         res.status(500).render("pages/error", {
+            pageTitle: "Error",
+            pageDescription: "Unable to load user permissions page.",
+            metaKeywords: "user permissions error, page load error",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+
             user: req.user,
-            message: "Something went wrong while loading user permissions",
+            message: "Something went wrong while loading user permissions"
         });
     }
 };
+
 
 // Get user permissions API
 export const getUserPermissions = async (req, res) => {
@@ -171,20 +198,31 @@ export const getAssignMenuPage = async (req, res) => {
         // Build menu tree
         const masterMenus = buildMenuTree(menus);
 
-        //Render page
+        // Render page
         res.render("pages/permissions/assign-menu", {
+            pageTitle: "Assign Menu",
+            pageDescription: "Assign menus and submenus to designations and manage access control.",
+            metaKeywords: "assign menu, menu permissions, designation access, manage menus",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+
             masterMenus,
             designations,
             user: req.user
         });
     } catch (error) {
         logger.error("Error in getAssignMenuPage:", error);
-        res.status(500).render("pages/permissions/assign-menu", {
-            masterMenus: [],
-            designations: []
+        res.status(500).render("pages/error", {
+            pageTitle: "Error",
+            pageDescription: "Unable to load assign menu page.",
+            metaKeywords: "assign menu error, page load error",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+
+            user: req.user,
+            message: "Failed to load assign menu page"
         });
     }
 };
+
 
 
 // Get assigned menus for a designation
@@ -471,7 +509,13 @@ export const getMenuList = async (req, res) => {
         ]);
 
         const totalPages = Math.ceil(total / limit);
+
         res.render("pages/permissions/list", {
+            pageTitle: "Menu List",
+            pageDescription: "View and manage all menus and submenus for your system.",
+            metaKeywords: "menu list, system menus, permissions, menu management",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+
             menus,
             currentPage: page,
             totalPages,
@@ -481,7 +525,16 @@ export const getMenuList = async (req, res) => {
             layout: !req.xhr
         });
     } catch (error) {
-        res.status(500).render("error", { message: error.message });
+        console.error("Error loading menu list:", error);
+        res.status(500).render("pages/error", {
+            pageTitle: "Error",
+            pageDescription: "Unable to load menu list.",
+            metaKeywords: "menu error, page load error",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+
+            message: error.message,
+            user: req.user
+        });
     }
 };
 
@@ -490,9 +543,27 @@ export const getAddMenu = async (req, res) => {
     try {
         const masters = await Menu.find({ type: "Menu", isActive: true }).sort({ name: 1 });
 
-        res.render("pages/permissions/add", { masters, menu: null, user: req.user });
+        res.render("pages/permissions/add", {
+            pageTitle: "Add Menu",
+            pageDescription: "Create a new menu or submenu for the system.",
+            metaKeywords: "add menu, create menu, menu management",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+
+            masters,
+            menu: null,
+            user: req.user
+        });
     } catch (error) {
-        res.status(500).render("error", { message: error.message });
+        console.error("Error loading add menu form:", error);
+        res.status(500).render("pages/error", {
+            pageTitle: "Error",
+            pageDescription: "Unable to load add menu page.",
+            metaKeywords: "add menu error, page load error",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+
+            message: error.message,
+            user: req.user
+        });
     }
 };
 
@@ -502,13 +573,38 @@ export const getEditMenu = async (req, res) => {
         const menu = await Menu.findById(req.params.id);
 
         if (!menu) {
-            return res.status(404).render("error", { message: "Menu not found" });
+            return res.status(404).render("pages/error", {
+                pageTitle: "Menu Not Found",
+                pageDescription: "The requested menu does not exist.",
+                metaKeywords: "menu not found, edit menu error",
+                canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+
+                message: "Menu not found",
+                user: req.user
+            });
         }
 
         const masters = await Menu.find({ type: "Menu", is_show: true }).sort({ name: 1 });
-        res.render("pages/permissions/add", { masters, menu, user: req.user });
+        res.render("pages/permissions/add", {
+            pageTitle: "Edit Menu",
+            pageDescription: "Edit the details of an existing menu or submenu.",
+            metaKeywords: "edit menu, menu management, update menu",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+
+            masters,
+            menu,
+            user: req.user
+        });
     } catch (error) {
-        res.status(500).render("error", { message: error.message });
+        console.error("Error loading edit menu form:", error);
+        res.status(500).render("pages/error", {
+            pageTitle: "Error",
+            pageDescription: "Unable to load edit menu page.",
+            metaKeywords: "edit menu error, page load error",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+
+            message: error.message,
+            user: req.user
+        });
     }
 };
-

@@ -541,7 +541,7 @@
                             render: (data, type, row) => {
                                 const file = row.files?.find(f => f.isPrimary) || row.files?.[0];
                                 if (!file) return '<div class="flxtblleft"><div class="flxtbltxt"><p>-</p></div></div>';
-                                const fileName = file.originalName || 'Unknown';
+                                const fileName = row.metadata?.fileName || file?.originalName || 'Unknown';
                                 const fileSize = formatFileSize(file.fileSize);
                                 const version = row.versioning?.currentVersion?.$numberDecimal || '1.0';
                                 const icon = getFileIcon(fileName);

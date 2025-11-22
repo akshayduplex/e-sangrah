@@ -18,7 +18,7 @@ import { connectDB } from "./database/Db.js";
 import fs from "fs";
 import { API_CONFIG } from "./config/ApiEndpoints.js";
 import { getSessionFilters } from "./helper/sessionHelpers.js";
-import { loadWebSettings } from "./controllers/WebSettingController.js";
+import WebSetting from "./models/WebSetting.js";
 
 const app = express();
 
@@ -86,9 +86,27 @@ const app = express();
     app.use(express.static(path.resolve("public")));
 
     // ------------------- Global Locals -------------------
-    app.use((req, res, next) => {
-        const { selectedProjectId, selectedProjectName } = getSessionFilters(req);
+    app.use(async (req, res, next) => {
+        const { selectedProjectId, selectedProjectName } = await getSessionFilters(req);
         const user = req.user || req.session.user || {};
+        const settings = await WebSetting.findOne();
+
+        res.locals.pageTitle = "";
+        res.locals.pageDescription = settings?.metaDescription || "";
+        res.locals.metaKeywords = settings?.metaKeywords || "";
+
+        res.locals.companyName = settings?.companyName || "";
+        res.locals.metaTitle = settings?.metaTitle || "e-Sangrah – Smart File Management";
+        res.locals.companyEmail = settings?.companyEmail || "";
+        res.locals.supportEmail = settings?.supportEmail || "";
+        res.locals.logo = settings?.logo || "";
+        res.locals.favicon = settings?.favicon || "";
+
+        res.locals.banner = settings?.banner || "";
+        res.locals.mailImg = settings?.mailImg || "";
+        res.locals.forgetpasswordImg = settings?.forgetpasswordImg || "";
+        res.locals.checkMailImg = settings?.checkMailImg || "";
+
         res.locals.BASE_URL = API_CONFIG.baseUrl || "";
         res.locals.designation = user.designation || null;
         res.locals.selectedProject = selectedProjectId || null;
@@ -114,9 +132,6 @@ const app = express();
 
     // ------------------- Error Handling -------------------
     app.use(errorHandler);
-    await loadWebSettings();
-    // ------------------- Load Menu Map in Background -------------------
-    // loadMenuMap();
 })();
 
 export default app;

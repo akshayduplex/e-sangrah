@@ -34,14 +34,14 @@ const documentSchema = new Schema({
         fileDescription: { type: String, trim: true },
         mainHeading: { type: String, trim: true }
     },
-
+    archivedAt: { type: Date, default: null },
     compliance: {
         isCompliance: { type: Boolean, default: false },
         expiryDate: { type: Date, default: null },
         retentionPeriod: { type: Number, default: null },
         complianceType: { type: String, trim: true }
     },
-
+    // complianceStatus: { type: Boolean, default: false },
     files: [{ type: Schema.Types.ObjectId, ref: "File", default: null }],
 
     signature: {

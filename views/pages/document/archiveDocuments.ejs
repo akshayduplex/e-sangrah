@@ -162,7 +162,7 @@
                                         <img src="${icon}" style="height:30px;">
                                     </span>
                                     <div>
-                                        <p class="mb-0 text-dark">${file.originalName || '-'}</p>
+                                        <p class="mb-0 text-dark">${doc.metadata?.fileName || file?.originalName || '-'}</p>
                                         <small class="text-muted">${fileSizeKB}</small>
                                     </div>
                                 </div>`,

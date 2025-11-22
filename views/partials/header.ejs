@@ -3,23 +3,51 @@
 
 <head>
 
-    <!-- Meta Tags -->
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard | e-Sangrah - Where you can manage your files in one software</title>
 
-    <meta name="description" content="">
-    <meta name="keywords" content="">
-    <meta name="author" content="">
-    <meta name="robots" content="index, follow">
+    <!-- Dynamic Title -->
+    <title>
+        <%= pageTitle ? pageTitle + " | " : "" %>
+            <%= companyName ? companyName + " | " : "" %>
+                <%= metaTitle ? metaTitle : "" %>
+    </title>
 
-    <!-- Apple Touch Icon -->
-    <link rel="apple-touch-icon" sizes="180x180" href="/img/apple-touch-icon.png">
+    <!-- Dynamic Meta Description -->
+    <meta name="description" content="<%= pageDescription || metaDescription %>">
+
+    <!-- Meta Keywords -->
+    <meta name="keywords" content="<%= metaKeywords || '' %>">
+
+    <!-- Author / Company -->
+    <meta name="author" content="<%= companyName || '' %>">
+
+    <!-- Robots -->
+    <meta name="robots" content="<%= process.env.NODE_ENV === 'production' ? 'index, follow' : 'noindex, nofollow' %>">
 
     <!-- Favicon -->
-    <link rel="icon" href="/img/favicon.png" type="image/x-icon">
-    <link rel="shortcut icon" href="/img/favicon.png" type="image/x-icon">
+    <link rel="icon" href="<%= favicon || '/favicon.ico' %>" type="image/x-icon">
 
+    <link rel="shortcut icon" href="<%= favicon %>" type="image/x-icon">
+
+    <!-- OpenGraph Tags (Facebook / WhatsApp / LinkedIn) -->
+    <meta property="og:title" content="<%= pageTitle || metaTitle %>">
+    <meta property="og:description" content="<%= pageDescription || metaDescription %>">
+    <meta property="og:image" content="<%= logo %>">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="<%= companyName %>">
+    <meta property="og:url" content="<%= canonicalUrl %>">
+
+    <!-- Twitter Card (Twitter/X SEO) -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="<%= pageTitle || metaTitle %>">
+    <meta name="twitter:description" content="<%= pageDescription || metaDescription %>">
+    <meta name="twitter:image" content="<%= logo %>">
+
+    <!-- Apple Touch Icon -->
+    <link rel="apple-touch-icon" sizes="180x180" href="<%= logo %>">
+
+    <!-- Preconnect & Fonts -->
     <!-- Theme Script js -->
     <script src="/js/theme-script.js"></script>
     <link href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" rel="stylesheet">
@@ -86,10 +114,10 @@
             <div class="main-header">
                 <div class="header-left">
                     <a href="/" class="logo">
-                        <img src="/img/logo.png" alt="Company Logo">
+                        <img src="<%= logo %>" alt="<%= companyName %> Logo">
                     </a>
                     <a href="/" class="dark-logo">
-                        <img src="/img/logo-white.svg" alt="Company Logo (dark)">
+                        <img src="<%= logo %>" alt="<%= companyName %> Logo">
                     </a>
                 </div>
 
@@ -236,10 +264,12 @@
                                                 href="/reset-password">
                                                 <i class="ti ti-lock-open me-1"></i>Reset Password
                                             </a>
-                                            <a class="dropdown-item d-inline-flex align-items-center p-0 py-2"
-                                                href="/setting">
-                                                <i class="ti ti-settings me-1"></i>Setting
-                                            </a>
+                                            <% if (user.profile_type==='superadmin' ) { %>
+                                                <a class="dropdown-item d-inline-flex align-items-center p-0 py-2"
+                                                    href="/setting">
+                                                    <i class="ti ti-settings me-1"></i>Setting
+                                                </a>
+                                                <% } %>
                                         </div>
                                         <div class="card-footer">
                                             <a id="logoutLink" href="/logout"
@@ -276,7 +306,7 @@
         <div class="sidebar" id="sidebar">
             <div class="sidebar-logo">
                 <a href="#" class="logo logo-normal">
-                    <img src="/img/logo.png" alt="Logo">
+                    <img src="<%= logo %>" alt="<%= companyName %> Logo">
                 </a>
                 <a href="#" class="logo-small">
                     <img src="/img/logo-small.svg" alt="Logo">

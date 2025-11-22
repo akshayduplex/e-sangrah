@@ -105,37 +105,53 @@ async function loadDocuments() {
             return;
         }
 
-        tbody.innerHTML = ''; // Clear old rows
+        tbody.innerHTML = ''; // Clear existing rows
 
         result.data.documents.forEach(doc => {
-            const { metadata, department, compliance, files } = doc;
-            const file = files?.[0];
+            const { metadata, department, compliance, files = [] } = doc;
 
-            const fileName = file?.originalName || metadata?.fileName || 'Untitled';
-            const fileSizeKB = file?.fileSize ? `${Math.round(file.fileSize / 1024)} KB` : '—';
-            const version = file?.version ? ` <span class="text-success">v${file.version}</span>` : '';
+            // Use metadata.fileName as the main display name
+            const displayName = metadata?.fileName?.trim() || 'Untitled Document';
 
-            const fileIcon = getFileIcon(fileName);
+            // Find the latest version file
+            const latestFile = files.reduce((latest, file) => {
+                const currentVer = file.version?.$numberDecimal || file.version || 0;
+                const latestVer = latest.version?.$numberDecimal || latest.version || 0;
+                return Number(currentVer) > Number(latestVer) ? file : latest;
+            }, files[0] || {});
 
-            const expiry = compliance?.expiryDate ? formatDateTime(compliance.expiryDate) : 'N/A';
+            const fileNameForIcon = latestFile?.originalName || '';
+            const fileSizeKB = latestFile?.fileSize
+                ? `${Math.round(latestFile.fileSize / 1024)} KB`
+                : '—';
+
+            const versionLabel = latestFile?.version
+                ? typeof latestFile.version === 'object'
+                    ? latestFile.version.$numberDecimal
+                    : latestFile.version
+                : '1.0';
+
+            const fileIcon = getFileIcon(fileNameForIcon);
+
+            const expiry = compliance?.isCompliance && compliance.expiryDate
+                ? formatDateTime(compliance.expiryDate)
+                : 'N/A';
+
             const retention = compliance?.retentionPeriod || 'Active';
-            const isCompliant = compliance?.isCompliance
-                ? `<p class="text-success d-flex align-items-center gap-2">
-        <span class="d-inline-flex align-items-center justify-content-center rounded-circle bg-success-subtle" style="width: 28px; height: 28px;">
-           <i class="ti ti-check"></i>
-        </span>
-        Compliant
-     </p>`
-                : `<p class="text-danger d-flex align-items-center gap-2">
-        <span class="d-inline-flex align-items-center justify-content-center rounded-circle bg-danger-subtle" style="width: 28px; height: 28px;">
-            <i class="ti ti-x"></i>
-        </span>
-        Non-Compliant
-     </p>`;
 
-            // --- Action Buttons (with proper data attributes) ---
-            const viewUrl = doc.link || `/documents/view/${doc._id}`;
-            const editUrl = `/documents/edit/${doc._id}`;
+            const isCompliant = compliance?.isCompliance
+                ? `<p class="text-success d-flex align-items-center gap-2 mb-0">
+                        <span class="d-inline-flex align-items-center justify-content-center rounded-circle bg-success-subtle" style="width: 28px; height: 28px;">
+                            <i class="ti ti-check"></i>
+                        </span>
+                        Compliant
+                   </p>`
+                : `<p class="text-danger d-flex align-items-center gap-2 mb-0">
+                        <span class="d-inline-flex align-items-center justify-content-center rounded-circle bg-danger-subtle" style="width: 28px; height: 28px;">
+                            <i class="ti ti-x"></i>
+                        </span>
+                        Non-Compliant
+                   </p>`;
 
             const actionsDropdown = `
                 <div class="btn-group" role="group">
@@ -167,21 +183,22 @@ async function loadDocuments() {
                     <td>${actionsDropdown}</td>
                     <td>
                         <div class="flxtblleft">
-                            <span class="avatar rounded bg-light mb-2">
-                                <img src="${fileIcon}" alt="file icon">
+                            <span class="avatar rounded bg-light">
+                                <img src="${fileIcon}" alt="icon" style="width: 32px; height: 32px;">
                             </span>
                             <div class="flxtbltxt">
-                                <p class="fs-14 mb-1 fw-normal text-neutral">
-                                    ${escapeHtml(fileName)}${version}
+                                <p class="fs-14 mb-1 fw-medium text-neutral text-truncate" style="max-width: 200px;" title="${escapeHtml(displayName)}">
+                                    ${escapeHtml(displayName)}
+                                    <span class="text-success ms-1">v${versionLabel}</span>
                                 </p>
-                                <span class="fs-11 fw-light text-black">${fileSizeKB}</span>
+                                <span class="fs-11 text-muted">${fileSizeKB}</span>
                             </div>
                         </div>
                     </td>
-                    <td><p>${department?.name || 'N/A'}</p></td>
+                    <td><p class="mb-0">${escapeHtml(department?.name || 'N/A')}</p></td>
                     <td>${isCompliant}</td>
-                    <td><p>${escapeHtml(retention)}</p></td>
-                    <td><p class="tbl_date">${expiry}</p></td>
+                    <td><p class="mb-0">${escapeHtml(retention)}</p></td>
+                    <td><p class="mb-0 tbl_date">${expiry}</p></td>
                 </tr>`;
 
             tbody.insertAdjacentHTML('beforeend', rowHTML);
@@ -191,7 +208,7 @@ async function loadDocuments() {
         console.error('Error loading documents:', err);
         const tbody = document.querySelector('#documentsTable tbody');
         if (tbody) {
-            tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger py-3">Failed to load documents.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger py-4">Failed to load documents.</td></tr>`;
         }
     }
 }

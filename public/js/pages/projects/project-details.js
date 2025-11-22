@@ -117,7 +117,29 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     setupProjectDateRestrictions();
+    // Auto-set designation when user is selected
+    if (e.target.classList.contains('user-select')) {
+        const userSelect = e.target;
+        const selectedOption = userSelect.selectedOptions[0];
+        const defaultDesignationId = selectedOption.getAttribute('data-designation');
 
+        // Find the designation select in the same row
+        const row = userSelect.closest('.approval-authority-row');
+        const designationSelect = row.querySelector('select[name*="[designation]"]');
+
+        // Reset the designation select options (keeps all designations)
+        const allOptions = Array.from(designationSelect.options);
+        allOptions.forEach(opt => opt.selected = false);
+
+        // Set the user's default designation if available
+        if (defaultDesignationId) {
+            const optionToSelect = Array.from(designationSelect.options).find(opt => opt.value === defaultDesignationId);
+            if (optionToSelect) optionToSelect.selected = true;
+        }
+
+        // Trigger Select2 update if used
+        $(designationSelect).trigger('change');
+    }
     // -----------------------------
     // Form Submissions
     // -----------------------------

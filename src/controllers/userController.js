@@ -16,11 +16,29 @@ import { activityLogger } from "../helper/activityLogger.js";
 
 // GET /users/list
 export const listUsers = (req, res) => {
-    res.render("pages/registerations/user-listing", {
-        title: "E-Sangrah - Users-List",
-        user: req.user
-    });
+    try {
+        res.render("pages/registerations/user-listing", {
+            pageTitle: "Users List",
+            pageDescription: "View and manage all registered users in your workspace.",
+            metaKeywords: "users list, user management, workspace users",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+
+            user: req.user
+        });
+    } catch (err) {
+        console.error("Error loading users list:", err);
+        res.status(500).render("pages/error", {
+            pageTitle: "Error",
+            pageDescription: "Unable to load users list.",
+            metaKeywords: "users list error, page load error",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+
+            user: req.user,
+            message: "Unable to load users list"
+        });
+    }
 };
+
 
 // GET /users/register
 export const showRegisterForm = async (req, res) => {
@@ -29,16 +47,29 @@ export const showRegisterForm = async (req, res) => {
         const designations = await Designation.find({ status: "Active" }).sort({ name: 1 }).lean();
 
         res.render("pages/registerations/user-registration", {
-            title: "E-Sangrah - Register",
+            pageTitle: "Register User",
+            pageDescription: "Register a new user and assign roles, department, and designation.",
+            metaKeywords: "user registration, add user, workspace users",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+
             departments,
             designations,
             user: req.user
         });
     } catch (err) {
         logger.error("Error loading user registration:", err);
-        res.status(500).send("Internal Server Error");
+        res.status(500).render("pages/error", {
+            pageTitle: "Error",
+            pageDescription: "Unable to load user registration page.",
+            metaKeywords: "user registration error, page load error",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+
+            user: req.user,
+            message: "Internal Server Error"
+        });
     }
 };
+
 
 // GET /users/:mode/:id
 export const viewOrEditUser = async (req, res) => {

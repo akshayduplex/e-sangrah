@@ -86,6 +86,84 @@
             </div>
         </div>
     </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const wrapper = document.getElementById('approvalAuthorityWrapper');
 
+            // Function to initialize Select2 for all selects inside a row
+            const initSelect2 = (row) => {
+                $(row).find('select').select2({ width: '100%' });
+            };
+
+            // Function to create a new Approval Authority row
+            const addApprovalAuthorityRow = () => {
+                const index = wrapper.querySelectorAll('.approval-authority-row').length;
+
+                const html = `
+        <div class="row g-2 mb-2 approval-authority-row">
+            <div class="col-md-4">
+                <select name="approvalAuthority[${index}][userId]" class="form-control select2 user-select" required>
+                    <option value="">-- Select User --</option>
+                    <% users.forEach(u => { %>
+                        <option value="<%= u._id %>" data-designation="<%= u.userDetails?.designation?._id || '' %>">
+                            <%= u.name %>
+                        </option>
+                    <% }) %>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <select name="approvalAuthority[${index}][designation]" class="form-control select2" required>
+                    <option value="">-- Select Designation --</option>
+                    <% designations.forEach(d => { %>
+                        <option value="<%= d._id %>"><%= d.name %></option>
+                    <% }) %>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <input type="number" name="approvalAuthority[${index}][priority]" class="form-control" placeholder="Priority" required>
+            </div>
+            <div class="col-md-1 d-flex align-items-center">
+                <button type="button" class="btn btn-danger btn-sm removeApprovalAuthority">
+                    <i class="ti ti-x"></i>
+                </button>
+            </div>
+        </div>`;
+
+                wrapper.insertAdjacentHTML('beforeend', html);
+
+                // Initialize Select2 for the newly added row
+                const newRow = wrapper.querySelector('.approval-authority-row:last-child');
+                initSelect2(newRow);
+            };
+
+            // Add row button
+            document.getElementById('addApprovalAuthority')?.addEventListener('click', addApprovalAuthorityRow);
+
+            // Remove row handler (delegated)
+            wrapper.addEventListener('click', (e) => {
+                if (e.target.closest('.removeApprovalAuthority')) {
+                    e.target.closest('.approval-authority-row').remove();
+                }
+            });
+
+            // Auto-set designation when user is selected (delegated for dynamic rows)
+            $(document).on('change', '.user-select', function () {
+                const selectedOption = this.selectedOptions[0];
+                const defaultDesignationId = selectedOption.getAttribute('data-designation');
+
+                const row = $(this).closest('.approval-authority-row');
+                const designationSelect = row.find('select[name*="[designation]"]');
+
+                if (defaultDesignationId) {
+                    designationSelect.val(defaultDesignationId).trigger('change');
+                } else {
+                    designationSelect.val('').trigger('change'); // Clear if no default
+                }
+            });
+
+            // Initialize Select2 for existing rows on page load
+            document.querySelectorAll('.approval-authority-row').forEach(initSelect2);
+        });
+    </script>
     <script src="/js/pages/projects/project-details.js"></script>
     <%- include('../../partials/footer') %>

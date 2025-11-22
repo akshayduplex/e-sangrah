@@ -18,49 +18,74 @@ export const showProjectListPage = async (req, res) => {
             .sort({ name: 1 })
             .lean();
 
+        res.locals.pageTitle = "Projects List";
+        res.locals.pageDescription = "View and manage all projects in your workspace.";
+        res.locals.metaKeywords = "projects, project management, workspace, file management";
+        res.locals.canonicalUrl = `${req.protocol}://${req.get("host")}${req.originalUrl}`;
+
         res.render("pages/projects/projectList", {
-            title: "E-Sangrah - Projects List",
             designations,
             user: req.user
         });
+
     } catch (err) {
         logger.error("Error loading project list:", err);
+
+        res.locals.pageTitle = "Error";
+        res.locals.pageDescription = "Unable to load the project list.";
+        res.locals.metaKeywords = "projects error, project list error";
+        res.locals.canonicalUrl = `${req.protocol}://${req.get("host")}${req.originalUrl}`;
+
         res.status(500).render("pages/error", {
-            title: "Error",
-            message: "Unable to load project list"
+            message: "Unable to load project list",
+            user: req.user
         });
     }
 };
-
 // Project details (new)
 export const showNewProjectDetails = async (req, res) => {
-    await renderProjectDetails(res, null, req.user);
+    await renderProjectDetails(req, res, null, {
+        pageTitle: "New Project Details",
+        pageDescription: "Create and configure a new project in your workspace.",
+        metaKeywords: "new project, project creation, project details",
+    });
 };
 
-// Project details (existing)
 export const showExistingProjectDetails = async (req, res) => {
-    await renderProjectDetails(res, req.params.id, req.user);
+    await renderProjectDetails(req, res, req.params.id, {
+        pageTitle: "Project Details",
+        pageDescription: "View and manage details of the selected project.",
+        metaKeywords: "project details, project management, workspace projects",
+    });
 };
 
 // Main Projects page
 export const showMainProjectsPage = async (req, res) => {
     try {
+        res.locals.pageTitle = "Projects";
+        res.locals.pageDescription = "Browse and manage all projects in your workspace.";
+        res.locals.metaKeywords = "projects, project list, workspace projects";
+        res.locals.canonicalUrl = `${req.protocol}://${req.get("host")}${req.originalUrl}`;
+
         res.render("pages/projects/projects", {
             user: req.user,
-            title: "E-Sangrah - Project List",
-            messages: req.flash(),
+            messages: req.flash()
         });
     } catch (err) {
         logger.error("Error loading projects page:", err);
+
+        res.locals.pageTitle = "Error";
+        res.locals.pageDescription = "Unable to load projects page.";
+        res.locals.metaKeywords = "projects error, page load error";
+        res.locals.canonicalUrl = `${req.protocol}://${req.get("host")}${req.originalUrl}`;
+
         res.render("pages/projects/projects", {
             user: req.user,
-            title: "E-Sangrah - Project List",
             messages: { error: "Unable to load projects" },
-            projects: [],
+            projects: []
         });
     }
 };
-
 
 //API controllers
 

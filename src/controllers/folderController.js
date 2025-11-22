@@ -27,37 +27,54 @@ import { activityLogger } from "../helper/activityLogger.js";
 export const showFolderListById = async (req, res) => {
     try {
         const { folderId } = req.params;
+
         res.render("pages/document/documentFolderList", {
-            title: "E-Sangrah - Documents-List",
+            pageTitle: "Documents List",
+            pageDescription: "View all documents within this folder.",
+            metaKeywords: "documents list, folder documents, document management",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+
             user: req.user,
             folderId
         });
     } catch (err) {
         logger.error("Error loading document list:", err);
         res.status(500).render("pages/error", {
-            title: "Error",
-            message: "Unable to load documents",
+            pageTitle: "Error",
+            pageDescription: "Unable to load documents in folder.",
+            metaKeywords: "document folder error",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+
+            user: req.user,
+            message: "Unable to load documents"
         });
     }
 };
-
 // Upload Folder page
 export const showUploadFolderPage = (req, res) => {
     const selectedProjectId = req.session.selectedProject || null;
-    const selectedProjectName = req.session.selectedProjectName || ''
-    res.render("pages/folders/upload-folder", {
-        title: "E-Sangrah - Upload-Folder",
-        user: req.user,
-        selectedProjectId: selectedProjectId,
-        selectedProjectName: selectedProjectName
+    const selectedProjectName = req.session.selectedProjectName || '';
 
+    res.render("pages/folders/upload-folder", {
+        pageTitle: "Upload Folder",
+        pageDescription: "Upload a new folder and add documents to your project.",
+        metaKeywords: "upload folder, add folder, project folder",
+        canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+
+        user: req.user,
+        selectedProjectId,
+        selectedProjectName
     });
 };
 
 // Archived Folders page
 export const showArchivedFoldersPage = (req, res) => {
     res.render("pages/folders/archivedFolders", {
-        title: "E-Sangrah - ArchivedFolders",
+        pageTitle: "Archived Folders",
+        pageDescription: "Browse all archived folders in your workspace.",
+        metaKeywords: "archived folders, old folders, document archive",
+        canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+
         user: req.user
     });
 };
@@ -70,33 +87,48 @@ export const showRecycleBinPage = async (req, res) => {
             .populate("department", "name")
             .populate("files", "originalName fileSize");
 
-        return res.render('pages/folders/recycleBin', { documents, user: req.user });
+        return res.render('pages/folders/recycleBin', {
+            pageTitle: "Recycle Bin",
+            pageDescription: "View deleted documents and restore them if needed.",
+            metaKeywords: "recycle bin, deleted documents, restore documents",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+
+            documents,
+            user: req.user
+        });
     } catch (error) {
         console.error(error);
-        return res.status(500).send("Failed to load recycle bin documents.");
+        return res.status(500).render("pages/error", {
+            pageTitle: "Error",
+            pageDescription: "Unable to load recycle bin documents.",
+            metaKeywords: "recycle bin error",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+
+            user: req.user,
+            message: "Failed to load recycle bin documents."
+        });
     }
 };
-
 // Main Folders page
 export const showMainFoldersPage = (req, res) => {
     res.render("pages/folders/folders", {
-        title: "E-Sangrah - Folders",
+        pageTitle: "Folders",
+        pageDescription: "View all folders for the selected project.",
+        metaKeywords: "project folders, folder management, document folders",
+        canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+
         user: req.user,
         projectId: req.query.id
     });
 };
 export const showviewFoldersPage = async (req, res) => {
     const { folderId } = req.params;
-    const { token } = req.query;
 
     try {
         const folder = await Folder.findById(folderId).lean();
         if (!folder) return res.status(404).send("Folder not found");
 
-        // Always return a valid object
         const access = await checkFolderAccess(folder, req) || {};
-
-        // Ensure defaults exist (prevents EJS crash)
         const defaults = {
             canView: false,
             canRequestAccess: false,
@@ -106,21 +138,31 @@ export const showviewFoldersPage = async (req, res) => {
             reason: "none"
         };
 
-
         res.render("pages/folders/viewFolders", {
+            pageTitle: folder.name || "Folder Details",
+            pageDescription: "View folder contents and manage access permissions.",
+            metaKeywords: "folder details, view folder, folder access",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+
             folder,
             user: req.user,
             ...defaults,
-            ...access // override defaults if defined
+            ...access
         });
 
     } catch (err) {
         console.error("Error rendering folder view:", err);
-        res.status(500).send("Server error");
+        res.status(500).render("pages/error", {
+            pageTitle: "Error",
+            pageDescription: "Unable to load folder contents.",
+            metaKeywords: "folder view error",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+
+            user: req.user,
+            message: "Server error"
+        });
     }
 };
-
-
 export const viewFile = async (req, res) => {
     try {
         const { fileId } = req.params;
@@ -149,29 +191,22 @@ export const viewFile = async (req, res) => {
             };
         };
 
-        // Fetch file document from DB
         const file = await File.findById(fileId);
         if (!file) {
             return res.render("pages/folders/viewFile", {
+                pageTitle: "File Not Found",
+                pageDescription: "The requested file could not be found.",
+                metaKeywords: "file not found, file error",
+                canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+
                 file: null,
                 documentTitle: "Document",
                 user: req.user
             });
         }
 
-        // Generate signed URL (or reuse saved one)
         const fileUrl = file.s3Url || await getObjectUrl(file.file, 3600);
 
-        // --- Log the file view activity (non-blocking) ---
-        const userId = req.user?._id || null;
-        // file.activityLog.push({
-        //     action: "opened",
-        //     performedBy: userId,
-        //     details: `File "${file.originalName}" viewed by ${userId || "unknown user"}`
-        // });
-
-        // file.save().catch(err => console.error("Failed to log file view:", err));
-        // Log the file view
         await activityLogger({
             actorId: req.user?._id || null,
             entityId: file._id,
@@ -180,8 +215,12 @@ export const viewFile = async (req, res) => {
             details: `${req.user ? req.user.name : "Guest User"} viewed ${file.originalName} file`
         });
 
-        // Render view page
         res.render("pages/folders/viewFile", {
+            pageTitle: file.originalName,
+            pageDescription: "View file details, preview, and download options.",
+            metaKeywords: "view file, file details, file preview, download file",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+
             file: {
                 ...file.toObject(),
                 formattedSize: formatFileSize(file.fileSize),
@@ -195,12 +234,18 @@ export const viewFile = async (req, res) => {
     } catch (error) {
         console.error("Error viewing file:", error);
         res.render("pages/folders/viewFile", {
+            pageTitle: "Error",
+            pageDescription: "Unable to view file.",
+            metaKeywords: "file view error",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+
             file: null,
             documentTitle: "Document",
             user: req.user
         });
     }
 };
+
 //API controllers
 
 // Create folder
@@ -987,6 +1032,7 @@ export const getFolderTree = async (req, res) => {
                                 file: "$$f.file",
                                 originalName: "$$f.originalName",
                                 fileType: "$$f.fileType",
+                                fileUrl: "$$f.s3Url",
                                 size: "$$f.fileSize",
                             }
                         }

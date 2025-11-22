@@ -8,38 +8,95 @@ import { activityLogger } from "../helper/activityLogger.js";
 
 // Render Add Designation page
 export const showAddDesignationPage = (req, res) => {
-    res.render("pages/designation/designation", {
-        designation: null,
-        user: req.user
-    });
+    try {
+        res.render("pages/designation/designation", {
+            pageTitle: "Add Designation",
+            pageDescription: "Create a new designation and manage organizational roles.",
+            metaKeywords: "add designation, create designation, job roles, organization structure",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+            designation: null,
+            user: req.user
+        });
+    } catch (err) {
+        logger.error("Add designation render error:", err);
+        res.status(500).render("pages/error", {
+            pageTitle: "Error",
+            pageDescription: "Unable to load the add designation page.",
+            metaKeywords: "error, designation error",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+            user: req.user,
+            message: "Unable to load add designation page"
+        });
+    }
 };
+
 
 // Render Edit Designation page
 export const showEditDesignationPage = async (req, res) => {
     try {
-        const designation = await Designation.findById(req.params.id);
+        const designation = await Designation.findById(req.params.id).lean();
+
         if (!designation) {
             req.flash("error", "Designation not found");
-            return res.redirect("/designations/list");
+            return res.status(404).render("pages/error", {
+                pageTitle: "Designation Not Found",
+                title: "Designation Not Found",
+                pageDescription: "The requested designation does not exist.",
+                metaKeywords: "designation not found, edit designation error",
+                canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+                user: req.user,
+                message: "Designation not found"
+            });
         }
 
         res.render("pages/designation/designation", {
+            pageTitle: "Edit Designation",
+            title: "Edit Designation",
+            pageDescription: "Edit role details and update designation information.",
+            metaKeywords: "edit designation, update role, job roles management",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
             designation,
             user: req.user
         });
+
     } catch (err) {
         logger.error("Error loading designation edit page:", err);
         req.flash("error", "Something went wrong");
-        res.redirect("/designations/list");
+        res.status(500).render("pages/error", {
+            pageTitle: "Error",
+            title: "Error",
+            pageDescription: "Unable to load the edit designation page.",
+            metaKeywords: "edit error, designation error",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+            user: req.user,
+            message: "Unable to load edit designation page"
+        });
     }
 };
 
 // Render Designation List page
 export const showDesignationListPage = (req, res) => {
-    res.render("pages/designation/designations-list", {
-        title: "Designation List",
-        user: req.user
-    });
+    try {
+        res.render("pages/designation/designations-list", {
+            pageTitle: "Designation List",
+            title: "Designation List",
+            pageDescription: "View and manage all designations created in your organization.",
+            metaKeywords: "designation list, job roles, organization roles, designation management",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+            user: req.user
+        });
+    } catch (err) {
+        logger.error("Designation list render error:", err);
+        res.status(500).render("pages/error", {
+            pageTitle: "Error",
+            title: "Error",
+            pageDescription: "Unable to load the designation list.",
+            metaKeywords: "designation list error, page error",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+            user: req.user,
+            message: "Unable to load designation list"
+        });
+    }
 };
 
 //API Controllers

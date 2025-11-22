@@ -23,17 +23,21 @@
             <div class="col-sm-5">
                 <div class="login_illstration">
                     <div class="loginlogo">
-                        <img src="/img/logo.png">
+                        <img src="<%= logo %>">
                     </div>
                     <div class="main_illustration">
-                        <img src="/img/login.png">
+                        <img src="<%= banner %>">
                     </div>
                 </div>
             </div>
             <div class="col-sm-7">
                 <div class="loginforms">
-                    <h2>Welcome to E- Sangrah!</h2>
-                    <p class="subtext">Where you can manage your files in one software</p>
+                    <h2>
+                        Welcome to <%= companyName || "E- Sangrah" %>!
+                    </h2>
+                    <p class="subtext">
+                        <%= metaTitle || "Where you can manage your files in one software" %>
+                    </p>
                     <div class="mb-4">
                         <label for="emailInput" class="form-label">Email</label>
                         <input type="email" class="form-control" id="emailInput" placeholder="name@example.com">

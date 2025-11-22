@@ -7,21 +7,53 @@ import { activityLogger } from "../helper/activityLogger.js";
 
 // Render Add Department page
 export const showAddDepartmentPage = (req, res) => {
-
-    res.render("pages/department/department", {
-        title: "E-Sangrah - Department",
-        user: req.user,
-        department: null,
-    });
+    try {
+        res.render("pages/department/department", {
+            pageTitle: "Add Department",
+            pageDescription: "Create a new department and manage organizational structure.",
+            metaKeywords: "add department, create department, organization structure, department management",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+            user: req.user,
+            department: null
+        });
+    } catch (err) {
+        logger.error("Add department render error:", err);
+        res.status(500).render("pages/error", {
+            pageTitle: "Error",
+            pageDescription: "Unable to load the add department page.",
+            metaKeywords: "error, department error, page load error",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+            user: req.user,
+            message: "Unable to load add department page"
+        });
+    }
 };
+
 
 // Department List page
 export const showDepartmentListPage = (req, res) => {
-    res.render("pages/department/departments-list", {
-        title: "E-Sangrah - Departments-List",
-        user: req.user
-    });
+    try {
+        res.render("pages/department/departments-list", {
+            pageTitle: "Departments List",
+            title: "Departments List",
+            pageDescription: "View and manage all departments within your workspace.",
+            metaKeywords: "departments list, department management, organizational units",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+            user: req.user
+        });
+    } catch (err) {
+        logger.error("Department list render error:", err);
+        res.status(500).render("pages/error", {
+            pageTitle: "Error",
+            pageDescription: "Unable to load the departments list.",
+            metaKeywords: "error, departments list error, page load error",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+            user: req.user,
+            message: "Unable to load departments list"
+        });
+    }
 };
+
 
 // Edit Department page
 export const showEditDepartmentPage = async (req, res) => {

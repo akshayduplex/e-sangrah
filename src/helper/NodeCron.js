@@ -1,12 +1,15 @@
 import cron from "node-cron";
+import mongoose from "mongoose";
 import TempFile from "../models/TempFile.js";
 import PermissionLogs from "../models/PermissionLogs.js";
 import FolderPermissionLogs from "../models/FolderPermissionLogs.js";
+import Document from "../models/Document.js";
 import { deleteObject } from "../utils/s3Helpers.js";
 import logger from "../utils/logger.js";
 
 let isRunningTempFiles = false;
 let isRunningLogs = false;
+let isRunningDocumentRetention = false;
 
 /* ----------------------------
   Temp files cleanup
@@ -32,11 +35,7 @@ const cleanupTempFiles = async () => {
             }
         }
 
-        if (oldFiles.length > 0) {
-            logger.info(`Temp file cleanup complete. ${oldFiles.length} files removed.`);
-        } else {
-            logger.info("Temp file cleanup complete. No files to remove.");
-        }
+        logger.info(`Temp file cleanup complete. ${oldFiles.length} files removed.`);
     } catch (err) {
         logger.error("Temp file cleanup failed:", err);
     } finally {
@@ -45,47 +44,48 @@ const cleanupTempFiles = async () => {
 };
 
 /* ----------------------------
-  PermissionLogs cleanup
+  Document retention job
 ---------------------------- */
-const cleanupPermissionLogs = async () => {
-    const now = new Date();
-    const result = await PermissionLogs.deleteMany({ expiresAt: { $lt: now } });
-    logger.info(`Permission log cleanup complete. ${result.deletedCount} expired logs removed.`);
+const documentRetentionJob = async () => {
+    if (isRunningDocumentRetention) {
+        logger.warn("Document retention job skipped: previous run still in progress.");
+        return;
+    }
+    isRunningDocumentRetention = true;
+
+    try {
+        const now = new Date();
+
+        // 1️⃣ Archive expired documents
+        const archiveResult = await Document.updateMany(
+            {
+                "compliance.expiryDate": { $lte: now },
+                isArchived: false,
+                isDeleted: false
+            },
+            { $set: { isArchived: true, archivedAt: now } } // Make sure archivedAt exists in schema
+        );
+        logger.info(`Archived ${archiveResult.modifiedCount} expired documents.`);
+
+        // 2️⃣ Delete documents archived 5 months ago
+        const fiveMonthsAgo = new Date();
+        fiveMonthsAgo.setMonth(fiveMonthsAgo.getMonth() - 5);
+
+        const deleteResult = await Document.updateMany(
+            {
+                isArchived: true,
+                isDeleted: false,
+                archivedAt: { $lte: fiveMonthsAgo }
+            },
+            { $set: { isDeleted: true, deletedAt: now } }
+        );
+        logger.info(`Permanently deleted ${deleteResult.modifiedCount} archived documents.`);
+    } catch (err) {
+        logger.error("Document retention job failed:", err);
+    } finally {
+        isRunningDocumentRetention = false;
+    }
 };
-
-/* ----------------------------
-  FolderPermissionLogs cleanup
----------------------------- */
-const cleanupFolderPermissionLogs = async () => {
-    const now = new Date();
-    const result = await FolderPermissionLogs.deleteMany({ expiresAt: { $lt: now } });
-    logger.info(`Folder permission log cleanup complete. ${result.deletedCount} expired logs removed.`);
-};
-
-/* ----------------------------
-  Combined logs cleanup runner
----------------------------- */
-// const runLogsCleanup = async () => {
-//     if (isRunningLogs) {
-//         logger.warn("Logs cleanup skipped: previous run still in progress.");
-//         return;
-//     }
-
-//     isRunningLogs = true;
-//     const startTime = new Date();
-//     logger.info(`[${startTime.toISOString()}] Permission logs cleanup job started.`);
-
-//     try {
-//         await cleanupPermissionLogs();
-//         await cleanupFolderPermissionLogs();
-//     } catch (err) {
-//         logger.error("Logs cleanup job failed:", err);
-//     } finally {
-//         const endTime = new Date();
-//         logger.info(`[${endTime.toISOString()}] Permission logs cleanup job finished. Duration: ${((endTime - startTime) / 1000).toFixed(2)}s`);
-//         isRunningLogs = false;
-//     }
-// };
 
 /* ----------------------------
   Start scheduled jobs
@@ -101,13 +101,13 @@ export const startCleanupJob = () => {
         { scheduled: true, timezone: "UTC" }
     );
 
-    // PermissionLogs and FolderPermissionLogs: daily at midnight UTC
-    // cron.schedule(
-    //     "0 0 * * *",
-    //     async () => {
-    //         logger.info("Triggering permission logs cleanup...");
-    //         await runLogsCleanup();
-    //     },
-    //     { scheduled: true, timezone: "UTC" }
-    // );
+    // Document retention: run daily at midnight UTC
+    cron.schedule(
+        "0 0 * * *",
+        async () => {
+            logger.info("Triggering document retention job...");
+            await documentRetentionJob();
+        },
+        { scheduled: true, timezone: "UTC" }
+    );
 };

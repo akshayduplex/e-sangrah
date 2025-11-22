@@ -8,13 +8,21 @@ import { successResponse, failResponse, errorResponse } from "../utils/responseH
 export const showNotificationsPage = (req, res) => {
     try {
         res.render("pages/notifications", {
-            title: "E-Sangrah - Notifications",
+            pageTitle: "Notifications",
+            pageDescription: "View all your notifications, alerts, and updates in one place.",
+            metaKeywords: "notifications, alerts, user updates, activity alerts",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+
             user: req.user
         });
     } catch (err) {
         console.error("Error loading notifications page:", err);
         res.status(500).render("pages/error", {
-            title: "Error",
+            pageTitle: "Error",
+            pageDescription: "Unable to load notifications page.",
+            metaKeywords: "notifications error, page load error",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+
             message: "Unable to load notifications",
             user: req.user
         });

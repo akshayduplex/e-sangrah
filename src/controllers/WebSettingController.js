@@ -1,74 +1,62 @@
-import { API_CONFIG } from "../config/ApiEndpoints.js";
 import WebSetting from "../models/WebSetting.js";
-import { deleteObject, folderUpload } from "../utils/s3Helpers.js";
-
-export const extractS3Key = (url) => {
-    if (!url) return null;
-    const parts = url.split(".com/");
-    return parts[1] || null;
-};
 
 export const updateWebSettings = async (req, res) => {
     try {
-        let settings = await WebSetting.findOne() || new WebSetting();
-        const files = req.files;
-        const timestamp = Date.now();
+        let settings = await WebSetting.findOne();
+        if (!settings) settings = new WebSetting();
 
-        if (files?.logo) {
-            if (settings.logoKey) await deleteObject(settings.logoKey);
-            const uploaded = await folderUpload(files.logo[0].buffer, `logo_${timestamp}_${files.logo[0].originalname}`, files.logo[0].mimetype, "public/images/logo");
-            settings.logo = uploaded.url;
-            settings.logoKey = uploaded.key;
+        const { companyName, metaTitle, metaDescription, metaKeywords, companyEmail, supportEmail } = req.body;
+
+        // Validate required
+        if (!companyEmail || !supportEmail) {
+            return res.status(400).json({
+                success: false,
+                message: "Company Email and Support Email are required."
+            });
         }
 
-        if (files?.favicon) {
-            if (settings.faviconKey) await deleteObject(settings.faviconKey);
-            const uploaded = await folderUpload(files.favicon[0].buffer, `favicon_${timestamp}_${files.favicon[0].originalname}`, files.favicon[0].mimetype, "public/images/favicon");
-            settings.favicon = uploaded.url;
-            settings.faviconKey = uploaded.key;
-        }
+        // Update fields (only overwrite if provided)
+        settings.companyName = companyName ?? settings.companyName;
+        settings.metaTitle = metaTitle ?? settings.metaTitle;
+        settings.metaDescription = metaDescription ?? settings.metaDescription;
+        settings.metaKeywords = metaKeywords ?? settings.metaKeywords;
 
-        if (files?.banner) {
-            if (settings.bannerKey) await deleteObject(settings.bannerKey);
-            const uploaded = await folderUpload(files.banner[0].buffer, `banner_${timestamp}_${files.banner[0].originalname}`, files.banner[0].mimetype, "public/images/banner");
-            settings.banner = uploaded.url;
-            settings.bannerKey = uploaded.key;
-        }
+        settings.companyEmail = companyEmail;
+        settings.supportEmail = supportEmail;
+
+        // Upload images
+        const f = req.files;
+
+        if (f?.logo) settings.logo = "/uploads/web-settings/" + f.logo[0].filename;
+        if (f?.favicon) settings.favicon = "/uploads/web-settings/" + f.favicon[0].filename;
+        if (f?.banner) settings.banner = "/uploads/web-settings/" + f.banner[0].filename;
+        if (f?.mailImg) settings.mailImg = "/uploads/web-settings/" + f.mailImg[0].filename;
+        if (f?.forgetpasswordImg) settings.forgetpasswordImg = "/uploads/web-settings/" + f.forgetpasswordImg[0].filename;
+        if (f?.checkMailImg) settings.checkMailImg = "/uploads/web-settings/" + f.checkMailImg[0].filename;
 
         await settings.save();
 
-        return res.json({ success: true, message: "Web settings updated successfully" });
+        return res.json({
+            success: true,
+            message: "Web settings updated successfully",
+            data: settings
+        });
+
     } catch (err) {
         console.error(err);
-        return res.status(500).json({ success: false, message: "Error updating settings" });
+        return res.status(500).json({
+            success: false,
+            message: "Error updating web settings"
+        });
     }
 };
-
 
 
 export const getWebSettings = async (req, res) => {
     try {
-        const setting = await WebSetting.findOne();
-        return res.status(200).json({
-            success: true,
-            data: setting
-        });
-    } catch (error) {
-        return res.status(500).json({
-            success: false,
-            message: error.message
-        });
-    }
-};
-
-export const loadWebSettings = async () => {
-    try {
-        const setting = await WebSetting.findOne();
-        if (setting) {
-            API_CONFIG.LOGO_URL = setting.logo || null;
-            API_CONFIG.EMAIL_BANNER = setting.banner || null;
-        }
+        const settings = await WebSetting.findOne();
+        return res.json({ success: true, data: settings });
     } catch (err) {
-        console.error("Failed to load web settings:", err.message);
+        return res.status(500).json({ success: false, message: err.message });
     }
 };

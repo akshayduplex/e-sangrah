@@ -83,8 +83,14 @@ export const register = async (req, res) => {
 // ---------------------------
 
 export const getLoginPage = (req, res) => {
-    res.render("pages/login", { title: "E-Sangrah - Login" });
+    res.render("pages/login", {
+        pageTitle: "Login",
+        pageDescription: "Access your e-Sangrah workspace by logging into your account.",
+        metaKeywords: "login, user login, esangrah login, sign in, workspace access",
+        canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`
+    });
 };
+
 
 
 export const login = async (req, res) => {
@@ -252,24 +258,33 @@ export const verifyTokenOtp = async (req, res) => {
 
 export const getForgotPasswordPage = (req, res) => {
     res.render("pages/forgot-password", {
+        pageTitle: "Forgot Password",
+        pageDescription: "Recover your e-Sangrah account by requesting a password reset.",
+        metaKeywords: "forgot password, password recovery, reset password, esangrah",
+        canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
         otpSent: false,
         otpVerified: false,
         email: "",
         message: null,
-        error: null,
+        error: null
     });
 };
 
 export const getResetPasswordPage = (req, res) => {
     res.render("pages/reset-password", {
+        pageTitle: "Reset Password",
+        pageDescription: "Reset your account password and regain access to your e-Sangrah workspace.",
+        metaKeywords: "reset password, account recovery, esangrah reset, password update",
+        canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
         otpSent: false,
         otpVerified: false,
         email: req.user.email,
         message: null,
         user: req.user,
-        error: null,
+        error: null
     });
 };
+
 
 
 // ---------------------------
@@ -522,15 +537,36 @@ export const showMyProfile = async (req, res) => {
             .lean();
 
         if (!user) {
-            return res.status(404).send("User not found");
+            return res.status(404).render("pages/error", {
+                pageTitle: "User Not Found",
+                pageDescription: "Unable to locate the user profile.",
+                metaKeywords: "profile, user profile, esangrah account",
+                canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+                message: "User not found",
+                user: req.user
+            });
         }
 
-        res.render("pages/myprofile", { user });
+        res.render("pages/myprofile", {
+            pageTitle: "My Profile",
+            pageDescription: "View and edit your personal information and account details.",
+            metaKeywords: "profile, my account, user profile, esangrah",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+            user
+        });
     } catch (err) {
         logger.error("Error loading profile:", err);
-        res.status(500).send("Server Error");
+        res.status(500).render("pages/error", {
+            pageTitle: "Server Error",
+            pageDescription: "An unexpected error occurred while loading the profile page.",
+            metaKeywords: "error, server error, profile error",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+            message: "Server Error",
+            user: req.user
+        });
     }
 };
+
 
 // POST update profile
 export const getProfile = async (req, res) => {
