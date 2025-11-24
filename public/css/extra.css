@@ -55,7 +55,7 @@
 /* --- Responsive Layout --- */
 @media (max-width: 768px) {
     .dflexbtwn {
-        flex-direction: column;
+        /* flex-direction: column; */
         align-items: flex-start;
         gap: 10px;
     }
@@ -105,4 +105,15 @@ table.datatable {
     .btncopylink span {
         display: none;
     }
+}
+
+.table-responsive-file-status {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.table-responsive-file-status .flextable {
+    min-width: 600px;
+    /* or whatever width makes sense */
 }

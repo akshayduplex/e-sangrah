@@ -261,7 +261,7 @@ export const getAllUsers = async (req, res) => {
             User.find(filter)
                 .populate("userDetails.department", "name")
                 .populate("userDetails.designation", "name")
-                .select("name email phone_number profile_type createdAt userDetails status")
+                .select("name email phone_number profile_type createdAt userDetails status lastLogin")
                 .sort({ [sortBy]: sortOrder === "asc" ? 1 : -1 })
                 .skip((page - 1) * limit)
                 .limit(Number(limit))

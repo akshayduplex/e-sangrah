@@ -152,6 +152,8 @@ export const login = async (req, res) => {
                     profile_type: user.profile_type,
                     name: user.name,
                 };
+                user.lastLogin = new Date();
+                await user.save();
 
                 //Return login success WITHOUT OTP
                 return successResponse(res, {
