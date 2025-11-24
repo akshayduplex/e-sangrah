@@ -526,18 +526,10 @@
                         let allVersions = [];
                         if (doc.files && doc.files.length > 0) {
                             allVersions = doc.files
-                                .map(f => {
-                                    const versionNum = f.version?.$numberDecimal
-                                        ? parseFloat(f.version.$numberDecimal)
-                                        : null;
-                                    return versionNum !== null ? versionNum : null;
-                                })
+                                .map(f => f.version?.$numberDecimal ?? f.version?.toString())
                                 .filter(v => v !== null);
-
                             allVersions = [...new Set(allVersions)];
-
-                            allVersions.sort((a, b) => b - a);
-
+                            allVersions.sort((a, b) => parseFloat(b) - parseFloat(a));
                             allVersions = allVersions.map(v => `v${v}`);
                         }
 

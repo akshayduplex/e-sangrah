@@ -1773,27 +1773,35 @@ export const updateDocument = async (req, res) => {
 
         await session.commitTransaction();
         try {
-
             if (versionedChanges.includes("tags")) {
                 if (document.project) {
                     await recomputeProjectTotalTags(document.project);
                 }
             }
 
+            // IF project changed → recalc both Old and New
             const originalProjectId = originalDoc.project ? originalDoc.project.toString() : null;
             const newProjectId = document.project ? document.project.toString() : null;
 
             if (originalProjectId !== newProjectId) {
                 if (originalProjectId) {
                     await recomputeProjectTotalTags(originalProjectId);
+                    await recomputeProjectTotalFiles(originalProjectId);
                 }
                 if (newProjectId) {
                     await recomputeProjectTotalTags(newProjectId);
+                    await recomputeProjectTotalFiles(newProjectId);
                 }
             }
+
+            // Always recompute files when files changed
+            if (versionedChanges.includes("files") && document.project) {
+                await recomputeProjectTotalFiles(document.project);
+            }
         } catch (err) {
-            logger.error("Failed to recompute project total tags after update:", err);
+            logger.error("Failed to recompute project totals after update:", err);
         }
+
 
         // ------------------------
         // POPULATE AND RESPOND

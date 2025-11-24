@@ -21,6 +21,7 @@ import Department from '../models/Departments.js';
 import { getSessionFilters } from '../helper/sessionHelpers.js';
 import { generateEmailTemplate } from '../helper/emailTemplate.js';
 import { activityLogger } from "../helper/activityLogger.js";
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 //Page controlers
 
 // Folder list by ID
@@ -424,7 +425,7 @@ export const automaticProjectDepartmentFolderCreate = async (req, res) => {
         }
         await activityLogger({
             actorId: req.user._id,
-            entityId: folder._id,
+            entityId: projectFolder._id,
             entityType: "Folder",
             action: "SYSTEM",
             details: `Automatically Folder created ${departmentName} by system`,

@@ -379,6 +379,10 @@ router.get("/session/project", async (req, res) => {
     }
 });
 
+router.get("/projectTypes", ProjectController.getProjectTypes);
+router.post("/projectTypes", ProjectController.createProjectType);
+router.patch("/projectTypes/:id", ProjectController.updateProjectType);
+router.delete("/projectTypes/:id", ProjectController.deleteProjectType);
 
 // Basic CRUD routes
 router.route('/projects')
@@ -407,8 +411,8 @@ router.route('/projects/upcoming-deadlines')
     .get(authorize('superadmin', 'admin', 'manager', 'user'), ProjectController.getUpcomingDeadlines);
 
 // Search route
-router.route('/projects/search')
-    .get(searchProjectsValidator, ProjectController.searchProjects);
+router.route('/projects/search').get(searchProjectsValidator, ProjectController.searchProjects);
+router.route('/projects/projectManagers/search').get(ProjectController.searchProjectManager);
 
 // Bulk operations
 router.route('/projects/bulk/update')

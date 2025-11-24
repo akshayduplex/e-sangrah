@@ -14,6 +14,9 @@ import { activityLogger } from "../helper/activityLogger.js";
 import { toProperCase } from "../helper/CommonHelper.js";
 import User from "../models/User.js";
 import WebSetting from "../models/WebSetting.js";
+import PQueue from 'p-queue';
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { Readable } from "stream";
 
 
 //Pages
@@ -157,34 +160,26 @@ export const downloadFolderAsZip = async (req, res) => {
         const folder = await Folder.findById(folderId);
         if (!folder) return res.status(404).json({ message: "Folder not found" });
 
-        // --- Permission Check ---
-        const canDownload = folder.permissions?.some(p =>
-            String(p.principal) === String(userId) &&
-            p.canDownload === true
+        const isOwner = String(folder.owner) === String(userId);
+        const isSuperadmin = req.user.profile_type === "superadmin";
+
+        const hasACLDownload = folder.permissions?.some(p =>
+            String(p.principal) === String(userId) && p.canDownload === true
         );
 
-        if (!canDownload) {
+        if (!isOwner && !isSuperadmin && !hasACLDownload) {
             return res.status(403).json({ message: "You do not have permission to download this folder" });
         }
 
-        // --- Get allowed files ---
-        const files = await File.find({ folder: folderId, status: "active" });
-
-        if (files.length === 0) {
-            return res.status(404).json({ message: "No accessible files in folder" });
-        }
-
-        // --- Generate filename strictly from folderId ---
-        const zipName = `${folderId}.zip`;
+        const zipName = `${folder.name}.zip`;
 
         res.setHeader("Content-Type", "application/zip");
-        res.setHeader("Content-Disposition", `attachment; filename=${zipName}`);
+        res.setHeader("Content-Disposition", `attachment; filename="${zipName}"`);
 
-        // --- Initialize ZIP stream ---
         const archive = archiver("zip", { zlib: { level: 9 } });
 
         archive.on("error", (err) => {
-            console.error("Archive error:", err);
+            console.error("Archive Error:", err);
             return res.status(500).send({ message: "Error creating ZIP" });
         });
 
@@ -192,38 +187,67 @@ export const downloadFolderAsZip = async (req, res) => {
 
         const queue = new PQueue({ concurrency: 5 });
 
-        // --- Append files to ZIP ---
-        for (const file of files) {
-            queue.add(async () => {
-                const command = new GetObjectCommand({
-                    Bucket: process.env.AWS_BUCKET,
-                    Key: file.file, // S3 key from DB
-                });
+        const addFolderToZip = async (folderId, zipPath) => {
+            const currentFolder = await Folder.findById(folderId);
+            if (!currentFolder) return;
 
-                const signedUrl = await getSignedUrl(s3Client, command, { expiresIn: 300 });
+            const files = await File.find({ folder: folderId, status: "active" });
 
-                const response = await axios({
-                    method: "GET",
-                    url: signedUrl,
-                    responseType: "stream",
-                });
+            for (const file of files) {
+                queue.add(async () => {
+                    const command = new GetObjectCommand({
+                        Bucket: process.env.AWS_BUCKET,
+                        Key: file.file,
+                    });
 
-                // human-friendly filename inside the ZIP:
-                archive.append(response.data, {
-                    name: file.originalName || "file",
+                    const signedUrl = await getSignedUrl(s3Client, command, { expiresIn: 300 });
+
+                    /** -------------------------
+                     *     NATURAL FETCH()
+                     * ---------------------------- */
+                    const response = await fetch(signedUrl);
+
+                    if (!response.ok) {
+                        throw new Error(`Fetch failed: ${response.statusText}`);
+                    }
+
+                    // Convert browser stream -> Node.js readable stream
+                    const nodeStream = Readable.fromWeb(response.body);
+
+                    const fileNameInsideZip = `${zipPath}/${file.originalName}`;
+
+                    archive.append(nodeStream, { name: fileNameInsideZip });
                 });
+            }
+
+            const subfolders = await Folder.find({
+                parent: folderId,
+                isDeleted: false
             });
-        }
 
+            for (const sub of subfolders) {
+                const subZipPath = `${zipPath}/${sub.name}`;
+                await addFolderToZip(sub._id, subZipPath);
+            }
+        };
+
+        await addFolderToZip(folderId, folder.name);
         await queue.onIdle();
         await archive.finalize();
+
+        await activityLogger({
+            actorId: userId || null,
+            entityId: req.params.fileId,
+            entityType: "File",
+            action: "DOWNLOAD",
+            details: `Folder ${folder.name} downloaded by ${req.user ? req.user.name : "Guest User"}`
+        });
 
     } catch (error) {
         console.error("Download ZIP error:", error);
         return res.status(500).json({ message: "Failed to download folder" });
     }
 };
-
 
 // Download file
 export const downloadFile = async (req, res) => {
@@ -237,27 +261,19 @@ export const downloadFile = async (req, res) => {
         });
 
         const s3Object = await s3Client.send(command);
-
-        // Set headers before streaming the file
         res.setHeader("Content-Disposition", `attachment; filename="${file.originalName}"`);
         res.setHeader("Content-Type", file.fileType || "application/octet-stream");
 
-        // Pipe file stream to response
         s3Object.Body.pipe(res);
 
-        // --- Add activity log entry asynchronously ---
-        const userId = req.user?._id; // assuming auth middleware sets req.user
-        // file.activityLog.push({
-        //     action: "downloaded",
-        //     performedBy: userId || null,
-        //     details: `File "${file.originalName}" downloaded by user ${userId || "unknown"}`
-        // });
+        const userId = req.user?._id;
+
         await activityLogger({
             actorId: userId || null,
             entityId: req.params.fileId,
             entityType: 'File',
             action: 'DOWNLOAD',
-            details: `File ${file.originalName} downloaded by user ${req.user ? req.user.name : "Guest User"}`
+            details: `File ${file.originalName} downloaded by ${req.user ? req.user.name : "Guest User"}`
         });
         // await file.save();
 

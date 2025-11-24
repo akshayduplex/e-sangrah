@@ -41,34 +41,59 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!append) projectsContainer.innerHTML = '';
 
         projects.forEach(project => {
+
+            // Manager display rule
+            const managers = Array.isArray(project.projectManager)
+                ? (project.projectManager.length <= 2
+                    ? project.projectManager.map(m => m.name).join(', ')
+                    : `${project.projectManager.length} Managers Assigned`)
+                : project.projectManager?.name || 'Unassigned';
+
+            const createdDate = new Date(
+                project.createdAt ?? project.projectStartDate
+            ).toLocaleDateString();
+
             const card = document.createElement('div');
             card.className = 'col-sm-3 d-flex';
-            card.innerHTML = `
-                <div class="card projectcard position-relative w-100">
-                    <div class="card-body pjcrdbody">
-                        <h5 class="fs-20 fw-normal mb-2">${project.projectName ?? 'Unnamed Project'}</h5>
-                        <a href="/projects/${project._id}/details" 
-                           class="position-absolute top-0 end-0 mt-2 me-4 text-primary fs-12 fw-light text-decoration-none">
-                           View
-                        </a>
-                        <small class="fs-12 text-black fw-light">
-                            Created on: ${new Date(project.createdAt ?? project.projectStartDate).toLocaleDateString()}
-                        </small>
-                        <h6 class="fs-16 fw-normal mt-2 text-neutral">
-                            ${project.projectManager?.name ?? 'Unassigned'}
-                        </h6>
-                        <small class="fs-12 fw-light">Status: ${project.projectStatus ?? 'Unknown'}</small>
 
-                        <div class="prjtxt mt-3">
-                            <p class="fs-12 fw-light">${project.projectDescription ?? ''}</p>
-                            <div class="dflexbtwn">
-                                <a href="/folders?id=${project._id}" class="site-btnmd fw-light fs-12">Access Files</a>
-                                <span>${project?.totalTags ?? 0} Tags</span>
-                            </div>
+            card.innerHTML = `
+            <div class="card projectcard position-relative w-100">
+                <div class="card-body pjcrdbody">
+
+                    <h5 class="fs-20 fw-normal mb-2">
+                        ${project.projectName ?? 'Unnamed Project'}
+                    </h5>
+
+                    <a href="/projects/${project._id}/details" 
+                       class="position-absolute top-0 end-0 mt-2 me-4 text-primary fs-12 fw-light text-decoration-none">
+                       View
+                    </a>
+
+                    <small class="fs-12 text-black fw-light">
+                        Created on: ${createdDate}
+                    </small>
+
+                    <h6 class="fs-16 fw-normal mt-2 text-neutral">
+                        ${managers}
+                    </h6>
+
+                    <small class="fs-12 fw-light">
+                        Status: ${project.projectStatus ?? 'Unknown'}
+                    </small>
+
+                    <div class="prjtxt mt-3">
+                        <p class="fs-12 fw-light">Total Files  ${project.totalFiles ?? ''}</p>
+
+                        <div class="dflexbtwn">
+                            <a href="/folders?id=${project._id}" class="site-btnmd fw-light fs-12">Access Files</a>
+                            <span>${project.totalTags ?? 0} Tags</span>
                         </div>
                     </div>
+
                 </div>
-            `;
+            </div>
+        `;
+
             projectsContainer.appendChild(card);
         });
     }

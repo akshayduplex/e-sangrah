@@ -547,29 +547,33 @@ $(document).ready(function () {
     }
 
     // --------------------------
-    // Project Manager Select2
+    // Project Manager Select2 (UPDATED)
     // --------------------------
     $('#projectManager').select2({
         placeholder: '-- Select Project Manager --',
         allowClear: true,
         ajax: {
-            url: '/api/user/search',
+            url: '/api/projects/projectManagers/search',
             dataType: 'json',
             delay: 250,
             data: function (params) {
+                const projectId = $('#projectName').val();
                 return {
-                    search: params.term || '',
+                    q: params.term || '',
                     page: params.page || 1,
                     limit: 10,
-                    profile_type: 'user'
+                    projectId: projectId && projectId !== 'all' ? projectId : ''
                 };
             },
             processResults: function (data, params) {
-                params.page = params.page || 1;
-                let results = data.users.map(u => ({ id: u._id, text: u.name }));
+                const results = (data.data || []).map(manager => ({
+                    id: manager._id,
+                    text: manager.name
+                }));
+
                 return {
                     results,
-                    pagination: { more: params.page * 10 < data.pagination.total }
+                    pagination: { more: false } // no pagination in your API
                 };
             },
             cache: true
@@ -577,15 +581,12 @@ $(document).ready(function () {
         minimumInputLength: 0
     });
 
+
     // Pre-select projectManager if editing
     if (window.isEdit && window.documentData && window.documentData.projectManager) {
-        const managerOption = new Option(
-            window.documentData.projectManager.name,
-            window.documentData.projectManager._id,
-            true,
-            true
-        );
-        $('#projectManager').append(managerOption).trigger('change');
+        const manager = window.documentData.projectManager;
+        const option = new Option(manager.name, manager._id, true, true);
+        $('#projectManager').append(option).trigger('change');
     }
 
     function initializeDonorSelect2() {
@@ -672,81 +673,6 @@ $(document).ready(function () {
             );
             $('#documentVendor').append(vendorOption).trigger('change');
         }
-    }
-
-    // Date restriction for compliance expiry date
-    function setupDateRestrictions() {
-        const startDateInput = $('input[name="documentDate"]');
-        const expiryDateInput = $('input[name="expiryDate"]');
-
-        // Initialize datepickers with restrictions
-        startDateInput.datetimepicker({
-            format: 'DD-MM-YYYY',
-            useCurrent: false
-        });
-
-        expiryDateInput.datetimepicker({
-            format: 'DD-MM-YYYY',
-            useCurrent: false,
-            enabledDates: false // Initially disable all dates until start date is selected
-        });
-
-        // When start date changes, update expiry date restrictions
-        startDateInput.on('dp.change', function (e) {
-            const selectedStartDate = e.date;
-
-            if (selectedStartDate) {
-                // Enable expiry date picker and set min date
-                expiryDateInput.data("DateTimePicker").enable();
-                expiryDateInput.data("DateTimePicker").minDate(selectedStartDate);
-
-                // If expiry date is already selected and before start date, clear it
-                const currentExpiryDate = expiryDateInput.data("DateTimePicker").date();
-                if (currentExpiryDate && currentExpiryDate.isBefore(selectedStartDate)) {
-                    expiryDateInput.data("DateTimePicker").clear();
-                }
-            } else {
-                // If no start date selected, disable expiry date
-                expiryDateInput.data("DateTimePicker").disable();
-            }
-        });
-
-        // Also handle when compliance is toggled
-        $('input[name="compliance"]').change(function () {
-            if ($(this).val() === 'yes') {
-                const startDate = startDateInput.data("DateTimePicker").date();
-                if (startDate) {
-                    expiryDateInput.data("DateTimePicker").enable();
-                    expiryDateInput.data("DateTimePicker").minDate(startDate);
-                }
-            }
-        });
-    }
-
-    // Alternative solution using native HTML5 date validation (simpler approach)
-    function setupSimpleDateRestriction() {
-        const startDateInput = document.querySelector('input[name="documentDate"]');
-        const expiryDateInput = document.querySelector('input[name="expiryDate"]');
-
-        startDateInput.addEventListener('change', function () {
-            if (this.value) {
-                // Convert DD-MM-YYYY to YYYY-MM-DD for min attribute
-                const parts = this.value.split('-');
-                if (parts.length === 3) {
-                    const yyyyMmDd = `${parts[2]}-${parts[1]}-${parts[0]}`;
-                    expiryDateInput.min = yyyyMmDd;
-
-                    // If expiry date is already selected and before start date, clear it
-                    const expiryParts = expiryDateInput.value.split('-');
-                    if (expiryDateInput.value && expiryParts.length === 3) {
-                        const expiryYyyyMmDd = `${expiryParts[2]}-${expiryParts[1]}-${expiryParts[0]}`;
-                        if (expiryYyyyMmDd < yyyyMmDd) {
-                            expiryDateInput.value = '';
-                        }
-                    }
-                }
-            }
-        });
     }
 
     // Enhanced solution with better DateTimePicker integration

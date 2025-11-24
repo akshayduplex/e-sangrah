@@ -1,16 +1,29 @@
 import Document from "../models/Document.js";
+import File from "../models/File.js";
 import Project from "../models/Project.js";
 
 // Helper to pick an icon for each file type (optional)
-export const getFileIcon = (fileType = "") => {
-    const lower = fileType.toLowerCase();
-    if (lower.includes("pdf")) return "/img/icons/fn1.png";
-    if (lower.includes("word") || lower.includes("doc")) return "/img/icons/fn2.png";
-    if (lower.includes("excel") || lower.includes("spreadsheet")) return "/img/icons/fn3.png";
-    if (lower.includes("ppt")) return "/img/icons/fn4.png";
-    if (lower.includes("image")) return "/img/icons/fn5.png";
+export const getFileIcon = (file) => {
+    if (!file) return "/img/icons/file.png";
+
+    const type = file.fileType?.toLowerCase() || "";
+
+    // If original file is an image, return the real uploaded image
+    if (type.includes("png") || type.includes("jpg") || type.includes("jpeg") || type.includes("gif")) {
+        if (file.s3Url) return file.s3Url;              // S3 storage
+        return `/uploads/${file.file}`;                 // Local storage
+    }
+
+    // File-type icons
+    if (type.includes("pdf")) return "/img/icons/fn1.png";
+    if (type.includes("doc") || type.includes("word")) return "/img/icons/fn2.png";
+    if (type.includes("xls") || type.includes("spreadsheet")) return "/img/icons/fn3.png";
+    if (type.includes("ppt")) return "/img/icons/fn4.png";
+    if (type.includes("txt")) return "/img/icons/txt.png";
+
     return "/img/icons/file.png";
 };
+
 
 export const formatFileSize = (bytes) => {
     if (!bytes) return "0 Bytes";
@@ -24,8 +37,8 @@ export function toProperCase(str = "") {
     if (!str) return "";
     return str
         .toLowerCase()
-        .replace(/\b\w/g, ch => ch.toUpperCase())         // Capitalize first letter
-        .replace(/\s+/g, " ")                              // Remove extra spaces
+        .replace(/\b\w/g, ch => ch.toUpperCase())
+        .replace(/\s+/g, " ")
         .trim();
 }
 
@@ -35,6 +48,11 @@ export const recomputeProjectTotalTags = async (projectId) => {
     if (!projectId) return;
 
     const distinctTags = await Document.distinct("tags", { project: projectId });
+    const totalFiles = await File.countDocuments({
+        projectId,
+        status: "active"
+    });
+
     const cleaned = (distinctTags || [])
         .map(t => (typeof t === "string" ? t.trim().toLowerCase() : null))
         .filter(Boolean);
@@ -43,6 +61,6 @@ export const recomputeProjectTotalTags = async (projectId) => {
     const totalTags = unique.length;
 
     await Project.findByIdAndUpdate(projectId, {
-        $set: { totalTags, tags: unique },
+        $set: { totalTags, totalFiles, tags: unique },
     }, { new: true }).exec();
 };

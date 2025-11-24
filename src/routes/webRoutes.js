@@ -179,6 +179,12 @@ router.get('/documents/approve-access/:token', authenticate, DocumentController.
 /* =========================================
    PROJECTS ROUTES
    ========================================= */
+// Projects Types List page
+router.get("/projectTypes/list", authenticate, ProjectController.showProjectTypesListPage);
+// Projects List page
+router.get("/projectTypes", authenticate, ProjectController.showProjectTypePage);
+router.get("/projectTypes/:id", authenticate, ProjectController.showProjectTypeEditPage);
+
 // Projects List page
 router.get("/projects/list", authenticate, ProjectController.showProjectListPage);
 

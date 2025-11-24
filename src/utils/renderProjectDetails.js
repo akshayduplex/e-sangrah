@@ -29,8 +29,8 @@ export async function renderProjectDetails(req, res, projectId = null, meta = {}
         if (project) {
             project.projectStartDateFormatted = formatDateDDMMYYYY(project.projectStartDate);
             project.projectEndDateFormatted = formatDateDDMMYYYY(project.projectEndDate);
-            project.projectStartDateISO = project.projectStartDate?.toISOString();
-            project.projectEndDateISO = project.projectEndDate?.toISOString();
+            project.projectStartDateISO = formatDateDDMMYYYY(project.projectStartDate);
+            project.projectEndDateISO = formatDateDDMMYYYY(project.projectEndDate);
         }
 
         const [users, departments, donors, vendors, projectTypes, designations] = await Promise.all([

@@ -8,16 +8,16 @@ const projectTypeSchema = new mongoose.Schema(
     {
         name: {
             type: String,
-            required: true,
+            required: [true, "Project type name is required"],
             trim: true,
             maxlength: 100,
             unique: true,
             index: true,
         },
         priority: {
-            type: String,
-            enum: ["Low", "Medium", "High", "Critical"],
-            default: "Medium",
+            type: Number,
+            default: 0,
+            min: 0
         },
         status: {
             type: String,
@@ -25,9 +25,19 @@ const projectTypeSchema = new mongoose.Schema(
             default: "Active",
             index: true,
         },
+        addedBy: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User",
+            required: true
+        },
+        updatedBy: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User",
+            required: true
+        },
         isActive: { type: Boolean, default: true, index: true },
     },
-    { timestamps: true } // createdAt = add-date, updatedAt = update-date
+    { timestamps: true }
 );
 
 projectTypeSchema.plugin(mongoosePaginate);
@@ -72,12 +82,13 @@ const projectSchema = new mongoose.Schema(
         //     required: true,
         //     index: true,
         // },
-        projectManager: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: "User",
-            required: true,
-            index: true,
-        }, // single select
+        projectManager: [
+            {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: "User",
+                required: true
+            }
+        ],
         projectCollaborationTeam: [
             { type: mongoose.Schema.Types.ObjectId, ref: "User" },
         ], // multiple select
@@ -129,6 +140,7 @@ const projectSchema = new mongoose.Schema(
         projectStartDate: { type: Date, required: true, index: true },
         projectEndDate: { type: Date, required: true, index: true },
         totalTags: { type: Number, default: 0 },
+        totalFiles: { type: Number, default: 0 },
         projectStatus: {
             type: String,
             enum: ["Active", "Inactive", "Closed"],

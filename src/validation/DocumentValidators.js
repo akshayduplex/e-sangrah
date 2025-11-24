@@ -17,11 +17,6 @@ export const createDocumentValidator = [
         .custom((val) => !val || isValidObjectId(val))
         .withMessage("Invalid project ID"),
 
-    body("projectManager")
-        .optional({ nullable: true })
-        .custom((val) => !val || isValidObjectId(val))
-        .withMessage("Invalid projectManager ID"),
-
     body("folderId")
         .optional({ nullable: true })
         .custom((val) => !val || isValidObjectId(val))

@@ -56,24 +56,24 @@
                 <!-- Project Manager, Logo, Status -->
                 <div class="row mb-3">
                     <div class="col-md-4">
-                        <label><strong>Project Manager</strong></label>
+                        <label><strong>Project Managers</strong></label>
                         <% if (viewOnly) { %>
                             <div>
-                                <%= project?.projectManager?.name || "Unassigned" %>
+                                <%= (project?.projectManager || []).map(pm=> pm.name).join(", ") || "Unassigned" %>
                             </div>
                             <% } else { %>
-                                <select name="projectManager" class="form-control select2" required>
+                                <select name="projectManager[]" class="form-control select2" multiple
+                                    data-placeholder="Select Project Managers" required>
+                                    <option></option>
                                     <% users.forEach(u=> { %>
-                                        <option value="<%= u._id %>"
-                                            <%=project?.projectManager?._id?.toString()===u._id.toString() ? "selected"
-                                            : "" %>>
+                                        <option value="<%= u._id %>" <%=project?.projectManager?.some(pm=>
+                                            pm._id?.toString() === u._id.toString()) ? "selected" : "" %>>
                                             <%= u.name %>
                                         </option>
                                         <% }) %>
                                 </select>
                                 <% } %>
                     </div>
-
                     <div class="col-md-4">
                         <label><strong>Project Logo</strong></label>
                         <% if (viewOnly) { %>

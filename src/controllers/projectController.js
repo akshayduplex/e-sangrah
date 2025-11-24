@@ -3,13 +3,82 @@ const { isValidObjectId, Types } = mongoose;
 import { successResponse, failResponse, errorResponse } from "../utils/responseHandler.js";
 import Department from "../models/Departments.js";
 import User from "../models/User.js";
-import Project from "../models/Project.js";
+import Project, { ProjectType } from "../models/Project.js";
 import { normalizeToArray, validateObjectIdArray } from "../helper/ValidateObjectId.js";
 import logger from "../utils/logger.js";
 import { parseDateDDMMYYYY } from "../utils/formatDate.js";
 import { renderProjectDetails } from "../utils/renderProjectDetails.js";
 import { activityLogger } from "../helper/activityLogger.js";
 //Page controllers
+
+// Show Add Project Type Page
+export const showProjectTypePage = (req, res) => {
+    try {
+        res.render("pages/projects/projectTypes", {
+            pageTitle: "Add Project Type",
+            pageDescription: "Create a new project type and manage project structure.",
+            metaKeywords: "add project type, create project type, project categories",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+            user: req.user,
+            projectType: null
+        });
+    } catch (err) {
+        logger.error("Add Project Type render error:", err);
+        res.status(500).render("pages/error", {
+            pageTitle: "Error",
+            pageDescription: "Unable to load the add project type page.",
+            metaKeywords: "error, project type error, page load error",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+            user: req.user,
+            message: "Unable to load add project type page"
+        });
+    }
+};
+
+
+// Edit Project Type Page
+export const showProjectTypeEditPage = async (req, res) => {
+    try {
+        const projectType = await ProjectType.findById(req.params.id);
+        if (!projectType) return res.redirect("/projectTypes/list");
+
+        res.render("pages/projects/projectTypes", {
+            pageTitle: "Edit Project Type",
+            pageDescription: "Update project type",
+            metaKeywords: "edit project type, update project type, project categories",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+            user: req.user,
+            projectType
+        });
+    } catch (err) {
+        logger.error("Error loading project type edit page:", err);
+        res.redirect("/projects/types/list");
+    }
+};
+// Project Types List Page
+export const showProjectTypesListPage = (req, res) => {
+    try {
+        res.render("pages/projects/projectTypes-list", {
+            pageTitle: "Project Types List",
+            title: "Project Types List",
+            pageDescription: "View and manage all project types within your workspace.",
+            metaKeywords: "project types list, project type management",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+            user: req.user
+        });
+    } catch (err) {
+        logger.error("Project Types list render error:", err);
+        res.status(500).render("pages/error", {
+            pageTitle: "Error",
+            pageDescription: "Unable to load the project types list.",
+            metaKeywords: "error, project type list error, page load error",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+            user: req.user,
+            message: "Unable to load project types list"
+        });
+    }
+};
+
 
 // Projects List page
 export const showProjectListPage = async (req, res) => {
@@ -89,6 +158,110 @@ export const showMainProjectsPage = async (req, res) => {
 
 //API controllers
 
+/**
+ * GET ALL Project Types
+ */
+export const getProjectTypes = async (req, res) => {
+    try {
+        const projectTypes = await ProjectType.find()
+            .populate("addedBy", "name email")
+            .populate("updatedBy", "name email")
+            .sort({ createdAt: -1 });
+
+        return res.json({
+            success: true,
+            data: projectTypes
+        });
+    } catch (error) {
+        console.error("Error fetching project types:", error);
+        return res.status(500).json({ success: false, message: "Server error" });
+    }
+};
+
+/**
+ * CREATE Project Type
+ */
+export const createProjectType = async (req, res) => {
+    try {
+        const newProjectType = await ProjectType.create({
+            ...req.body,
+            addedBy: req.user._id,
+            updatedBy: req.user._id   // FIXED: required field
+        });
+
+        return res.status(201).json({
+            success: true,
+            message: "Project Type added successfully!",
+            data: newProjectType
+        });
+
+    } catch (error) {
+        return res.status(400).json({
+            success: false,
+            message: error.message || "Failed to create project type"
+        });
+    }
+};
+
+/**
+ * UPDATE Project Type
+ */
+export const updateProjectType = async (req, res) => {
+    try {
+        req.body.updatedBy = req.user._id;
+
+        const updatedProjectType = await ProjectType.findByIdAndUpdate(
+            req.params.id,
+            { $set: req.body },
+            { new: true, runValidators: true }
+        );
+
+        if (!updatedProjectType) {
+            return res.status(404).json({
+                success: false,
+                message: "Project Type not found"
+            });
+        }
+
+        return res.json({
+            success: true,
+            message: "Project Type updated successfully!",
+            data: updatedProjectType
+        });
+
+    } catch (error) {
+        return res.status(400).json({
+            success: false,
+            message: error.message || "Failed to update"
+        });
+    }
+};
+
+/**
+ * DELETE Project Type
+ */
+export const deleteProjectType = async (req, res) => {
+    try {
+        const deleted = await ProjectType.findByIdAndUpdate(
+            req.params.id,
+            { isActive: false, UpdatedBy: req.user._id },
+            { new: true }
+        );
+
+        if (!deleted)
+            return res.status(404).json({ success: false, message: "Project Type not found" });
+
+        return res.json({
+            success: true,
+            message: "Project Type disabled successfully",
+            data: deleted
+        });
+
+    } catch (error) {
+        return res.status(500).json({ success: false, message: "Server error" });
+    }
+};
+
 export const createProject = async (req, res) => {
     try {
         const body = req.body;
@@ -103,6 +276,7 @@ export const createProject = async (req, res) => {
         ];
 
         // Normalize arrays
+        body.projectManager = normalizeToArray(body.projectManager);
         body.donor = normalizeToArray(body.donor);
         body.vendor = normalizeToArray(body.vendor);
         body.projectCollaborationTeam = normalizeToArray(body.projectCollaborationTeam);
@@ -115,14 +289,14 @@ export const createProject = async (req, res) => {
         }
 
         // Validate single ObjectIds
-        const objectIdFields = ["projectManager", "projectType"];
+        const objectIdFields = ["projectType"];
         for (const field of objectIdFields) {
             if (!isValidObjectId(body[field])) {
                 return failResponse(res, `Invalid ${field} ID`, 400);
             }
         }
 
-        const arrayFields = ["projectCollaborationTeam", "donor", "vendor"];
+        const arrayFields = ["projectManager", "projectCollaborationTeam", "donor", "vendor"];
         for (const field of arrayFields) {
             if (body[field] && !validateObjectIdArray(body[field], field)) {
                 return failResponse(res, `Invalid ID in ${field}`, 400);
@@ -176,7 +350,7 @@ export const createProject = async (req, res) => {
             projectCode: body.projectCode.trim().toUpperCase(),
             projectType: new mongoose.Types.ObjectId(body.projectType),
             projectDescription: body.projectDescription?.trim() || "",
-            projectManager: new mongoose.Types.ObjectId(body.projectManager),
+            projectManager: body.projectManager.map(id => new mongoose.Types.ObjectId(id)),
             projectCollaborationTeam: body.projectCollaborationTeam || [],
             donor: body.donor || [],
             vendor: body.vendor || [],
@@ -300,7 +474,7 @@ export const updateProject = async (req, res) => {
         }
 
         // Validate single ObjectId fields
-        const singleFields = ["projectManager", "projectType"];
+        const singleFields = ["projectType"];
         for (const field of singleFields) {
             if (body[field]) {
                 if (!isValidObjectId(body[field])) {
@@ -311,7 +485,7 @@ export const updateProject = async (req, res) => {
         }
 
         // Normalize and validate arrays
-        const arrayFields = ["projectCollaborationTeam", "donor", "vendor"];
+        const arrayFields = ["projectCollaborationTeam", "projectManager", "donor", "vendor"];
         for (const field of arrayFields) {
             body[field] = normalizeToArray(body[field]);
             for (const val of body[field]) {
@@ -1318,7 +1492,7 @@ export const searchProjects = async (req, res) => {
             page: parseInt(page),
             limit: parseInt(limit),
             sort: { createdAt: -1 },
-            select: 'projectName projectDescription projectManager projectStatus tags totalTags createdAt',
+            select: 'projectName projectDescription projectManager projectStatus totalFiles totalTags createdAt',
             populate: [
                 { path: 'projectManager', select: 'name email' }
             ]
@@ -1343,6 +1517,44 @@ export const searchProjects = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Server error while searching projects'
+        });
+    }
+};
+
+export const searchProjectManager = async (req, res) => {
+    try {
+        const { projectId } = req.query;
+
+        if (!projectId) {
+            return res.status(400).json({
+                success: false,
+                message: "projectId is required in query"
+            });
+        }
+
+        // Fetch project with populated projectManager field
+        const project = await Project.findById(projectId)
+            .populate("projectManager", "name email designation") // select desired fields
+            .lean();
+
+        if (!project) {
+            return res.status(404).json({
+                success: false,
+                message: "Project not found"
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: "Project managers fetched successfully",
+            data: project.projectManager
+        });
+
+    } catch (error) {
+        console.error("Error searching project managers:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Server error while searching project managers"
         });
     }
 };

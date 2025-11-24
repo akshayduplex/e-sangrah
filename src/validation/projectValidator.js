@@ -19,10 +19,6 @@ export const createProjectValidator = [
         .notEmpty().withMessage("Department is required")
         .isMongoId().withMessage("Invalid department ID"),
 
-    body("projectManager")
-        .notEmpty().withMessage("Project manager is required")
-        .isMongoId().withMessage("Invalid project manager ID"),
-
     body("projectStartDate")
         .notEmpty().withMessage("Project start date is required")
         .isISO8601().withMessage("Invalid start date"),

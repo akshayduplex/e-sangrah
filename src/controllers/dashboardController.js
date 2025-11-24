@@ -213,7 +213,7 @@ export const getFileStatus = async (req, res) => {
                     _id: 1,
                     latestActivity: 1,
                     actor: { _id: 1, name: 1, email: 1 },
-                    file: { originalName: 1, fileSize: 1, fileType: 1 }
+                    file: { originalName: 1, fileSize: 1, s3Url: 1, fileType: 1 }
                 }
             }
         ];
@@ -239,7 +239,7 @@ export const getFileStatus = async (req, res) => {
                 name: file?.originalName || "Unknown File",
                 fileSize: formatFileSize(file?.fileSize || 0),
                 fileType: file?.fileType || "unknown",
-                icon: getFileIcon(file?.fileType || ""),
+                icon: getFileIcon(file || ""),
                 status: act.action,
                 lastActionTime: act.createdAt,
                 performedBy: item.actor
