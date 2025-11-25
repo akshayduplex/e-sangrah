@@ -1,6 +1,7 @@
 import Document from "../models/Document.js";
 import File from "../models/File.js";
 import Project from "../models/Project.js";
+import WebSetting from "../models/WebSetting.js";
 
 // Helper to pick an icon for each file type (optional)
 export const getFileIcon = (file) => {
@@ -63,4 +64,17 @@ export const recomputeProjectTotalTags = async (projectId) => {
     await Project.findByIdAndUpdate(projectId, {
         $set: { totalTags, totalFiles, tags: unique },
     }, { new: true }).exec();
+};
+
+let cachedSettings = null;
+
+export const getCompanySettings = async () => {
+    if (cachedSettings) return cachedSettings;
+    cachedSettings = await WebSetting.findOne({}) || {};
+    return cachedSettings;
+};
+
+export const refreshCompanySettings = async () => {
+    cachedSettings = await WebSetting.findOne({}) || {};
+    return cachedSettings;
 };

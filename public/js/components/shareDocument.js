@@ -574,7 +574,7 @@
                     versions.forEach(item => {
                         const documentName = item.documentName;
                         const versionValue = item.versionLabel;
-                        const modifiedDate = new Date(item.createdAt).toLocaleString();
+                        const modifiedDate = formatDateTime(item.createdAt);
                         const changedBy = item.createdBy?.name || "Unknown";
                         const changeReason = item.changeReason || "Updated";
 

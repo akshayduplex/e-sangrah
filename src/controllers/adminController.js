@@ -473,7 +473,10 @@ export const grantAccess = async (req, res) => {
                 duration,
                 expiresAt: expiresAt ? expiresAt.toLocaleString() : "N/A",
                 ownerName: doc.owner?.name || "Document Owner",
-                accessUrl
+                accessUrl,
+                companyName: res.locals.companyName || "Our Company",
+                logoUrl: res.locals.logo || "",
+                bannerUrl: res.locals.mailImg || "",
             };
 
             // Generate HTML using your central email generator

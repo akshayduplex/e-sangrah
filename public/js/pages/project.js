@@ -49,9 +49,9 @@ document.addEventListener("DOMContentLoaded", () => {
                     : `${project.projectManager.length} Managers Assigned`)
                 : project.projectManager?.name || 'Unassigned';
 
-            const createdDate = new Date(
+            const createdDate = formatDateTime(
                 project.createdAt ?? project.projectStartDate
-            ).toLocaleDateString();
+            );
 
             const card = document.createElement('div');
             card.className = 'col-sm-3 d-flex';

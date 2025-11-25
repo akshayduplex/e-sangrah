@@ -157,9 +157,6 @@ export const getDesignationById = async (req, res) => {
 
 // Create new designation
 export const createDesignation = async (req, res) => {
-    const session = await Designation.startSession();
-    session.startTransaction();
-
     try {
         if (!req.user) return failResponse(res, 'Unauthorized', 401);
 
@@ -182,9 +179,9 @@ export const createDesignation = async (req, res) => {
 
         // Create Designation
         const designation = new Designation(designationData);
-        await designation.save({ session });
+        await designation.save();
 
-        //  Fetch all menus
+        // Fetch all menus
         const allMenus = await Menu.find({}, '_id').lean();
 
         // Prepare bulk MenuAssignment documents
@@ -201,12 +198,10 @@ export const createDesignation = async (req, res) => {
 
         // Insert all menu assignments
         if (assignments.length > 0) {
-            await MenuAssignment.insertMany(assignments, { session });
+            await MenuAssignment.insertMany(assignments);
         }
 
-        // Commit transaction
-        await session.commitTransaction();
-        session.endSession();
+        // Log activity
         await activityLogger({
             actorId: req.user._id,
             entityId: designation._id,
@@ -217,10 +212,8 @@ export const createDesignation = async (req, res) => {
         });
 
         return successResponse(res, designation, 'Designation created successfully and menus assigned');
-    } catch (err) {
-        await session.abortTransaction();
-        session.endSession();
 
+    } catch (err) {
         // Handle duplicate name error
         if (err.code === 11000 && err.keyValue?.name) {
             return failResponse(res, 'Designation name already exists', 400);
@@ -229,6 +222,7 @@ export const createDesignation = async (req, res) => {
         return errorResponse(res, err);
     }
 };
+
 
 // Update designation
 export const updateDesignation = async (req, res) => {

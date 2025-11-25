@@ -9,12 +9,13 @@ export const folderAccessApprovedTemplate = (data) => {
         folderLink = '#',
         systemName = ApiEndpoints.API_CONFIG.COMPANY_NAME,
         themeColor = '#28a745', // Green approval theme
-        companyName = ApiEndpoints.API_CONFIG.COMPANY_NAME,
-        logoUrl = ApiEndpoints.API_CONFIG.LOGO_URL,
-        bannerUrl = ApiEndpoints.API_CONFIG.EMAIL_BANNER,
+        companyName = '',
+        logoUrl = '',
+        bannerUrl = '',
         BASE_URL = ApiEndpoints.API_CONFIG.baseUrl
     } = data;
-
+    const fullLogoUrl = logoUrl ? `${BASE_URL}${logoUrl}` : '';
+    const fullBannerUrl = bannerUrl ? `${BASE_URL}${bannerUrl}` : '';
     const formattedExpiry = expiresAt
         ? new Date(expiresAt).toLocaleString()
         : 'N/A';
@@ -35,7 +36,7 @@ export const folderAccessApprovedTemplate = (data) => {
     // Logo (centered and ensured display)
     html += '<tr>';
     html += '<td style="text-align:center; padding:20px;">';
-    html += `<img src="${logoUrl}" alt="${companyName} Logo" style="max-width:120px; height:auto; display:block; margin:auto;">`;
+    html += `<img src="${fullLogoUrl}" alt="${companyName} Logo" style="max-width:120px; height:auto; display:block; margin:auto;">`;
     html += '</td>';
     html += '</tr>';
 
@@ -43,7 +44,7 @@ export const folderAccessApprovedTemplate = (data) => {
     html += '<tr>';
     html += `<td style="background:${themeColor}; text-align:center; border-radius:6px 6px 0 0;">`;
     html += `<h2 style="font-size:24px; color:#fff; font-weight:500; margin:0; padding:15px 0;">Folder Access Approved</h2>`;
-    html += `<img src="${bannerUrl}" alt="Email Banner" style="max-width:100%; height:auto; display:block; margin:0 auto;">`;
+    html += `<img src="${fullBannerUrl}" alt="Email Banner" style="max-width:100%; height:auto; display:block; margin:0 auto;">`;
     html += '</td>';
     html += '</tr>';
 

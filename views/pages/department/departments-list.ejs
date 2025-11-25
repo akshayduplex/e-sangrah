@@ -79,7 +79,7 @@
                             let tbody = '';
                             res.data.forEach((dept, index) => {
                                 let addedBy = dept.addedBy?.name || '-';
-                                let createdAt = new Date(dept.add_date).toLocaleString();
+                                let createdAt = formatDateTime(dept.add_date);
                                 tbody += `
                     <tr>
                         <td>${index + 1}</td>
@@ -152,6 +152,4 @@
                         });
                     });
                 });
-
-
             </script>

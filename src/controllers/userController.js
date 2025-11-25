@@ -166,6 +166,9 @@ export const registerUser = async (req, res) => {
             name,
             email,
             password: randomPassword,
+            companyName: res.locals.companyName || "Our Company",
+            logoUrl: res.locals.logo || "",
+            bannerUrl: res.locals.mailImg || "",
             BASE_URL: API_CONFIG.baseUrl
         }
 

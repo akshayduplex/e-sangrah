@@ -1,169 +1,151 @@
-<!DOCTYPE html>
-<html lang="en">
+<%- include('../../partials/header') %>
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>
-        <%= documentTitle %>
-    </title>
+    <div class="page-wrapper">
+        <div class="content container-fluid">
+            <h2 class="main-header">
+                <%= documentTitle %>
+            </h2>
+            <hr class="mb-4">
 
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+            <% if (expiredMessage) { %>
 
-    <style>
-        body {
-            background-color: #ffffff;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-            padding: 20px;
-        }
+                <div class="card p-4 shadow-sm" style="max-width: 520px;">
+                    <h3 class="h4 text-danger mb-3">Access Restricted</h3>
 
-        .main-header {
-            font-size: 2rem;
-            font-weight: 300;
-            color: #333;
-            margin-bottom: 5px;
-        }
+                    <div class="alert alert-warning">
+                        <%= expiredMessage %>
+                    </div>
 
-        .file-card {
-            width: 150px;
-            padding: 15px 10px;
-            background-color: #ffffff;
-            border: 1px solid #dee2e6;
-            border-radius: 6px;
-            position: relative;
-            margin-right: 15px;
-            margin-bottom: 15px;
-        }
+                    <p class="text-muted">
+                        You do not have permission to view this document.
+                        Click below to send a request.
+                    </p>
 
-        .file-icon-box {
-            width: 50px;
-            height: 60px;
-            background-color: #e0f0ff;
-            border-radius: 4px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 5px;
-            overflow: hidden;
-        }
+                    <button id="requestAccessBtn" class="btn btn-primary btn-lg" onclick="requestAccess()">
+                        <i class="bi bi-person-fill-lock me-2"></i> Request Access
+                    </button>
 
-        .file-icon-box img {
-            width: 40px;
-            height: 40px;
-            object-fit: contain;
-        }
-
-        .file-name {
-            font-size: 0.9rem;
-            font-weight: 600;
-            color: #333;
-            margin: 0;
-            line-height: 1.2;
-            /* fix overflow */
-            word-wrap: break-word;
-            /* allows breaking long words */
-            overflow: hidden;
-            text-overflow: ellipsis;
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            /* show max 2 lines */
-            -webkit-box-orient: vertical;
-        }
-
-
-        .file-size {
-            font-size: 0.75rem;
-            color: #6c757d;
-            margin: 0;
-        }
-
-        .dropdown-toggle::after {
-            display: none;
-        }
-    </style>
-</head>
-
-<body>
-
-    <div class="container-fluid">
-
-        <h2 class="main-header">
-            <%= documentTitle %>
-        </h2>
-        <div class="breadcrumb-item active">
-            Version <%= currentVersionLabel %>
-        </div>
-
-        <hr>
-
-        <% if (expiredMessage) { %>
-            <div class="alert alert-warning mt-3" role="alert">
-                <%= expiredMessage %>
-            </div>
-
-            <% } else { %>
-
-                <div id="files-list" class="d-flex flex-wrap">
-
-                    <% if (files && files.length> 0) { %>
-
-                        <% files.forEach(file=> { %>
-
-                            <div class="file-card shadow-sm">
-                                <div class="d-flex flex-column align-items-center">
-
-                                    <div class="file-icon-box">
-                                        <% let ext=file.originalName.split('.').pop().toLowerCase(); let
-                                            iconPath='/img/icons/fn1.png' ; if (['ppt', 'pptx' ].includes(ext))
-                                            iconPath='/img/icons/fn1.png' ; else if (['doc', 'docx' ].includes(ext))
-                                            iconPath='/img/icons/fn2.png' ; else if (['xls', 'xlsx' ].includes(ext))
-                                            iconPath='/img/icons/fn3.png' ; else if (ext==='pdf' )
-                                            iconPath='/img/icons/fn4.png' ; %>
-                                            <img src="<%= iconPath %>" alt="<%= ext %> icon">
-                                    </div>
-
-                                    <p class="file-name text-center mt-1" title="<%= file.originalName %>">
-                                        <%= file.originalName %>
-                                    </p>
-
-                                    <p class="file-size text-center">
-                                        <%= file.formattedSize %>
-                                    </p>
-
-                                </div>
-
-                                <div class="dropdown position-absolute top-0 end-0 m-1">
-                                    <button class="btn btn-sm p-0 text-dark" type="button" data-bs-toggle="dropdown">
-                                        <i class="bi bi-three-dots"></i>
-                                    </button>
-                                    <ul class="dropdown-menu dropdown-menu-end">
-                                        <li>
-                                            <a class="dropdown-item" href="/api/download/file/<%= file._id %>">
-                                                <i class="bi bi-download me-2"></i>Download
-                                            </a>
-                                        </li>
-                                        <li>
-                                            <a class="dropdown-item" href="/folders/view/<%= file._id %>"
-                                                target="_blank">
-                                                <i class="bi bi-eye me-2"></i>View
-                                            </a>
-                                        </li>
-                                    </ul>
-                                </div>
-                            </div>
-
-                            <% }) %>
-
-                                <% } else { %>
-                                    <p class="text-muted mt-3">No files attached to this version.</p>
-                                    <% } %>
-
+                    <div class="d-flex align-items-center mt-3">
+                        <div id="loader" class="spinner-border text-primary me-2" style="display:none;"></div>
+                        <div id="responseMessage" class="flex-grow-1"></div>
+                    </div>
                 </div>
-                <% } %>
+
+                <% } else { %>
+
+                    <h3 class="h5 text-secondary mb-3">Attached Files:</h3>
+
+                    <div id="files-list" class="row g-4">
+
+                        <% if (files && files.length> 0) { %>
+
+                            <% for (var i=0; i < files.length; i++) { var file=files[i]; var
+                                parts=file.originalName.split('.'); var ext=parts[parts.length - 1].toLowerCase(); var
+                                imageExt=["jpg","jpeg","png","gif","webp"]; var isImage=imageExt.indexOf(ext) !==-1; var
+                                iconPath="" ; if (isImage) { iconPath=file.fileUrl; } else if
+                                (["ppt","pptx"].indexOf(ext) !==-1) { iconPath="/img/icons/fn1.png" ; } else if
+                                (["doc","docx"].indexOf(ext) !==-1) { iconPath="/img/icons/fn2.png" ; } else if
+                                (["xls","xlsx"].indexOf(ext) !==-1) { iconPath="/img/icons/fn3.png" ; } else if
+                                (ext==="pdf" ) { iconPath="/img/icons/fn4.png" ; } else {
+                                iconPath="/img/icons/default.png" ; } %>
+
+                                <div class="col-sm-6 col-md-4 col-lg-3">
+                                    <div
+                                        class="file-card border p-3 rounded shadow-sm position-relative d-flex flex-column align-items-center text-center h-100">
+
+                                        <div class="file-icon-box mb-2" style="max-width: 64px;">
+                                            <img src="<%= iconPath %>" class="img-fluid" alt="file icon"
+                                                style="<% if (isImage) { %>border-radius:6px; object-fit:cover; width:64px; height:64px;<% } %>">
+                                        </div>
+
+                                        <p class="file-name fw-bold text-truncate w-100 mb-1"
+                                            title="<%= file.originalName %>">
+                                            <%= file.originalName %>
+                                        </p>
+
+                                        <p class="file-size text-muted small mb-0">
+                                            <%= file.formattedSize %>
+                                        </p>
+
+                                        <div class="dropdown position-absolute top-0 end-0 m-1">
+                                            <button type="button"
+                                                class="btn btn-sm dropdown-toggle dropdown-toggle-icon"
+                                                data-bs-toggle="dropdown" aria-expanded="false">
+                                                <i class="bi bi-three-dots-vertical"></i>
+                                            </button>
+
+                                            <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                                                <li>
+                                                    <a class="dropdown-item" href="/folders/view/<%= file._id %>"
+                                                        target="_blank">
+                                                        <i class="bi bi-eye me-2"></i> View
+                                                    </a>
+                                                </li>
+                                                <li>
+                                                    <a class="dropdown-item" href="/api/download/file/<%= file._id %>">
+                                                        <i class="bi bi-download me-2"></i> Download
+                                                    </a>
+                                                </li>
+                                            </ul>
+                                        </div>
+
+                                    </div>
+                                </div>
+
+                                <% } %> <!-- END LOOP -->
+
+                                    <% } else { %>
+
+                                        <div class="col-12">
+                                            <div class="alert alert-info w-100">
+                                                <i class="bi bi-info-circle me-2"></i> No files available.
+                                            </div>
+                                        </div>
+
+                                        <% } %>
+
+                    </div>
+
+                    <% } %>
+        </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-</body>
+    <%- include('../../partials/footer') %>
 
-</html>
+        <script>
+            async function requestAccess() {
+                var btn = document.getElementById("requestAccessBtn");
+                var loader = document.getElementById("loader");
+                var msg = document.getElementById("responseMessage");
+
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Sending...';
+
+                var documentId = "<%= documentId %>";
+                var email = "<%= email || '' %>";
+
+                try {
+                    var res = await fetch('/api/documents/' + documentId + '/request-access', {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ email: email })
+                    });
+
+                    var data = await res.json();
+
+                    if (res.ok) {
+                        msg.innerHTML = '<div class="alert alert-success mt-2">' + data.message + '</div>';
+                        btn.innerHTML = "Request Sent";
+                    } else {
+                        msg.innerHTML = '<div class="alert alert-danger mt-2">' + data.message + '</div>';
+                        btn.disabled = false;
+                        btn.innerHTML = "Try Again";
+                    }
+
+                } catch (err) {
+                    msg.innerHTML = '<div class="alert alert-danger mt-2">Server error. Please try again.</div>';
+                    btn.disabled = false;
+                    btn.innerHTML = "Try Again";
+                }
+            }
+        </script>

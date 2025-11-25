@@ -35,11 +35,15 @@ import upload from "../middlewares/fileUploads.js";
 import * as AuthValidators from "../validation/AuthValidators.js";
 import * as PermissionLogsValidators from "../validation/PermissionLogsValidators.js";
 import * as DocumentValidators from "../validation/DocumentValidators.js";
+import * as DepartmentValidators from "../validation/DepartmentValidators.js";
+import * as DesignationValidators from "../validation/DesignationValidators.js";
+import * as ProjectValidator from "../validation/ProjectValidator.js";
+import * as VenderDonorValidation from "../validation/VenderDonorValidation.js";
+import * as PermissionValidator from "../validation/PermissionValidator.js";
+import * as ProjectTypeValidators from "../validation/ProjectTypeValidators.js";
 
-
-import { createProjectValidator, donorValidator, projectIdValidator, searchProjectsValidator, vendorValidator } from '../validation/projectValidator.js';
-import { registerVendor, registerVendorOrDonor } from "../validation/venderDonorValidation.js";
-import { assignMenusValidator, getAssignedMenusValidator, unAssignMenusValidator } from "../validation/permissionValidator.js";
+import { registerVendor, registerVendorOrDonor } from "../validation/VenderDonorValidation.js";
+import { assignMenusValidator, getAssignedMenusValidator, unAssignMenusValidator } from "../validation/PermissionValidator.js";
 
 // ---------------------------
 // Model imports
@@ -69,13 +73,13 @@ const router = express.Router();
 router.post("/auth/register", AuthValidators.registerValidator, validators, AuthController.register);
 router.post("/auth/login", AuthValidators.loginValidator, validators, AuthController.login);
 
-router.post("/auth/send-otp", AuthValidators.sendOtpValidator, validators, AuthController.sendOtp);
+router.post("/auth/send-otp", AuthController.sendOtp);
 router.post("/auth/verify-otp", AuthController.verifyOtp);
 router.post("/auth/verify/token", AuthController.verifyTokenOtp);
 
-router.post("/auth/reset-password", AuthValidators.resetPasswordValidator, validators, AuthController.resetPassword);
-router.post("/auth/send-reset-link", AuthValidators.sendResetLinkValidator, validators, AuthController.sendResetLink);
-router.get("/auth/verify-reset/:token", AuthValidators.verifyResetTokenValidator, validators, AuthController.verifyResetLink);
+router.post("/auth/reset-password", AuthController.resetPassword);
+router.post("/auth/send-reset-link", AuthController.sendResetLink);
+router.get("/auth/verify-reset/:token", AuthController.verifyResetLink);
 
 
 //public routes
@@ -284,8 +288,8 @@ router.get('/departments/search', authenticate, DepartmentController.searchDepar
 router.get('/departments/:id', authenticate, DepartmentController.getDepartmentById);
 
 // Admin-only routes (CRUD)
-router.post('/departments', authenticate, checkPermissions, DepartmentController.createDepartment);
-router.patch('/departments/:id', authenticate, checkPermissions, DepartmentController.updateDepartment);
+router.post('/departments', authenticate, checkPermissions, DepartmentValidators.createDepartmentValidator, validators, DepartmentController.createDepartment);
+router.patch('/departments/:id', authenticate, checkPermissions, DepartmentValidators.updateDepartmentValidator, validators, DepartmentController.updateDepartment);
 router.delete('/departments/:id', authenticate, checkPermissions, DepartmentController.deleteDepartment);
 
 
@@ -303,8 +307,8 @@ router.get('/designations', authenticate, DesignationController.getAllDesignatio
 router.get('/designations/search', authenticate, DesignationController.searchDesignations)
 router.get('/designations/:id', authenticate, DesignationController.getDesignationById);
 // Admin-only CRUD
-router.post('/designations', authenticate, authorize('admin', 'superadmin'), DesignationController.createDesignation);
-router.patch('/designations/:id', authenticate, authorize('admin', 'superadmin'), DesignationController.updateDesignation);
+router.post('/designations', authenticate, authorize('admin', 'superadmin'), DesignationValidators.createDesignationValidator, validators, DesignationController.createDesignation);
+router.patch('/designations/:id', authenticate, authorize('admin', 'superadmin'), DesignationValidators.updateDesignationValidator, validators, DesignationController.updateDesignation);
 router.delete('/designations/:id', authenticate, authorize('admin', 'superadmin'), DesignationController.deleteDesignation);
 
 
@@ -380,8 +384,8 @@ router.get("/session/project", async (req, res) => {
 });
 
 router.get("/projectTypes", ProjectController.getProjectTypes);
-router.post("/projectTypes", ProjectController.createProjectType);
-router.patch("/projectTypes/:id", ProjectController.updateProjectType);
+router.post("/projectTypes", ProjectTypeValidators.updateRequestStatusValidator, validators, ProjectController.createProjectType);
+router.patch("/projectTypes/:id", ProjectTypeValidators.updateRequestStatusValidator, validators, ProjectController.updateProjectType);
 router.delete("/projectTypes/:id", ProjectController.deleteProjectType);
 
 // Basic CRUD routes
@@ -390,7 +394,7 @@ router.route('/projects')
         ProjectController.getAllProjects
     )
     .post(
-        createProjectValidator, upload.single('projectLogo'), ProjectController.createProject);
+        ProjectValidator.createProjectValidator, upload.single('projectLogo'), ProjectController.createProject);
 
 router.route('/projects/:id/status')
     .patch(ProjectController.updateProjectStatus);
@@ -411,7 +415,7 @@ router.route('/projects/upcoming-deadlines')
     .get(authorize('superadmin', 'admin', 'manager', 'user'), ProjectController.getUpcomingDeadlines);
 
 // Search route
-router.route('/projects/search').get(searchProjectsValidator, ProjectController.searchProjects);
+router.route('/projects/search').get(ProjectController.searchProjects);
 router.route('/projects/projectManagers/search').get(ProjectController.searchProjectManager);
 
 // Bulk operations
@@ -436,7 +440,7 @@ router.route('/projects/:id/donors/:donorId')
 
 // Vendor management routes
 router.route('/projects/:id/vendors')
-    .post(donorValidator, authorize('superadmin', 'admin', 'manager'), vendorValidator, ProjectController.addVendorToProject);
+    .post(authorize('superadmin', 'admin', 'manager'), ProjectValidator.vendorValidator, ProjectController.addVendorToProject);
 
 router.route('/projects/:id/vendors/:vendorId')
     .put(authorize('superadmin', 'admin', 'manager'), ProjectController.updateVendorInProject)
@@ -453,7 +457,7 @@ router.route('/projects/:id/archive')
 router.route('/projects/:id')
     .get(authorize('superadmin', 'admin', 'manager', 'user', 'viewer'), ProjectController.getProject)
     .patch(authorize('superadmin', 'admin', 'manager', 'user'), upload.single('projectLogo'), ProjectController.updateProject)
-    .delete(projectIdValidator, authorize('superadmin', 'admin'), ProjectController.deleteProject);
+    .delete(authorize('superadmin', 'admin'), ProjectController.deleteProject);
 router.route('/projects/:id/restore')
     .patch(authorize('superadmin', 'admin'), ProjectController.restoreProject);
 

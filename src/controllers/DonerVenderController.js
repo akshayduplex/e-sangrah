@@ -229,6 +229,9 @@ export const registerDonorVendor = async (req, res, next) => {
             name: user_name,
             email: email_id,
             password: randomPassword,
+            companyName: res.locals.companyName || "Our Company",
+            logoUrl: res.locals.logo || "",
+            bannerUrl: res.locals.mailImg || "",
             BASE_URL: API_CONFIG.baseUrl
         }
         // Generate HTML using your central email generator
@@ -379,6 +382,9 @@ export const registerVendor = async (req, res, next) => {
             name: vendor_name,
             email: vendor_email,
             password: randomPassword,
+            companyName: res.locals.companyName || "Our Company",
+            logoUrl: res.locals.logo || "",
+            bannerUrl: res.locals.mailImg || "",
             BASE_URL: API_CONFIG.baseUrl
         }
         // Generate HTML using your central email generator

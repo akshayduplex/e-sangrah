@@ -163,7 +163,7 @@ export const showMainProjectsPage = async (req, res) => {
  */
 export const getProjectTypes = async (req, res) => {
     try {
-        const projectTypes = await ProjectType.find()
+        const projectTypes = await ProjectType.find({ isActive: false })
             .populate("addedBy", "name email")
             .populate("updatedBy", "name email")
             .sort({ createdAt: -1 });
@@ -186,7 +186,7 @@ export const createProjectType = async (req, res) => {
         const newProjectType = await ProjectType.create({
             ...req.body,
             addedBy: req.user._id,
-            updatedBy: req.user._id   // FIXED: required field
+            updatedBy: req.user._id
         });
 
         return res.status(201).json({
@@ -258,6 +258,7 @@ export const deleteProjectType = async (req, res) => {
         });
 
     } catch (error) {
+        console.error(error);
         return res.status(500).json({ success: false, message: "Server error" });
     }
 };

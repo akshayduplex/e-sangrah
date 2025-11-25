@@ -181,6 +181,9 @@ export const login = async (req, res) => {
             userName: user.name,
             otp,
             expiryMinutes: 10,
+            companyName: res.locals.companyName || "Our Company",
+            logoUrl: res.locals.logo || "",
+            bannerUrl: res.locals.mailImg || "",
             BASE_URL: API_CONFIG.baseUrl
         };
 
@@ -333,6 +336,9 @@ export const sendOtp = async (req, res) => {
         const data = {
             userName: user.name || "User",
             otp,
+            companyName: res.locals.companyName || "Our Company",
+            logoUrl: res.locals.logo || "",
+            bannerUrl: res.locals.mailImg || "",
             expiryMinutes: 10,
             BASE_URL: API_CONFIG.baseUrl
         };
@@ -456,6 +462,9 @@ export const sendResetLink = async (req, res) => {
         // --- Prepare Email Template Data ---
         const data = {
             name: user.name || "User",
+            companyName: res.locals.companyName || "Our Company",
+            logoUrl: res.locals.logo || "",
+            bannerUrl: res.locals.mailImg || "",
             resetLink,
         };
 
@@ -618,6 +627,3 @@ export const updateProfile = async (req, res) => {
         res.status(500).json({ success: false, message: "Server Error" });
     }
 };
-
-
-

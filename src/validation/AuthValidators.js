@@ -228,10 +228,10 @@ export const resetPasswordValidator = [
  * Send reset link validator
  */
 export const sendResetLinkValidator = [
-    body("email")
-        .notEmpty().withMessage("Email is required")
-        .isEmail().withMessage("Invalid email")
-        .normalizeEmail()
+    // body("email")
+    //     .notEmpty().withMessage("Email is required")
+    //     .isEmail().withMessage("Invalid email")
+    //     .normalizeEmail()
 ];
 
 

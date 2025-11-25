@@ -13,43 +13,36 @@
                         </ol>
                     </nav>
                 </div>
-                <div class="rtbtn">
-                    <a href="/documents/add" class="btn btn-primary btn-lg rounded-pill me-2 mb-2">
-                        <i class="ti ti-plus me-1"></i>Add New Document
-                    </a>
-                </div>
             </div>
 
             <!-- Documents Table -->
             <div class="row">
-                <div class="col-xxl-12 col-xl-12">
-                    <div class="card flex-fill">
-                        <div class="card-body p-0">
-                            <div class="table-responsive">
-                                <table class="table datatable" id="documents_table_new">
-                                    <thead>
-                                        <tr>
-                                            <th>Actions</th>
-                                            <th>File Name</th>
-                                            <th>Owner Name</th>
-                                            <th>Owner Email</th>
-                                            <th>Department</th>
-                                            <th>Project</th>
-                                            <th>Tags</th>
-                                            <th>Status</th>
-                                            <th>Created On</th>
-                                            <th>Last Modified</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="documents_table_body_new"></tbody>
-                                </table>
-                            </div>
+                <div class="card">
+                    <div class="card-body">
+                        <div class="table-responsive" id="documentsTableWrapper">
+                            <table class="table table-hover datatable" id="documents_table_new">
+                                <thead class="thead-light">
+                                    <tr>
+                                        <th>File Name</th>
+                                        <th>Owner Name</th>
+                                        <th>Owner Email</th>
+                                        <th>Department</th>
+                                        <th>Project</th>
+                                        <th>Tags</th>
+                                        <th>Status</th>
+                                        <th>Created On</th>
+                                        <th>Last Modified</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="documents_table_body_new"></tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
             </div>
-
         </div>
+
+    </div>
     </div>
 
     <%- include('../../partials/footer') %>
@@ -59,87 +52,36 @@
 
         <script>
             $(document).ready(function () {
-                const $tableBody = $("#documents_table_body_new");
 
-                // Extract folder ID from URL
-                const urlParts = window.location.pathname.split('/');
-                const folderId = urlParts[1] || '';
+                const folderId = window.location.pathname.split('/')[1];
 
-                function fetchDocuments() {
-                    $.ajax({
+                $('#documents_table_new').DataTable({
+                    processing: true,
+                    serverSide: true,
+                    ajax: {
                         url: `${baseUrl}/api/documents/folder/${folderId}`,
-                        method: 'GET',
-                        success: function (res) {
-                            if (!res.success) return;
-                            const documents = res.documents || [];
-                            $tableBody.empty();
-
-                            documents.forEach(doc => {
-                                const fileName = doc.signature?.fileName || "-";
-                                const ownerName = doc.owner?.name || "-";
-                                const ownerEmail = doc.owner?.email || "-";
-                                const department = doc.department?.name || "-";
-                                const project = doc.project?.projectName || "-";
-                                const tags = (doc.tags || []).join(", ") || "-";
-                                const statusClass = {
-                                    'Draft': 'bg-soft-info',
-                                    'Pending': 'bg-soft-warning',
-                                    'Approved': 'bg-soft-success',
-                                    'Rejected': 'bg-soft-danger',
-                                    'UnderReview': 'bg-soft-warning',
-                                    'Archived': 'bg-soft-secondary'
-                                }[doc.status] || 'bg-soft-secondary';
-                                const createdAt = doc.createdAt ? new Date(doc.createdAt).toLocaleString() : '-';
-                                const updatedAt = doc.updatedAt ? new Date(doc.updatedAt).toLocaleString() : '-';
-
-                                const rowHtml = `
-<tr>
-    <td>
-        <div class="btn-group" role="group">
-            <button type="button" class="btn border-0" data-bs-toggle="dropdown" aria-expanded="false">
-                <i class="ti ti-settings"></i>
-            </button>
-            <ul class="dropdown-menu">
-                <li><a class="dropdown-item" href="${doc.link || '#'}" target="_blank"><i class="ti ti-eye"></i> View</a></li>
-                <li><a class="dropdown-item" href="/documents/edit/${doc._id}"><i class="ti ti-pencil-minus"></i> Edit</a></li>
-                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#share-doc-modal-${doc._id}"><i class="ti ti-share"></i> Share</a></li>
-                <li><a class="dropdown-item" href="${doc.signature?.fileUrl || '#'}" download><i class="ti ti-download"></i> Download</a></li>
-                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#trash-doc-modal-${doc._id}"><i class="ti ti-trash"></i> Move to Trash</a></li>
-                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#archive-doc-modal-${doc._id}"><i class="ti ti-archive"></i> Archive</a></li>
-            </ul>
-        </div>
-    </td>
-    <td>${fileName}</td>
-    <td>${ownerName}</td>
-    <td>${ownerEmail}</td>
-    <td>${department}</td>
-    <td>${project}</td>
-    <td>${tags}</td>
-    <td><span class="badge badge-md ${statusClass}">${doc.status}</span></td>
-    <td>${createdAt}</td>
-    <td>${updatedAt}</td>
-</tr>`;
-
-                                $tableBody.append(rowHtml);
-                            });
-
-                            // Initialize DataTable with options
-                            $('#documents_table_new').DataTable({
-                                destroy: true,
-                                paging: true,
-                                searching: true,
-                                ordering: true,
-                                info: true,
-                                autoWidth: false,
-                                order: [[8, 'desc']] // default order by Created On descending
-                            });
-                        },
-                        error: function (err) {
-                            console.error("Error fetching documents:", err);
+                        type: "GET",
+                        dataSrc: function (json) {
+                            return json.data;
                         }
-                    });
-                }
+                    },
+                    columns: [
+                        { data: "metadata.fileName", defaultContent: "-" },
+                        { data: "owner.name", defaultContent: "-" },
+                        { data: "owner.email", defaultContent: "-" },
+                        { data: "department.name", defaultContent: "-" },
+                        { data: "project.projectName", defaultContent: "-" },
+                        { data: "tags", render: d => d?.join(", ") || "-" },
+                        {
+                            data: "status", render: function (status) {
+                                return `<span class="badge bg-soft-info">${status}</span>`
+                            }
+                        },
+                        { data: "createdAt", render: d => formatDateTime(d) },
+                        { data: "updatedAt", render: d => formatDateTime(d) }
+                    ],
+                    order: [[7, "desc"]]
+                });
 
-                fetchDocuments();
             });
         </script>

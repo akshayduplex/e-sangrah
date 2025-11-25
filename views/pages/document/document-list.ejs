@@ -469,7 +469,7 @@
                     // -------------------------
                     function renderRow(doc) {
                         var fileSizeKB = doc.files[0]?.fileSize ? (doc.files[0].fileSize / 1024).toFixed(2) + ' KB' : '-';
-                        const lastModified = new Date(doc.updatedAt).toLocaleString();
+                        const lastModified = formatDateTime(doc.updatedAt);
                         const owner = doc.owner
                             ? (() => {
                                 const imgSrc = doc.owner.profile_image || '/img/users/user-08.jpg';

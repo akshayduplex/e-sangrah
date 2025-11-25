@@ -83,7 +83,7 @@ class VersionManager {
                                 <div class="row">
                                     <div class="col-md-6">
                                         <strong>Version:</strong> v${versionDocument.version}<br>
-                                        <strong>Modified:</strong> ${new Date(versionDocument.versionInfo.timestamp).toLocaleString()}<br>
+                                        <strong>Modified:</strong> ${formatDateTime(versionDocument.versionInfo.timestamp)}<br>
                                         <strong>By:</strong> ${versionDocument.versionInfo.changedBy?.name}
                                     </div>
                                     <div class="col-md-6">

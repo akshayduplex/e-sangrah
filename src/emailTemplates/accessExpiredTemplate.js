@@ -16,7 +16,7 @@ export const accessExpiredTemplate = (documentId) => `
     <div class="modal">
         <h2>Access Expired</h2>
         <p>This invitation has expired. Please request access again from the document owner.</p>
-        <button onclick="window.location.href='/documents/request-access/${documentId}'">Request Access</button>
+        <button onclick="window.location.href='/api/documents/${documentId}/request-access'">Request Access</button>
     </div>
 </body>
 </html>

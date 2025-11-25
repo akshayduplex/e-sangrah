@@ -127,7 +127,7 @@
 						{ data: "userDetails", render: ud => ud?.department?.name || "-" },
 						{
 							data: "createdAt",
-							render: data => data ? new Date(data).toLocaleString("en-GB") : "-"
+							render: data => data ? formatDateTime(data) : "-"
 						},
 						{
 							data: "_id",

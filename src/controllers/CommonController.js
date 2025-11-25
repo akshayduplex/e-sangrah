@@ -20,6 +20,25 @@ import { Readable } from "stream";
 
 
 //Pages
+export const showCheckMailPage = (req, res) => {
+    try {
+        res.render("pages/checkMail", {
+            pageTitle: "Mail Verification",
+            pageDescription: "Get help, explore FAQs, and contact support for issues related to your e-Sangrah workspace.",
+            metaKeywords: "support, help center, esangrah support, customer support, faq",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+            user: req.user
+        });
+    } catch (err) {
+        logger.error("support page render error:", err);
+        res.status(500).render("pages/error", {
+            pageTitle: "Error",
+            pageDescription: "There was an issue loading the Mail page.",
+            user: req.user,
+            message: "Unable to load mail page"
+        });
+    }
+};
 export const showSupportPage = (req, res) => {
     try {
         res.render("pages/support", {
@@ -39,7 +58,6 @@ export const showSupportPage = (req, res) => {
         });
     }
 };
-
 
 export const showSettingPage = async (req, res) => {
     try {

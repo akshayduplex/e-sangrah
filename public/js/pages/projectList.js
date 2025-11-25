@@ -53,14 +53,14 @@ document.addEventListener("DOMContentLoaded", () => {
                             </div>
                         </div>
                     </td>
-                    <td><p class="tbl_date">${new Date(project.projectEndDate).toLocaleDateString()} &nbsp;&nbsp; ${new Date(project.projectEndDate).toLocaleTimeString()}</p></td>
+                    <td><p class="tbl_date">${formatDateTime(project.projectEndDate)} &nbsp;&nbsp; ${formatDateTime(project.projectEndDate)}</p></td>
                     <td><p>${project.projectManager?.name || "—"}</p></td>
                     <td><p>${project.department?.name || "—"}</p></td>
                     <td><p>${project.projectName}</p></td>
                     <td><p>—</p></td>
                     <td><p>${(project.tags || []).join(", ")}</p></td>
                     <td><p>Document</p></td>
-                    <td><p class="tbl_date">${new Date(project.createdAt).toLocaleDateString()} &nbsp;&nbsp; ${new Date(project.createdAt).toLocaleTimeString()}</p></td>
+                    <td><p class="tbl_date">${formatDateTime(project.createdAt)} &nbsp;&nbsp; ${formatDateTime(project.createdAt)}</p></td>
                     <td><p>${project.projectDescription || ""}</p></td>
                     <td><p>—</p></td>
                     <td><span class="badge badge-md bg-soft-success">${project.projectStatus || "Unknown"}</span></td>

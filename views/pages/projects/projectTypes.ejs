@@ -92,16 +92,15 @@
         const submitBtn = document.getElementById('submitBtn');
 
         form.addEventListener('submit', async (e) => {
-            e.preventDefault(); // Prevent normal form submission
+            e.preventDefault();
 
             const originalBtnText = submitBtn.innerHTML;
 
-            // Show loader inside button
             submitBtn.disabled = true;
             submitBtn.innerHTML = `
-            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-            Processing...
-        `;
+        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+        Processing...
+    `;
 
             const formData = new FormData(form);
             const data = Object.fromEntries(formData.entries());
@@ -122,16 +121,23 @@
                     showToast(result.message || 'Project Type saved successfully!', 'success');
                     setTimeout(() => { window.location.href = '/projectTypes/list'; }, 1000);
                 } else {
-                    showToast(result.error || 'Failed to save department', 'danger');
+                    // Handle backend validation errors
+                    if (result.errors && Array.isArray(result.errors)) {
+                        result.errors.forEach(err => showToast(err.message, 'danger'));
+                    } else {
+                        showToast(result.error || 'Failed to save department', 'danger');
+                    }
+                    console.error('Backend error:', result);
                 }
             } catch (err) {
-                showToast('Something went wrong!', 'danger');
+                showToast(err.message || 'Something went wrong!', 'danger');
+                console.error('Fetch error:', err);
             } finally {
-                // Restore original button
                 submitBtn.innerHTML = originalBtnText;
                 submitBtn.disabled = false;
             }
         });
     </script>
+
 
     <%- include('../../partials/footer') %>

@@ -269,7 +269,7 @@ export const viewDocumentFiles = async (req, res) => {
             pageDescription: "View publicly shared document details and files.",
             metaKeywords: "public document, document viewer, online file viewer",
             canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
-
+            documentTitle: document?.metadata?.fileName || "Invited Document",
             expiredMessage,
             docExpired,
             version,
@@ -323,13 +323,14 @@ export const viewInvitedDocumentFiles = async (req, res) => {
         } catch {
             return res.render("pages/document/viewInvitedDocumentFiles", {
                 pageTitle: "Access Denied",
+                documentTitle: "Access Denied",
                 pageDescription: "This invitation link is invalid or corrupted.",
-                metaKeywords: "invitation link invalid, restricted document",
+                metaKeywords: "",
                 canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
-
                 expiredMessage: "Invalid or corrupted link.",
                 canRenew: false,
                 user: req.user,
+                email: req.user?.email || null,
                 sharedAccess: null,
                 document: null,
                 versionData: null,
@@ -349,9 +350,9 @@ export const viewInvitedDocumentFiles = async (req, res) => {
 
         let expiredMessage = null;
 
-        // Check access expiration
-        if (!sharedAccess) expiredMessage = "You don't have access to this document.";
-        else {
+        if (!sharedAccess) {
+            expiredMessage = "You don't have access to this document.";
+        } else {
             const expired = sharedAccess.expiresAt && now > sharedAccess.expiresAt;
             const usedOnce = sharedAccess.duration === "onetime" && sharedAccess.used;
 
@@ -369,48 +370,59 @@ export const viewInvitedDocumentFiles = async (req, res) => {
         let files = [];
 
         if (sharedAccess && !expiredMessage) {
+
             document = await Document.findById(documentId)
                 .populate({
                     path: "currentVersion",
                     populate: { path: "files", model: "File" }
                 })
+                .populate("files")
                 .lean();
 
             versionData = document?.currentVersion;
 
-            if (versionData?.files?.length > 0) {
-                files = await Promise.all(
-                    versionData.files.map(async (file) => {
-                        let fileUrl = file.s3Url || (file.file ? await getObjectUrl(file.file, 3600) : null);
-                        const ext = file.originalName.split(".").pop().toLowerCase();
 
-                        return {
-                            _id: file._id,
-                            originalName: file.originalName,
-                            fileSize: file.fileSize || 0,
-                            formattedSize: formatFileSize(file.fileSize),
-                            fileUrl,
-                            fileType: {
-                                isPDF: ext === "pdf",
-                                isWord: ["doc", "docx"].includes(ext),
-                                isExcel: ["xls", "xlsx"].includes(ext),
-                                isPowerPoint: ["ppt", "pptx"].includes(ext),
-                                isText: ["txt", "md", "json", "xml", "html", "csv"].includes(ext),
-                                extension: ext
-                            }
-                        };
-                    })
-                );
-            }
+            let versionFiles = versionData?.files || [];
+
+            let legacyFiles = document?.files || [];
+
+            let selectedFiles = versionFiles.length ? versionFiles : legacyFiles;
+
+            files = await Promise.all(
+                selectedFiles.map(async (file) => {
+                    let fileUrl = file.s3Url ||
+                        (file.file ? await getObjectUrl(file.file, 3600) : null);
+
+                    const ext = file.originalName.split(".").pop().toLowerCase();
+
+                    return {
+                        _id: file._id,
+                        originalName: file.originalName,
+                        fileSize: file.fileSize || 0,
+                        formattedSize: formatFileSize(file.fileSize),
+                        fileUrl,
+                        fileType: {
+                            isPDF: ext === "pdf",
+                            isWord: ["doc", "docx"].includes(ext),
+                            isExcel: ["xls", "xlsx"].includes(ext),
+                            isPowerPoint: ["ppt", "pptx"].includes(ext),
+                            isText: ["txt", "md", "json", "xml", "html", "csv"].includes(ext),
+                            extension: ext
+                        }
+                    };
+                })
+            );
         }
 
         res.render("pages/document/viewInvitedDocumentFiles", {
             pageTitle: document?.metadata?.fileName || "Invited Document",
-            pageDescription: "Access the document shared with you via invitation link.",
-            metaKeywords: "shared document, invited document, secure document access",
+            title: document?.metadata?.fileName || "Invited Document",
+            documentTitle: document?.metadata?.fileName || "Invited Document",
+            pageDescription: "Access the document shared with you.",
+            metaKeywords: "",
             canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
-
             expiredMessage,
+            documentId: documentId,
             canRenew: !!expiredMessage,
             currentVersionLabel: document?.currentVersionLabel || "N/A",
             user: req.user,
@@ -423,10 +435,9 @@ export const viewInvitedDocumentFiles = async (req, res) => {
         console.error("Error in viewInvitedDocumentFiles:", error);
         res.render("pages/document/viewInvitedDocumentFiles", {
             pageTitle: "Document Error",
+            title: "Document Error",
             pageDescription: "Server error while opening invited document.",
-            metaKeywords: "document error, shared document failed",
             canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
-
             expiredMessage: "Server error while loading the document.",
             canRenew: false,
             user: req.user,
@@ -436,6 +447,7 @@ export const viewInvitedDocumentFiles = async (req, res) => {
         });
     }
 };
+
 
 
 // Helper
@@ -745,46 +757,55 @@ export const getDocuments = async (req, res) => {
 export const getDocumentsByFolder = async (req, res) => {
     try {
         const { folderId } = req.params;
-        const { page = 1, limit = 20, sortBy = "createdAt", order = "desc", search = "" } = req.query;
 
         if (!mongoose.Types.ObjectId.isValid(folderId)) {
             return res.status(400).json({ success: false, message: "Invalid folder ID" });
         }
 
-        // Build query
-        let query = { folderId: folderId };
+        // DataTables parameters
+        const start = parseInt(req.query.start) || 0;
+        const length = parseInt(req.query.length) || 20;
+        const searchValue = req.query.search?.value || "";
+        const orderColumnIndex = req.query.order?.[0]?.column || 0;
+        const orderDirection = req.query.order?.[0]?.dir === "desc" ? -1 : 1;
 
-        // Text search
-        if (search) {
-            query.$text = { $search: search };
+        // Columns mapping
+        const columns = ["fileName", "owner.name", "owner.email", "department.name", "project.projectName", "tags", "status", "createdAt", "updatedAt"];
+        const sortField = columns[orderColumnIndex] || "createdAt";
+
+        // Base query
+        let query = { folderId };
+
+        // Search
+        if (searchValue) {
+            query.$text = { $search: searchValue };
         }
 
-        // Count total documents
-        const total = await Document.countDocuments(query);
+        const totalRecords = await Document.countDocuments({ folderId });
+        const filteredRecords = await Document.countDocuments(query);
 
-        // Fetch documents with pagination
         const documents = await Document.find(query)
             .populate("project", "projectName")
             .populate("department", "name")
             .populate("owner", "name email")
-            .populate("projectManager", "name email")
-            .sort({ [sortBy]: order === "desc" ? -1 : 1 })
-            .skip((page - 1) * limit)
-            .limit(parseInt(limit));
+            .lean() // improves performance on large datasets
+            .sort({ [sortField]: orderDirection })
+            .skip(start)
+            .limit(length);
 
         res.json({
             success: true,
-            total,
-            page: parseInt(page),
-            limit: parseInt(limit),
-            documents
+            data: documents,
+            recordsTotal: totalRecords,
+            recordsFiltered: filteredRecords
         });
 
     } catch (err) {
-        logger.error("Error fetching documents by folder:", err);
+        console.error("Error fetching documents:", err);
         res.status(500).json({ success: false, message: "Server Error" });
     }
 };
+
 
 /**
  * Get single document by ID
@@ -3212,6 +3233,9 @@ export const inviteUser = async (req, res) => {
             name: user.name,
             accessLevel,
             expiresAt,
+            companyName: res.locals.companyName || "Our Company",
+            logoUrl: res.locals.logo || "",
+            bannerUrl: res.locals.mailImg || "",
             inviteLink
         }
         // Generate HTML using your central email generator
@@ -3280,95 +3304,141 @@ export const autoAcceptInvite = async (req, res) => {
 export const requestAccessAgain = async (req, res) => {
     try {
         const { documentId } = req.params;
-        const { email } = req.body; // Only email is provided for external users
-        const userId = req.session.user?._id;
+        const { email } = req.body;
+        const sessionUser = req.session.user;
+        const userId = sessionUser?._id;
 
+        /** -------- VALIDATION -------- */
         if (!userId && !email) {
-            return res.status(401).json({ success: false, message: "Not logged in or email not provided" });
+            return res.status(401).json({
+                success: false,
+                message: "Not logged in or email not provided"
+            });
         }
 
-        const doc = await Document.findById(documentId).populate("owner", "email name");
-        if (!doc) return res.status(404).json({ success: false, message: "Document not found" });
+        /** -------- DOCUMENT CHECK -------- */
+        const doc = await Document.findById(documentId)
+            .populate("owner", "email name");
+
+        if (!doc) {
+            return res.status(404).json({ success: false, message: "Document not found" });
+        }
 
         const owner = doc.owner;
-        if (!owner?.email) return res.status(400).json({ success: false, message: "Owner email not found" });
+        if (!owner?.email) {
+            return res.status(400).json({ success: false, message: "Owner email not found" });
+        }
 
-        // Check if user exists
+        /** Prevent self-request */
+        if (userId && owner._id.toString() === userId.toString()) {
+            return res.status(400).json({
+                success: false,
+                message: "You already own this document"
+            });
+        }
+
+        /** -------- USER HANDLING -------- */
         let user = null;
         let isExternal = false;
         let userName = "";
+        let userEmail = email;
 
         if (userId) {
             user = await User.findById(userId);
-            userName = user?.name;
-        } else if (email) {
+            userName = user?.name || "";
+            userEmail = user?.email;
+        } else {
             user = await User.findOne({ email });
             if (user) {
                 isExternal = false;
                 userName = user.name;
+                userEmail = user.email;
             } else {
                 isExternal = true;
-                userName = ""; // external, name unknown
+                userName = ""; // Unknown external user
+                userEmail = email;
             }
         }
 
-        // Create JWT token for owner approval
-        const token = jwt.sign({
-            docId: documentId,
-            userId: user?._id || null,
-            userEmail: email || user?.email,
-            userName: userName,
-            action: "approveAccess"
-        }, API_CONFIG.ACCESS_GRANT_SECRET || "supersecretkey", { expiresIn: "3d" });
+        /** -------- TOKEN FOR APPROVAL LINK -------- */
+        const token = jwt.sign(
+            {
+                docId: documentId,
+                userId: user?._id || null,
+                userEmail,
+                userName,
+                isExternal,
+                action: "approveAccess"
+            },
+            API_CONFIG.ACCESS_GRANT_SECRET || "supersecretkey",
+            { expiresIn: "3d" }
+        );
+
+        /** -------- PERMISSION LOGS -------- */
+        const log = await PermissionLogs.findOneAndUpdate(
+            {
+                document: documentId,
+                "user.email": userEmail
+            },
+            {
+                document: documentId,
+                owner: owner._id,
+                user: { username: userName, email: userEmail },
+                access: "view",
+                isExternal,
+                requestStatus: "pending",
+                token
+            },
+            { new: true, upsert: true }
+        );
+
+        const logId = log._id;
 
         const baseUrl = API_CONFIG.baseUrl || "http://localhost:5000";
-        // const approvalLink = `${baseUrl}/documents/approve-access/${token}`;
-        const approvalLink = `${baseUrl}/permissionslogs`;
+        const approvalLink = `${baseUrl}/permissionslogs?id=${logId}`;
+
+        /** -------- EMAIL PREPARATION -------- */
         const data = {
             userName,
-            email,
+            email: userEmail,
             user,
             doc,
-            approvalLink
-        }
-        // Generate HTML using your central email generator
-        const html = generateEmailTemplate('documentAccessRequest', data);
+            approvalLink,
+            companyName: res.locals.companyName || "Our Company",
+            logoUrl: res.locals.logo || "",
+            bannerUrl: res.locals.mailImg || "",
+        };
 
+        const html = generateEmailTemplate("documentAccessRequest", data);
+
+        /** -------- SEND EMAIL -------- */
         await sendEmail({
             to: owner.email,
-            subject: `Access Request for Document: ${doc.metadata?.fileName || 'Untitled'}`,
+            subject: `Access Request for Document: ${doc.metadata?.fileName || "Untitled"}`,
             html,
-            fromName: "E-Sangrah Team",
+            fromName: "E-Sangrah Team"
         });
+
+        /** -------- ACTIVITY LOG -------- */
         await activityLogger({
             actorId: userId || null,
             entityId: documentId,
             entityType: "Document",
             action: "REQUEST_ACCESS",
-            details: `${email || req.user?.email} requested access to document`,
+            details: `${userEmail} requested access to document ${doc.metadata?.fileName || "Untitled"}`
         });
-        // Log request in PermissionLogs
-        await PermissionLogs.findOneAndUpdate(
-            {
-                document: documentId,
-                "user.email": email || user?.email
-            },
-            {
-                document: documentId,
-                owner: owner._id,
-                user: { username: userName, email: email || user?.email },
-                access: "view",
-                isExternal,
-                requestStatus: "pending",
-            },
-            { new: true, upsert: true }
-        );
 
-        res.json({ success: true, message: `Request sent to ${owner.name || owner.email}` });
+        res.json({
+            success: true,
+            message: `Request sent to ${owner.name || owner.email}`
+        });
 
     } catch (err) {
         console.error(err);
-        res.status(500).json({ success: false, message: "Server error: " + err.message });
+        res.status(500).json({
+            success: false,
+            message: "Server error: " + err.message
+        });
     }
 };
 
@@ -3441,6 +3511,9 @@ export const grantAccessViaToken = async (req, res) => {
                 name: user.name || userEmail,
                 fileName: doc.metadata?.fileName,
                 duration,
+                companyName: res.locals.companyName || "Our Company",
+                logoUrl: res.locals.logo || "",
+                bannerUrl: res.locals.mailImg || "",
                 ownerName: doc.owner?.name || "Document Owner"
             }
             // Generate HTML using your central email generator
@@ -3936,6 +4009,9 @@ export const updateApprovalStatus = async (req, res) => {
                 ownerName: document.owner.name,
                 requesterName: req.user.name,
                 fileName: document.metadata?.fileName || "Untitled Document",
+                companyName: res.locals.companyName || "Our Company",
+                logoUrl: res.locals.logo || "",
+                bannerUrl: res.locals.mailImg || "",
                 comment,
             }
             // Generate HTML using your central email generator
@@ -4004,6 +4080,9 @@ export const updateApprovalStatus = async (req, res) => {
                     departmentName: document.department?.name || "General",
                     requesterName: req.user.name,
                     approvalLink,
+                    companyName: res.locals.companyName || "Our Company",
+                    logoUrl: res.locals.logo || "",
+                    bannerUrl: res.locals.mailImg || "",
                     BASE_URL: API_CONFIG.baseUrl,
                 }
                 // Generate HTML using your central email generator
@@ -4078,6 +4157,12 @@ export const sendApprovalMail = async (req, res) => {
             description: document.description || "No description provided",
             departmentName: document.department?.name || "N/A",
             requesterName: document.owner?.name || "System",
+            companyName: res.locals.companyName || "Our Company",
+            logoUrl: res.locals.logo || "",
+            bannerUrl: res.locals.mailImg || "",
+            companyName: res.locals.companyName || "Our Company",
+            logoUrl: res.locals.logo || "",
+            bannerUrl: res.locals.mailImg || "",
             verifyUrl,
             reviewUrl
         }
@@ -4172,6 +4257,9 @@ export const verifyApprovalMail = async (req, res) => {
                         departmentName: nextUser.userDetails?.department?.name || "N/A",
                         requesterName: document.owner?.name || "System",
                         verifyUrl,
+                        companyName: res.locals.companyName || "Our Company",
+                        logoUrl: res.locals.logo || "",
+                        bannerUrl: res.locals.mailImg || "",
                         reviewUrl
                     }
                     // Generate HTML using your central email generator

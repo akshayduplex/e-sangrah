@@ -3,14 +3,15 @@ import mongoose from "mongoose";
 const departmentSchema = new mongoose.Schema({
     name: {
         type: String,
-        required: true,
+        required: [true, "Department name is required"],
         trim: true,
         unique: true,
-        maxlength: 250
+        maxlength: [250, "Department name cannot exceed 250 characters"]
     },
     priority: {
         type: Number,
-        default: 0
+        default: 1,
+        min: [1, 'Priority must be greater than 0'],
     },
     status: {
         type: String,
@@ -39,8 +40,7 @@ const departmentSchema = new mongoose.Schema({
     timestamps: false
 });
 
-
-// Pre-save hook to update `updated_date` automatically
+// Pre-save hook to auto-update `updated_date` on save
 departmentSchema.pre("save", function (next) {
     this.updated_date = Date.now();
     next();

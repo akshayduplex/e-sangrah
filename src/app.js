@@ -95,7 +95,7 @@ const app = express();
         res.locals.pageDescription = settings?.metaDescription || "";
         res.locals.metaKeywords = settings?.metaKeywords || "";
 
-        res.locals.companyName = settings?.companyName || "";
+        res.locals.companyName = settings?.companyName || "E-sangrah";
         res.locals.metaTitle = settings?.metaTitle || "e-Sangrah – Smart File Management";
         res.locals.companyEmail = settings?.companyEmail || "";
         res.locals.supportEmail = settings?.supportEmail || "";

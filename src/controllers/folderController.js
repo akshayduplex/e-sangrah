@@ -1421,6 +1421,9 @@ export const shareFolder = async (req, res) => {
             senderName: req.user?.name,
             folderName: folder.name,
             access,
+            companyName: res.locals.companyName || "Our Company",
+            logoUrl: res.locals.logo || "",
+            bannerUrl: res.locals.mailImg || "",
             expiresAt: expiresAt ? new Date(expiresAt).toLocaleString() : 'N/A',
             folderLink: shareLink || '#',
         };
@@ -1626,7 +1629,10 @@ export const updateFolderLogPermission = async (req, res) => {
             // send rejection email
             const data = {
                 userName,
-                folderName
+                folderName,
+                companyName: res.locals.companyName || "Our Company",
+                logoUrl: res.locals.logo || "",
+                bannerUrl: res.locals.mailImg || ""
             }
             const html = generateEmailTemplate("folderAccessRejected", data)
             await sendEmail({
@@ -1690,6 +1696,9 @@ export const updateFolderLogPermission = async (req, res) => {
             access,
             expiresAt,
             folderLink,
+            companyName: res.locals.companyName || "Our Company",
+            logoUrl: res.locals.logo || "",
+            bannerUrl: res.locals.mailImg || ""
         }
         const html = generateEmailTemplate('folderAccessApproved', data)
         await sendEmail({
@@ -1887,6 +1896,9 @@ export const requestFolderAccess = async (req, res) => {
                 user,
                 folder,
                 manageLink,
+                companyName: res.locals.companyName || "Our Company",
+                logoUrl: res.locals.logo || "",
+                bannerUrl: res.locals.mailImg || "",
             }
             const htmlContent = generateEmailTemplate("folderAccessRequest", data)
             await sendEmail({
@@ -1986,6 +1998,9 @@ export const grantFolderAccess = async (req, res) => {
             folderName: folder.name,
             access: duration || "Full Access",
             expiresAt,
+            companyName: res.locals.companyName || "Our Company",
+            logoUrl: res.locals.logo || "",
+            bannerUrl: res.locals.mailImg || "",
             folderLink: `${API_CONFIG.baseUrl}/${access}er/${folder._id}`,
             approvedByName: owner.name || "Unknown"
         }

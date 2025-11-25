@@ -203,15 +203,12 @@ document.addEventListener("DOMContentLoaded", function () {
             if (data.success) {
                 showToast("Verification link sent to your email. Please check your email to complete the process.", "success");
 
-                // Clear form and hide sections
                 resetForm.style.display = "none";
                 otpSection.style.display = "none";
                 emailInput.value = "";
-
-                // Optionally redirect to login after a delay
                 setTimeout(() => {
-                    window.location.href = "/login?pending=check-email";
-                }, 3000);
+                    window.location.href = "/checkmail";
+                }, 1000);
             } else {
                 showToast(data.message || "Failed to send verification link.", "error");
             }

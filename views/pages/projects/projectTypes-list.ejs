@@ -94,8 +94,7 @@
     </td>
    <td>${pt.addedBy?.name || pt.addedBy?.email || '-'}</td>
       <td>${pt.updatedBy?.name || pt.updatedBy?.email || '-'}</td>
-    <td>${new Date(pt.createdAt).toLocaleString()}</td>
-
+    <td>${formatDateTime(pt.createdAt)}</td>
     <td>
         <a href="/projectTypes/${pt._id}" class="text-primary me-2" title="Edit">
             <i class="ti ti-edit"></i>

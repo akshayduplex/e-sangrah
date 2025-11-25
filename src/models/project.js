@@ -1,23 +1,21 @@
 import mongoose from "mongoose";
 import mongoosePaginate from "mongoose-paginate-v2";
 
-/**
- * Master Project Type Schema
- */
+
 const projectTypeSchema = new mongoose.Schema(
     {
         name: {
             type: String,
             required: [true, "Project type name is required"],
             trim: true,
-            maxlength: 100,
+            maxlength: [100, "Name cannot exceed 100 characters"],
             unique: true,
             index: true,
         },
         priority: {
             type: Number,
             default: 0,
-            min: 0
+            min: [0, "Priority cannot be negative"],
         },
         status: {
             type: String,
@@ -28,12 +26,12 @@ const projectTypeSchema = new mongoose.Schema(
         addedBy: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "User",
-            required: true
+            required: true,
         },
         updatedBy: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "User",
-            required: true
+            required: true,
         },
         isActive: { type: Boolean, default: true, index: true },
     },

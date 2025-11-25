@@ -64,11 +64,23 @@ export const showEditDepartmentPage = async (req, res) => {
         res.render("pages/department/department", {
             title: "E-Sangrah - Edit Department",
             department,
+            pageTitle: "Departments List",
+            title: "Departments List",
+            pageDescription: "View and manage all departments within your workspace.",
+            metaKeywords: "departments list, department management, organizational units",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
             user: req.user
         });
     } catch (err) {
-        logger.error("Error loading department edit page:", err);
-        res.redirect("/departments/list");
+        logger.error("Department list render error:", err);
+        res.status(500).render("pages/error", {
+            pageTitle: "Error",
+            pageDescription: "Unable to load the departments.",
+            metaKeywords: "error, departments list error, page load error",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+            user: req.user,
+            message: "Unable to load departments"
+        });
     }
 };
 
@@ -130,13 +142,21 @@ export const getDepartmentById = async (req, res) => {
     }
 };
 
-// Create new department
+// Create Department
 export const createDepartment = async (req, res) => {
     try {
         if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
 
+        const { name, priority, status } = req.body;
+
+        // Validate required fields
+        if (!name) return res.status(400).json({ error: 'Department name is required' });
+        if (priority !== undefined && priority < 1) return res.status(400).json({ error: 'Priority must be greater than 0' });
+
         const departmentData = {
-            ...req.body,
+            name,
+            priority,
+            status,
             addedBy: {
                 user_id: req.user._id,
                 name: req.user.name,
@@ -157,20 +177,37 @@ export const createDepartment = async (req, res) => {
 
         res.status(200).json({ message: 'Department added successfully!' });
     } catch (err) {
-        logger.error(err);
-        res.status(500).json({ error: 'Failed to add department' });
+        // Handle Mongoose validation errors
+        if (err.name === 'ValidationError') {
+            const messages = Object.values(err.errors).map(e => e.message);
+            return res.status(400).json({ error: messages.join(', ') });
+        }
+
+        // Handle duplicate name error
+        if (err.code === 11000) {
+            return res.status(400).json({ error: 'Department name already exists' });
+        }
+
+        return errorResponse(res, err);
     }
 };
 
-// Update department
+// Update Department
 export const updateDepartment = async (req, res) => {
     try {
         const { id } = req.params;
-        if (!mongoose.Types.ObjectId.isValid(id)) return failResponse(res, 'Invalid department ID', 400);
-        if (!req.user) return failResponse(res, 'Unauthorized', 401);
+        if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: 'Invalid department ID' });
+        if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
+
+        const { name, priority, status } = req.body;
+
+        // Validate fields
+        if (priority !== undefined && priority < 1) return res.status(400).json({ error: 'Priority must be greater than 0' });
 
         const updateData = {
-            ...req.body,
+            ...(name && { name }),
+            ...(priority !== undefined && { priority }),
+            ...(status && { status }),
             updatedBy: {
                 user_id: req.user._id,
                 name: req.user.name,
@@ -196,7 +233,15 @@ export const updateDepartment = async (req, res) => {
 
         return successResponse(res, department, 'Department updated successfully');
     } catch (err) {
-        logger.error(err);
+        if (err.name === 'ValidationError') {
+            const messages = Object.values(err.errors).map(e => e.message);
+            return res.status(400).json({ error: messages.join(', ') });
+        }
+
+        if (err.code === 11000) {
+            return res.status(400).json({ error: 'Department name already exists' });
+        }
+
         return errorResponse(res, err);
     }
 };

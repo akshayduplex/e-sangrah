@@ -121,8 +121,8 @@
                                         status: user.status,
                                         department: user.userDetails?.department?.name || "-",
                                         designation: user.userDetails?.designation?.name || "-",
-                                        lastLogin: user.lastLogin ? new Date(user.lastLogin).toLocaleString() : "-",
-                                        createdAt: new Date(user.createdAt).toLocaleString(),
+                                        lastLogin: user.lastLogin ? formatDateTime(user.lastLogin) : "-",
+                                        createdAt: formatDateTime(user.createdAt),
                                         actions: `
                             <a href="/users/edit/${user._id}" class="text-primary me-2"><i class="ti ti-edit"></i></a>
                             <a href="#" class="text-danger btn-delete" data-id="${user._id}"><i class="ti ti-trash"></i></a>

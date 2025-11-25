@@ -67,19 +67,6 @@ function updateSubmitButton() {
     }
 }
 
-// Format date function
-function formatDate(dateString) {
-    if (!dateString) return null;
-
-    const date = new Date(dateString);
-    const options = {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-    };
-    return date.toLocaleDateString('en-US', options).replace(/(\d+)(st|nd|rd|th)/, '$1$2');
-}
-
 // Submit approval function
 async function submitApproval() {
     const selectedAction = document.querySelector('input[name="approvalAction"]:checked');
