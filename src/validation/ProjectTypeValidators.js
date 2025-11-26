@@ -1,13 +1,36 @@
-import { body, param, query } from "express-validator";
+import { body, param } from "express-validator";
 
-export const updateRequestStatusValidator = [
+export const createProjectTypeValidator = [
     body("name")
         .notEmpty().withMessage("Project type name is required")
-        .isLength({ max: 100 }).withMessage("Name cannot exceed 100 characters"),
+        .isString().withMessage("Name must be a string")
+        .isLength({ max: 50 }).withMessage("Name cannot exceed 50 characters"),
+
     body("priority")
         .optional()
-        .isInt({ min: 1 }).withMessage("Priority must be a positive integer"),
+        .isInt({ min: 0 }).withMessage("Priority cannot be negative"),
+
     body("status")
         .optional()
-        .isIn(["Active", "Inactive"]).withMessage("Status must be Active or Inactive"),
+        .isIn(["Active", "Inactive"])
+        .withMessage("Status must be Active or Inactive"),
+];
+
+export const updateProjectTypeValidator = [
+    param("id")
+        .isMongoId().withMessage("Invalid project type ID"),
+
+    body("name")
+        .optional()
+        .isString().withMessage("Name must be a string")
+        .isLength({ max: 50 }).withMessage("Name cannot exceed 50 characters"),
+
+    body("priority")
+        .optional()
+        .isInt({ min: 0 }).withMessage("Priority cannot be negative"),
+
+    body("status")
+        .optional()
+        .isIn(["Active", "Inactive"])
+        .withMessage("Status must be Active or Inactive")
 ];

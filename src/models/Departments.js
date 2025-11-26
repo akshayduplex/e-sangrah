@@ -10,8 +10,8 @@ const departmentSchema = new mongoose.Schema({
     },
     priority: {
         type: Number,
-        default: 1,
-        min: [1, 'Priority must be greater than 0'],
+        default: 0,
+        min: [0, 'Priority must be greater than or equal to 0'],
     },
     status: {
         type: String,

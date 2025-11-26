@@ -6,7 +6,7 @@ export const createDepartmentValidator = [
     body("name")
         .trim()
         .notEmpty().withMessage("Department name is required")
-        .isLength({ min: 2, max: 250 }).withMessage("Name must be 2-250 characters long")
+        .isLength({ min: 2, max: 50 }).withMessage("Name must be 2-50 characters long")
         .matches(/^[a-zA-Z0-9\s\-]+$/).withMessage("Name contains invalid characters"),
 
     body("priority")

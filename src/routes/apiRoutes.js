@@ -384,8 +384,8 @@ router.get("/session/project", async (req, res) => {
 });
 
 router.get("/projectTypes", ProjectController.getProjectTypes);
-router.post("/projectTypes", ProjectTypeValidators.updateRequestStatusValidator, validators, ProjectController.createProjectType);
-router.patch("/projectTypes/:id", ProjectTypeValidators.updateRequestStatusValidator, validators, ProjectController.updateProjectType);
+router.post("/projectTypes", ProjectTypeValidators.createProjectTypeValidator, validators, ProjectController.createProjectType);
+router.patch("/projectTypes/:id", ProjectTypeValidators.updateProjectTypeValidator, validators, ProjectController.updateProjectType);
 router.delete("/projectTypes/:id", ProjectController.deleteProjectType);
 
 // Basic CRUD routes
@@ -456,7 +456,7 @@ router.route('/projects/:id/archive')
 // Single project operations
 router.route('/projects/:id')
     .get(authorize('superadmin', 'admin', 'manager', 'user', 'viewer'), ProjectController.getProject)
-    .patch(authorize('superadmin', 'admin', 'manager', 'user'), upload.single('projectLogo'), ProjectController.updateProject)
+    .patch(authorize('superadmin', 'admin', 'manager', 'user'), ProjectValidator.updateProjectValidator, validators, upload.single('projectLogo'), ProjectController.updateProject)
     .delete(authorize('superadmin', 'admin'), ProjectController.deleteProject);
 router.route('/projects/:id/restore')
     .patch(authorize('superadmin', 'admin'), ProjectController.restoreProject);
