@@ -37,6 +37,10 @@ const vendorDetailsSchema = new mongoose.Schema(
         },
         contact_person: { type: String, trim: true },
         services_offered: { type: [String], default: [] },
+        designation: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Designation",
+        },
     },
     { _id: false }
 );
@@ -51,6 +55,10 @@ const donorDetailsSchema = new mongoose.Schema(
         },
         organization_name: { type: String, trim: true },
         id_proof: { type: String, trim: true },
+        designation: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Designation",
+        },
     },
     { _id: false }
 );

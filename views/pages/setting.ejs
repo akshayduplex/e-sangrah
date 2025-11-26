@@ -6,12 +6,11 @@
             <!-- Breadcrumb -->
             <div class="d-flex align-items-center justify-content-between page-breadcrumb mb-3">
                 <div class="my-auto mb-2">
-                    <h2 class="mb-1">Web Settings</h2>
+                    <h2 class="mb-1">Settings</h2>
                     <nav>
                         <ol class="breadcrumb mb-0">
                             <li class="breadcrumb-item"><a href="#"><i class="ti ti-smart-home"></i></a></li>
                             <li class="breadcrumb-item">Settings</li>
-                            <li class="breadcrumb-item active">Web Settings</li>
                         </ol>
                     </nav>
                 </div>
@@ -42,7 +41,12 @@
                             <input type="email" class="form-control" name="companyEmail"
                                 value="<%= settings?.companyEmail %>" required>
                         </div>
-
+                        <!-- Support Name -->
+                        <div class="mb-4">
+                            <label class="form-label">Support Team Name</label>
+                            <input type="text" class="form-control" name="supportTeamName"
+                                value="<%= settings?.supportTeamName %>" required>
+                        </div>
                         <!-- Support Email -->
                         <div class="mb-4">
                             <label class="form-label">Support Email</label>
@@ -121,7 +125,7 @@
 
                         <div class="text-end">
                             <button type="submit" id="saveBtn" class="btn btn-primary">
-                                <span id="btnText">Save Settings</span>
+                                <span id="btnText">Save</span>
                                 <span id="btnLoader" class="spinner-border spinner-border-sm d-none"></span>
                             </button>
                         </div>

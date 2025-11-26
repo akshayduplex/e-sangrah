@@ -104,10 +104,15 @@ export const showDesignationListPage = (req, res) => {
 // Get all designations
 export const getAllDesignations = async (req, res) => {
     try {
-        const data = await Designation.find()
-            // .populate('added_by.user_id', 'name email')
-            .lean();
+        let filter = {};
+
+        if (req.user?.profile_type !== "superadmin") {
+            filter.isDonorOrVendor = false;
+        }
+
+        const data = await Designation.find(filter).lean();
         res.json({ success: true, data });
+
     } catch (err) {
         return errorResponse(res, err);
     }
@@ -117,7 +122,12 @@ export const searchDesignations = async (req, res) => {
     try {
         const { search = '', page = 1, limit = 10 } = req.query;
 
-        const query = { status: "Active" };
+        const query = { status: "Active", isDonorOrVendor: false };
+
+        if (req.user?.profile_type !== "superadmin") {
+            query.isDonorOrVendor = false;
+        }
+
         if (search) {
             query.name = { $regex: search, $options: 'i' };
         }
@@ -125,31 +135,45 @@ export const searchDesignations = async (req, res) => {
         const skip = (parseInt(page) - 1) * parseInt(limit);
 
         const [data, total] = await Promise.all([
-            Designation.find(query).select('name priority').skip(skip).limit(parseInt(limit)).lean(),
+            Designation.find(query)
+                .select('name priority')
+                .skip(skip)
+                .limit(parseInt(limit))
+                .lean(),
             Designation.countDocuments(query)
         ]);
 
         res.json({
             success: true,
             data,
-            pagination: {
-                more: skip + data.length < total
-            }
+            pagination: { more: skip + data.length < total }
         });
+
     } catch (err) {
         return errorResponse(res, err);
     }
 };
+
 // Get designation by ID
 export const getDesignationById = async (req, res) => {
     try {
         const { id } = req.params;
-        if (!mongoose.Types.ObjectId.isValid(id)) return failResponse(res, 'Invalid designation ID', 400);
+        if (!mongoose.Types.ObjectId.isValid(id))
+            return failResponse(res, 'Invalid designation ID', 400);
 
         const designation = await Designation.findById(id).lean();
-        if (!designation) return failResponse(res, 'Designation not found', 404);
+        if (!designation)
+            return failResponse(res, 'Designation not found', 404);
+
+        // Restrict donor/vendor for non-superadmin
+        if (!req.user || req.user.profile_type !== "superadmin") {
+            if (designation.isDonorOrVendor) {
+                return failResponse(res, "You are not allowed to view this designation", 403);
+            }
+        }
 
         return successResponse(res, designation, 'Designation fetched successfully');
+
     } catch (err) {
         return errorResponse(res, err);
     }
@@ -160,11 +184,17 @@ export const createDesignation = async (req, res) => {
     try {
         if (!req.user) return failResponse(res, 'Unauthorized', 401);
 
+        // Restrict creation of donor/vendor roles
+        if (req.body.isDonorOrVendor && req.user.profile_type !== "superadmin") {
+            return failResponse(res, "Only superadmin can create donor/vendor designations", 403);
+        }
+
         const designationData = {
             name: req.body.name,
             priority: req.body.priority || 0,
             status: req.body.status || 'Active',
             description: req.body.description || '',
+            isDonorOrVendor: req.body.isDonorOrVendor || false,
             added_by: {
                 user_id: req.user._id,
                 name: req.user.name,
@@ -177,28 +207,23 @@ export const createDesignation = async (req, res) => {
             }
         };
 
-        // Create Designation
         const designation = new Designation(designationData);
         await designation.save();
 
-        // Fetch all menus
-        const allMenus = await Menu.find({}, '_id').lean();
+        //If designation is donor/vendor → DO NOT assign menus  
+        if (!designation.isDonorOrVendor) {
+            const allMenus = await Menu.find({}, '_id').lean();
 
-        // Prepare bulk MenuAssignment documents
-        const assignments = allMenus.map(menu => ({
-            designation_id: designation._id,
-            menu_id: menu._id,
-            permissions: {
-                read: true,
-                write: true,
-                delete: true
-            },
-            assigned_date: new Date()
-        }));
+            const assignments = allMenus.map(menu => ({
+                designation_id: designation._id,
+                menu_id: menu._id,
+                permissions: { read: true, write: true, delete: true },
+                assigned_date: new Date()
+            }));
 
-        // Insert all menu assignments
-        if (assignments.length > 0) {
-            await MenuAssignment.insertMany(assignments);
+            if (assignments.length > 0) {
+                await MenuAssignment.insertMany(assignments);
+            }
         }
 
         // Log activity
@@ -211,31 +236,46 @@ export const createDesignation = async (req, res) => {
             meta: designationData
         });
 
-        return successResponse(res, designation, 'Designation created successfully and menus assigned');
+        return successResponse(
+            res,
+            designation,
+            `Designation created successfully${designation.isDonorOrVendor ? '' : ' and menus assigned'}`
+        );
 
     } catch (err) {
-        // Handle duplicate name error
         if (err.code === 11000 && err.keyValue?.name) {
             return failResponse(res, 'Designation name already exists', 400);
         }
-
         return errorResponse(res, err);
     }
 };
-
-
 // Update designation
 export const updateDesignation = async (req, res) => {
     try {
         const { id } = req.params;
-        if (!mongoose.Types.ObjectId.isValid(id)) return failResponse(res, 'Invalid designation ID', 400);
-        if (!req.user) return failResponse(res, 'Unauthorized', 401);
+        if (!mongoose.Types.ObjectId.isValid(id))
+            return failResponse(res, 'Invalid designation ID', 400);
+
+        const designation = await Designation.findById(id);
+        if (!designation)
+            return failResponse(res, 'Designation not found', 404);
+
+        // Restrict update
+        if (designation.isDonorOrVendor && req.user?.profile_type !== "superadmin") {
+            return failResponse(res, "You are not allowed to update this designation", 403);
+        }
+
+        // Restrict user from changing "isDonorOrVendor"
+        if (req.body.isDonorOrVendor !== undefined && req.user.profile_type !== "superadmin") {
+            return failResponse(res, "Only superadmin can modify donor/vendor flag", 403);
+        }
 
         const updateData = {
             name: req.body.name,
             priority: req.body.priority,
             status: req.body.status,
             description: req.body.description,
+            isDonorOrVendor: req.body.isDonorOrVendor,
             updated_by: {
                 user_id: req.user._id,
                 name: req.user.name,
@@ -243,52 +283,38 @@ export const updateDesignation = async (req, res) => {
             }
         };
 
-        const designation = await Designation.findByIdAndUpdate(id, updateData, {
+        const updated = await Designation.findByIdAndUpdate(id, updateData, {
             new: true,
-            runValidators: true,
-            context: 'query'
+            runValidators: true
         });
 
-        if (!designation) return failResponse(res, 'Designation not found', 404);
-        await activityLogger({
-            actorId: req.user._id,
-            entityId: id,
-            entityType: "Designation",
-            action: "UPDATE",
-            details: `Designation '${designation.name}' updated by ${req.user.name}`,
-            meta: updateData
-        });
+        return successResponse(res, updated, 'Designation updated successfully');
 
-        return successResponse(res, designation, 'Designation updated successfully');
     } catch (err) {
-        // Handle duplicate name error
-        if (err.code === 11000 && err.keyValue?.name) {
-            return failResponse(res, 'Designation name already exists', 400);
-        }
         return errorResponse(res, err);
     }
 };
-
-
-
 // Delete designation
 export const deleteDesignation = async (req, res) => {
     try {
         const { id } = req.params;
-        if (!mongoose.Types.ObjectId.isValid(id)) return failResponse(res, 'Invalid designation ID', 400);
+
+        if (!mongoose.Types.ObjectId.isValid(id))
+            return failResponse(res, 'Invalid designation ID', 400);
+
+        const designation = await Designation.findById(id);
+        if (!designation)
+            return failResponse(res, 'Designation not found', 404);
+
+        // Restriction for delete
+        if (designation.isDonorOrVendor && req.user?.profile_type !== "superadmin") {
+            return failResponse(res, "You are not allowed to delete this designation", 403);
+        }
 
         const deleted = await Designation.findByIdAndDelete(id);
-        if (!deleted) return failResponse(res, 'Designation not found', 404);
-        await activityLogger({
-            actorId: req.user?._id || null,
-            entityId: id,
-            entityType: "Designation",
-            action: "DELETE",
-            details: `Designation '${deleted.name}' deleted`,
-            meta: {}
-        });
 
         return successResponse(res, {}, 'Designation deleted successfully');
+
     } catch (err) {
         return errorResponse(res, err);
     }

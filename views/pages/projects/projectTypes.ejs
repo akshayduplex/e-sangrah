@@ -125,7 +125,7 @@
                     if (result.errors && Array.isArray(result.errors)) {
                         result.errors.forEach(err => showToast(err.message, 'danger'));
                     } else {
-                        showToast(result.error || 'Failed to save department', 'danger');
+                        showToast(result.message || 'Failed to save department', 'danger');
                     }
                     console.error('Backend error:', result);
                 }

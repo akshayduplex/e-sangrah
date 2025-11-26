@@ -487,7 +487,7 @@ export const grantAccess = async (req, res) => {
                 to: userEmail,
                 subject: "Access Granted",
                 html,
-                fromName: "Support Team",
+                fromName: res.locals?.supportTeamName || "DMS Support Team",
             });
         }
         return res.status(200).json({

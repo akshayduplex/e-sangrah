@@ -32,7 +32,7 @@
                                 <span id="fileNameDisplay">-</span>
                                 <span id="currentVersionDisplay" class="text-success fw-semibold ms-2"
                                     style="display:none;">
-                                    v1.2 (Current Version)
+
                                 </span>
                             </h5>
                         </div>
@@ -366,10 +366,10 @@
                     });
 
                     // Version Details
-                    document.getElementById('versionNum').value = version;
+                    document.getElementById('versionNum').value = data?.versionLabel || '-';
                     document.getElementById('versionDate').value = formatDate(data.timestamp);
                     document.getElementById('changedBy').value = data.changedBy?.name || '-';
-                    document.getElementById('changeComment').value = data.changes || '-';
+                    document.getElementById('changeComment').value = data?.changeReason || '-';
 
                     // Project & Dept
                     document.getElementById('projectName').value = doc.project?.projectName || '-';

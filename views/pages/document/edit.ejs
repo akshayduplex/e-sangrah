@@ -300,40 +300,40 @@
         </div>
     </div>
     <!-- /Page Wrapper -->
-
-    <script>
-        // Initialize data for JavaScript
-        try {
-            window.isEdit = true;
-            window.documentId = "<%= document._id %>";
-            window.documentData = <% - JSON.stringify(document) %>;
-        } catch (e) {
-            console.error('❌ EJS Variables Failed:', e);
-            // Fallback to DOM elements
-            window.documentId = document.getElementById('hiddenDocumentId')?.value;
-            const hiddenData = document.getElementById('hiddenDocumentData')?.getAttribute('data-document');
-            if (hiddenData) {
-                window.documentData = JSON.parse(decodeURIComponent(hiddenData));
+    <%- include('../../modals/document-modals') %>
+        <script>
+            // Initialize data for JavaScript
+            try {
+                window.isEdit = true;
+                window.documentId = "<%= document._id %>";
+                window.documentData = <% - JSON.stringify(document) %>;
+            } catch (e) {
+                console.error('EJS Variables Failed:', e);
+                // Fallback to DOM elements
+                window.documentId = document.getElementById('hiddenDocumentId')?.value;
+                const hiddenData = document.getElementById('hiddenDocumentData')?.getAttribute('data-document');
+                if (hiddenData) {
+                    window.documentData = JSON.parse(decodeURIComponent(hiddenData));
+                }
+                window.isEdit = true;
             }
-            window.isEdit = true;
-        }
 
-        // Final verification
-        if (!window.documentId || window.documentId === 'undefined' || !window.documentData) {
-            console.error('❌ ALL METHODS FAILED - Document Data:', {
-                documentId: window.documentId,
-                documentData: window.documentData
-            });
-            document.getElementById('debugInfo').className = 'alert alert-danger';
-            document.getElementById('debugInfo').innerHTML = `
+            // Final verification
+            if (!window.documentId || window.documentId === 'undefined' || !window.documentData) {
+                console.error(' ALL METHODS FAILED - Document Data:', {
+                    documentId: window.documentId,
+                    documentData: window.documentData
+                });
+                document.getElementById('debugInfo').className = 'alert alert-danger';
+                document.getElementById('debugInfo').innerHTML = `
             <h6>Configuration Error</h6>
             <p>Failed to load document data. Please refresh the page.</p>
             <button onclick="window.location.reload()" class="btn btn-sm btn-warning">Refresh Page</button>
         `;
-        }
-    </script>
+            }
+        </script>
 
-    <!-- Include modals and scripts -->
-    <%- include('../../partials/footer') %>
-        <script src="/js/pages/documents/document-utils.js"></script>
-        <script src="/js/pages/documents/edit-document.js"></script>
+        <!-- Include modals and scripts -->
+        <%- include('../../partials/footer') %>
+            <script src="/js/pages/documents/document-utils.js"></script>
+            <script src="/js/pages/documents/edit-document.js"></script>

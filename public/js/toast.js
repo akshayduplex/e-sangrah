@@ -1,23 +1,36 @@
-document.addEventListener("DOMContentLoaded", () => {
-    function showToast(message, type = "info", duration = 4000) {
-        const colors = {
-            success: "#2B1871",
-            error: "#e74c3c",
-            info: "#3498db",
-            warning: "#f39c12"
-        };
 
+(function () {
+    'use strict';
+    const TOAST_COLORS = {
+        success: "#28a745",
+        error: "#dc3545",
+        warning: "#ffc107",
+        info: "#007bff"
+    };
+
+    function showToast(message, type = "info", duration = 4000) {
+        if (typeof Toastify === 'undefined') {
+            console.error("Toastify is not loaded. Please include the Toastify.js library.");
+            alert(message);
+            return;
+        }
+
+        const toastMessage = message ? String(message) : "No message provided";
+
+        const toastType = TOAST_COLORS.hasOwnProperty(type) ? type : 'info';
+        const backgroundColor = TOAST_COLORS[toastType];
         Toastify({
-            text: message || "No message provided",
-            duration,
+            text: toastMessage,
+            duration: duration,
             gravity: "bottom",
             position: "right",
-            backgroundColor: colors[type] || colors.info,
+            backgroundColor: backgroundColor,
             stopOnFocus: true,
             close: true
-        }).showToast(); // make sure this line stays
+        }).showToast();
     }
 
-    // Expose globally so you can call it anywhere
-    window.showToast = showToast;
-});
+    document.addEventListener("DOMContentLoaded", () => {
+        window.showToast = showToast;
+    });
+})();

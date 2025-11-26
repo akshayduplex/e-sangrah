@@ -557,7 +557,6 @@ router.post("/menu", authenticate, async (req, res) => {
     try {
         const user = req.user;
         const { type, master_id, name, icon_code, url, priority, is_show, isActive } = req.body;
-        console.log("All Values", req.body)
         // Pre-validation
         if (type === "SubMenu" && !master_id) {
             return res.status(400).json({ success: false, message: "SubMenu requires a master_id" });
@@ -1206,13 +1205,13 @@ router.get('/folders/:folderId/access/:token', FolderController.accessViaToken);
 // CRUD endpoints
 router.post("/add-vendor-donor",
     upload.single('profile_image'),
-    registerVendorOrDonor,
+    VenderDonorValidation.registerVendorOrDonor,
     DonerVenderController.registerDonorVendor
 );
 
 router.post("/add-vendor",
     upload.single('profile_image'),
-    registerVendor,
+    VenderDonorValidation.registerVendor,
     DonerVenderController.registerVendor
 );
 

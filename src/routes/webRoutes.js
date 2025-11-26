@@ -164,7 +164,7 @@ router.get("/documents/list", authenticate, checkPermissions, DocumentController
 
 // View Document page
 
-router.get("/documents/:id/versions/view", authenticate, authorize('admin', 'superadmin', 'user'), DocumentController.showViewDocumentPage);
+router.get("/documents/:id/versions/view", authenticate, authorize('admin', 'superadmin', 'user', 'vendor', 'donor'), DocumentController.showViewDocumentPage);
 router.get("/documents/archived", authenticate, DocumentController.showArchivedDocumentPage);
 
 

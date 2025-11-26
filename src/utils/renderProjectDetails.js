@@ -43,7 +43,7 @@ export async function renderProjectDetails(req, res, projectId = null, meta = {}
             User.find({ profile_type: "donor" }, "name").lean(),
             User.find({ profile_type: "vendor" }, "name").lean(),
             ProjectType.find({ status: "Active", isActive: true }, "name").lean(),
-            Designation.find({ status: "Active" }, "name").lean(),
+            Designation.find({ status: "Active", isDonorOrVendor: false }, "name").lean(),
         ]);
 
         // Set SEO metadata

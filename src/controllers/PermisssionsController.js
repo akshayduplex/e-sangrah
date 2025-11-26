@@ -343,23 +343,40 @@ export const unAssignMenu = async (req, res) => {
 export const getSidebarForUser = async (req, res) => {
     try {
         const profileType = req.user?.profile_type;
-        const designationId = req.user?.userDetails?.designation;
+        let designationId = null;
+
+        // ================================
+        // FIX: GET DESIGNATION FOR ALL USER TYPES
+        // ================================
+        if (!["superadmin", "admin"].includes(profileType)) {
+            switch (profileType) {
+                case "user":
+                    designationId = req.user?.userDetails?.designation;
+                    break;
+
+                case "vendor":
+                    designationId = req.user?.vendorDetails?.designation;
+                    break;
+
+                case "donor":
+                    designationId = req.user?.donorDetails?.designation;
+                    break;
+            }
+        }
+        // ================================
+
         let assignedMenus = [];
 
-        // 1. Superadmin: no filtering — full access
+        // 1. Superadmin: all menus, no filter
         if (profileType === "superadmin") {
-            assignedMenus = await Menu.find({}, {
-                name: 1,
-                url: 1,
-                icon_code: 1,
-                type: 1,
-                master_id: 1,
-                priority: 1,
-            })
+            assignedMenus = await Menu.find(
+                {},
+                { name: 1, url: 1, icon_code: 1, type: 1, master_id: 1, priority: 1 }
+            )
                 .sort({ priority: 1 })
                 .lean();
 
-            // 2. Admin: apply is_show + isActive filters
+            // 2. Admin: only active + is_show
         } else if (profileType === "admin") {
             assignedMenus = await Menu.find(
                 { is_show: true, isActive: true },
@@ -368,8 +385,9 @@ export const getSidebarForUser = async (req, res) => {
                 .sort({ priority: 1 })
                 .lean();
 
-            // 3. Normal users: by assignment + isActive + is_show, plus parent chain
+            // 3. Normal users (including donors/vendors)
         } else {
+
             if (!designationId) {
                 return res.status(400).json({
                     success: false,
@@ -378,7 +396,11 @@ export const getSidebarForUser = async (req, res) => {
             }
 
             const assignments = await MenuAssignment.aggregate([
-                { $match: { designation_id: new mongoose.Types.ObjectId(designationId) } },
+                {
+                    $match: {
+                        designation_id: new mongoose.Types.ObjectId(designationId)
+                    }
+                },
                 {
                     $lookup: {
                         from: "menus",
@@ -389,7 +411,7 @@ export const getSidebarForUser = async (req, res) => {
                 },
                 { $unwind: "$menu" },
 
-                // Only pick assigned menus that are active and should be shown
+                // filter menus
                 { $match: { "menu.isActive": true, "menu.is_show": true } },
 
                 {
@@ -405,6 +427,7 @@ export const getSidebarForUser = async (req, res) => {
                     },
                 },
 
+                // Fetch parents for full chain
                 {
                     $graphLookup: {
                         from: "menus",
@@ -420,7 +443,7 @@ export const getSidebarForUser = async (req, res) => {
                 },
             ]);
 
-            // Build a flat list: assigned + parents
+            // Merge assigned + parents
             const allMenus = [];
             for (const a of assignments) {
                 allMenus.push({
@@ -433,7 +456,8 @@ export const getSidebarForUser = async (req, res) => {
                     priority: a.priority,
                     permissions: a.permissions || {},
                 });
-                if (Array.isArray(a.parents) && a.parents.length) {
+
+                if (Array.isArray(a.parents)) {
                     for (const p of a.parents) {
                         allMenus.push({
                             _id: p._id,
@@ -443,14 +467,13 @@ export const getSidebarForUser = async (req, res) => {
                             type: p.type,
                             master_id: p.master_id,
                             priority: p.priority,
-                            // parent menus don't need `permissions` here
                             permissions: {},
                         });
                     }
                 }
             }
 
-            // Deduplicate by menu _id
+            // Deduplicate menus
             const menuMap = new Map();
             for (const m of allMenus) {
                 menuMap.set(m._id.toString(), m);
@@ -458,12 +481,12 @@ export const getSidebarForUser = async (req, res) => {
             assignedMenus = Array.from(menuMap.values());
         }
 
-        // Build hierarchical structure
+        // Build hierarchy
         const buildHierarchy = (menus, parentId = null) => {
             return menus
                 .filter(m => {
                     const mid = m.master_id ? m.master_id.toString() : null;
-                    return (mid === (parentId ? parentId.toString() : null));
+                    return mid === (parentId ? parentId.toString() : null);
                 })
                 .sort((a, b) => (a.priority || 0) - (b.priority || 0))
                 .map(m => ({
@@ -490,7 +513,6 @@ export const getSidebarForUser = async (req, res) => {
         });
     }
 };
-
 
 // Render menu list with pagination
 export const getMenuList = async (req, res) => {

@@ -53,9 +53,12 @@ export const docTypes = [
 
 
 export const FILE_TYPE_CATEGORIES = {
-    word: ["doc", "docx"],
-    excel: ["xls", "xlsx"],
-    ppt: ["ppt", "pptx"],
+    word: ["doc", "docx", "odt"],
+    excel: ["xls", "xlsx", "csv", "ods"],
+    ppt: ["ppt", "pptx", "odp"],
     pdf: ["pdf"],
-    media: ["mp3", "mp4", "mov", "avi", "wav"]
+    media: [
+        "jpg", "jpeg", "png", "gif", "mp3", "mp4", "mov", "avi",
+        "mkv", "webm", "wav", "svg", "heic", "jfif"
+    ]
 };

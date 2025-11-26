@@ -3,7 +3,7 @@ import Document from "../models/Document.js";
 import File from "../models/File.js";
 import { successResponse, failResponse, errorResponse } from "../utils/responseHandler.js";
 import { calculateStartDate } from "../utils/calculateStartDate.js";
-import { formatFileSize, getFileIcon } from "../helper/CommonHelper.js";
+import { formatFileSize, getFileIcon, getGrowth } from "../helper/CommonHelper.js";
 import { FILE_TYPE_CATEGORIES, FILTER_PERIODS } from "../constant/Constant.js";
 import Project, { ProjectType } from "../models/Project.js";
 import { applyFilters, getSessionFilters } from "../helper/sessionHelpers.js";
@@ -99,17 +99,6 @@ export const getDashboardStats = async (req, res) => {
 
         const current = formatStats(currentStats);
         const previous = formatStats(previousStats);
-
-        const getGrowth = (cur, prev) => {
-            if (prev === 0) return cur > 0 ? 100 : 0;
-
-            let growth = Math.round(((cur - prev) / prev) * 100);
-
-            if (growth > 300) growth = 300;
-            if (growth < -100) growth = -100;
-
-            return growth;
-        };
 
         const response = {
             selectedYear: year,
@@ -753,79 +742,112 @@ export const getDocumentsStatusSummary = async (req, res) => {
         return errorResponse(res, err);
     }
 };
-
-
 //Analytics page
-
 export const getAnalyticsStats = async (req, res) => {
     try {
         const { selectedYear, selectedProjectId } = getSessionFilters(req);
         const user = req.user;
         const isSuperAdmin = req.session?.user?.profile_type === "superadmin";
+
+        const year = selectedYear ? Number(selectedYear) : new Date().getFullYear();
+
+        const currentStart = new Date(year, 0, 1);
+        const currentEnd = new Date(year, 11, 31, 23, 59, 59);
+        const prevStart = new Date(year - 1, 0, 1);
+        const prevEnd = new Date(year - 1, 11, 31, 23, 59, 59);
+
+        const baseFilter = {
+            isDeleted: false,
+            isArchived: false
+        };
+
+        if (!isSuperAdmin) baseFilter.owner = user._id;
+        if (selectedProjectId) baseFilter.project = selectedProjectId;
+
+        const currentFilter = {
+            ...baseFilter,
+            createdAt: { $gte: currentStart, $lte: currentEnd }
+        };
+
+        const previousFilter = {
+            ...baseFilter,
+            createdAt: { $gte: prevStart, $lte: prevEnd }
+        };
+
+        // Yearly totals
+        const totalCurrent = await Document.countDocuments(currentFilter);
+        const totalPrevious = await Document.countDocuments(previousFilter);
+
+        // ---------- MONTHLY COMPARISON ----------
         const now = new Date();
+
+        // Current month
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
         const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
 
-        // === BASE FILTER ===
-        const baseFilter = { isDeleted: false };
-
-        // Restrict if not super admin
-        if (!isSuperAdmin) {
-            baseFilter.owner = user._id;
-        }
-
-        // Filter by project
-        if (selectedProjectId) {
-            baseFilter.project = selectedProjectId;
-        }
-
-        // Filter by selected year
-        if (selectedYear) {
-            baseFilter.createdAt = {
-                $gte: new Date(selectedYear, 0, 1),
-                $lte: new Date(selectedYear, 11, 31, 23, 59, 59),
-            };
-        }
-
-        // === TOTAL DOCUMENTS ===
-        const totalDocuments = await Document.countDocuments(baseFilter);
-
-        // === UPLOADED THIS MONTH ===
         const uploadedThisMonth = await Document.countDocuments({
             ...baseFilter,
-            createdAt: { $gte: startOfMonth, $lte: endOfMonth },
+            createdAt: { $gte: startOfMonth, $lte: endOfMonth }
         });
 
-        // === MODIFIED DOCUMENTS ===
-        // modified = currentVersion > 1.0
-        const modifiedDocuments = await Document.countDocuments({
+        // Previous month
+        const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const prevMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+
+        const uploadedLastMonth = await Document.countDocuments({
             ...baseFilter,
-            "versioning.currentVersion": { $gt: mongoose.Types.Decimal128.fromString("1.0") },
+            createdAt: { $gte: prevMonthStart, $lte: prevMonthEnd }
         });
 
-        // === DELETED OR ARCHIVED ===
-        const deletedOrArchived = await Document.countDocuments({
+        const uploadedThisMonthGrowth = getGrowth(uploadedThisMonth, uploadedLastMonth);
+
+        // Modified documents (year)
+        const modifiedCurrent = await Document.countDocuments({
+            ...currentFilter,
+            currentVersionNumber: { $gt: mongoose.Types.Decimal128.fromString("1.0") }
+        });
+
+        const modifiedPrevious = await Document.countDocuments({
+            ...previousFilter,
+            currentVersionNumber: { $gt: mongoose.Types.Decimal128.fromString("1.0") }
+        });
+
+        // Deleted or archived (year)
+        const deletedOrArchivedCurrent = await Document.countDocuments({
             ...(isSuperAdmin ? {} : { owner: user._id }),
             ...(selectedProjectId && { project: selectedProjectId }),
-            ...(selectedYear && {
-                createdAt: {
-                    $gte: new Date(selectedYear, 0, 1),
-                    $lte: new Date(selectedYear, 11, 31, 23, 59, 59),
-                },
-            }),
+            createdAt: { $gte: currentStart, $lte: currentEnd },
+            $or: [{ isDeleted: true }, { isArchived: true }],
+        });
+
+        const deletedOrArchivedPrevious = await Document.countDocuments({
+            ...(isSuperAdmin ? {} : { owner: user._id }),
+            ...(selectedProjectId && { project: selectedProjectId }),
+            createdAt: { $gte: prevStart, $lte: prevEnd },
             $or: [{ isDeleted: true }, { isArchived: true }],
         });
 
         return res.status(200).json({
             success: true,
             data: {
-                totalDocuments,
+                selectedYear: year,
+
+                totalDocuments: totalCurrent,
+                totalDocumentsGrowth: getGrowth(totalCurrent, totalPrevious),
+
                 uploadedThisMonth,
-                modifiedDocuments,
-                deletedOrArchived,
+                uploadedThisMonthGrowth,     // <-- NEW
+
+                modifiedDocuments: modifiedCurrent,
+                modifiedDocumentsGrowth: getGrowth(modifiedCurrent, modifiedPrevious),
+
+                deletedOrArchived: deletedOrArchivedCurrent,
+                deletedOrArchivedGrowth: getGrowth(deletedOrArchivedCurrent, deletedOrArchivedPrevious),
+
                 filters: { selectedYear, selectedProjectId },
             },
         });
+
     } catch (err) {
         console.error("Error fetching document stats:", err);
         return res.status(500).json({
@@ -836,16 +858,14 @@ export const getAnalyticsStats = async (req, res) => {
     }
 };
 
-
+const DEFAULT_MEDIA_CATEGORY = "Media";
 export const getDepartmentFileUsage = async (req, res) => {
     try {
-        const user = req.user; // Assuming you have user info from auth middleware
-
-        // Get all active departments
+        const user = req.user;
         const departments = await Department.find({ status: "Active" }).sort({ priority: 1 });
-
         const departmentNames = departments.map(dep => dep.name);
-
+        const deptIndexMap = {};
+        departmentNames.forEach((name, i) => { deptIndexMap[name] = i; });
         const fileTypeCounts = {
             Word: Array(departmentNames.length).fill(0),
             Excel: Array(departmentNames.length).fill(0),
@@ -854,33 +874,41 @@ export const getDepartmentFileUsage = async (req, res) => {
             Media: Array(departmentNames.length).fill(0)
         };
 
-        // Build file query based on user type
-        let fileQuery = { status: "active" };
-
+        const fileQuery = { status: "active" };
         if (user.profile_type !== "superadmin") {
-            // Restrict to files uploaded by the logged-in user
             fileQuery.uploadedBy = user._id;
         }
 
-        // Fetch files with department references
         const files = await File.find(fileQuery).populate("departmentId", "name");
+        const getCategory = (ext) => {
+            if (!ext) return DEFAULT_MEDIA_CATEGORY;
+            ext = ext.toLowerCase();
 
-        // Count by department and file type
-        files.forEach(file => {
-            if (!file.departmentId) return;
-            const deptIndex = departmentNames.indexOf(file.departmentId.name);
-            if (deptIndex === -1) return;
+            if (FILE_TYPE_CATEGORIES.word.includes(ext)) return "Word";
+            if (FILE_TYPE_CATEGORIES.excel.includes(ext)) return "Excel";
+            if (FILE_TYPE_CATEGORIES.ppt.includes(ext)) return "PPT";
+            if (FILE_TYPE_CATEGORIES.pdf.includes(ext)) return "PDF";
+            if (FILE_TYPE_CATEGORIES.media.includes(ext)) return "Media";
+            return DEFAULT_MEDIA_CATEGORY;
+        };
 
-            const ext = (file.originalName.split(".").pop() || "").toLowerCase();
+        for (const file of files) {
+            if (!file.departmentId || !file.departmentId.name) continue;
 
-            if (FILE_TYPE_CATEGORIES.word.includes(ext)) fileTypeCounts.Word[deptIndex]++;
-            else if (FILE_TYPE_CATEGORIES.excel.includes(ext)) fileTypeCounts.Excel[deptIndex]++;
-            else if (FILE_TYPE_CATEGORIES.ppt.includes(ext)) fileTypeCounts.PPT[deptIndex]++;
-            else if (FILE_TYPE_CATEGORIES.pdf.includes(ext)) fileTypeCounts.PDF[deptIndex]++;
-            else if (FILE_TYPE_CATEGORIES.media.includes(ext)) fileTypeCounts.Media[deptIndex]++;
-        });
+            const deptIndex = deptIndexMap[file.departmentId.name];
+            if (deptIndex === undefined) continue;
 
-        // Response formatted for Highcharts
+            const ext = (file.originalName?.split(".").pop() || "").toLowerCase();
+            const category = getCategory(ext);
+
+            if (fileTypeCounts[category]) {
+                fileTypeCounts[category][deptIndex]++;
+            } else {
+                fileTypeCounts[category] = Array(departmentNames.length).fill(0);
+                fileTypeCounts[category][deptIndex]++;
+            }
+        }
+
         res.status(200).json({
             categories: departmentNames,
             series: [

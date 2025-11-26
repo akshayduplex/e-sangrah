@@ -98,6 +98,7 @@ const app = express();
         res.locals.companyName = settings?.companyName || "E-sangrah";
         res.locals.metaTitle = settings?.metaTitle || "e-Sangrah – Smart File Management";
         res.locals.companyEmail = settings?.companyEmail || "";
+        res.locals.supportTeamName = settings?.supportTeamName || "DMS Support Team";
         res.locals.supportEmail = settings?.supportEmail || "";
         res.locals.logo = settings?.logo || "";
         res.locals.favicon = settings?.favicon || "";
@@ -126,7 +127,9 @@ const app = express();
     app.get('/', async (req, res) => {
         res.redirect('/login');
     });
-
+    app.get('/ping', (req, res) => {
+        res.status(204).end();
+    });
     // ------------------- Background Tasks -------------------
     startCleanupJob();
 

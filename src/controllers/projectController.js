@@ -255,12 +255,24 @@ export const createProjectType = async (req, res) => {
         });
 
     } catch (error) {
+
+        // DUPLICATE KEY ERROR (MongoDB 11000)
+        if (error.code === 11000) {
+            const duplicateField = Object.keys(error.keyValue)[0];
+
+            return res.status(400).json({
+                success: false,
+                message: `A project type with this ${duplicateField} already exists.`,
+            });
+        }
+
         return res.status(400).json({
             success: false,
             message: error.message || "Failed to create project type"
         });
     }
 };
+
 
 /**
  * UPDATE Project Type
@@ -289,6 +301,17 @@ export const updateProjectType = async (req, res) => {
         });
 
     } catch (error) {
+
+        // DUPLICATE KEY ERROR (MongoDB 11000)
+        if (error.code === 11000) {
+            const duplicateField = Object.keys(error.keyValue)[0];
+
+            return res.status(400).json({
+                success: false,
+                message: `A project type with this ${duplicateField} already exists.`,
+            });
+        }
+
         return res.status(400).json({
             success: false,
             message: error.message || "Failed to update"

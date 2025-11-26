@@ -5,10 +5,10 @@ export const updateWebSettings = async (req, res) => {
         let settings = await WebSetting.findOne();
         if (!settings) settings = new WebSetting();
 
-        const { companyName, metaTitle, metaDescription, metaKeywords, companyEmail, supportEmail } = req.body;
-
+        const { companyName, metaTitle, metaDescription, supportTeamName, metaKeywords, companyEmail, supportEmail } = req.body;
+        console.log("Received Body:", req.body);
         // Validate required
-        if (!companyEmail || !supportEmail) {
+        if (!companyEmail || !supportEmail || !supportTeamName) {
             return res.status(400).json({
                 success: false,
                 message: "Company Email and Support Email are required."
@@ -20,7 +20,7 @@ export const updateWebSettings = async (req, res) => {
         settings.metaTitle = metaTitle ?? settings.metaTitle;
         settings.metaDescription = metaDescription ?? settings.metaDescription;
         settings.metaKeywords = metaKeywords ?? settings.metaKeywords;
-
+        settings.supportTeamName = supportTeamName ?? settings.supportTeamName;
         settings.companyEmail = companyEmail;
         settings.supportEmail = supportEmail;
 

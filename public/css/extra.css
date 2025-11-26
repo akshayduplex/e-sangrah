@@ -117,3 +117,8 @@ table.datatable {
     min-width: 600px;
     /* or whatever width makes sense */
 }
+
+.no-interaction {
+    pointer-events: none !important;
+    overflow: hidden !important;
+}

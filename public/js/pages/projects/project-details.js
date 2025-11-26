@@ -141,7 +141,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     successModal.show();
 
                     addForm.reset();
-                    successModalEl.querySelector("button[data-bs-dismiss='modal']").addEventListener("click", () => {
+                    successModalEl.addEventListener("hidden.bs.modal", () => {
                         window.location.href = "/projects";
                     });
                 } else {

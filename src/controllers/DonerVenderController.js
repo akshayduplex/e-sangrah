@@ -3,6 +3,8 @@ import { generateRandomPassword } from "../helper/GenerateRandomPassword.js";
 import User from "../models/User.js";
 import { sendEmail } from "../services/emailService.js";
 import { activityLogger } from "../helper/activityLogger.js";
+import { getDesignationId } from "../helper/CommonHelper.js";
+import { generateEmailTemplate } from "../helper/emailTemplate.js";
 //Page controller for Donor and Vendor Registration
 
 // GET /donors/register
@@ -141,6 +143,7 @@ export const listVendors = async (req, res) => {
 export const registerDonorVendor = async (req, res, next) => {
     try {
         const profile_image = req.file ? req.file.location : undefined;
+        const designationId = await getDesignationId("donor");
         const {
             id,
             user_name,
@@ -219,6 +222,7 @@ export const registerDonorVendor = async (req, res, next) => {
                 donor_type,
                 organization_name: user_organization,
                 id_proof: pan_tax_id,
+                designation: designationId
             } : undefined,
             vendorDetails: role === "vendor" ? { /* add vendor fields if needed */ } : undefined
         });
@@ -240,7 +244,7 @@ export const registerDonorVendor = async (req, res, next) => {
         await sendEmail({
             to: email_id,
             subject: "Welcome to E-Sangrah",
-            html: htmlContent,
+            html,
             fromName: "E-Sangrah Team",
         });
         await activityLogger({
@@ -261,7 +265,7 @@ export const registerVendor = async (req, res, next) => {
     try {
         // Multer file (optional)
         const uploadedProfileImage = req.file ? req.file.location : undefined;
-
+        const designationId = await getDesignationId("vendor");
         // Extract vendor-specific fields from multipart/form-data
         const {
             id, // if present -> update existing vendor
@@ -376,6 +380,7 @@ export const registerVendor = async (req, res, next) => {
                 gst_number: gst,
                 contact_person,
                 services_offered: servicesArrayCreate,
+                designation: designationId
             }
         });
         const data = {

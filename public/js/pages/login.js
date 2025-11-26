@@ -119,6 +119,8 @@ async function verifyOtp(email, otp) {
                 const profileType = data?.data?.user?.profile_type;
                 if (profileType === "admin" || profileType === "superadmin") {
                     window.location.href = "/admin/dashboard";
+                } else if (profileType === "vendor" || profileType === "donor") {
+                    window.location.href = "/documents/list";
                 } else {
                     window.location.href = "/employee/dashboard";
                 }
@@ -191,9 +193,12 @@ async function handleLogin({ emailInput, passwordInput, loginBtn }) {
                     const profileType = data?.data?.user?.profile_type;
                     if (profileType === "admin" || profileType === "superadmin") {
                         window.location.href = "/admin/dashboard";
+                    } else if (profileType === "vendor" || profileType === "donor") {
+                        window.location.href = "/documents/list";
                     } else {
                         window.location.href = "/employee/dashboard";
                     }
+
                 }, 1000);
             }
         } else {

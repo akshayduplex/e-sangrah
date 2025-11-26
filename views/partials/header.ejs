@@ -189,7 +189,6 @@
                                                 New Folder
                                             </a>
                                             <a href="/documents/add" class="d-block py-2">Upload Document</a>
-                                            <a href="/links/add" class="d-block py-2">Link</a>
                                         </div>
                                     </div>
                                 </div>
@@ -231,7 +230,7 @@
                                             <%= name || "User" %>
                                         </h5>
                                         <p class="subtxt">
-                                            <%= designation?.name || "" %>
+                                            <%= designation?.name || user.profile_type || "" %>
                                         </p>
                                     </span>
                                 </a>
@@ -240,7 +239,7 @@
                                         <div class="card-header">
                                             <div class="d-flex align-items-center">
                                                 <span class="avatar avatar-lg me-2 avatar-rounded">
-                                                    <img src="<%= user.profile_image || ''%>"
+                                                    <img src="<%= user?.profile_image || ''%>"
                                                         alt="<%= name || 'User' %>" width="50" height="50"
                                                         style="object-fit: cover; border-radius: 50%;">
 
@@ -250,7 +249,7 @@
                                                         <%= name || "User" %>
                                                     </h5>
                                                     <p class="subtxt">
-                                                        <%= designation?.name || "" %>
+                                                        <%= designation?.name || user?.profile_type|| "Guest" %>
                                                     </p>
                                                 </span>
                                             </div>
@@ -297,7 +296,16 @@
                     </div>
                 </div>
                 <!-- /Mobile Menu -->
+                <div id="network-status-banner" style="display:none; background:#ff3b3b; color:white; 
+            padding:8px; text-align:center; position:fixed; top:0; width:100%; z-index:10000;">
+                    You are offline, or the connection is too slow…
+                </div>
 
+                <div id="network-overlay"
+                    style="display:none; position:fixed; top:0; left:0; width:100%; height:100%;
+            background:rgba(0,0,0,0.6); z-index:9999; align-items:center; justify-content:center; font-size:22px; color:white;">
+                    Reconnecting… Please wait
+                </div>
             </div>
         </div>
         <!-- /Header -->

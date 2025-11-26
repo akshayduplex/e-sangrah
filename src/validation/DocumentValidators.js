@@ -302,7 +302,7 @@ export const createApprovalRequestValidator = [
 
     body("priority")
         .notEmpty()
-        .isInt({ min: 1 })
+        .isInt({ min: 0 })
         .withMessage("level must be a positive integer"),
 
     body("addDate")

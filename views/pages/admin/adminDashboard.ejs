@@ -381,7 +381,8 @@
     <%- include('../../partials/footer') %>
         <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
         <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
-        <script>// Dashboard card click handlers
+        <script>
+            // Dashboard card click handlers
             document.addEventListener('DOMContentLoaded', function () {
                 const dashboardCards = document.querySelectorAll('.dashboard-card');
 
@@ -392,21 +393,26 @@
                         redirectToDocumentsWithStatus(status);
                     });
                 });
+                const pendingCount = document.getElementById('pendingCount');
+                if (pendingCount) {
+                    pendingCount.style.cursor = "pointer";
+                    pendingCount.addEventListener('click', function () {
+                        redirectToDocumentsWithStatus("Pending");
+                    });
+                }
             });
 
             function redirectToDocumentsWithStatus(status) {
-                // Construct the URL with status parameter
                 const baseUrl = window.location.origin;
                 let url = `${baseUrl}/documents/list`;
 
-                // Add status parameter if not "all"
                 if (status && status !== 'all') {
                     url += `?status=${encodeURIComponent(status)}`;
                 }
 
-                // Redirect to documents list page
                 window.location.href = url;
             }
         </script>
+
         <script src="/js/components/shareDocument.js"></script>
         <script src="/js/pages/dashboard/adminDashboard.js"></script>

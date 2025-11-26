@@ -259,13 +259,48 @@ async function loadAnalyticsStats() {
         const res = await fetch("/api/analytics/stats");
         const { data } = await res.json();
 
+        // Update numbers
         document.querySelector("#total-documents").textContent = data.totalDocuments;
         document.querySelector("#uploaded-this-month").textContent = data.uploadedThisMonth;
         document.querySelector("#modified-documents").textContent = data.modifiedDocuments;
         document.querySelector("#deleted-archive").textContent = data.deletedOrArchived;
+
+        // Update badges using correct API fields
+        updateGrowthBadge('#total-documents', data.totalDocumentsGrowth);
+        updateGrowthBadge('#uploaded-this-month', data.uploadedThisMonthGrowth ?? 0);
+        updateGrowthBadge('#modified-documents', data.modifiedDocumentsGrowth);
+        updateGrowthBadge('#deleted-archive', data.deletedOrArchivedGrowth);
+
     } catch (err) {
         console.error("Failed to load document stats:", err);
     }
+}
+
+
+function updateGrowthBadge(cardSelector, growthPercent) {
+    const $card = $(cardSelector).closest('.card');
+    const $badge = $card.find('.fs-12.fw-medium').first(); // finds growth section
+
+    if (growthPercent === undefined || growthPercent === null) {
+        $badge.html(`
+            <span class="sm-avatar avatar rounded bg-soft-secondary">
+                <i class="ti ti-minus"></i>
+            </span> 
+            0%
+        `);
+        return;
+    }
+
+    const isPositive = growthPercent >= 0;
+    const icon = isPositive ? 'ti ti-trending-up' : 'ti ti-trending-down';
+    const colorClass = isPositive ? 'bg-soft-success text-success' : 'bg-soft-danger text-danger';
+
+    $badge.html(`
+        <span class="sm-avatar avatar rounded ${colorClass.split(' ')[0]}">
+            <i class="${icon}"></i>
+        </span>
+        ${isPositive ? '+' : ''}${growthPercent}%
+    `);
 }
 
 // =================== Event Listeners ===================

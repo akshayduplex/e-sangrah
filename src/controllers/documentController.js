@@ -12,7 +12,6 @@ import SharedWith from "../models/SharedWith.js";
 import File from "../models/File.js";
 import { bumpVersion } from "../utils/bumpVersion.js";
 import _ from "lodash";
-import Approval from "../models/Approval.js";
 import { getObjectUrl } from "../utils/s3Helpers.js";
 import { decrypt, encrypt } from "../helper/SymmetricEncryption.js";
 import { generateShareLink } from "../helper/GenerateUniquename.js";
@@ -44,7 +43,6 @@ export const showDocumentListPage = async (req, res) => {
             pageDescription: "Browse, filter, and manage all documents in your workspace.",
             metaKeywords: "documents list, document management, search documents, filter documents",
             canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
-
             designations,
             user: req.user,
             searchQuery: q || "",
@@ -527,11 +525,26 @@ export const getDocuments = async (req, res) => {
         }
 
         // --- If not superadmin, restrict documents ---
+        // --- If not superadmin, restrict documents ---
         if (profile_type !== "superadmin") {
-            filter.$or = [
+
+            // Base condition for normal users
+            const baseAccess = [
                 { owner: userId },
-                // { sharedWithUsers: userId }
+                // { sharedWithUsers: userId }  // enable if needed
             ];
+
+            // Vendor → only documents where vendor is assigned
+            if (profile_type === "vendor") {
+                baseAccess.push({ documentVendor: userId });
+            }
+
+            // Donor → only documents where donor is assigned
+            if (profile_type === "donor") {
+                baseAccess.push({ documentDonor: userId });
+            }
+
+            filter.$or = baseAccess;
         }
 
         const toArray = val => {
@@ -1536,13 +1549,21 @@ const createVersionSnapshot = async (document, changesMade, userId, reason) => {
         });
         return versionDoc;
     } catch (error) {
-        console.error('❌ Error creating version snapshot:', error);
+        console.error(' Error creating version snapshot:', error);
         throw error;
     }
 };
 
 /**
  * Update document with proper version handling
+ */
+/**
+ * Update document with proper version handling
+ */
+
+/**
+ * Update document with proper version handling, fixing double-save and 
+ * ensuring version consistency on restore.
  */
 export const updateDocument = async (req, res) => {
     const session = await mongoose.startSession();
@@ -1556,6 +1577,7 @@ export const updateDocument = async (req, res) => {
             return res.status(400).json({ success: false, message: "Invalid document ID" });
         }
 
+        // NOTE: Document model must be available in scope
         const document = await Document.findById(id).session(session);
         if (!document) {
             await session.abortTransaction();
@@ -1567,6 +1589,8 @@ export const updateDocument = async (req, res) => {
             await session.abortTransaction();
             return res.status(403).json({ success: false, message: "Unauthorized" });
         }
+
+        // Store original for comparison BEFORE any changes are applied to the object
         const originalDoc = document.toObject();
         const updateData = { ...req.body };
         const changedFields = [];
@@ -1574,7 +1598,7 @@ export const updateDocument = async (req, res) => {
 
         const VERSIONED_FIELDS = [
             "description", "comment", "link", "files",
-            "signature", "compliance", "tags", "metadata"
+            "signature", "compliance", "tags", "metadata", "startDate"
         ];
 
         // ------------------------
@@ -1589,21 +1613,31 @@ export const updateDocument = async (req, res) => {
                     fileIds = updateData.fileIds;
                 }
 
+                // ⚠️ FIX: Check if files are REQUIRED on update. If this check is needed, uncomment it.
+                if (fileIds.length === 0 && some_condition_files_are_required) {
+                    await session.abortTransaction();
+                    return res.status(400).json({ success: false, message: "Files are required for this type of update." });
+                }
+
                 if (fileIds.length > 0) {
+                    // processFileUpdates handles updating document.files and adding 'files' to changedFields
+                    // NOTE: processFileUpdates must be available in scope
                     const newFiles = await processFileUpdates(document, fileIds, req.user, changedFields, session);
 
                     if (newFiles?.length) {
-                        document.__newFiles = newFiles; // store ONLY new files
-                        versionedChanges.push("files");
+                        document.__newFiles = newFiles; // store ONLY new files for snapshot
+                        // Ensure 'files' is in versionedChanges if files were added/replaced
+                        if (!versionedChanges.includes("files")) {
+                            versionedChanges.push("files");
+                        }
                     }
-
                 }
 
                 // Remove processed field to avoid reprocessing
                 delete updateData.fileIds;
             } catch (error) {
                 console.error('❌ Error processing fileIds:', error);
-                throw new Error('Invalid fileIds format');
+                throw new Error('Invalid fileIds format or file processing error');
             }
         }
 
@@ -1656,64 +1690,71 @@ export const updateDocument = async (req, res) => {
                     break;
 
                 case "compliance":
+                    let complianceUpdated = false;
                     if (typeof value === 'string') {
                         const isCompliance = value.toLowerCase() === 'yes';
                         if (document.compliance.isCompliance !== isCompliance) {
                             document.compliance.isCompliance = isCompliance;
                             changedFields.push("compliance.isCompliance");
-                            versionedChanges.push("compliance");
+                            complianceUpdated = true;
                         }
                     } else if (typeof value === 'object') {
                         Object.keys(value).forEach(subKey => {
-                            if (document.compliance[subKey] !== value[subKey]) {
-                                document.compliance[subKey] = value[subKey];
+                            // Safely handle comparison for dates/objects within compliance
+                            const currentValue = document.compliance[subKey];
+                            const newValue = value[subKey];
+
+                            // Simple check for primitive/date fields
+                            if (currentValue?.toString() !== newValue?.toString()) {
+                                document.compliance[subKey] = newValue;
                                 changedFields.push(`compliance.${subKey}`);
-                                versionedChanges.push("compliance");
+                                complianceUpdated = true;
                             }
                         });
+                    }
+                    if (complianceUpdated && !versionedChanges.includes("compliance")) {
+                        versionedChanges.push("compliance");
                     }
                     break;
 
                 default:
+                    // Handle other standard fields
                     if (document.schema.path(key) && document[key] !== value) {
                         document[key] = value;
                         changedFields.push(key);
-                        if (VERSIONED_FIELDS.includes(key)) {
+                        if (VERSIONED_FIELDS.includes(key) && !versionedChanges.includes(key)) {
                             versionedChanges.push(key);
                         }
                     }
                     break;
             }
         }
+
         // ------------------------
-        // SAFE DATE VALIDATION (startDate < expiryDate)
+        // DATE VALIDATION AND APPLICATION
         // ------------------------
 
+        let dateChanges = false;
         let newStartDate = document.startDate;
         let newExpiryDate = document.compliance?.expiryDate;
 
         // Parse startDate (documentDate)
         if (updateData.documentDate) {
             let parsed = new Date(updateData.documentDate);
-
-            // Fallback for DD-MM-YYYY
             if (isNaN(parsed.getTime())) {
                 const p = updateData.documentDate.split(/[-\/]/);
                 if (p.length === 3) parsed = new Date(`${p[2]}-${p[1]}-${p[0]}`);
             }
-
             if (!isNaN(parsed.getTime())) newStartDate = parsed;
         }
 
         // Parse expiryDate (compliance.expiryDate)
         if (updateData.compliance?.expiryDate) {
             let exp = new Date(updateData.compliance.expiryDate);
-
             const p = updateData.compliance.expiryDate.split(/[-\/]/);
             if (isNaN(exp.getTime()) && p.length === 3) {
                 exp = new Date(`${p[2]}-${p[1]}-${p[0]}`);
             }
-
             if (!isNaN(exp.getTime())) newExpiryDate = exp;
         }
 
@@ -1731,22 +1772,25 @@ export const updateDocument = async (req, res) => {
         }
 
         // If passes validation → apply updates
-        if (updateData.documentDate && newStartDate) {
+        if (updateData.documentDate && newStartDate && document.startDate?.getTime() !== newStartDate.getTime()) {
             document.startDate = newStartDate;
             changedFields.push("startDate");
             versionedChanges.push("startDate");
+            dateChanges = true;
         }
 
-        if (updateData.compliance?.expiryDate && newExpiryDate) {
+        if (updateData.compliance?.expiryDate && newExpiryDate && document.compliance.expiryDate?.getTime() !== newExpiryDate.getTime()) {
             document.compliance.expiryDate = newExpiryDate;
             changedFields.push("compliance.expiryDate");
-            versionedChanges.push("compliance");
+            if (!versionedChanges.includes("compliance")) versionedChanges.push("compliance"); // Compliance is a versioned parent field
+            dateChanges = true;
         }
 
 
         // ------------------------
         // SIGNATURE HANDLING
         // ------------------------
+        // NOTE: handleSignatureUpdate must be available in scope
         const signatureUpdated = await handleSignatureUpdate(document, req);
         if (signatureUpdated) {
             changedFields.push("signature");
@@ -1765,35 +1809,74 @@ export const updateDocument = async (req, res) => {
             });
         }
 
-        // Update timestamp and save
+        // Update timestamp
         document.updatedAt = new Date();
-        await document.save({ session });
+
 
         // ------------------------
         // VERSIONING (ONLY IF CONTENT CHANGED)
         // ------------------------
         if (versionedChanges.length > 0) {
+
+            // 🚩 FIX: Query the DocumentVersion collection for the ABSOLUTE maximum version number
+            // NOTE: DocumentVersion model must be available in scope
+            const latestVersionDoc = await DocumentVersion.findOne({ documentId: document._id })
+                .sort({ versionNumber: -1 }) // Sort descending to get the highest
+                .session(session)
+                .lean();
+
+            // Use the label from the latest historical version for the bump calculation
+            const baseVersionLabel = latestVersionDoc
+                ? latestVersionDoc.versionLabel
+                : document.currentVersionLabel; // Fallback to current document label
+
+            // NOTE: computeDiff and createReadableChangeReason must be available in scope
             const updatedDoc = document.toObject();
             const diff = computeDiff(originalDoc, updatedDoc, versionedChanges);
             const readableReason = createReadableChangeReason(diff);
 
-            // Bump version
-            const { versionLabel, versionNumber } = bumpVersion(document.currentVersionLabel);
+            // Bump version using the highest label found
+            const { versionLabel, versionNumber } = bumpVersion(baseVersionLabel);
+
+            // Apply new version to the main document
             document.previousVersionLabel = document.currentVersionLabel;
             document.currentVersionLabel = versionLabel;
             document.currentVersionNumber = versionNumber;
 
-            await document.save({ session });
-            await createVersionSnapshot(
-                document,
-                diff,
-                req.user._id,
-                readableReason
-            );
+            // Store diff and reason temporarily for use after save
+            document.__versionDiff = diff;
+            document.__readableReason = readableReason;
         }
 
+        // ------------------------
+        // FINAL SAVE (ONE TIME) - Fixes double versioning/save issue
+        // ------------------------
+        await document.save({ session });
+
+
+        // ------------------------
+        // CREATE VERSION SNAPSHOT
+        // ------------------------
+        if (versionedChanges.length > 0) {
+            // NOTE: createVersionSnapshot must be available in scope
+            await createVersionSnapshot(
+                document,
+                document.__versionDiff,
+                req.user._id,
+                document.__readableReason
+            );
+
+            // Clean up temporary properties
+            delete document.__versionDiff;
+            delete document.__readableReason;
+        }
+
+
         await session.commitTransaction();
+
+
         try {
+            // NOTE: recomputeProjectTotalTags, recomputeProjectTotalFiles, logger must be available in scope
             if (versionedChanges.includes("tags")) {
                 if (document.project) {
                     await recomputeProjectTotalTags(document.project);
@@ -1820,6 +1903,7 @@ export const updateDocument = async (req, res) => {
                 await recomputeProjectTotalFiles(document.project);
             }
         } catch (err) {
+            // NOTE: logger must be available in scope
             logger.error("Failed to recompute project totals after update:", err);
         }
 
@@ -2054,7 +2138,6 @@ export const restoreVersion = async (req, res) => {
         session.startTransaction();
 
         const { id, versionId } = req.params;
-        console.log("RESTORE:", id, versionId);
 
         // Validate Document ID
         if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -2985,7 +3068,7 @@ export const bulkPermissionUpdate = async (req, res) => {
         });
         res.json({
             success: true,
-            message: "Permission update completed",
+            message: "Permission updated",
             bulkResult,
             invalidIds
         });
@@ -4173,7 +4256,7 @@ export const sendApprovalMail = async (req, res) => {
             to: approverUser.email,
             subject: `Document Approval Request - ${document.metadata?.fileName || "Document"}`,
             html,
-            fromName: "Support Team",
+            fromName: res.locals?.supportTeamName || "DMS Support Team",
         });
         await activityLogger({
             actorId: req.user?._id,

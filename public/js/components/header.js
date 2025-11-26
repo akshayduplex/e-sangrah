@@ -1,7 +1,12 @@
 
 document.addEventListener("DOMContentLoaded", function () {
     const baseUrl = window.baseUrl;
+    const uploadBtn = document.querySelector("#uploadBtn");
 
+
+    if (window.profile_type === "vendor" || window.profile_type === "donor") {
+        if (uploadBtn) uploadBtn.style.display = "none";
+    }
     // ---------------------------
     // MODAL BACKDROP FIX
     // ---------------------------
@@ -157,10 +162,9 @@ document.addEventListener("DOMContentLoaded", function () {
                 updateUrl({ q: searchTerm || null });
             }
         }
-
         function toggleClearButtons() {
-            $('.clear-search-global').toggle(!!$('#globalSearchInput').val().trim());
-            $('.clear-search-page').toggle(!!$('#searchInput').val().trim());
+            $('.clear-search-global').toggle(!!(($('#globalSearchInput').val() || '').trim()));
+            $('.clear-search-page').toggle(!!(($('#searchInput').val() || '').trim()));
         }
 
         function clearSearch() {

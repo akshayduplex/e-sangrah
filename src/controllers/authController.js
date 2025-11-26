@@ -195,7 +195,7 @@ export const login = async (req, res) => {
             to: email,
             subject: "Your Login OTP",
             html,
-            fromName: "DMS Support Team",
+            fromName: res.locals?.supportTeamName || "DMS Support Team",
         });
 
         return successResponse(res, {
@@ -351,7 +351,7 @@ export const sendOtp = async (req, res) => {
             to: email,
             subject: "Your OTP for Password Reset",
             html,
-            fromName: "DMS Support Team",
+            fromName: res.locals?.supportTeamName || "DMS Support Team",
         });
 
         return successResponse(res, {}, "OTP sent to your email");
@@ -476,7 +476,7 @@ export const sendResetLink = async (req, res) => {
             to: email,
             subject: "Verify Password Change",
             html,
-            fromName: "Support Team",
+            fromName: res.locals?.supportTeamName || "DMS Support Team",
         });
 
         // --- Success Response ---

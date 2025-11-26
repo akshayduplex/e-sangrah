@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 
 const WebSettingSchema = new mongoose.Schema({
     companyName: { type: String, required: true, default: "" },
+    supportTeamName: { type: String, required: true, default: "" },
     metaTitle: { type: String, default: "" },
     metaDescription: { type: String, default: "" },
     metaKeywords: { type: String, default: "" },

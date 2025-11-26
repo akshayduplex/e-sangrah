@@ -507,14 +507,11 @@ $(document).ready(function () {
                 if (response.success && response.data) {
                     const d = response.data;
 
-                    // Main numbers
                     $('#totalDocs').text(d.total || 0);
                     $('#approvedDocs').text(d.approved || 0);
                     $('#pendingDocs').text(d.pending || 0);
                     $('#rejectedDocs').text(d.rejected || 0);
-                    $('#pendingCount').text(d.pending || 0); // if you use this elsewhere
-
-                    // Dynamic growth percentages (real data instead of static +10%)
+                    $('#pendingCount').text(d.pending || 0);
                     updateGrowthBadge('#totalDocs', d.totalGrowth);
                     updateGrowthBadge('#approvedDocs', d.approvedGrowth);
                     updateGrowthBadge('#pendingDocs', d.pendingGrowth);
@@ -527,10 +524,9 @@ $(document).ready(function () {
         });
     }
 
-    // Helper: replaces the static "+10%" with real growth from API
     function updateGrowthBadge(cardSelector, growthPercent) {
         const $card = $(cardSelector).closest('.card');
-        const $badge = $card.find('.text-success, .text-danger').first(); // the span with growth
+        const $badge = $card.find('.text-success, .text-danger').first();
 
         if (growthPercent === undefined || growthPercent === null) {
             $badge.html('<span class="sm-avatar avatar rounded bg-soft-secondary"><i class="ti ti-minus"></i></span> 0%');
@@ -1013,35 +1009,26 @@ $(document).ready(function () {
         if (center) center.innerHTML = `<p class="fs-13 mb-1 text-muted">No Data</p><h3>0%</h3>`;
     }
 
-    // Event Handlers for Period Dropdowns
     $(document).on('click', '.donor-vendor-period-option', function () {
         const period = $(this).data('period');
         const label = $(this).text();
 
-        console.log('Period changed to:', period); // Debug log
-
-        // Update label and store period in data attribute
         $('#currentDonorVendorPeriodLabel')
             .text(label)
             .data('period', period);
 
-        // Reload chart with new period
         loadDonorVendorProjects();
     });
 
-    // Initialize Donor/Vendor section
     function initializeDonorVendorSection() {
-        // Initialize Select2 dropdowns
+
         initializeDonorSelect2();
         initializeVendorSelect2();
 
-        // Preload options
         preloadDonorVendorOptions();
 
-        // Set initial period
         $('#currentDonorVendorPeriodLabel').data('period', 'year');
 
-        // Load initial chart
         loadDonorVendorProjects();
     }
     $(document).on('click', '.dept-upload-period-option', function () {

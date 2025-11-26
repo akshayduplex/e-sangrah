@@ -141,3 +141,14 @@ function checkDuplicateValue(field, value, $input) {
         }
     });
 }
+
+function showLoader(btn) {
+    btn.dataset.originalText = btn.innerHTML;
+    btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Resetting...`;
+    btn.disabled = true;
+}
+
+function hideLoader(btn) {
+    btn.innerHTML = btn.dataset.originalText;
+    btn.disabled = false;
+}

@@ -1,3 +1,4 @@
+import Designation from "../models/Designation.js";
 import Document from "../models/Document.js";
 import File from "../models/File.js";
 import Project from "../models/Project.js";
@@ -78,3 +79,24 @@ export const refreshCompanySettings = async () => {
     cachedSettings = await WebSetting.findOne({}) || {};
     return cachedSettings;
 };
+
+export const getGrowth = (cur, prev) => {
+    if (prev === 0) return cur > 0 ? 100 : 0;
+
+    let growth = Math.round(((cur - prev) / prev) * 100);
+
+    if (growth > 100) growth = 100;
+    if (growth < -100) growth = -100;
+
+    return growth;
+};
+
+export async function getDesignationId(profile_type) {
+    const names = profile_type === "vendor" ? ["vendor", "vendors"] : ["donor", "donors"];
+    const designation = await Designation.findOne({
+        name: { $in: names.map(n => new RegExp(`^${n}$`, "i")) },
+        status: "Active"
+    });
+    if (!designation) throw new Error(`No active designation found for ${profile_type}`);
+    return designation._id;
+}

@@ -945,12 +945,46 @@ export const getFolderTree = async (req, res) => {
         /* -----------------------------------
          * PERMISSION FILTER (non-superadmin)
          * ----------------------------------- */
+        /* -----------------------------------
+         * PERMISSION FILTER (non-superadmin)
+         * ----------------------------------- */
         if (profileType !== "superadmin") {
-            match.$or = [
+
+            // Base access: owner or shared permission
+            const accessConditions = [
                 { owner: userId },
-                { "permissions.principal": userId },
+                { "permissions.principal": userId }
             ];
+
+            // Vendor → show folders containing his vendor documents
+            if (profileType === "vendor") {
+                accessConditions.push({
+                    _id: {
+                        $in: await Document.distinct("folderId", {
+                            documentVendor: userId,
+                            isDeleted: false,
+                            isArchived: false
+                        })
+                    }
+                });
+            }
+
+            // Donor → show folders containing his donor documents
+            if (profileType === "donor") {
+                accessConditions.push({
+                    _id: {
+                        $in: await Document.distinct("folderId", {
+                            documentDonor: userId,
+                            isDeleted: false,
+                            isArchived: false
+                        })
+                    }
+                });
+            }
+
+            match.$or = accessConditions;
         }
+
 
         /* -----------------------------------
          * OPTIONAL: DEPARTMENT FILTER

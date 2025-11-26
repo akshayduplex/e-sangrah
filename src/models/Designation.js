@@ -21,6 +21,11 @@ const designationSchema = new mongoose.Schema({
         type: String,
         default: ''
     },
+    isDonorOrVendor: {
+        type: Boolean,
+        require: true,
+        default: false
+    },
     added_by: {
         user_id: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
         name: { type: String, required: true },

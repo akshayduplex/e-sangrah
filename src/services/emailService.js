@@ -28,9 +28,9 @@ const transporter = nodemailer.createTransport({
  * @param {string} options.to - Recipient
  * @param {string} options.subject - Subject
  * @param {string} options.html - HTML body
- * @param {string} [options.fromName="Support Team"]
+ * @param {string} [options.fromName="DMS Support Team"]
  */
-export const sendEmail = async ({ to, subject, html, fromName = "Support Team" }) => {
+export const sendEmail = async ({ to, subject, html, fromName = "DMS Support Team" }) => {
     try {
         await transporter.sendMail({
             from: `"${fromName}" <${EMAIL_FROM_MAIL}>`,

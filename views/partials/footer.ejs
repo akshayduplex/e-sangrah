@@ -219,7 +219,10 @@
 <!-- <script src="/socket.io/socket.io.js"></script> -->
 
 <!-- Custom JS -->
-<script> window.baseUrl = "<%= BASE_URL %>";</script>
+<script> window.baseUrl = "<%= BASE_URL %>";
+    window.profile_type = "<%= profile_type %>";
+</script>
+<script src="/js/components/network-check.js"></script>
 <script src="/js/todo.js"></script>
 <script src="/js/toast.js"></script>
 <script defer src="/js/components/header.js"></script>

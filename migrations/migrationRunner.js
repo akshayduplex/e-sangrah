@@ -1,7 +1,6 @@
 import mongoose from "mongoose";
 
 // Import your models
-import Approval from "../src/models/Approval.js";
 import Department from "../src/models/Departments.js";
 import Designation from "../src/models/Designation.js";
 import Folder from "../src/models/Folder.js";

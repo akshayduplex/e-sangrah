@@ -76,7 +76,7 @@
                             res.data.forEach((desig, index) => {
                                 let addedBy = desig.added_by?.email || '-';
                                 let updatedBy = desig.updated_by?.email || '-';
-                                let createdAt = new Date(desig.add_date).toLocaleString();
+                                let createdAt = formatDateTime(desig.add_date);
                                 tbody += `
 <tr>
     <td>${index + 1}</td>

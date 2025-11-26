@@ -121,23 +121,33 @@ function initializeDepartmentSelect2() {
         }
     });
 }
-
 function initializeProjectManagerSelect2() {
     $('#projectManager').select2({
         placeholder: '-- Select Project Manager --',
         allowClear: true,
         ajax: {
-            url: '/api/user/search',
+            url: '/api/projects/projectManagers/search',
             dataType: 'json',
             delay: 250,
             data: function (params) {
-                return { search: params.term || '', page: params.page || 1, limit: 10, profile_type: 'user' };
+                const projectId = $('#projectName').val();
+                return {
+                    q: params.term || '',
+                    page: params.page || 1,
+                    limit: 10,
+                    projectId: projectId && projectId !== 'all' ? projectId : ''
+                };
             },
             processResults: function (data, params) {
-                params.page = params.page || 1;
-                let results = data.users.map(u => ({ id: u._id, text: u.name }));
-                results.unshift({ id: 'all', text: '-- Select Project Manager --' });
-                return { results, pagination: { more: params.page * 10 < data.pagination.total } };
+                const results = (data.data || []).map(manager => ({
+                    id: manager._id,
+                    text: manager.name
+                }));
+
+                return {
+                    results,
+                    pagination: { more: false } // no pagination in your API
+                };
             },
             cache: true
         },
