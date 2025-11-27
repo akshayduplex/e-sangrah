@@ -86,32 +86,36 @@ export const showSettingPage = async (req, res) => {
 // Check duplicate fields
 export const checkDuplicate = async (req, res) => {
     try {
-        const { email, phone_number, employee_id } = req.query;
+        const { email, phone_number, employee_id, gst_number, id_proof } = req.query;
 
         let query = {};
 
         if (email) query.email = email.toLowerCase();
         if (phone_number) query.phone_number = phone_number;
         if (employee_id) query["userDetails.employee_id"] = employee_id;
+        if (gst_number) query["vendorDetails.gst_number"] = gst_number.toUpperCase();
+        if (id_proof) query["donorDetails.id_proof"] = id_proof;
 
         const user = await User.findOne(query);
 
         if (user) {
-            return res.json({
-                exists: true,
-                field: email ? 'email' :
-                    phone_number ? 'phone_number' :
-                        'employee_id'
-            });
+            let field = 'unknown';
+            if (email && user.email === email.toLowerCase()) field = 'email';
+            else if (phone_number && user.phone_number === phone_number) field = 'phone_number';
+            else if (employee_id && user.userDetails?.employee_id === employee_id) field = 'employee_id';
+            else if (gst_number && user.vendorDetails?.gst_number === gst_number.toUpperCase()) field = 'gst_number';
+            else if (id_proof && user.donorDetails?.id_proof === id_proof) field = 'id_proof';
+
+            return res.json({ exists: true, field });
         }
 
         return res.json({ exists: false });
 
     } catch (err) {
+        console.error(err);
         res.status(500).json({ success: false, message: "Server error" });
     }
 };
-
 
 function sanitize(str) {
     return String(str)

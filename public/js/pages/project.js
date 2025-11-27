@@ -2,22 +2,23 @@ document.addEventListener("DOMContentLoaded", () => {
     const projectsContainer = document.getElementById("projectsContainer");
     const searchInput = document.getElementById("projectSearch");
     const loader = document.getElementById("loader");
-
+    const currentUrl = window.location.href;
+    const urlObj = new URL(currentUrl);
+    const queryParams = new URLSearchParams(urlObj.search);
+    const projectId = queryParams.get('id');
     let currentPage = 1;
     let currentQuery = '';
     let totalPages = 1;
     let isLoading = false;
-
     async function fetchProjects(page = 1, query = '', append = false) {
-        if (isLoading) return; // prevent duplicate requests
-        if (page > totalPages) return; // no more pages
-
+        if (isLoading) return;
+        if (page > totalPages) return;
         isLoading = true;
         loader.style.display = 'block';
 
         try {
             const response = await fetch(
-                `${baseUrl}/api/projects/search?q=${encodeURIComponent(query)}&page=${page}&limit=10`,
+                `${baseUrl}/api/projects/search?q=${encodeURIComponent(query)}&page=${page}&limit=10&projectId=${encodeURIComponent(projectId)}`,
                 { credentials: 'include' }
             );
 

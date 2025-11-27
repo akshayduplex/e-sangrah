@@ -180,25 +180,35 @@ export const saveUserPermissions = async (req, res) => {
 
 //API Controllers
 
-// Render assign menu page
+
 export const getAssignMenuPage = async (req, res) => {
     try {
-        // Fetch active designations
-        const designations = await Designation.find({ status: "Active" })
-            .select("name status")
-            .sort({ name: 1 })
-            .lean();
+        let designations;
 
-        // Fetch all menus
+
+        if (req.user.profile_type === "superadmin") {
+
+            designations = await Designation.find()
+                .select("name status")
+                .sort({ name: 1 })
+                .lean();
+        } else {
+
+            designations = await Designation.find({
+                status: "Active",
+                isDonorOrVendor: false
+            })
+                .select("name status")
+                .sort({ name: 1 })
+                .lean();
+        }
         const menus = await Menu.find()
             .sort({ priority: 1, add_date: -1 })
             .populate("added_by updated_by", "name email")
             .lean();
 
-        // Build menu tree
         const masterMenus = buildMenuTree(menus);
 
-        // Render page
         res.render("pages/permissions/assign-menu", {
             pageTitle: "Assign Menu",
             pageDescription: "Assign menus and submenus to designations and manage access control.",
@@ -209,6 +219,7 @@ export const getAssignMenuPage = async (req, res) => {
             designations,
             user: req.user
         });
+
     } catch (error) {
         logger.error("Error in getAssignMenuPage:", error);
         res.status(500).render("pages/error", {

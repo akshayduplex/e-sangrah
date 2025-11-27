@@ -1718,8 +1718,7 @@ export const updateFolderLogPermission = async (req, res) => {
             entityId: folder._id,
             entityType: "Folder",
             action: "UPDATE_LOG_PERMISSION",
-            details: `Updated log Permissions for folder: ${folder.name} by ${req.user?.name}`,
-            meta: { permissions }
+            details: `Updated log Permissions for folder: ${folder.name} by ${req.user?.name}`
         });
 
         // send approval email

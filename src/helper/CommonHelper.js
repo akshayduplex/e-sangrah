@@ -9,11 +9,9 @@ export const getFileIcon = (file) => {
     if (!file) return "/img/icons/file.png";
 
     const type = file.fileType?.toLowerCase() || "";
-
-    // If original file is an image, return the real uploaded image
     if (type.includes("png") || type.includes("jpg") || type.includes("jpeg") || type.includes("gif")) {
-        if (file.s3Url) return file.s3Url;              // S3 storage
-        return `/uploads/${file.file}`;                 // Local storage
+        if (file.s3Url) return file.s3Url;
+        return `/uploads/${file.file}`;
     }
 
     // File-type icons
@@ -35,7 +33,7 @@ export const formatFileSize = (bytes) => {
     return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
 };
 
-export function toProperCase(str = "") {
+export async function toProperCase(str = "") {
     if (!str) return "";
     return str
         .toLowerCase()
@@ -100,3 +98,39 @@ export async function getDesignationId(profile_type) {
     if (!designation) throw new Error(`No active designation found for ${profile_type}`);
     return designation._id;
 }
+
+export async function getDateRange(filter) {
+    const now = new Date();
+
+    switch (filter) {
+        case "today": {
+            const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            const end = new Date(start);
+            end.setHours(23, 59, 59, 999);
+            return { start, end };
+        }
+
+        case "week": {
+            const start = new Date(now);
+            start.setDate(start.getDate() - 7);
+            start.setHours(0, 0, 0, 0);
+
+            return { start, end: now };
+        }
+
+        case "month": {
+            const start = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+            start.setHours(0, 0, 0, 0);
+            return { start, end: now };
+        }
+
+        case "year": {
+            const start = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+            start.setHours(0, 0, 0, 0);
+            return { start, end: now };
+        }
+
+        default:
+            return null;
+    }
+};

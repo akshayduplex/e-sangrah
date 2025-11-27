@@ -6,7 +6,7 @@ $(document).ready(function () {
     const $spinner = $('#vendorSubmitSpinner');
     const $btnText = $btn.find('.btn-text');
     const initialBtnLabel = $btnText.text();
-
+    const gstPattern = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/i;
     const $name = $('#vendor_name');
     const $email = $('#vendor_email');
     const $mobile = $('#vendor_mobile');
@@ -43,14 +43,37 @@ $(document).ready(function () {
         }
     });
 
-    // VENDOR GST DUPLICATE CHECK (Optional but recommended)
     $('#gst_number').on('blur', function () {
         const gst = $(this).val().trim().toUpperCase();
         if (gst.length > 5) {
-            checkDuplicateValue('employee_id', gst, $(this)); // Change if you’re checking GST separately
+            checkDuplicateValue('gst_number', gst, $(this));
         }
     });
+    // GST validation on input/change/blur
+    $gst.on('input change blur', function () {
+        const val = ($gst.val() || '').trim().toUpperCase();
+        const ok = gstPattern.test(val);
+        $gst.toggleClass('is-valid', ok).toggleClass('is-invalid', !ok);
+    });
 
+    function validateAll() {
+        const v1 = reqNonEmpty($name);
+        const v2 = emailPattern.test(($email.val() || '').trim());
+        $email.toggleClass('is-valid', v2).toggleClass('is-invalid', !v2);
+
+        const v3 = /^\d{10}$/.test(($mobile.val() || '').trim());
+        $mobile.toggleClass('is-valid', v3).toggleClass('is-invalid', !v3);
+
+        const v4 = reqNonEmpty($company);
+
+        const v5 = gstPattern.test(($gst.val() || '').trim()); // <-- GST format validation
+        $gst.toggleClass('is-valid', v5).toggleClass('is-invalid', !v5);
+
+        const v6 = reqNonEmpty($contact);
+        const v7 = reqNonEmpty($services);
+
+        return v1 && v2 && v3 && v4 && v5 && v6 && v7;
+    }
     // Email validation (same pattern used in donor form)
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     $email.on('input change blur', function () {

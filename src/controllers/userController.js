@@ -87,6 +87,10 @@ export const viewOrEditUser = async (req, res) => {
         const designations = await Designation.find().lean();
 
         res.render("pages/registerations/user-form", {
+            pageTitle: "Edit User",
+            pageDescription: "Edit user and assign roles, department, and designation.",
+            metaKeywords: "edit user, workspace users",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
             title: `User - ${user.name}`,
             user,
             departments,
@@ -94,8 +98,16 @@ export const viewOrEditUser = async (req, res) => {
             viewOnly: mode === "view"
         });
     } catch (err) {
-        logger.error(err);
-        res.status(500).send("Internal Server Error");
+        logger.error("Error loading user", err);
+        res.status(500).render("pages/error", {
+            pageTitle: "Error",
+            pageDescription: "Unable to load user edit page.",
+            metaKeywords: "user edit error, page load error",
+            canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+
+            user: req.user,
+            message: "Internal Server Error"
+        });
     }
 };
 

@@ -152,3 +152,17 @@ function hideLoader(btn) {
     btn.innerHTML = btn.dataset.originalText;
     btn.disabled = false;
 }
+
+function timeAgo(date) {
+    const now = new Date();
+    const past = new Date(date);
+    const diff = Math.floor((now - past) / 1000);
+
+    if (diff < 60) return "just now";
+    if (diff < 3600) return Math.floor(diff / 60) + " mins ago"; // less than 1 hour
+    if (diff < 86400) return Math.floor(diff / 3600) + " hours ago"; // less than 1 day
+    if (diff < 604800) return Math.floor(diff / 86400) + " days ago"; // less than 1 week
+    if (diff < 2419200) return Math.floor(diff / 604800) + " weeks ago"; // less than 1 month
+    if (diff < 29030400) return Math.floor(diff / 2419200) + " months ago"; // less than 1 year
+    return Math.floor(diff / 29030400) + " years ago";
+}

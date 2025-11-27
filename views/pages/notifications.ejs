@@ -66,14 +66,33 @@
 				});
 
 				const renderAction = (data, type, row) => {
-					if (row.type === 'approval_request') {
-						return `<button class="approvbtn btn btn-primary btn-sm" data-url="/approval-requests?documentId=${row.relatedDocument?._id}">Approve</button>`;
-					} else {
-						const viewUrl = row.relatedDocument ? `/documents/list?documentId=${row.relatedDocument._id}` : '#';
-						return `<a href="${viewUrl}" class="fs-16 text-primary fw-light">View</a>`;
-					}
-				};
+					let actionUrl = "#";
+					let buttonHtml = "";
 
+					if (row.type === "approval_request") {
+						actionUrl = `/approval-requests?documentId=${row.relatedDocument?._id}`;
+						buttonHtml = `<button class="approvbtn btn btn-primary btn-sm" data-url="${actionUrl}">Approve</button>`;
+						return buttonHtml;
+					}
+
+					// Map all other types exactly as in your original routes
+					if (row.type === "document_approved") {
+						actionUrl = `/document/${row.relatedDocument?._id}/approval/track`;
+					}
+					else if (row.type === "document") {
+						actionUrl = `/documents/list?documentId=${row.relatedDocument?._id}`;
+					}
+					else if (row.type === "approval_update") {
+						actionUrl = `/employee/approval?id=${row.relatedDocument?._id}`;
+					}
+					else if (row.type === "document_discussion") {
+						actionUrl = `/employee/approval?id=${row.relatedDocument?._id}`;
+					}
+					else if (row.type === "project_assigned") {
+						actionUrl = `/projects?id=${row.relatedProject?._id}`;
+					}
+					return `<a href="${actionUrl}" class="fs-16 text-primary fw-light">View</a>`;
+				};
 				// Initialize DataTable
 				const table = $('#notification-table').DataTable({
 					processing: true,

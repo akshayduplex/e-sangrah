@@ -524,8 +524,6 @@ export const getDocuments = async (req, res) => {
             filter._id = documentId;
         }
 
-        // --- If not superadmin, restrict documents ---
-        // --- If not superadmin, restrict documents ---
         if (profile_type !== "superadmin") {
 
             // Base condition for normal users
@@ -534,12 +532,10 @@ export const getDocuments = async (req, res) => {
                 // { sharedWithUsers: userId }  // enable if needed
             ];
 
-            // Vendor → only documents where vendor is assigned
             if (profile_type === "vendor") {
                 baseAccess.push({ documentVendor: userId });
             }
 
-            // Donor → only documents where donor is assigned
             if (profile_type === "donor") {
                 baseAccess.push({ documentDonor: userId });
             }
@@ -564,15 +560,11 @@ export const getDocuments = async (req, res) => {
                     { "metadata.fileDescription": { $regex: safeSearch, $options: "i" } },
                     { "metadata.mainHeading": { $regex: safeSearch, $options: "i" } },
 
-                    // Document-level fields
                     { description: { $regex: safeSearch, $options: "i" } },
                     { remark: { $regex: safeSearch, $options: "i" } },
                     { tags: { $in: [new RegExp(safeSearch, "i")] } },
 
-                    // Files
                     { "files.originalName": { $regex: safeSearch, $options: "i" } },
-
-                    // Project name (via populated field)
                     { "project.projectName": { $regex: safeSearch, $options: "i" } }
                 ]
             });
@@ -595,8 +587,8 @@ export const getDocuments = async (req, res) => {
                 ];
             }
             else if (normalizedStatus === "modified") {
-                filter["versioning.currentVersion"] = {
-                    $gt: mongoose.Types.Decimal128.fromString("1.0")
+                filter["currentVersionNumber"] = {
+                    $ne: mongoose.Types.Decimal128.fromString("1.0")
                 };
             }
             else if (normalizedStatus === "Compliance and Retention") {
@@ -1405,6 +1397,53 @@ export const createDocument = async (req, res) => {
                         folder.files = [...new Set(folder.files.map(f => f.toString()))];
 
                         await folder.save();
+                        // ------------------- Assign Donor/Vendor permissions to Folder ONLY -------------------
+                        if (validFolderId) {
+                            const folder = await Folder.findById(validFolderId);
+
+                            if (folder) {
+                                const newPermissions = [];
+
+                                // Assign Donor Permission
+                                if (documentDonor && mongoose.Types.ObjectId.isValid(documentDonor)) {
+                                    const donorExists = folder.permissions.some(
+                                        p => String(p.principal) === String(documentDonor)
+                                    );
+
+                                    if (!donorExists) {
+                                        newPermissions.push({
+                                            principal: documentDonor,
+                                            model: "User",
+                                            access: "view",
+                                            canDownload: true
+                                        });
+                                    }
+                                }
+
+                                // Assign Vendor Permission
+                                if (documentVendor && mongoose.Types.ObjectId.isValid(documentVendor)) {
+                                    const vendorExists = folder.permissions.some(
+                                        p => String(p.principal) === String(documentVendor)
+                                    );
+
+                                    if (!vendorExists) {
+                                        newPermissions.push({
+                                            principal: documentVendor,
+                                            model: "User",
+                                            access: "view",
+                                            canDownload: true
+                                        });
+                                    }
+                                }
+
+                                // Push new permissions
+                                if (newPermissions.length > 0) {
+                                    folder.permissions.push(...newPermissions);
+                                    await folder.save();
+                                }
+                            }
+                        }
+
                     }
                 }
             }
@@ -1458,20 +1497,90 @@ export const createDocument = async (req, res) => {
             }
         }
         // ------------------- Notifications -------------------
-        if (parsedWantApprovers && documentApprovalAuthority.length > 0) {
-            for (const authority of documentApprovalAuthority) {
+        try {
+
+            // 1) Notify Approval Authority (if approval required)
+            if (parsedWantApprovers && documentApprovalAuthority.length > 0) {
+                for (const authority of documentApprovalAuthority) {
+                    await addNotification({
+                        recipient: authority.userId._id || authority.userId,
+                        sender: userId,
+                        type: "approval_request",
+                        title: "Document Approval Required",
+                        message: `${userName} uploaded a new document that requires your approval.`,
+                        relatedDocument: document._id,
+                        relatedProject: project || null,
+                        priority: "high",
+                        actionUrl: `/documents/${document._id}?tab=approval`
+                    });
+                }
+            }
+
+            // 2) Notify Project Manager
+            if (projectManager && mongoose.Types.ObjectId.isValid(projectManager)) {
                 await addNotification({
-                    recipient: authority.userId._id || authority.userId,
+                    recipient: projectManager,
                     sender: userId,
-                    type: "approval_request",
-                    title: "Document Approval Required",
-                    message: `${userName} has uploaded a document that requires your approval.`,
+                    type: "document",
+                    title: "New Document Uploaded",
+                    message: `${userName} uploaded a document under your project.`,
                     relatedDocument: document._id,
                     relatedProject: project || null,
-                    priority: "high",
-                    actionUrl: `/documents/${document._id}?tab=approval`
+                    priority: "medium",
+                    actionUrl: `/documents/${document._id}`
                 });
             }
+
+            // 3) Notify Document Donor
+            if (documentDonor && mongoose.Types.ObjectId.isValid(documentDonor)) {
+                await addNotification({
+                    recipient: documentDonor,
+                    sender: userId,
+                    type: "document",
+                    title: "Document Added (Donor)",
+                    message: `${userName} uploaded a new document involving you as Donor.`,
+                    relatedDocument: document._id,
+                    relatedProject: project || null,
+                    priority: "medium",
+                    actionUrl: `/documents/${document._id}`
+                });
+            }
+
+            //4) Notify Document Vendor
+            if (documentVendor && mongoose.Types.ObjectId.isValid(documentVendor)) {
+                await addNotification({
+                    recipient: documentVendor,
+                    sender: userId,
+                    type: "document",
+                    title: "Document Added (Vendor)",
+                    message: `${userName} uploaded a new document involving you as Vendor.`,
+                    relatedDocument: document._id,
+                    relatedProject: project || null,
+                    priority: "medium",
+                    actionUrl: `/documents/${document._id}`
+                });
+            }
+
+            // 5) Notify Department Manager if needed
+            if (department) {
+                const dept = await Department.findById(department).select("manager");
+                if (dept?.manager) {
+                    await addNotification({
+                        recipient: dept.manager,
+                        sender: userId,
+                        type: "document",
+                        title: "Department Document Update",
+                        message: `${userName} added a new document to your department.`,
+                        relatedDocument: document._id,
+                        relatedProject: project || null,
+                        priority: "low",
+                        actionUrl: `/documents/${document._id}`
+                    });
+                }
+            }
+
+        } catch (notifyErr) {
+            logger.error("Notification sending failed:", notifyErr);
         }
 
         await activityLogger({
@@ -1762,7 +1871,7 @@ export const updateDocument = async (req, res) => {
         const isCompliance = updateData.compliance?.isCompliance ?? document.compliance.isCompliance;
 
         if (isCompliance && newStartDate && newExpiryDate) {
-            if (newStartDate >= newExpiryDate) {
+            if (newStartDate > newExpiryDate) {
                 await session.abortTransaction();
                 return res.status(400).json({
                     success: false,
@@ -4082,7 +4191,7 @@ export const updateApprovalStatus = async (req, res) => {
             await addNotification({
                 recipient: document.owner._id,
                 sender: userId,
-                type: 'document',
+                type: 'document_discussion',
                 title: 'Discussion Requested',
                 message: `${req.user.name} requested a discussion on document "${document.metadata?.fileName || document._id}". Remark: ${comment}`,
                 relatedDocument: documentId,

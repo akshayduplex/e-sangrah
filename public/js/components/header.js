@@ -296,13 +296,15 @@ document.addEventListener("DOMContentLoaded", function () {
     function renderNotifications(notifications) {
         notificationContainer.innerHTML = "";
         notifications.forEach(n => {
-            const createdTime = formatDateTime(n.createdAt);
+            const createdTime = timeAgo(n.createdAt);
             let actionUrl = "#";
             let displayButton = "";
-            if (n.type === "approval_request") { actionUrl = "/approval-requests"; displayButton = `<span class="badge bg-success text-white px-2 py-1 ms-2">Approve</span>`; }
-            else if (n.type === "document_approved") actionUrl = `/document/${n.documentId}/approval/track`;
-            else if (n.type === "document") actionUrl = "/documents/list";
-            else if (n.type === "approval_update") actionUrl = "/employee/approval";
+            if (n.type === "approval_request") { actionUrl = `/approval-requests?documentId=${n.relatedDocument._id}`; displayButton = `<span class="badge bg-success text-white px-2 py-1 ms-2">Approve</span>`; }
+            else if (n.type === "document_approved") actionUrl = `/document/${n.relatedDocument._id}/approval/track`;
+            else if (n.type === "document") actionUrl = `/documents/list?documentId=${n.relatedDocument._id}`;
+            else if (n.type === "approval_update") actionUrl = `/employee/approval?id=${n.relatedDocument._id}`;
+            else if (n.type === "document_discussion") actionUrl = `/employee/approval?id=${n.relatedDocument._id}`;
+            else if (n.type === "project_assigned") actionUrl = `/projects?id=${n.relatedProject._id}`;
 
             const html = `
                 <div class="border-bottom mb-3 ${!n.isRead ? 'unread_notf' : ''}">

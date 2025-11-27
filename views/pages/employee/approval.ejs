@@ -102,6 +102,10 @@
         <script src="/js/components/shareDocument.js"></script>
         <script>
             $(document).ready(function () {
+                const currentUrl = window.location.href;
+                const urlObj = new URL(currentUrl);
+                const queryParams = new URLSearchParams(urlObj.search);
+                const documentId = queryParams.get('documentId');
                 const fileIcons = {
                     ppt: "/img/icons/fn1.png",
                     pptx: "/img/icons/fn1.png",
@@ -127,7 +131,7 @@
                 // -------------------------
                 const table = $('#approvalTable').DataTable({
                     ajax: {
-                        url: '/api/approval-requests',
+                        url: `/api/approval-requests?documentId=${documentId || ""}`,
                         Credentials: 'include',
                         type: 'GET',
                         data: function (d) {

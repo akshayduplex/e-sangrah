@@ -113,9 +113,12 @@
 					</nav>
 				</div>
 				<div class="rtbtn">
-					<a href="#" class="btn btn-primary btn-lg rounded-pill me-2 mb-2 btn-add-folder" id="btnAddFolder">
-						<i class="ti ti-plus me-1"></i> Create Folder
-					</a>
+					<% if (profile_type !=='vendor' && profile_type !=='donor' ) { %>
+						<a href="#" class="btn btn-primary btn-lg rounded-pill me-2 mb-2 btn-add-folder"
+							id="btnAddFolder">
+							<i class="ti ti-plus me-1"></i> Create Folder
+						</a>
+						<% } %>
 				</div>
 			</div>
 
@@ -189,12 +192,12 @@
 				const accessTypeSelect = document.getElementById("accessType");
 				const roleTypeSelect = document.getElementById("roleType");
 				const projectId = "<%= projectId %>";
-
+				const isSuperAdmin = window.profile_type === 'superadmin';
 				let currentShareFolderId = null;
 				let allUsers = [];
-
+				window.profile_type = "<%= profile_type %>";
 				const folderState = {
-					selectedFolders: [], // Array of { id, name } objects for the current path
+					selectedFolders: [],
 					currentFolderId: null,
 					isLoading: false
 				};
@@ -500,15 +503,10 @@
 
 							const userPermission = folder.permissions?.[0] || null;
 
-							const canView = !isOwner && userPermission
-								? (userPermission.access === "view" || userPermission.access === "edit")
-								: isOwner;
+							const canView = isSuperAdmin || isOwner || (userPermission && (userPermission.access === "view" || userPermission.access === "edit"));
+							const canDownload = isSuperAdmin || isOwner || (userPermission && userPermission.canDownload === true);
 
-							const canDownload = !isOwner && userPermission
-								? userPermission.canDownload === true
-								: isOwner;
-
-							if (!isOwner && isBlocked) {
+							if (!isSuperAdmin && !isOwner && isBlocked) {
 								div.classList.add("blocked");
 							}
 
@@ -525,48 +523,41 @@
 
                 <!-- VIEW -->
                 <li>
-                    <a class="dropdown-item view-folder 
-                        ${(!canView || isBlocked) ? "disabled-link" : ""}"
-                        href="${(!canView || isBlocked) ? "#" : "/" + folder._id + "/list"}">
+                      <a class="dropdown-item view-folder 
+                        ${(!canView && !isSuperAdmin) ? "disabled-link" : ""}"
+                        href="${(!canView && !isSuperAdmin) ? "#" : "/" + folder._id + "/list"}">
                         <i class="ti ti-eye"></i> View
                     </a>
                 </li>
 
                 <!-- DOWNLOAD -->
                 <li>
-                    <a class="dropdown-item download-folder 
-                        ${(!canDownload || isBlocked) ? "disabled-link" : ""}"
+                   <a class="dropdown-item download-folder 
+                        ${(!canDownload && !isSuperAdmin) ? "disabled-link" : ""}"
                         href="#" data-folder-id="${folder._id}" data-bs-toggle="modal" 
                         data-bs-target="#downloaddoc-modal">
                         <i class="ti ti-download"></i> Download
                     </a>
                 </li>
 
-                ${isOwner ? `
-                    <!-- OWNER OPTIONS -->
+                ${(isOwner || isSuperAdmin) ? `
                     <li><a class="dropdown-item rename-folder" href="#"><i class="ti ti-pencil-minus"></i> Rename</a></li>
-
                     <li><a class="dropdown-item toggle-block" href="#" data-id="${folder._id}">
                         <i class="ti ti-lock${isBlocked ? "-open" : ""}"></i>
                         <span class="block-text">${isBlocked ? "Unblock" : "Block"}</span>
                     </a></li>
-
                     <li><a class="dropdown-item share-btn" href="#" data-doc-id="${folder._id}" data-bs-toggle="modal" data-bs-target="#sharedoc-modal"><i class="ti ti-share"></i> Share</a></li>
-
                     <li><a class="dropdown-item delete-folder" href="#" data-bs-toggle="modal" data-bs-target="#trashdoc-modal"><i class="ti ti-trash"></i> Move to Trash</a></li>
-
                     <li><a class="dropdown-item archive-folder" href="#" data-bs-toggle="modal" data-bs-target="#archivedoc-modal"><i class="ti ti-archive"></i> Move to Archive</a></li>
                 ` : ""}
             </ul>
         </div>
     `;
-
-							if (canView && !isBlocked) {
+							if (canView || isSuperAdmin) {
 								div.addEventListener("dblclick", () => {
 									loadFolders(folder._id, [...parentPath, { id: folder._id, name: folder.name }]);
 								});
 							}
-
 							elements.container.appendChild(div);
 						});
 

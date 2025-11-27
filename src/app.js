@@ -84,6 +84,9 @@ const app = express();
     app.set("view engine", "ejs");
     app.set("views", path.resolve("views"));
     app.use(express.static(path.resolve("public")));
+    // Increase payload limits for forms
+    app.use(express.json({ limit: "50mb" }));
+    app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
     // ------------------- Global Locals -------------------
     app.use(async (req, res, next) => {

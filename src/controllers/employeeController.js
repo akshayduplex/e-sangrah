@@ -28,11 +28,13 @@ export const showEmployeeDashboardPage = (req, res) => {
 
 export const showEmployeeApprovalPage = (req, res) => {
     try {
+        const documentId = req.query.id || null;
         res.render("pages/employee/approval", {
             pageTitle: "Employee Approvals",
             pageDescription: "View and manage document and task approval requests.",
             metaKeywords: "employee approvals, approval workflow, approval requests",
             canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
+            documentId,
             user: req.user
         });
     } catch (err) {
@@ -104,7 +106,10 @@ export const getApprovalRequests = async (req, res) => {
         const userId = new mongoose.Types.ObjectId(user._id);
         const profileType = user.profile_type;
         const userDepartment = user.department ? new mongoose.Types.ObjectId(user.department) : null;
-
+        const documentId = req.query.documentId;
+        if (documentId && mongoose.Types.ObjectId.isValid(documentId)) {
+            filter._id = new mongoose.Types.ObjectId(documentId);
+        }
         let {
             status,
             department,
@@ -130,6 +135,9 @@ export const getApprovalRequests = async (req, res) => {
             ];
             if (userDepartment) accessConditions.push({ department: userDepartment });
             filter.$or = accessConditions;
+        }
+        if (documentId && mongoose.Types.ObjectId.isValid(documentId)) {
+            filter._id = new mongoose.Types.ObjectId(documentId);
         }
 
         if (status && status !== "All") {

@@ -3,6 +3,7 @@ import Department from '../models/Departments.js';
 import { successResponse, failResponse, errorResponse } from "../utils/responseHandler.js";
 import logger from '../utils/logger.js';
 import { activityLogger } from "../helper/activityLogger.js";
+import Document from '../models/Document.js';
 //Page Controllers
 
 // Render Add Department page
@@ -102,26 +103,65 @@ export const getAllDepartments = async (req, res) => {
 export const searchDepartments = async (req, res) => {
     try {
         const { search = '', page = 1, limit = 10 } = req.query;
+        const userId = req.user?._id;
+        const profileType = req.user?.profile_type;
 
-        const query = { status: "Active" };
+        let query = { status: "Active" };
+
         if (search) {
-            query.name = { $regex: search, $options: 'i' };
+            query.name = { $regex: search, $options: "i" };
+        }
+
+        // ---------------------------------------------------------
+        // RESTRICT DEPARTMENTS FOR DONOR / VENDOR ONLY
+        // ---------------------------------------------------------
+        if (profileType === "donor" || profileType === "vendor") {
+
+            const documentFilter = {
+                isDeleted: false
+            };
+
+            if (profileType === "donor") {
+                documentFilter.documentDonor = userId;
+            }
+
+            if (profileType === "vendor") {
+                documentFilter.documentVendor = userId;
+            }
+
+            const departmentIds = await Document.distinct("department", documentFilter);
+
+            if (departmentIds.length === 0) {
+                return res.json({
+                    success: true,
+                    data: [],
+                    pagination: { more: false }
+                });
+            }
+
+            query._id = { $in: departmentIds };
         }
 
         const skip = (parseInt(page) - 1) * parseInt(limit);
 
         const [data, total] = await Promise.all([
-            Department.find(query).select('name priority').skip(skip).limit(parseInt(limit)).lean(),
+            Department.find(query)
+                .select("name priority")
+                .skip(skip)
+                .limit(parseInt(limit))
+                .lean(),
+
             Department.countDocuments(query)
         ]);
 
-        res.json({
+        return res.json({
             success: true,
             data,
             pagination: {
                 more: skip + data.length < total
             }
         });
+
     } catch (err) {
         return errorResponse(res, err);
     }
@@ -149,7 +189,6 @@ export const createDepartment = async (req, res) => {
 
         const { name, priority, status } = req.body;
 
-        // Validate required fields
         if (!name) return res.status(400).json({ error: 'Department name is required' });
         if (priority !== undefined && priority < 1) return res.status(400).json({ error: 'Priority must be greater than 0' });
 

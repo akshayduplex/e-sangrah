@@ -1,5 +1,5 @@
 $(document).ready(function () {
-
+    const panPattern = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
     // DONOR EMAIL DUPLICATE CHECK
     $('#email_id').on('blur', function () {
         const email = $(this).val().trim();
@@ -8,6 +8,21 @@ $(document).ready(function () {
         if (pattern.test(email)) {
             checkDuplicateValue('email', email, $(this));
         }
+    });
+    $('#pan_tax_id').on('input blur', function () {
+        const val = $(this).val().trim().toUpperCase();
+        $(this).val(val);
+        if (panPattern.test(val)) {
+            $(this).removeClass('is-invalid').addClass('is-valid');
+            $('#panTaxIdFeedback').text('');
+        } else {
+            $(this).removeClass('is-valid').addClass('is-invalid');
+            $('#panTaxIdFeedback').text('Invalid PAN / Tax ID format').css('color', 'red');
+        }
+    });
+    $('#pan_tax_id').on('blur', function () {
+        const val = $(this).val().trim().toUpperCase();
+        if (val) checkDuplicateValue('id_proof', val, $(this));
     });
 
     // DONOR MOBILE DUPLICATE CHECK

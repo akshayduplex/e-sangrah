@@ -18,6 +18,8 @@ const notificationSchema = new mongoose.Schema({
         enum: [
             "document",
             "document_approved",
+            'document',
+            'document_discussion',
             "approval_request",
             "approval_update",
             "project_assigned",

@@ -9,6 +9,7 @@ import logger from "../utils/logger.js";
 import { parseDateDDMMYYYY } from "../utils/formatDate.js";
 import { renderProjectDetails } from "../utils/renderProjectDetails.js";
 import { activityLogger } from "../helper/activityLogger.js";
+import { addNotification } from "./NotificationController.js";
 //Page controllers
 
 const extractApprovalAuthority = (body) => {
@@ -190,13 +191,14 @@ export const showExistingProjectDetails = async (req, res) => {
 // Main Projects page
 export const showMainProjectsPage = async (req, res) => {
     try {
+        const projectId = req.query.id || null;
         res.locals.pageTitle = "Projects";
         res.locals.pageDescription = "Browse and manage all projects in your workspace.";
         res.locals.metaKeywords = "projects, project list, workspace projects";
         res.locals.canonicalUrl = `${req.protocol}://${req.get("host")}${req.originalUrl}`;
-
         res.render("pages/projects/projects", {
             user: req.user,
+            projectId: projectId,
             messages: req.flash()
         });
     } catch (err) {
@@ -441,6 +443,30 @@ export const createProject = async (req, res) => {
             action: "CREATE",
             details: `Project '${project.projectName}' created by ${user.name}`
         });
+        // ---------------------------------------------
+        // SEND NOTIFICATIONS TO USERS BY ROLE
+        // ---------------------------------------------
+
+        const sendRoleNotification = async (recipientList, roleName) => {
+            for (const recipient of recipientList) {
+                await addNotification({
+                    recipient,
+                    sender: user._id,
+                    type: "project_assigned",
+                    title: `${roleName} Assignment`,
+                    message: `You have been added as a ${roleName} in project "${project.projectName}".`,
+                    relatedProject: project._id,
+                    priority: "medium",
+                    actionUrl: `/projects/${project._id}`
+                });
+            }
+        };
+
+        // Notify Managers
+        await sendRoleNotification(projectData.projectManager, "Project Manager");
+        // Notify Collaboration Team
+        if (projectData.projectCollaborationTeam?.length > 0)
+            await sendRoleNotification(projectData.projectCollaborationTeam, "Project Collaboration Team");
 
         return successResponse(res, project, "Project created successfully", 201);
 
@@ -455,14 +481,23 @@ export const createProject = async (req, res) => {
 export const getAllProjects = async (req, res) => {
     try {
         const { search } = req.query;
+        const userId = req.user?._id;
+        const profileType = req.user?.profile_type;
 
         let query = {};
+
         if (search) {
-            // Case-insensitive search on projectName
             query.projectName = { $regex: new RegExp(search, "i") };
         }
 
-        // If no search term, limit results to 10
+        if (profileType === "donor") {
+            query.donor = userId; // Only projects where user is in donor array
+        }
+
+        if (profileType === "vendor") {
+            query.vendor = userId; // Only projects where user is in vendor array
+        }
+
         const limit = search ? 0 : 10;
 
         const projects = await Project.find(query, { _id: 1, projectName: 1 })
@@ -476,7 +511,6 @@ export const getAllProjects = async (req, res) => {
         return errorResponse(res, err, "Failed to fetch projects");
     }
 };
-
 
 // Get a single project by ID
 export const getProject = async (req, res) => {
@@ -1500,10 +1534,15 @@ export const getProjectTimeline = async (req, res) => {
 // Search projects with advanced filtering
 export const searchProjects = async (req, res) => {
     try {
-        const { q, status, manager, priority, startDate, endDate, page = 1, limit = 10 } = req.query;
+        const { q, status, manager, priority, startDate, endDate, page = 1, limit = 10, projectId = '' } = req.query;
 
         // Build search query
         const query = { isActive: true };
+
+        // Filter by projectId
+        if (projectId && isValidObjectId(projectId)) {
+            query._id = projectId;
+        }
 
         // Text search
         if (q) {
@@ -1551,7 +1590,7 @@ export const searchProjects = async (req, res) => {
 
         res.status(200).json({
             success: true,
-            query: { q, status, manager, priority, startDate, endDate },
+            query: { q, status, manager, priority, startDate, endDate, projectId },
             count: projects.totalDocs,
             data: projects.docs,
             pagination: {

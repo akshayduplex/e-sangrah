@@ -497,23 +497,35 @@ export const verifyResetLink = async (req, res) => {
         const { token } = req.params;
         const { email } = req.query;
 
-        const otpEntry = otpStore[email];
-        if (!otpEntry || otpEntry.resetToken !== token) {
-            return failResponse(res, "Invalid or expired reset link", 400);
+        if (!email || !token) {
+            return res.redirect("/forgot-password?error=Invalid+reset+link");
         }
 
+        const otpEntry = otpStore[email];
+
+        // Invalid or mismatched token
+        if (!otpEntry || otpEntry.resetToken !== token) {
+            return res.redirect("/forgot-password?error=Invalid+or+expired+reset+link");
+        }
+
+        // Expired token
         if (otpEntry.expires < Date.now()) {
             delete otpStore[email];
-            return failResponse(res, "Reset link expired", 400);
+            return res.redirect("/forgot-password?error=Reset+link+expired");
         }
 
+        // User not found
         const user = await User.findOne({ email });
-        if (!user) return failResponse(res, "User not found", 404);
+        if (!user) {
+            return res.redirect("/forgot-password?error=User+not+found");
+        }
 
+        // Update password
         user.raw_password = otpEntry.newPassword;
         user.passwordVerification = "verified";
         await user.save();
 
+        // Remove OTP entry
         delete otpStore[email];
 
         // Destroy session and clear cookie
@@ -531,6 +543,7 @@ export const verifyResetLink = async (req, res) => {
             });
         });
 
+        // Success
         return res.redirect("/login?success=Password+updated");
 
     } catch (err) {

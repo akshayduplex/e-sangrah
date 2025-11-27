@@ -134,22 +134,34 @@ document.addEventListener("DOMContentLoaded", () => {
                     method: "POST",
                     body: formData
                 });
-                const data = await res.json();
+
+                let data = {};
+                try {
+                    data = await res.json();
+                } catch (parseErr) {
+                    data = { message: "Invalid server response" };
+                }
+
                 if (res.ok) {
+
                     const successModalEl = document.getElementById("data-success-register");
                     const successModal = new bootstrap.Modal(successModalEl);
                     successModal.show();
 
                     addForm.reset();
+                    toggleLoader(submitBtn, false);
+
                     successModalEl.addEventListener("hidden.bs.modal", () => {
                         window.location.href = "/projects";
                     });
+
                 } else {
                     showToast(data.message || "Failed to create project", "error");
                     toggleLoader(submitBtn, false);
                 }
+
             } catch (err) {
-                showToast("Something went wrong while creating the project." + err, "error");
+                showToast("Something went wrong while creating the project. " + err.message, "error");
                 toggleLoader(submitBtn, false);
             }
         });

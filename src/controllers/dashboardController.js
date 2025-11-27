@@ -3,7 +3,7 @@ import Document from "../models/Document.js";
 import File from "../models/File.js";
 import { successResponse, failResponse, errorResponse } from "../utils/responseHandler.js";
 import { calculateStartDate } from "../utils/calculateStartDate.js";
-import { formatFileSize, getFileIcon, getGrowth } from "../helper/CommonHelper.js";
+import { formatFileSize, getDateRange, getFileIcon, getGrowth } from "../helper/CommonHelper.js";
 import { FILE_TYPE_CATEGORIES, FILTER_PERIODS } from "../constant/Constant.js";
 import Project, { ProjectType } from "../models/Project.js";
 import { applyFilters, getSessionFilters } from "../helper/sessionHelpers.js";
@@ -43,16 +43,27 @@ export const getDashboardStats = async (req, res) => {
         const userId = new mongoose.Types.ObjectId(user._id);
         const profileType = user.profile_type?.toLowerCase();
 
-        const { selectedProjectId, selectedYear } = getSessionFilters(req);
+        const { selectedProjectId } = getSessionFilters(req);
+        const filter = req.query.filter || "year";
+        /* ------------------ DATE RANGE FROM HELPER ------------------ */
+        const range = await getDateRange(filter);
 
-        const year = selectedYear ? Number(selectedYear) : new Date().getFullYear();
+        if (!range) {
+            return errorResponse(res, {}, "Invalid filter option");
+        }
 
-        // Base filters
+        const { start, end } = range;
+
+        /* ------------------ PREVIOUS PERIOD RANGE ------------------ */
+        const diff = end.getTime() - start.getTime();
+        const prevStart = new Date(start.getTime() - diff);
+        const prevEnd = new Date(end.getTime() - diff);
+
+        /* ------------------ BASE MATCH ------------------ */
         const baseMatch = [
             { isDeleted: { $ne: true } },
             { isArchived: { $ne: true } }
         ];
-
 
         if (profileType !== "superadmin") {
             baseMatch.push({ owner: userId });
@@ -62,21 +73,19 @@ export const getDashboardStats = async (req, res) => {
             baseMatch.push({ project: selectedProjectId });
         }
 
-        const currentStart = new Date(year, 0, 1);
-        const currentEnd = new Date(year, 11, 31, 23, 59, 59);
-        const prevStart = new Date(year - 1, 0, 1);
-        const prevEnd = new Date(year - 1, 11, 31, 23, 59, 59);
-
+        /* ------------------ MATCH CURRENT ------------------ */
         const currentMatch = [
             ...baseMatch,
-            { createdAt: { $gte: currentStart, $lte: currentEnd } }
+            { createdAt: { $gte: start, $lte: end } }
         ];
 
+        /* ------------------ MATCH PREVIOUS ------------------ */
         const previousMatch = [
             ...baseMatch,
             { createdAt: { $gte: prevStart, $lte: prevEnd } }
         ];
 
+        /* ------------------ AGGREGATION ------------------ */
         const currentStats = await Document.aggregate([
             { $match: { $and: currentMatch } },
             { $group: { _id: "$status", count: { $sum: 1 } } }
@@ -87,6 +96,7 @@ export const getDashboardStats = async (req, res) => {
             { $group: { _id: "$status", count: { $sum: 1 } } }
         ]);
 
+        /* ------------------ FORMAT ------------------ */
         const formatStats = (data) => {
             const stats = { total: 0, draft: 0, pending: 0, approved: 0, rejected: 0 };
             data.forEach(s => {
@@ -100,8 +110,17 @@ export const getDashboardStats = async (req, res) => {
         const current = formatStats(currentStats);
         const previous = formatStats(previousStats);
 
+        /* ------------------ GROWTH FUNCTION ------------------ */
+        const getGrowth = (curr, prev) => {
+            if (prev === 0) return curr > 0 ? 100 : 0;
+            return ((curr - prev) / prev) * 100;
+        };
+
+        /* ------------------ RESPONSE ------------------ */
         const response = {
-            selectedYear: year,
+            filter,
+            startDate: start,
+            endDate: end,
 
             total: current.total,
             totalGrowth: getGrowth(current.total, previous.total),
@@ -116,15 +135,17 @@ export const getDashboardStats = async (req, res) => {
             approvedGrowth: getGrowth(current.approved, previous.approved),
 
             rejected: current.rejected,
-            rejectedGrowth: getGrowth(current.rejected, previous.rejected)
+            rejectedGrowth: getGrowth(current.rejected, previous.rejected),
         };
 
         return successResponse(res, response, "Dashboard stats fetched successfully");
+
     } catch (err) {
         console.error("Dashboard Error:", err);
         return errorResponse(res, err, "Failed to fetch stats");
     }
 };
+
 
 
 export const getFileStatus = async (req, res) => {
@@ -782,8 +803,8 @@ export const getAnalyticsStats = async (req, res) => {
         const now = new Date();
 
         // Current month
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
 
         const uploadedThisMonth = await Document.countDocuments({
             ...baseFilter,
@@ -791,8 +812,8 @@ export const getAnalyticsStats = async (req, res) => {
         });
 
         // Previous month
-        const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        const prevMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+        const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0, 0);
+        const prevMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
 
         const uploadedLastMonth = await Document.countDocuments({
             ...baseFilter,
