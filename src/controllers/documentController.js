@@ -525,11 +525,14 @@ export const getDocuments = async (req, res) => {
         }
 
         if (profile_type !== "superadmin") {
-
-            // Base condition for normal users
             const baseAccess = [
                 { owner: userId },
-                // { sharedWithUsers: userId }  // enable if needed
+                {
+                    $and: [
+                        { owner: { $ne: userId } },       // non-owner
+                        { status: "Approved" }            // only if approved
+                    ]
+                }
             ];
 
             if (profile_type === "vendor") {
@@ -1463,15 +1466,6 @@ export const createDocument = async (req, res) => {
             if (isNaN(parsedExpiryDate.getTime())) {
                 return failResponse(res, "Invalid expiry date format", 400);
             }
-
-            // ------------------- Validate startDate < expiryDate -------------------
-            // if (startDate && startDate > parsedExpiryDate) {
-            //     return failResponse(
-            //         res,
-            //         "Document date (start date) must be earlier than expiry date",
-            //         400
-            //     );
-            // }
         }
 
         // ------------------- Get Project Approval Authority -------------------
@@ -1539,7 +1533,6 @@ export const createDocument = async (req, res) => {
             currentVersionNumber: mongoose.Types.Decimal128.fromString("1.0"),
         });
 
-        // ------------------- Process Files in Parallel -------------------
         // ------------------- Process Files -------------------
         let fileDocs = [];
         if (parsedFileIds.length > 0) {
@@ -1817,12 +1810,7 @@ export const createDocument = async (req, res) => {
 };
 
 
-/**
- * Utility: Create version snapshot
- */
-/**
- * Create version snapshot with change diffs
- */
+
 const createVersionSnapshot = async (document, changesMade, userId, reason) => {
     try {
         const snapshot = {
@@ -1842,20 +1830,22 @@ const createVersionSnapshot = async (document, changesMade, userId, reason) => {
             documentDonor: document.documentDonor,
             documentVendor: document.documentVendor,
             updatedAt: document.updatedAt,
+            files: document.files,
         };
-        const newFiles = document.__newFiles || [];
+        // const newFiles = document.__newFiles || [];
+
         const versionNumber = document.currentVersionNumber;
         const versionLabel = document.currentVersionLabel;
 
         const versionDoc = await DocumentVersion.create({
             documentId: document._id,
             snapshot,
-            changesMade, // This should be the diff object
+            changesMade,
             createdBy: userId,
             changeReason: reason,
             versionNumber,
             versionLabel,
-            files: newFiles,
+            files: document.files,
             timestamp: new Date(),
         });
         return versionDoc;
@@ -1863,14 +1853,8 @@ const createVersionSnapshot = async (document, changesMade, userId, reason) => {
         console.error(' Error creating version snapshot:', error);
         throw error;
     }
-};
+}
 
-/**
- * Update document with proper version handling
- */
-/**
- * Update document with proper version handling
- */
 
 /**
  * Update document with proper version handling, fixing double-save and 
@@ -1924,7 +1908,7 @@ export const updateDocument = async (req, res) => {
                     fileIds = updateData.fileIds;
                 }
 
-                // ⚠️ FIX: Check if files are REQUIRED on update. If this check is needed, uncomment it.
+                //Check if files are REQUIRED on update. If this check is needed, uncomment it.
                 if (fileIds.length === 0 && some_condition_files_are_required) {
                     await session.abortTransaction();
                     return res.status(400).json({ success: false, message: "Files are required for this type of update." });
@@ -4406,6 +4390,7 @@ export const updateApprovalStatus = async (req, res) => {
                 companyName: res.locals.companyName || "Our Company",
                 logoUrl: res.locals.logo || "",
                 bannerUrl: res.locals.mailImg || "",
+                documentLink: `${API_CONFIG.baseUrl}/employee/approval?id=${document._id}`,
                 comment,
             }
             // Generate HTML using your central email generator

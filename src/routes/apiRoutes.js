@@ -290,7 +290,7 @@ router.get('/departments/:id', authenticate, DepartmentController.getDepartmentB
 // Admin-only routes (CRUD)
 router.post('/departments', authenticate, checkPermissions, DepartmentValidators.createDepartmentValidator, validators, DepartmentController.createDepartment);
 router.patch('/departments/:id', authenticate, checkPermissions, DepartmentValidators.updateDepartmentValidator, validators, DepartmentController.updateDepartment);
-router.delete('/departments/:id', authenticate, checkPermissions, DepartmentController.deleteDepartment);
+router.delete('/departments/:id', authenticate, DepartmentController.deleteDepartment);
 
 
 // ---------------------------

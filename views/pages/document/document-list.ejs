@@ -556,7 +556,7 @@
                         <img src="${fileIcons[doc?.files[0]?.originalName.split('.').pop().toLowerCase()] || fileIcons.default}" style="height:30px;">
                     </span>
                     <div>
-                         <p class="mb-0 text-dark">${doc?.metadata?.fileName}-${doc.metadata.mainHeading}</p>
+                         <p class="mb-0 text-dark">${doc?.metadata?.fileName || 'N/A'}</p>
                         <small class="text-muted">${fileSizeKB}</small>
                     </div>
                 </div>`

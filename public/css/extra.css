@@ -122,3 +122,9 @@ table.datatable {
     pointer-events: none !important;
     overflow: hidden !important;
 }
+
+.icon-activity {
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+}

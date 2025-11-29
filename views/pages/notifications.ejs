@@ -71,7 +71,7 @@
 
 					if (row.type === "approval_request") {
 						actionUrl = `/approval-requests?documentId=${row.relatedDocument?._id}`;
-						buttonHtml = `<button class="approvbtn btn btn-primary btn-sm" data-url="${actionUrl}">Approve</button>`;
+						buttonHtml = `<button class="approvbtn adminapprv_btn btn-sm" data-url="${actionUrl}">Approve</button>`;
 						return buttonHtml;
 					}
 

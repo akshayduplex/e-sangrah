@@ -18,6 +18,12 @@ import PQueue from 'p-queue';
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { Readable } from "stream";
 
+function formatHeader(text) {
+    if (!text) return "";
+    return text
+        .replace(/([A-Z])/g, " $1")
+        .replace(/^./, str => str.toUpperCase());
+}
 
 //Pages
 export const showCheckMailPage = (req, res) => {

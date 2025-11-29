@@ -315,7 +315,7 @@ $(document).ready(function () {
                 <div class="dflexbtwn mb-2 align-items-start">
                     <div class="flxtblleft d-flex align-items-start">
                         <span class="mb-2">
-                            <img src="/img/icons/usrround.png" alt="activity">
+                            <img src="/img/icons/user-activity.svg" alt="activity" class="icon-activity">
                         </span>
                         <div class="flxtbltxt ms-3">
                             <p class="fs-16 mb-1 fw-normal">

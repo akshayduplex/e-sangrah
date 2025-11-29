@@ -75,27 +75,42 @@
             let documentsTable = null;
 
             // Build the dropdown actions
-            function buildActions(docId) {
+            function buildActions(doc) {
+                const docId = doc._id;
+                const fileId = doc.files?.[0]?._id || '';
+
                 return `
         <div class="btn-group" role="group">
             <button type="button" class="btn border-0 p-1" data-bs-toggle="dropdown" aria-expanded="false">
                 <i class="ti ti-settings"></i>
             </button>
             <ul class="dropdown-menu dropdown-menu-end">
-                <li><a class="dropdown-item" href="#" data-id="${docId}" href="/documents/${docId}/versions/view?version="" data-action="view"><i class="ti ti-eye"></i> View</a></li>
-                <li><a class="dropdown-item"  href="/documents/edit/${docId}"><i class="ti ti-pencil-minus"></i> Edit</a></li>
-               <li>
-                        <a class="dropdown-item share-btn" href="#" data-doc-id="${docId}"  data-file-id="${docId.files?.[0]?._id || ''}"  data-bs-toggle="modal" data-bs-target="#sharedoc-modal">
-                            <i class="ti ti-share"></i> Share
-                        </a>
-                    </li>
-                    <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-id="${docId}" data-bs-target="#versionhistory-modal"><i class="ti ti-history"></i> Version History</a></li>
-                    <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-file-id="${docId.files?.[0]?._id || ''}" data-bs-target="#downloaddoc-modal"><i class="ti ti-download"></i> Download</a></li>
-                    <li><a class="dropdown-item btn-delete" href="#" data-id="${docId}" data-bs-toggle="modal" data-bs-target="#trashdoc-modal"><i class="ti ti-trash"></i> Move to Trash</a></li>
-                    <li><a class="dropdown-item archive-document" href="#"  data-id="${docId}" data-bs-toggle="modal" data-bs-target="#archivedoc-modal"><i class="ti ti-archive"></i> Move to Archive</a></li>
-                </ul>
+                <li><a class="dropdown-item" href="#" data-id="${docId}" data-action="view"><i class="ti ti-eye"></i> View</a></li>
+                <li><a class="dropdown-item" href="/documents/edit/${docId}"><i class="ti ti-pencil-minus"></i> Edit</a></li>
+                <li>
+                    <a class="dropdown-item share-btn" href="#"
+                       data-doc-id="${docId}"
+                       data-file-id="${fileId}"
+                       data-bs-toggle="modal"
+                       data-bs-target="#sharedoc-modal">
+                        <i class="ti ti-share"></i> Share
+                    </a>
+                </li>
+                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-id="${docId}" data-bs-target="#versionhistory-modal"><i class="ti ti-history"></i> Version History</a></li>
+                <li>
+                    <a class="dropdown-item" href="#"
+                       data-bs-toggle="modal"
+                       data-file-id="${fileId}"
+                       data-bs-target="#downloaddoc-modal">
+                        <i class="ti ti-download"></i> Download
+                    </a>
+                </li>
+                <li><a class="dropdown-item btn-delete" href="#" data-id="${docId}" data-bs-toggle="modal" data-bs-target="#trashdoc-modal"><i class="ti ti-trash"></i> Move to Trash</a></li>
+                <li><a class="dropdown-item archive-document" href="#" data-id="${docId}" data-bs-toggle="modal" data-bs-target="#archivedoc-modal"><i class="ti ti-archive"></i> Move to Archive</a></li>
+            </ul>
         </div>`;
             }
+
 
             $(document).ready(function () {
                 $('#compilanceDepartment').select2({
@@ -168,15 +183,20 @@
                             }
 
                             const docs = result.data.documents.map(doc => {
-                                const { _id, metadata, department, compliance, files } = doc;
+                                const { _id, metadata, department, compliance, files, currentVersionLabel, archivedAt } = doc;
                                 const file = files?.[0];
-
-                                const fileName = file?.originalName || metadata?.fileName || 'Untitled';
+                                const retentionStatus = getRetentionStatus(archivedAt, compliance?.expiryDate);
+                                const retentionDisplay = `
+    <p class="mb-0 d-flex align-items-center fw-medium text-neutral">
+        ${retentionStatus.icon} 
+        ${retentionStatus.status}
+    </p>
+`; const fileName = metadata?.fileName || file?.originalName || 'Untitled';
                                 const fileSizeKB = file?.fileSize ? `${Math.round(file.fileSize / 1024)} KB` : '—';
-                                const version = file?.version ? ` <span class="text-success">v${file.version}</span>` : '';
+                                const version = currentVersionLabel ? ` <span class="text-success">v${currentVersionLabel}</span>` : '';
                                 const fileIcon = getFileIcon(fileName);
                                 const expiry = compliance?.expiryDate ? formatDateTime(compliance.expiryDate) : 'N/A';
-                                const retention = compliance?.retentionPeriod || 'Active';
+                                const retention = retentionDisplay || '-';
                                 const isCompliant = compliance?.isCompliance
                                     ? `<p class="text-success d-flex align-items-center gap-2">
                                 <span class="d-inline-flex align-items-center justify-content-center rounded-circle bg-success-subtle" style="width: 28px; height: 28px;">
@@ -190,7 +210,7 @@
                            </p>`;
 
                                 return [
-                                    buildActions(_id),
+                                    buildActions(doc),
                                     `<div class="flxtblleft">
                             <span class="avatar rounded bg-light mb-2">
                                 <img src="${fileIcon}" alt="file icon">

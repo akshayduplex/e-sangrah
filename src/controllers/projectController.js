@@ -415,6 +415,7 @@ export const createProject = async (req, res) => {
             projectName: body.projectName.trim(),
             projectCode: body.projectCode.trim().toUpperCase(),
             projectType: new mongoose.Types.ObjectId(body.projectType),
+            addedBy: user._id,
             projectDescription: body.projectDescription?.trim() || "",
             projectManager: body.projectManager.map(id => new mongoose.Types.ObjectId(id)),
             projectCollaborationTeam: body.projectCollaborationTeam || [],

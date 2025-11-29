@@ -107,9 +107,7 @@ export const getApprovalRequests = async (req, res) => {
         const profileType = user.profile_type;
         const userDepartment = user.department ? new mongoose.Types.ObjectId(user.department) : null;
         const documentId = req.query.documentId;
-        if (documentId && mongoose.Types.ObjectId.isValid(documentId)) {
-            filter._id = new mongoose.Types.ObjectId(documentId);
-        }
+
         let {
             status,
             department,

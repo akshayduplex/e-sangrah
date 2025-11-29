@@ -148,7 +148,7 @@
                     <td>${appr.userId?.name || '-'}</td>
                     <td>${appr.approvedOn ? new Date(appr.approvedOn).toDateString() : 'In Review'}</td>
                     <td><span class="status-badge status-${appr.status.toLowerCase()}">${appr.status}</span></td>
-                    <td>-</td>
+                    <td>${appr?.remark}</td>
                 </tr>
             `).join('');
 					}

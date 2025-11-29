@@ -90,9 +90,17 @@ export const showEditDepartmentPage = async (req, res) => {
 // Get all active departments
 export const getAllDepartments = async (req, res) => {
     try {
-        const departments = await Department.find({})
+        let filter = {};
+
+        // non-superadmin users → only items created by them
+        if (req.user.profile_type !== 'superadmin') {
+            filter["addedBy.email"] = req.user.email;
+        }
+
+        const departments = await Department.find(filter)
             .select('name priority status addedBy add_date')
             .lean();
+
         return successResponse(res, departments, 'Departments fetched successfully');
     } catch (err) {
         return errorResponse(res, err);

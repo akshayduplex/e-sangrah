@@ -32,7 +32,8 @@
 									<label for="name" class="form-label">Full Name <span
 											class="text-danger">*</span></label>
 									<input type="text" id="name" name="name" class="form-control"
-										placeholder="Enter full name" required>
+										placeholder="Enter full name" required maxlength="80"
+										oninput="this.value = this.value.replace(/[^A-Za-z ]/g,'')">
 								</div>
 							</div>
 
@@ -42,7 +43,7 @@
 									<label for="email" class="form-label">Email Address <span
 											class="text-danger">*</span></label>
 									<input type="email" id="email" name="email" class="form-control"
-										placeholder="example@email.com" required>
+										placeholder="example@email.com" required maxlength="80">
 								</div>
 							</div>
 
@@ -53,7 +54,7 @@
 											class="text-danger">*</span></label>
 									<input type="tel" id="phone_number" name="phone_number" class="form-control"
 										placeholder="Enter 10-digit phone number" pattern="^[0-9]{10}$" maxlength="10"
-										required oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0,10)">
+										required oninput="this.value = this.value.replace(/[^0-9]/g,'').slice(0,10)">
 								</div>
 							</div>
 
@@ -63,7 +64,7 @@
 									<label for="employee_id" class="form-label">Employee ID <span
 											class="text-danger">*</span></label>
 									<input type="text" id="employee_id" name="employee_id" class="form-control"
-										placeholder="Enter Employee ID" required
+										placeholder="Enter Employee ID" required maxlength="15"
 										oninput="this.value = this.value.toUpperCase()">
 								</div>
 							</div>
@@ -95,7 +96,7 @@
 									<label for="address" class="form-label">Address <span
 											class="optnl_lbl">(Optional)</span></label>
 									<textarea id="address" name="address" rows="3" class="form-control"
-										placeholder="Enter address"></textarea>
+										placeholder="Enter address" maxlength="250"></textarea>
 								</div>
 							</div>
 

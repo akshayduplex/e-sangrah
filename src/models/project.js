@@ -72,14 +72,12 @@ const projectSchema = new mongoose.Schema(
             required: true,
             index: true,
         },
-
+        addedBy: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User"
+        },
         projectDescription: { type: String, trim: true, maxlength: 1000 },
-        // department: {
-        //     type: mongoose.Schema.Types.ObjectId,
-        //     ref: "Department",
-        //     required: true,
-        //     index: true,
-        // },
+
         projectManager: [
             {
                 type: mongoose.Schema.Types.ObjectId,

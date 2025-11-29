@@ -15,7 +15,8 @@
                             </div>
                             <% } else { %>
                                 <input type="text" name="projectName" class="form-control"
-                                    placeholder="Enter Project Name" value="<%= project?.projectName || '' %>" required>
+                                    placeholder="Enter Project Name" value="<%= project?.projectName || '' %>" required
+                                    maxlength="200">
                                 <% } %>
                     </div>
 
@@ -28,7 +29,8 @@
                             <% } else { %>
                                 <input type="text" name="projectCode" class="form-control"
                                     placeholder="Enter Project Code" value="<%= project?.projectCode || '' %>"
-                                    <%=project ? 'readonly' : '' %> required>
+                                    <%=project ? 'readonly' : '' %> maxlength="20"
+                                oninput="this.value = this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')" required>
                                 <% } %>
                     </div>
 
@@ -304,7 +306,7 @@
                                                             <input type="number"
                                                                 name="approvalAuthority[<%= index %>][priority]"
                                                                 class="form-control" placeholder="Enter priority"
-                                                                value="<%= a.priority %>" required>
+                                                                min="1" max="999" value="<%= a.priority %>" required>
                                                         </div>
                                                         <div class="col-md-1 d-flex align-items-center">
                                                             <button type="button"
@@ -394,7 +396,7 @@
                             </div>
                             <% } else { %>
                                 <textarea name="projectDescription" class="form-control" rows="4"
-                                    style="resize:vertical"
+                                    style="resize:vertical" maxlength="1000"
                                     placeholder="Enter project description"><%= project?.projectDescription || '' %></textarea>
                                 <% } %>
                     </div>

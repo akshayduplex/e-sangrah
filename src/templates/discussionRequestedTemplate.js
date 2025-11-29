@@ -10,6 +10,7 @@ export const discussionRequestedTemplate = (data) => {
         logoUrl = '',
         bannerUrl = '',
         themeColor = '#1c69d5',
+        documentLink,
         BASE_URL = ApiEndpoints.API_CONFIG.baseUrl
     } = data;
     const fullLogoUrl = logoUrl ? `${BASE_URL}${logoUrl}` : '';
@@ -54,7 +55,7 @@ export const discussionRequestedTemplate = (data) => {
 
     // Optional button (can be linked to document discussion page)
     html += `<div style="text-align:center; margin:25px 0;">`;
-    html += `<a href="${BASE_URL}/documents" target="_blank" rel="noopener noreferrer" style="text-decoration:none; border-radius:7px; padding:12px 25px; color:#fff; background:${themeColor}; font-size:15px; display:inline-block;">`;
+    html += `<a href="${documentLink}" target="_blank" rel="noopener noreferrer" style="text-decoration:none; border-radius:7px; padding:12px 25px; color:#fff; background:${themeColor}; font-size:15px; display:inline-block;">`;
     html += `View Document</a>`;
     html += `</div>`;
 

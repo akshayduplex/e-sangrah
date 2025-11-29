@@ -196,6 +196,7 @@
 				let currentShareFolderId = null;
 				let allUsers = [];
 				window.profile_type = "<%= profile_type %>";
+				const isMobile = window.matchMedia("(max-width: 768px)").matches;
 				const folderState = {
 					selectedFolders: [],
 					currentFolderId: null,
@@ -554,9 +555,17 @@
         </div>
     `;
 							if (canView || isSuperAdmin) {
-								div.addEventListener("dblclick", () => {
-									loadFolders(folder._id, [...parentPath, { id: folder._id, name: folder.name }]);
-								});
+								if (isMobile) {
+									// Single tap
+									div.addEventListener("click", () => {
+										loadFolders(folder._id, [...parentPath, { id: folder._id, name: folder.name }]);
+									});
+								} else {
+									// Desktop double-click
+									div.addEventListener("dblclick", () => {
+										loadFolders(folder._id, [...parentPath, { id: folder._id, name: folder.name }]);
+									});
+								}
 							}
 							elements.container.appendChild(div);
 						});
