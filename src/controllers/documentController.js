@@ -709,7 +709,7 @@ export const getDocuments = async (req, res) => {
         // --- Fetch documents ---
         const documents = await Document.find(filter)
             .select(`
-                files updatedAt createdAt wantApprovers signature isDeleted isArchived 
+                files updatedAt createdAt wantApprovers signature isDeleted isArchived archivedAt
                 comment sharedWithUsers compliance status metadata tags owner versioning
                 documentVendor documentDonor department project description
                 documentApprovalAuthority currentVersionLabel
@@ -753,6 +753,208 @@ export const getDocuments = async (req, res) => {
     }
 };
 
+export const getComplianceDocuments = async (req, res) => {
+    try {
+        const {
+            page = 1,
+            limit = 10,
+            search,
+            department,
+            project,
+            date,
+            orderColumn,
+            orderDir,
+            docType,
+            documentId
+        } = req.query;
+
+        const userId = req.user?._id;
+        const profile_type = req.user?.profile_type;
+        // --- Base filter ---
+        const filter = {
+            isDeleted: false
+        };
+        /** -------------------- DOCUMENT ID FILTER -------------------- **/
+        if (documentId && mongoose.Types.ObjectId.isValid(documentId)) {
+            filter._id = documentId;
+        }
+
+        if (profile_type !== "superadmin") {
+
+            // Base condition for normal users
+            const baseAccess = [
+                { owner: userId },
+                // { sharedWithUsers: userId }  // enable if needed
+            ];
+
+            if (profile_type === "vendor") {
+                baseAccess.push({ documentVendor: userId });
+            }
+
+            if (profile_type === "donor") {
+                baseAccess.push({ documentDonor: userId });
+            }
+
+            filter.$or = baseAccess;
+        }
+
+        const toArray = val => {
+            if (!val) return [];
+            if (Array.isArray(val)) return val;
+            return val.split(',').map(v => v.trim()).filter(Boolean);
+        };
+
+        // --- Search ---
+        if (search?.trim()) {
+            const safeSearch = search.trim();
+            filter.$and = filter.$and || [];
+            filter.$and.push({
+                $or: [
+                    // Metadata fields
+                    { "metadata.fileName": { $regex: safeSearch, $options: "i" } },
+                    { "metadata.fileDescription": { $regex: safeSearch, $options: "i" } },
+                    { "metadata.mainHeading": { $regex: safeSearch, $options: "i" } },
+
+                    { description: { $regex: safeSearch, $options: "i" } },
+                    { remark: { $regex: safeSearch, $options: "i" } },
+                    { tags: { $in: [new RegExp(safeSearch, "i")] } },
+
+                    { "files.originalName": { $regex: safeSearch, $options: "i" } },
+                    { "project.projectName": { $regex: safeSearch, $options: "i" } }
+                ]
+            });
+        }
+
+        // --- Department filter ---
+        if (department) {
+            const deptArray = toArray(department).filter(id => mongoose.Types.ObjectId.isValid(id));
+            if (deptArray.length > 0) {
+                filter.department = deptArray.length === 1 ? deptArray[0] : { $in: deptArray };
+            }
+        }
+
+        // --- Project filter (from query or session) ---
+        const sessionProjectId = req.session?.selectedProject;
+        const projectIds = [];
+
+        if (sessionProjectId && mongoose.Types.ObjectId.isValid(sessionProjectId)) {
+            projectIds.push(sessionProjectId);
+        }
+
+        if (project) {
+            const projArray = toArray(project).filter(id => mongoose.Types.ObjectId.isValid(id));
+            projectIds.push(...projArray);
+        }
+
+        if (projectIds.length > 0) {
+            filter.project = projectIds.length === 1 ? projectIds[0] : { $in: projectIds };
+        }
+
+        /** -------------------- DATE -------------------- **/
+        if (date) {
+            const [day, month, year] = date.split("-").map(Number);
+            const selectedDate = new Date(year, month - 1, day);
+            if (!isNaN(selectedDate.getTime())) {
+                const nextDate = new Date(selectedDate);
+                nextDate.setDate(nextDate.getDate() + 1);
+                filter.createdAt = { $gte: selectedDate, $lt: nextDate };
+            }
+        }
+        // --- Year filter from session ---
+        if (req.session?.selectedYear) {
+            const year = parseInt(req.session.selectedYear, 10);
+            if (!isNaN(year)) {
+                const startOfYear = new Date(year, 0, 1);
+                const endOfYear = new Date(year + 1, 0, 1);
+
+                // Merge year filter with possible existing date filter
+                if (!filter.createdAt) {
+                    filter.createdAt = { $gte: startOfYear, $lt: endOfYear };
+                } else {
+                    filter.createdAt.$gte = startOfYear;
+                    filter.createdAt.$lt = endOfYear;
+                }
+            }
+        }
+
+        /** -------------------- DOC TYPE FILTER -------------------- **/
+        if (!filter._id && docType?.trim()) {
+            const filesByType = await mongoose
+                .model("File")
+                .find({ fileType: docType.trim() }, { document: 1 });
+            const docIds = filesByType.map((f) => f.document).filter(Boolean);
+            if (docIds.length > 0) {
+                filter._id = { $in: docIds };
+            } else {
+                filter._id = null;
+            }
+        }
+
+        /** -------------------- SORTING -------------------- **/
+        const columnMap = {
+            1: "metadata.fileName",
+            2: "updatedAt",
+            3: "owner.name",
+            4: "department.name",
+            5: "project.projectName",
+            9: "tags",
+            10: "metadata",
+            14: "status",
+        };
+        const sortField = columnMap[orderColumn] || "createdAt";
+        const sortOrder = orderDir === "asc" ? 1 : -1;
+
+        /** -------------------- PAGINATION -------------------- **/
+        const pageNum = Math.max(1, parseInt(page));
+        const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
+        const skip = (pageNum - 1) * limitNum;
+
+        // --- Fetch documents ---
+        const documents = await Document.find(filter)
+            .select(`
+                files updatedAt createdAt wantApprovers signature isDeleted isArchived archivedAt
+                comment sharedWithUsers compliance status metadata tags owner versioning
+                documentVendor documentDonor department project description
+                documentApprovalAuthority currentVersionLabel
+            `)
+            .populate("department", "name")
+            .populate("project", "projectName")
+            .populate({
+                path: "owner",
+                select: "name email profile_image profile_type userDetails.employee_id userDetails.designation",
+                populate: { path: "userDetails.designation", select: "name" },
+            })
+            .populate("documentDonor", "name profile_image")
+            .populate("documentVendor", "name profile_image")
+            .populate("sharedWithUsers", "name profile_image email")
+            .populate("files", "originalName version fileSize")
+            .populate({
+                path: "documentApprovalAuthority.userId",
+                select: "name email profile_image profile_type userDetails.employee_id"
+            })
+            .sort({ [sortField]: sortOrder })
+            .skip(skip)
+            .limit(limitNum)
+            .lean();
+
+        const totalDocuments = await Document.countDocuments(filter);
+
+        return successResponse(res, {
+            documents,
+            pagination: {
+                currentPage: pageNum,
+                totalPages: Math.ceil(totalDocuments / limitNum),
+                totalDocuments,
+                hasNext: pageNum * limitNum < totalDocuments,
+                hasPrev: pageNum > 1
+            }
+        }, "Documents retrieved successfully");
+
+    } catch (error) {
+        console.error(error);
+        return errorResponse(res, error, "Failed to retrieve documents");
+    }
+};
 
 /**
  * @desc Get all documents by folderId

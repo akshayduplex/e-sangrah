@@ -172,7 +172,7 @@ router.get("/approval-requests", EmployeeController.getApprovalRequests);
  */
 // List all documents
 router.get("/documents", DocumentController.getDocuments);
-
+router.get("/documents/compliance", DocumentController.getComplianceDocuments);
 // Get documents in a specific folder
 router.get("/documents/folder/:folderId", authenticate, DocumentController.getDocumentsByFolder);
 

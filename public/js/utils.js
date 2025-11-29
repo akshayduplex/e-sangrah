@@ -166,3 +166,36 @@ function timeAgo(date) {
     if (diff < 29030400) return Math.floor(diff / 2419200) + " months ago"; // less than 1 year
     return Math.floor(diff / 29030400) + " years ago";
 }
+
+function getRetentionStatus(archivedAt, docExpiresAt) {
+    const NOW = new Date();
+    const EXPIRING_THRESHOLD_DAYS = 30;
+    const EXPIRING_SOON_DATE = new Date(NOW.getTime() + EXPIRING_THRESHOLD_DAYS * 86400000);
+
+    if (archivedAt && new Date(archivedAt) < NOW) {
+        return {
+            status: 'Archive',
+            icon: '<i class="ti ti-archive fs-20 me-2" style="color:#000000;"></i>'
+        };
+    }
+
+    if (docExpiresAt) {
+        const expiryDate = new Date(docExpiresAt);
+        if (expiryDate < NOW) {
+            return {
+                status: 'Expired',
+                icon: '<i class="ti ti-clock-hour-7 fs-20 me-2" style="color:#FF0000;"></i>' // red
+            };
+        } else if (expiryDate <= EXPIRING_SOON_DATE) {
+            return {
+                status: 'Expiring',
+                icon: '<i class="ti ti-clock-hour-7 fs-20 me-2" style="color:#F9CA24;"></i>'
+            };
+        }
+    }
+
+    return {
+        status: 'Active',
+        icon: '<i class="ti ti-folder-check fs-20 me-2" style="color:#3C951C;"></i>'
+    };
+}

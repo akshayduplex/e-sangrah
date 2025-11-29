@@ -237,32 +237,38 @@ async function handleLogoutLink(logoutLink) {
     }
 }
 
-
 // -------- Initialization --------
 function initLoginPage() {
     const loginBtn = document.getElementById("loginBtn");
     const emailInput = document.getElementById("emailInput");
     const passwordInput = document.getElementById("passwordInput");
-    const logoutLink = document.getElementById("logoutLink"); // anchor tag
 
-    // Init features
+    const desktopLogoutLink = document.getElementById("logoutLink");
+
+    const mobileLogoutLink = document.getElementById("mobileLogoutLink");
+
     initPasswordToggles();
 
-    // Bind login handler
     if (loginBtn && emailInput && passwordInput) {
         loginBtn.addEventListener("click", () =>
             handleLogin({ emailInput, passwordInput, loginBtn })
         );
     }
 
-    // Bind logout link
-    if (logoutLink) {
-        logoutLink.addEventListener("click", (e) => {
+    if (desktopLogoutLink) {
+        desktopLogoutLink.addEventListener("click", (e) => {
             e.preventDefault();
-            handleLogoutLink(logoutLink);
+            handleLogoutLink(desktopLogoutLink);
+        });
+    }
+
+    if (mobileLogoutLink) {
+        mobileLogoutLink.addEventListener("click", (e) => {
+            e.preventDefault();
+
+            handleLogoutLink(mobileLogoutLink);
         });
     }
 }
 
-// Run once DOM is parsed (script has defer)
 initLoginPage();

@@ -89,26 +89,30 @@ function formatFileSize(bytes) {
 }
 
 // =================== Documents ===================
-async function loadDocuments() {
+async function loadDocuments(selectedDept = "", sortBy = "") {
     try {
-        const response = await fetch('/api/documents');
+        let url = `/api/documents/compliance?limit=10&page=1`;
+
+        if (selectedDept) url += `&department=${selectedDept}`;
+        if (sortBy) {
+            if (sortBy === "name") url += `&orderColumn=1&orderDir=asc`;
+            else if (sortBy === "date") url += `&orderColumn=2&orderDir=desc`;
+            else if (sortBy === "status") url += `&orderColumn=14&orderDir=asc`;
+        }
+
+        const response = await fetch(url);
         const result = await response.json();
 
-        if (!result.success || !Array.isArray(result.data?.documents)) {
-            console.warn('No documents found.');
+        const tbody = document.querySelector("#documentsTable tbody");
+        tbody.innerHTML = "";
+
+        if (!result.success || !result.data.documents.length) {
+            tbody.innerHTML = `<tr><td colspan="6" class="text-center py-3">No documents found</td></tr>`;
             return;
         }
-
-        const tbody = document.querySelector('#documentsTable tbody');
-        if (!tbody) {
-            console.error('Table body not found.');
-            return;
-        }
-
-        tbody.innerHTML = ''; // Clear existing rows
 
         result.data.documents.forEach(doc => {
-            const { metadata, department, compliance, files = [] } = doc;
+            const { metadata, department, compliance, files = [], archivedAt, docExpiresAt } = doc;
 
             // Use metadata.fileName as the main display name
             const displayName = metadata?.fileName?.trim() || 'Untitled Document';
@@ -119,7 +123,17 @@ async function loadDocuments() {
                 const latestVer = latest.version?.$numberDecimal || latest.version || 0;
                 return Number(currentVer) > Number(latestVer) ? file : latest;
             }, files[0] || {});
-
+            const expiry = compliance?.isCompliance && compliance.expiryDate
+                ? formatDateTime(compliance.expiryDate)
+                : 'N/A';
+            // Call the new function to get the status and icon
+            const retentionStatus = getRetentionStatus(archivedAt, compliance?.expiryDate);
+            const retentionDisplay = `
+    <p class="mb-0 d-flex align-items-center fw-medium text-neutral">
+        ${retentionStatus.icon} 
+        ${retentionStatus.status}
+    </p>
+`;
             const fileNameForIcon = latestFile?.originalName || '';
             const fileSizeKB = latestFile?.fileSize
                 ? `${Math.round(latestFile.fileSize / 1024)} KB`
@@ -132,13 +146,6 @@ async function loadDocuments() {
                 : '1.0';
 
             const fileIcon = getFileIcon(fileNameForIcon);
-
-            const expiry = compliance?.isCompliance && compliance.expiryDate
-                ? formatDateTime(compliance.expiryDate)
-                : 'N/A';
-
-            const retention = compliance?.retentionPeriod || 'Active';
-
             const isCompliant = compliance?.isCompliance
                 ? `<p class="text-success d-flex align-items-center gap-2 mb-0">
                         <span class="d-inline-flex align-items-center justify-content-center rounded-circle bg-success-subtle" style="width: 28px; height: 28px;">
@@ -197,7 +204,7 @@ async function loadDocuments() {
                     </td>
                     <td><p class="mb-0">${escapeHtml(department?.name || 'N/A')}</p></td>
                     <td>${isCompliant}</td>
-                    <td><p class="mb-0">${escapeHtml(retention)}</p></td>
+                 <td>${retentionDisplay}</td>
                     <td><p class="mb-0 tbl_date">${expiry}</p></td>
                 </tr>`;
 
@@ -205,11 +212,7 @@ async function loadDocuments() {
         });
 
     } catch (err) {
-        console.error('Error loading documents:', err);
-        const tbody = document.querySelector('#documentsTable tbody');
-        if (tbody) {
-            tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger py-4">Failed to load documents.</td></tr>`;
-        }
+        console.error(err);
     }
 }
 
@@ -305,6 +308,20 @@ function updateGrowthBadge(cardSelector, growthPercent) {
 
 // =================== Event Listeners ===================
 document.addEventListener('DOMContentLoaded', () => {
+    let currentDept = "";
+    let currentSort = "";
+    // Department Filter
+    $("#analyticsDepartment").on("change", function () {
+        currentDept = $(this).val();
+        loadDocuments(currentDept, currentSort);
+    });
+
+    // Sort by
+    document.getElementById("sortBySelect").addEventListener("change", function () {
+        currentSort = this.value;
+        loadDocuments(currentDept, currentSort);
+    });
+
     loadDashboardStats();
     loadFileStatusLogs();
     loadDocuments();

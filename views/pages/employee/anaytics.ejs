@@ -283,11 +283,11 @@
                             <div class="dropdown">
                                 <div class="input-group">
                                     <span class="input-group-text border">Sort by:</span>
-                                    <select class="form-select border text-black">
-                                        <option selected>Doc type</option>
-                                        <option value="1">Date</option>
-                                        <option value="2">Name</option>
-                                        <option value="3">Status</option>
+                                    <select class="form-select border text-black" id="sortBySelect">
+                                        <option value="" disabled selected>Doc type</option>
+                                        <option value="date">Date</option>
+                                        <option value="name">Name</option>
+                                        <option value="status">Status</option>
                                     </select>
                                 </div>
                             </div>
@@ -350,7 +350,39 @@
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             const statusCards = document.querySelectorAll('.anlytc_linkbx[data-status]');
+            // -------------------------
+            // Initialize Select2 with Clear Option
+            // -------------------------
+            function initSelect2(selector, url, placeholder, textKey) {
+                $(selector).select2({
+                    placeholder: placeholder,
+                    allowClear: true,
+                    ajax: {
+                        url,
+                        dataType: 'json',
+                        delay: 250,
+                        data: params => ({ search: params.term }),
+                        processResults: data => {
+                            const results = data.data.map(item => ({
+                                id: item._id,
+                                text: item[textKey]
+                            }));
+                            return { results };
+                        }
+                    }
+                });
 
+                // Reset selection when clearing
+                $(selector).on('select2:select', function (e) {
+                    if (!e.params.data.id) {
+                        $(this).val(null).trigger('change');
+                    }
+                });
+            }
+
+            // Initialize Select2
+            initSelect2('#analyticsDepartment', `${baseUrl}/api/departments/search`, 'Select Department', 'name');
+            // initSelect2('#projectName', `${baseUrl}/api/projects`, 'Select Project', 'projectName');
             statusCards.forEach(card => {
                 card.style.cursor = 'pointer';
                 card.addEventListener('click', function (e) {

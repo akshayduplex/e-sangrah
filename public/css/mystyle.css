@@ -14,7 +14,7 @@
     }
 
     .loginforms {
-        padding-left: 35px;
+        padding-left: 12px;
         padding-top: 20px;
     }
 
@@ -1120,4 +1120,20 @@
 
     .select2-container .select2-selection--single .select2-selection__clear span {
         line-height: 37px !important;
+    }
+
+    /* Ensures toast fits on all device sizes */
+    .toastify {
+        max-width: 90% !important;
+        z-index: 999999 !important;
+    }
+
+    /* Mobile adjustments */
+    @media (max-width: 767px) {
+        .toastify {
+            left: 5% !important;
+            right: 5% !important;
+            font-size: 14px;
+            padding: 10px 14px;
+        }
     }

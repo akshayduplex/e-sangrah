@@ -121,7 +121,7 @@
                     </a>
                 </div>
 
-                <a id="mobile_btn" class="mobile_btn" href="#sidebar">
+                <a id="mobile_btn" class="mobile_btn" href="#">
                     <span class="bar-icon">
                         <span></span><span></span><span></span>
                     </span>
@@ -292,7 +292,11 @@
                     <div class="dropdown-menu dropdown-menu-end">
                         <a class="dropdown-item" href="/my-profile">My Profile</a>
                         <a class="dropdown-item" href="/reset-password">Reset Password</a>
-                        <a href="#" class="dropdown-item" onclick="logoutUser(event)">Logout</a>
+                        <% if (user.profile_type==='superadmin' ) { %>
+                            <a class="dropdown-item" href="/setting">Setting
+                            </a>
+                            <% } %>
+                                <a href="/logout" class="dropdown-item" id="mobileLogoutLink">Logout</a>
                     </div>
                 </div>
                 <!-- /Mobile Menu -->

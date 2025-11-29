@@ -80,7 +80,7 @@
                                 if (response.success) {
                                     // Format rows for DataTables
                                     const rows = response.files.map(file => {
-                                        const lastAction = new Date(file.lastActionTime).toLocaleString();
+                                        const lastAction = formatDateTime(file.lastActionTime);
                                         const performedBy = file.performedBy
                                             ? `${file.performedBy.name}<br><small>${file.performedBy.email}</small>`
                                             : `<span class="text-muted">Unknown</span>`;
