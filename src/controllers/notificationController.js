@@ -190,20 +190,6 @@ export const markAsRead = async (req, res) => {
     }
 };
 
-// ------------------- Mark All Notifications as Read -------------------
-export const markAllAsRead = async (req, res) => {
-    try {
-        await Notification.updateMany(
-            { recipient: req.user._id, isRead: false },
-            { isRead: true }
-        );
-
-        return successResponse(res, null, "All notifications marked as read");
-    } catch (error) {
-        return errorResponse(res, error);
-    }
-};
-
 // ------------------- Delete Notification -------------------
 export const deleteNotification = async (req, res) => {
     try {

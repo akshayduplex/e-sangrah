@@ -123,6 +123,70 @@ export const checkDuplicate = async (req, res) => {
     }
 };
 
+// Save selected project & year to session
+export const saveSessionProject = async (req, res) => {
+    const { projectId, selectedYear } = req.body;
+
+    try {
+        if (projectId) {
+            const project = await Project.findById(projectId).select("projectName");
+
+            if (!project) {
+                return res.status(404).json({ error: "Project not found" });
+            }
+
+            req.session.selectedProject = projectId;
+            req.session.selectedProjectName = project.projectName;
+        }
+
+        if (selectedYear) {
+            req.session.selectedYear = selectedYear;
+        }
+
+        req.session.save((err) => {
+            if (err) return res.status(500).json({ error: "Failed to save session" });
+
+            res.json({
+                success: true,
+                selectedProject: req.session.selectedProject || null,
+                selectedProjectName: req.session.selectedProjectName || null,
+                selectedYear: req.session.selectedYear || null,
+            });
+        });
+    } catch (err) {
+        console.error("Error saving session project:", err);
+        res.status(500).json({ error: "Server error" });
+    }
+};
+
+// Get selected project from session
+export const getSessionProject = async (req, res) => {
+    try {
+        if (!req.session.user) {
+            return res.status(401).json({
+                error: "Not logged in",
+                selectedProject: null,
+                selectedProjectName: null,
+                selectedYear: null,
+            });
+        }
+
+        res.json({
+            selectedProject: req.session.selectedProject || null,
+            selectedProjectName: req.session.selectedProjectName || null,
+            selectedYear: req.session.selectedYear || null,
+        });
+    } catch (err) {
+        console.error("Error in getSessionProject:", err);
+        res.status(500).json({
+            error: "Server error",
+            selectedProject: null,
+            selectedProjectName: null,
+            selectedYear: null,
+        });
+    }
+};
+
 function sanitize(str) {
     return String(str)
         .replace(/[^a-zA-Z0-9_-]/g, '_')

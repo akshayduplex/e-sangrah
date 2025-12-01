@@ -3944,66 +3944,6 @@ export const generateShareableLink = async (req, res) => {
         });
     }
 };
-/**
- * Get document audit logs
- */
-export const getDocumentAuditLogs = async (req, res) => {
-    try {
-        const { id } = req.params;
-
-        if (!mongoose.Types.ObjectId.isValid(id)) {
-            return failResponse(res, "Invalid document ID", 400);
-        }
-
-        const document = await Document.findById(id)
-            .populate("auditLog.performedBy", "firstName lastName email")
-            .select("auditLog");
-
-        if (!document) {
-            return failResponse(res, "Document not found", 404);
-        }
-
-        // Check access permissions
-        const hasAccess = document.hasAccess(req.user._id, req.user.department);
-        if (!hasAccess) {
-            return failResponse(res, "Access denied", 403);
-        }
-
-        return successResponse(res, { auditLogs: document.auditLog }, "Audit logs retrieved successfully");
-    } catch (error) {
-        return errorResponse(res, error, "Failed to retrieve audit logs");
-    }
-};
-
-/**
- * Get document access logs
- */
-export const getDocumentAccessLogs = async (req, res) => {
-    try {
-        const { id } = req.params;
-
-        if (!mongoose.Types.ObjectId.isValid(id)) {
-            return failResponse(res, "Invalid document ID", 400);
-        }
-
-        const document = await Document.findById(id)
-            .populate("accessLog.accessedBy", "firstName lastName email")
-            .select("accessLog");
-
-        if (!document) {
-            return failResponse(res, "Document not found", 404);
-        }
-
-        // Only owner can view access logs
-        if (document.owner.toString() !== req.user._id.toString()) {
-            return failResponse(res, "Only the owner can view access logs", 403);
-        }
-
-        return successResponse(res, { accessLogs: document.accessLog }, "Access logs retrieved successfully");
-    } catch (error) {
-        return errorResponse(res, error, "Failed to retrieve access logs");
-    }
-};
 
 /**
  * Search documents

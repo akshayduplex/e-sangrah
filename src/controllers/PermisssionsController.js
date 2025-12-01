@@ -234,7 +234,309 @@ export const getAssignMenuPage = async (req, res) => {
     }
 };
 
+// ------------------
+// GET PAGINATED MENUS
+// ------------------
+export const getMenus = async (req, res) => {
+    try {
+        const search = req.query.search?.trim() || "";
+        let filter = {};
 
+        if (search) {
+            filter = {
+                $or: [
+                    { name: { $regex: search, $options: "i" } },
+                    { type: { $regex: search, $options: "i" } },
+                    { url: { $regex: search, $options: "i" } }
+                ]
+            };
+        }
+
+        // If limit = 0 → return all
+        if (req.query.limit === "0") {
+            const menus = await Menu.find(filter)
+                .sort({ priority: 1, add_date: -1 })
+                .populate("added_by updated_by", "name email")
+                .lean();
+
+            const total = await Menu.countDocuments();
+            const filtered = await Menu.countDocuments(filter);
+
+            return res.json({
+                success: true,
+                data: menus,
+                pagination: {
+                    page: 1,
+                    limit: 0,
+                    total,
+                    filtered,
+                    pages: 1,
+                }
+            });
+        }
+
+        const page = Math.max(parseInt(req.query.page) || 1, 1);
+        const limit = Math.max(parseInt(req.query.limit) || 10, 1);
+        const skip = (page - 1) * limit;
+
+        const [menus, total, filtered] = await Promise.all([
+            Menu.find(filter)
+                .sort({ priority: 1, add_date: -1 })
+                .skip(skip)
+                .limit(limit)
+                .populate("added_by updated_by", "name email")
+                .lean(),
+
+            Menu.countDocuments(),
+            Menu.countDocuments(filter)
+        ]);
+
+        res.json({
+            success: true,
+            data: menus,
+            pagination: {
+                page,
+                limit,
+                total,
+                filtered,
+                pages: Math.ceil(filtered / limit)
+            }
+        });
+
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// ------------------
+// CREATE MENU
+// ------------------
+export const createMenu = async (req, res) => {
+    try {
+        const user = req.user;
+        const { type, master_id, name, icon_code, url, priority, is_show, isActive } = req.body;
+
+        if (type === "SubMenu" && !master_id) {
+            return res.status(400).json({ success: false, message: "SubMenu requires master_id" });
+        }
+        if (type === "Menu" && master_id) {
+            return res.status(400).json({ success: false, message: "Menu cannot have master_id" });
+        }
+
+        const menu = new Menu({
+            type,
+            master_id: master_id || null,
+            name,
+            icon_code: icon_code || "",
+            url: url || "#",
+            priority: Number(priority) || 1,
+            is_show: !!is_show,
+            isActive: !!isActive,
+            added_by: {
+                user_id: user._id,
+                name: user.name,
+                email: user.email
+            },
+            updated_by: {
+                user_id: user._id,
+                name: user.name,
+                email: user.email
+            }
+        });
+
+        await menu.save();
+
+        res.json({ success: true, data: menu });
+
+    } catch (error) {
+        if (error.code === 11000) {
+            return res.status(400).json({ success: false, message: "URL must be unique" });
+        }
+        if (error.name === "ValidationError") {
+            return res.status(400).json({ success: false, message: error.message });
+        }
+
+        res.status(500).json({ success: false, message: "Error creating menu" });
+    }
+};
+
+// ------------------
+// UPDATE MENU
+// ------------------
+export const updateMenu = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { type, master_id, name, icon_code, url, priority, is_show, isActive } = req.body;
+
+        if (type === "SubMenu" && !master_id) {
+            return res.status(400).json({ success: false, message: "SubMenu requires master_id" });
+        }
+        if (type === "Menu" && master_id) {
+            return res.status(400).json({ success: false, message: "Menu cannot have master_id" });
+        }
+
+        const menu = await Menu.findByIdAndUpdate(
+            id,
+            {
+                type,
+                master_id: master_id || null,
+                name,
+                icon_code,
+                url,
+                priority: Number(priority) || 1,
+                is_show: is_show === "true" || is_show === true,
+                isActive: isActive === "true" || isActive === true,
+                updated_by: {
+                    user_id: req.user._id,
+                    name: req.user.name,
+                    email: req.user.email
+                }
+            },
+            { new: true, runValidators: true }
+        );
+
+        if (!menu) {
+            return res.status(404).json({ success: false, message: "Menu not found" });
+        }
+
+        res.json({ success: true, data: menu });
+
+    } catch (error) {
+        if (error.code === 11000) {
+            return res.status(400).json({ success: false, message: "URL must be unique" });
+        }
+        if (error.name === "ValidationError") {
+            return res.status(400).json({ success: false, message: error.message });
+        }
+
+        res.status(500).json({ success: false, message: "Error updating menu" });
+    }
+};
+
+// ------------------
+// DELETE MENU
+// ------------------
+export const deleteMenu = async (req, res) => {
+    try {
+        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+            return res.status(400).json({ success: false, message: "Invalid menu ID" });
+        }
+
+        const menu = await Menu.findByIdAndDelete(req.params.id);
+        if (!menu) {
+            return res.status(404).json({ success: false, message: "Menu not found" });
+        }
+
+        await MenuAssignment.deleteMany({ menu_id: req.params.id });
+
+        res.json({ success: true, message: "Menu deleted successfully" });
+
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// ------------------
+// GET MENUS BY TYPE
+// ------------------
+export const getMenusByType = async (req, res) => {
+    try {
+        const menus = await Menu.find({ type: req.params.type })
+            .sort({ priority: 1, name: 1 })
+            .lean();
+
+        res.json({ success: true, data: menus });
+
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// ------------------
+// TOGGLE SHOW/STATUS
+// ------------------
+export const toggleMenuStatus = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const field = req.query.field;
+
+        if (!["is_show", "isActive"].includes(field)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid field. Allowed: is_show, isActive"
+            });
+        }
+
+        const menu = await Menu.findById(id);
+        if (!menu) {
+            return res.status(404).json({ success: false, message: "Menu not found" });
+        }
+
+        const updatedValue = !menu[field];
+
+        const updated = await Menu.findByIdAndUpdate(
+            id,
+            {
+                $set: {
+                    [field]: updatedValue,
+                    updated_by: req.user
+                        ? {
+                            user_id: req.user._id,
+                            name: req.user.name,
+                            email: req.user.email
+                        }
+                        : menu.updated_by
+                }
+            },
+            { new: true }
+        );
+
+        res.json({
+            success: true,
+            message: `${field} updated successfully`,
+            data: {
+                id: updated._id,
+                [field]: updated[field]
+            }
+        });
+
+    } catch (error) {
+        res.status(500).json({ success: false, message: "Server error" });
+    }
+};
+
+// ------------------
+// ASSIGN MENUS
+// ------------------
+export const assignMenus = async (req, res) => {
+    try {
+        const { designation_id, menu_ids } = req.body;
+
+        if (!designation_id || !Array.isArray(menu_ids)) {
+            return res.status(400).json({ success: false, message: "Designation ID and menu IDs array required" });
+        }
+
+        if (!mongoose.Types.ObjectId.isValid(designation_id)) {
+            return res.status(400).json({ success: false, message: "Invalid designation ID" });
+        }
+
+        for (const id of menu_ids) {
+            if (!mongoose.Types.ObjectId.isValid(id)) {
+                return res.status(400).json({ success: false, message: `Invalid menu ID: ${id}` });
+            }
+        }
+
+        await MenuAssignment.deleteMany({ designation_id });
+
+        const assignments = menu_ids.map(menu_id => ({ designation_id, menu_id }));
+        const savedAssignments = await MenuAssignment.insertMany(assignments);
+
+        res.status(201).json({ success: true, data: savedAssignments });
+
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
 
 // Get assigned menus for a designation
 export const getAssignedMenus = async (req, res) => {

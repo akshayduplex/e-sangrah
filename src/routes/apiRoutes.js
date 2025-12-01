@@ -15,7 +15,6 @@ import * as AdminDashboard from "../controllers/DashboardController.js"
 import * as DepartmentController from "../controllers/DepartmentController.js";
 import * as DesignationController from "../controllers/DesignationController.js";
 import * as DocumentController from "../controllers/DocumentController.js";
-import * as DocumentHandlerController from "../controllers/DocumentHandlerController.js";
 import * as ProjectController from "../controllers/ProjectController.js";
 import * as PermissionController from "../controllers/PermisssionsController.js";
 import * as FolderController from "../controllers/FolderController.js";
@@ -86,6 +85,8 @@ router.get("/auth/verify-reset/:token", AuthController.verifyResetLink);
 router.get('/file/pdf/:fileId', optionalAuth, CommonController.servePDF);
 router.get('/documents/:id/versions/view', DocumentController.viewDocumentVersion);
 router.get("/download/file/:fileId", optionalAuth, CommonController.downloadFile);
+
+
 // Apply authentication to all routes
 router.use(authenticate);
 
@@ -103,12 +104,7 @@ router.get('/documents/download/:fileId/:token', authenticate, async (req, res) 
     if (!file) return res.status(404).send('File not found');
 
     const decryptedUrl = decrypt(token);
-    // For S3
-    // res.redirect(decryptedUrl);
-    // For local files:
-    // res.sendFile(path.resolve(decryptedUrl));
-
-    res.redirect(decryptedUrl); // S3 presigned URL
+    res.redirect(decryptedUrl);
 });
 
 // ---------------------------
@@ -124,8 +120,8 @@ router.post("/auth/logout", authenticate, AuthController.logout);
 // ---------------------------
 
 router.get('/check', CommonController.checkDuplicate);
-
-// Route to Download Folder
+router.post("/session/project", authenticate, CommonController.saveSessionProject);
+router.get("/session/project", CommonController.getSessionProject);
 router.get("/download/:folderId", authenticate, CommonController.downloadFolderAsZip);
 router.post('/export', authenticate, CommonController.exportDocuments);
 router.get('/export/formats', authenticate, CommonController.getExportFormats);
@@ -167,53 +163,32 @@ router.get("/approval-requests", EmployeeController.getApprovalRequests);
 // Document Routes
 // ---------------------------
 
-/**
- * Document Management
- */
-// List all documents
 router.get("/documents", DocumentController.getDocuments);
 router.get("/documents/compliance", DocumentController.getComplianceDocuments);
-// Get documents in a specific folder
 router.get("/documents/folder/:folderId", authenticate, DocumentController.getDocumentsByFolder);
-
-// Search documents
 router.get("/documents/search", DocumentController.searchDocuments);
-
-// Create a new document (only accepts signature file)
 router.post("/documents", upload.fields([{ name: "signatureFile", maxCount: 1 }]), DocumentValidators.createDocumentValidator, validators, DocumentController.createDocument);
-
-// Update a document (with optional signature update)
 router.patch("/documents/:id", upload.fields([{ name: "signature", maxCount: 1 }]), DocumentController.updateDocument);
-
 router.patch('/documents/:id/sharelink', DocumentController.updateShareSettings);
-// Hard delete (permanent removal)
 router.delete("/documents/permanent", DocumentValidators.deleteDocumentValidator, validators, DocumentController.deleteDocument);
-// Soft delete (move to recycle bin)
 router.delete("/documents/:id", DocumentValidators.softDeleteDocumentValidator, validators, DocumentController.softDeleteDocument);
-
-
-// Update document status (hard delete or other status updates)
 router.patch("/documents/:id/status", DocumentValidators.updateDocumentStatusValidator, validators, DocumentController.updateDocumentStatus);
-
-// Archive and restore documents
 router.patch("/documents/:id/archive", DocumentValidators.archiveDocumentValidator, validators, DocumentController.archiveDocuments);
 router.get("/documents/archive", DocumentController.getArchivedDocuments);
 router.patch("/documents/:id/restore", DocumentValidators.restoreDocumentValidator, validators, DocumentController.restoreDocument);
-
-// Recycle bin
 router.get("/documents/recyclebin", DocumentController.getRecycleBinDocuments);
-
 
 /**
  * Document Sharing & Permissions
  */
+
 // Share a document
 router.patch("/documents/:id/share", DocumentValidators.shareDocumentValidator, validators, DocumentController.shareDocument);
 
 // List all users a document is shared with
 router.get("/documents/:documentId/shared-users", DocumentController.getSharedUsers);
 
-// Done for updating the permission of all people with access
+//updating the permission of all people with access
 router.patch("/documents/:documentId/permissions", DocumentValidators.bulkPermissionUpdateValidator, validators, DocumentController.bulkPermissionUpdate);
 
 // Update user access level for a shared document
@@ -237,20 +212,10 @@ router.post("/documents/grant-access/:token", DocumentValidators.grantAccessViaT
 // Generate shareable link for a document file
 router.get('/documents/:documentId/:fileId/share-link', DocumentController.generateShareableLink)
 
-
-/**
- * Audit & Logs
- */
-// Get audit logs for a document
-router.get("/documents/:id/audit-logs", DocumentController.getDocumentAuditLogs);
-
-// Get access logs for a document
-router.get("/documents/:id/access-logs", DocumentController.getDocumentAccessLogs);
-
-
 /**
  * Document Versioning
  */
+
 // Get version history
 router.get('/documents/:id/versions/history', DocumentController.getVersionHistory);
 
@@ -264,13 +229,14 @@ router.patch('/documents/:id/versions/:versionId/restore', DocumentController.re
 /**
  * Document Approval Workflow
  */
+
 // Create an approval request
 router.post('/documents/:documentId/add', authenticate, DocumentValidators.createApprovalRequestValidator, validators, DocumentController.createOrUpdateApprovalRequest);
 
 // Track approvals
 router.get('/documents/:documentId/approval/track', authenticate, DocumentController.getApprovals);
 
-// // Approval Mail
+// Approval Mail
 router.get('/documents/:documentId/approval/:approverId/mail', authenticate, DocumentController.sendApprovalMail);
 
 router.get('/verify-approval/:token', authenticate, DocumentController.verifyApprovalMail);
@@ -282,31 +248,23 @@ router.patch('/documents/:documentId/approval', authenticate, DocumentValidators
 // ---------------------------
 // Departments routes
 // ---------------------------
-// Publicly exposed API routes
+
 router.get('/departments', authenticate, DepartmentController.getAllDepartments);
 router.get('/departments/search', authenticate, DepartmentController.searchDepartments);
 router.get('/departments/:id', authenticate, DepartmentController.getDepartmentById);
 
-// Admin-only routes (CRUD)
 router.post('/departments', authenticate, checkPermissions, DepartmentValidators.createDepartmentValidator, validators, DepartmentController.createDepartment);
 router.patch('/departments/:id', authenticate, checkPermissions, DepartmentValidators.updateDepartmentValidator, validators, DepartmentController.updateDepartment);
 router.delete('/departments/:id', authenticate, DepartmentController.deleteDepartment);
 
-
-// ---------------------------
-// DocumentHandler routes
-// ---------------------------
-
-// PATCH /shared/:sharedId/renew
-router.patch("/shared/:sharedId/renew", authenticate, DocumentHandlerController.renewAccess);
 // ---------------------------
 // Designation routes
 // ---------------------------
-// Public API
+
 router.get('/designations', authenticate, DesignationController.getAllDesignations);
 router.get('/designations/search', authenticate, DesignationController.searchDesignations)
 router.get('/designations/:id', authenticate, DesignationController.getDesignationById);
-// Admin-only CRUD
+
 router.post('/designations', authenticate, authorize('admin', 'superadmin'), DesignationValidators.createDesignationValidator, validators, DesignationController.createDesignation);
 router.patch('/designations/:id', authenticate, authorize('admin', 'superadmin'), DesignationValidators.updateDesignationValidator, validators, DesignationController.updateDesignation);
 router.delete('/designations/:id', authenticate, authorize('admin', 'superadmin'), DesignationController.deleteDesignation);
@@ -316,72 +274,6 @@ router.delete('/designations/:id', authenticate, authorize('admin', 'superadmin'
 // ---------------------------
 // Projects routes
 // ---------------------------
-
-// Save selected project to session
-router.post("/session/project", authenticate, async (req, res) => {
-    const { projectId, selectedYear } = req.body;
-
-    try {
-        if (projectId) {
-            // Fetch project name only if projectId is provided
-            const project = await Project.findById(projectId).select("projectName");
-
-            if (!project) {
-                return res.status(404).json({ error: "Project not found" });
-            }
-
-            req.session.selectedProject = projectId;
-            req.session.selectedProjectName = project.projectName;
-        }
-
-        if (selectedYear) {
-            req.session.selectedYear = selectedYear;
-        }
-
-        req.session.save(err => {
-            if (err) return res.status(500).json({ error: "Failed to save session" });
-
-            res.json({
-                success: true,
-                selectedProject: req.session.selectedProject || null,
-                selectedProjectName: req.session.selectedProjectName || null,
-                selectedYear: req.session.selectedYear || null
-            });
-        });
-
-    } catch (err) {
-        console.error("Error saving session project:", err);
-        res.status(500).json({ error: "Server error" });
-    }
-});
-// Get selected project from session
-router.get("/session/project", async (req, res) => {
-    try {
-        if (!req.session.user) {
-            return res.status(401).json({
-                error: "Not logged in",
-                selectedProject: null,
-                selectedProjectName: null,
-                selectedYear: null
-            });
-        }
-
-        // Respond with session project data
-        res.json({
-            selectedProject: req.session.selectedProject || null,
-            selectedProjectName: req.session.selectedProjectName || null,
-            selectedYear: req.session.selectedYear || null
-        });
-    } catch (err) {
-        console.error("Error in /session/project:", err);
-        res.status(500).json({
-            error: "Server error",
-            selectedProject: null,
-            selectedProjectName: null,
-            selectedYear: null
-        });
-    }
-});
 
 router.get("/projectTypes", ProjectController.getProjectTypes);
 router.post("/projectTypes", ProjectTypeValidators.createProjectTypeValidator, validators, ProjectController.createProjectType);
@@ -398,68 +290,16 @@ router.route('/projects')
 
 router.route('/projects/:id/status')
     .patch(ProjectController.updateProjectStatus);
-// Filtered project routes
-router.route('/projects/status/:projectStatus')
-    .get(authorize('superadmin', 'admin', 'manager', 'user', 'viewer'), ProjectController.getProjectsByStatus);
-
-router.route('/projects/department/:departmentId')
-    .get(authorize('superadmin', 'admin', 'manager', 'user', 'viewer'), ProjectController.getProjectsByDepartment);
-
-router.route('/projects/manager/:managerId')
-    .get(authorize('superadmin', 'admin', 'manager', 'user', 'viewer'), ProjectController.getProjectsByManager);
-
-router.route('/projects/overdue')
-    .get(authorize('superadmin', 'admin', 'manager'), ProjectController.getOverdueProjects);
-
-router.route('/projects/upcoming-deadlines')
-    .get(authorize('superadmin', 'admin', 'manager', 'user'), ProjectController.getUpcomingDeadlines);
 
 // Search route
 router.route('/projects/search').get(ProjectController.searchProjects);
 router.route('/projects/projectManagers/search').get(ProjectController.searchProjectManager);
-
-// Bulk operations
-router.route('/projects/bulk/update')
-    .patch(authorize('superadmin', 'admin'), ProjectController.bulkUpdateProjects);
-
-// Export route
-router.route('/projects/export')
-    .get(authorize('superadmin', 'admin', 'manager'), ProjectController.exportProjects);
-
-// Project timeline
-router.route('/projects/:id/timeline')
-    .get(authorize('superadmin', 'admin', 'manager', 'user', 'viewer'), ProjectController.getProjectTimeline);
-
-// Donor management routes
-router.route('/projects/:id/donors')
-    .post(authorize('superadmin', 'admin', 'manager'), ProjectController.addDonorToProject);
-
-router.route('/projects/:id/donors/:donorId')
-    .put(authorize('superadmin', 'admin', 'manager'), ProjectController.updateDonorInProject)
-    .delete(authorize('superadmin', 'admin', 'manager'), ProjectController.removeDonorFromProject);
-
-// Vendor management routes
-router.route('/projects/:id/vendors')
-    .post(authorize('superadmin', 'admin', 'manager'), ProjectValidator.vendorValidator, ProjectController.addVendorToProject);
-
-router.route('/projects/:id/vendors/:vendorId')
-    .put(authorize('superadmin', 'admin', 'manager'), ProjectController.updateVendorInProject)
-    .delete(authorize('superadmin', 'admin', 'manager'), ProjectController.removeVendorFromProject);
-
-
-router.route('/projects/:id/clone')
-    .post(authorize('superadmin', 'admin', 'manager'), ProjectController.cloneProject);
-
-router.route('/projects/:id/archive')
-    .patch(authorize('superadmin', 'admin'), ProjectController.archiveProject);
 
 // Single project operations
 router.route('/projects/:id')
     .get(authorize('superadmin', 'admin', 'manager', 'user', 'viewer'), ProjectController.getProject)
     .patch(authorize('superadmin', 'admin', 'manager', 'user'), ProjectValidator.updateProjectValidator, validators, upload.single('projectLogo'), ProjectController.updateProject)
     .delete(authorize('superadmin', 'admin'), ProjectController.deleteProject);
-router.route('/projects/:id/restore')
-    .patch(authorize('superadmin', 'admin'), ProjectController.restoreProject);
 
 
 
@@ -471,7 +311,6 @@ router.route('/projects/:id/restore')
 router.post("/notifications", NotificationController.createNotification);
 router.get("/notifications", NotificationController.getUserNotifications);
 router.patch("/notifications/:id/read", NotificationController.markAsRead);
-router.patch("/notifications/mark-all-read", NotificationController.markAllAsRead);
 router.delete("/notifications/:id", NotificationController.deleteNotification);
 
 
@@ -479,314 +318,24 @@ router.delete("/notifications/:id", NotificationController.deleteNotification);
 // Permissions routes
 // ---------------------------
 
-// Get paginated menus
-router.get("/menu", authenticate, async (req, res) => {
-    try {
-        const search = req.query.search?.trim() || "";
-        let filter = {};
+router.get("/menu", authenticate, PermissionController.getMenus);
+router.post("/menu", authenticate, PermissionController.createMenu);
+router.put("/menu/:id", authenticate, PermissionController.updateMenu);
+router.delete("/menu/:id", authenticate, PermissionController.deleteMenu);
+router.get("/menu/type/:type", authenticate, PermissionController.getMenusByType);
+router.patch("/menu/:id/toggle-status", authenticate, PermissionController.toggleMenuStatus);
 
-        if (search) {
-            filter = {
-                $or: [
-                    { name: { $regex: search, $options: "i" } },
-                    { type: { $regex: search, $options: "i" } },
-                    { url: { $regex: search, $options: "i" } }
-                ]
-            };
-        }
-
-        // If limit = 0 → return all data (no pagination)
-        if (req.query.limit === "0") {
-            const menus = await Menu.find(filter)
-                .sort({ priority: 1, add_date: -1 })
-                .populate("added_by updated_by", "name email")
-                .lean();
-
-            const total = await Menu.countDocuments();
-            const filtered = await Menu.countDocuments(filter);
-
-            return res.json({
-                success: true,
-                data: menus,
-                pagination: {
-                    page: 1,
-                    limit: 0,
-                    total,
-                    filtered,
-                    pages: 1
-                }
-            });
-        }
-
-        const page = Math.max(parseInt(req.query.page) || 1, 1);
-        const limit = Math.max(parseInt(req.query.limit) || 10, 1);
-        const skip = (page - 1) * limit;
-
-        const [menus, total, filtered] = await Promise.all([
-            Menu.find(filter)
-                .sort({ priority: 1, add_date: -1 })
-                .skip(skip)
-                .limit(limit)
-                .populate("added_by updated_by", "name email")
-                .lean(),
-
-            Menu.countDocuments(),
-            Menu.countDocuments(filter)
-        ]);
-
-        res.json({
-            success: true,
-            data: menus,
-            pagination: {
-                page,
-                limit,
-                total,
-                filtered,
-                pages: Math.ceil(filtered / limit)
-            }
-        });
-
-    } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
-    }
-});
-
-
-// Create menu
-router.post("/menu", authenticate, async (req, res) => {
-    try {
-        const user = req.user;
-        const { type, master_id, name, icon_code, url, priority, is_show, isActive } = req.body;
-        // Pre-validation
-        if (type === "SubMenu" && !master_id) {
-            return res.status(400).json({ success: false, message: "SubMenu requires a master_id" });
-        }
-        if (type === "Menu" && master_id) {
-            return res.status(400).json({ success: false, message: "Menu cannot have a master_id" });
-        }
-
-        const menu = new Menu({
-            type,
-            master_id: master_id || null,
-            name,
-            icon_code: icon_code || "",
-            url: url || "#",
-            priority: Number(priority) || 1,
-            is_show: !!is_show,
-            isActive: !!isActive,
-            added_by: {
-                user_id: user._id,
-                name: user.name,
-                email: user.email
-            },
-            updated_by: {
-                user_id: user._id,
-                name: user.name,
-                email: user.email
-            }
-        });
-
-        await menu.save();
-        res.json({ success: true, data: menu });
-    } catch (error) {
-        if (error.code === 11000) {
-            return res.status(400).json({ success: false, message: "URL must be unique" });
-        }
-        if (error.name === "ValidationError") {
-            return res.status(400).json({ success: false, message: error.message });
-        }
-        logger.error("Error creating menu:", error);
-        res.status(500).json({ success: false, message: "Error creating menu" });
-    }
-});
-
-
-// Update menu
-router.put("/menu/:id", authenticate, async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { type, master_id, name, icon_code, url, priority, is_show, isActive } = req.body;
-
-        // Pre-validation
-        if (type === "SubMenu" && !master_id) {
-            return res.status(400).json({ success: false, message: "SubMenu requires a master_id" });
-        }
-        if (type === "Menu" && master_id) {
-            return res.status(400).json({ success: false, message: "Menu cannot have a master_id" });
-        }
-
-        // Convert values to real booleans
-        const isShowBool = is_show === "true" || is_show === true;
-        const isActiveBool = isActive === "true" || isActive === true;
-
-        const menu = await Menu.findByIdAndUpdate(
-            id,
-            {
-                type,
-                master_id: master_id || null,
-                name,
-                icon_code,
-                url,
-                priority: Number(priority) || 1,
-                is_show: isShowBool,
-                isActive: isActiveBool,
-                updated_by: {
-                    user_id: req.user._id,
-                    name: req.user.name,
-                    email: req.user.email
-                }
-            },
-            { new: true, runValidators: true }
-        );
-
-        if (!menu) {
-            return res.status(404).json({ success: false, message: "Menu not found" });
-        }
-
-        res.json({ success: true, data: menu });
-
-    } catch (error) {
-
-        if (error.code === 11000) {
-            return res.status(400).json({ success: false, message: "URL must be unique" });
-        }
-
-        if (error.name === "ValidationError") {
-            return res.status(400).json({ success: false, message: error.message });
-        }
-
-        logger.error("Error updating menu:", error);
-        res.status(500).json({ success: false, message: "Error updating menu" });
-    }
-});
-
-// Delete menu
-router.delete("/menu/:id", authenticate, async (req, res) => {
-    try {
-        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-            return res.status(400).json({ success: false, message: "Invalid menu ID" });
-        }
-
-        const menu = await Menu.findByIdAndDelete(req.params.id);
-        if (!menu) return res.status(404).json({ success: false, message: "Menu not found" });
-
-        await MenuAssignment.deleteMany({ menu_id: req.params.id });
-        res.json({ success: true, message: "Menu deleted successfully" });
-    } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
-    }
-});
-
-// Get menus by type
-router.get("/menu/type/:type", authenticate, async (req, res) => {
-    try {
-        const menus = await Menu.find({ type: req.params.type })
-            .sort({ priority: 1, name: 1 })
-            .lean();
-        res.json({ success: true, data: menus });
-    } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
-    }
-});
-// Toggle is_show status
-router.patch("/menu/:id/toggle-status", authenticate, async (req, res) => {
-    try {
-        const { id } = req.params;
-        const field = req.query.field; // field to toggle: is_show OR isActive
-
-        if (!["is_show", "isActive"].includes(field)) {
-            return res.status(400).json({
-                success: false,
-                message: "Invalid field. Allowed: is_show, isActive"
-            });
-        }
-
-        const menu = await Menu.findById(id);
-        if (!menu) {
-            return res.status(404).json({ success: false, message: "Menu not found" });
-        }
-
-        // Toggle the selected field
-        const updatedValue = !menu[field];
-
-        const updated = await Menu.findByIdAndUpdate(
-            id,
-            {
-                $set: {
-                    [field]: updatedValue,
-                    updated_by: req.user
-                        ? {
-                            user_id: req.user._id,
-                            name: req.user.name,
-                            email: req.user.email
-                        }
-                        : menu.updated_by
-                }
-            },
-            { new: true }
-        );
-
-        res.json({
-            success: true,
-            message: `${field} updated successfully`,
-            data: {
-                id: updated._id,
-                [field]: updated[field]
-            }
-        });
-
-    } catch (error) {
-        logger.error("Toggle menu status error:", error);
-        res.status(500).json({ success: false, message: "Server error" });
-    }
-});
-
-// ---------------------------
-// Menu Assignment Endpoints
-// ---------------------------
-
-// Assign menus to a designation
-router.post("/menu/assign", authenticate, async (req, res) => {
-    try {
-        const { designation_id, menu_ids } = req.body;
-
-        if (!designation_id || !Array.isArray(menu_ids)) {
-            return res.status(400).json({ success: false, message: "Designation ID and menu IDs array are required" });
-        }
-
-        if (!mongoose.Types.ObjectId.isValid(designation_id)) {
-            return res.status(400).json({ success: false, message: "Invalid designation ID" });
-        }
-
-        for (const id of menu_ids) {
-            if (!mongoose.Types.ObjectId.isValid(id)) {
-                return res.status(400).json({ success: false, message: `Invalid menu ID: ${id}` });
-            }
-        }
-
-        // Remove existing assignments
-        await MenuAssignment.deleteMany({ designation_id });
-
-        // Insert new assignments
-        const assignments = menu_ids.map(menu_id => ({ designation_id, menu_id }));
-        const savedAssignments = await MenuAssignment.insertMany(assignments);
-
-        res.status(201).json({ success: true, data: savedAssignments });
-    } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
-    }
-});
+// Assign menus to designation
+router.post("/menu/assign", authenticate, PermissionController.assignMenus);
 router.delete("/assign-menu/unselect", authenticate, unAssignMenusValidator, PermissionController.unAssignMenu)
-// For logged-in user’s sidebar
 router.get("/sidebar", authenticate, PermissionController.getSidebarForUser);
-// Get assigned menus for a designation
 router.get("/assign-menu/designation/:designation_id/menus", authenticate, getAssignedMenusValidator, PermissionController.getAssignedMenus);
 router.post("/assign-menu/assign", authenticate, assignMenusValidator, PermissionController.assignMenusToDesignation);
 
 // Save user permissions
 router.post("permisssions/user/permissions/:userId", authenticate, async (req, res) => {
     try {
-        const { permissions } = req.body; // permissions = [{ menu_id, read, write, delete }]
+        const { permissions } = req.body;
         const userId = req.params.userId;
 
         for (const perm of permissions) {
@@ -896,11 +445,7 @@ router.post("/files/upload-folder/:folderId", ParentFolderName, s3uploadfolder.a
     }
 });
 
-
-
-
 router.get("/files/download/:fileName", TempController.download);
-router.post("/files/submit-form", TempController.submitForm);
 router.delete("/files/:fileId", TempController.deleteFile);
 router.get("/files/:fileId/status", TempController.getFileStatus);
 
@@ -1065,35 +610,6 @@ router.get('/session/recent-folders', async (req, res) => {
     } catch (error) {
         console.error('Error fetching recent folders:', error);
         res.status(500).json({ success: false, message: 'Internal server error' });
-    }
-});
-
-
-
-// Clear recent folders
-router.delete('/session/clear-recent-folders', async (req, res) => {
-    try {
-        await Session.findOneAndUpdate(
-            { userId: req.user._id },
-            {
-                $set: {
-                    recentFolders: [],
-                    lastVisitedFolder: null
-                }
-            }
-        );
-
-        res.json({
-            success: true,
-            message: 'Recent folders cleared successfully'
-        });
-
-    } catch (error) {
-        console.error('Error clearing recent folders:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Internal server error'
-        });
     }
 });
 

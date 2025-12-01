@@ -235,41 +235,6 @@ export const handleFolderUpload = async (req, res, parentFolder) => {
     }
 };
 
-// Submit form and mark files permanent
-export const submitForm = async (req, res) => {
-    try {
-        const { fileIds, formData } = req.body;
-
-        if (!fileIds || !Array.isArray(fileIds)) {
-            return res.status(400).json({ error: "File IDs are required" });
-        }
-
-        const results = [];
-
-        for (const fileId of fileIds) {
-            const file = await TempFile.findById(fileId);
-            if (file && file.status === "temp") {
-                file.status = "permanent";
-                file.formDataId = formData?.id || null;
-                await file.save();
-                results.push({ fileId: file._id, status: "permanent", success: true });
-            } else {
-                results.push({ fileId, status: "not_found_or_invalid", success: false });
-            }
-        }
-
-        res.json({
-            success: true,
-            message: "Form submitted successfully",
-            files: results,
-            formData,
-        });
-    } catch (err) {
-        logger.error("Form submission error:", err);
-        res.status(500).json({ error: "Form submission failed" });
-    }
-};
-
 // Cancel/Delete temp file
 export const deleteFile = async (req, res) => {
     try {
