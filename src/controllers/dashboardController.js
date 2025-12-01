@@ -865,10 +865,12 @@ const DEFAULT_MEDIA_CATEGORY = "Media";
 export const getDepartmentFileUsage = async (req, res) => {
     try {
         const user = req.user;
+        const { selectedYear, selectedProjectId } = getSessionFilters(req);
+
         const departments = await Department.find({ status: "Active" }).sort({ priority: 1 });
         const departmentNames = departments.map(dep => dep.name);
-        const deptIndexMap = {};
-        departmentNames.forEach((name, i) => { deptIndexMap[name] = i; });
+        const deptIndexMap = Object.fromEntries(departmentNames.map((name, i) => [name, i]));
+
         const fileTypeCounts = {
             Word: Array(departmentNames.length).fill(0),
             Excel: Array(departmentNames.length).fill(0),
@@ -877,12 +879,29 @@ export const getDepartmentFileUsage = async (req, res) => {
             Media: Array(departmentNames.length).fill(0)
         };
 
+        // ---- BASE QUERY ----
         const fileQuery = { status: "active" };
+
+        // Restrict non-admin users
         if (user.profile_type !== "superadmin") {
             fileQuery.uploadedBy = user._id;
         }
 
+        // Filter by project
+        if (selectedProjectId) {
+            fileQuery.projectId = selectedProjectId;
+        }
+
+        // Filter by uploaded year
+        if (selectedYear) {
+            fileQuery.uploadedAt = {
+                $gte: new Date(`${selectedYear}-01-01T00:00:00Z`),
+                $lte: new Date(`${selectedYear}-12-31T23:59:59Z`)
+            };
+        }
+
         const files = await File.find(fileQuery).populate("departmentId", "name");
+
         const getCategory = (ext) => {
             if (!ext) return DEFAULT_MEDIA_CATEGORY;
             ext = ext.toLowerCase();
@@ -896,7 +915,7 @@ export const getDepartmentFileUsage = async (req, res) => {
         };
 
         for (const file of files) {
-            if (!file.departmentId || !file.departmentId.name) continue;
+            if (!file.departmentId?.name) continue;
 
             const deptIndex = deptIndexMap[file.departmentId.name];
             if (deptIndex === undefined) continue;
@@ -904,12 +923,7 @@ export const getDepartmentFileUsage = async (req, res) => {
             const ext = (file.originalName?.split(".").pop() || "").toLowerCase();
             const category = getCategory(ext);
 
-            if (fileTypeCounts[category]) {
-                fileTypeCounts[category][deptIndex]++;
-            } else {
-                fileTypeCounts[category] = Array(departmentNames.length).fill(0);
-                fileTypeCounts[category][deptIndex]++;
-            }
+            fileTypeCounts[category][deptIndex]++;
         }
 
         res.status(200).json({

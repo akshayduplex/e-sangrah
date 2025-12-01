@@ -17,6 +17,7 @@ import WebSetting from "../models/WebSetting.js";
 import PQueue from 'p-queue';
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { Readable } from "stream";
+import Project from "../models/Project.js";
 
 function formatHeader(text) {
     if (!text) return "";
@@ -231,13 +232,13 @@ export const servePDF = async (req, res) => {
         // Stream the PDF to the browser
         response.Body.pipe(res);
 
-        await activityLogger({
-            actorId: null,
-            entityId: fileId,
-            entityType: 'File',
-            action: 'VIEW',
-            details: `PDF ${file.originalName} viewed in browser by ${req.user ? req.user.name : "Guest User"}`
-        });
+        // await activityLogger({
+        //     actorId: null,
+        //     entityId: fileId,
+        //     entityType: 'File',
+        //     action: 'VIEW',
+        //     details: `PDF ${file.originalName} viewed in browser by ${req.user ? req.user.name : "Guest User"}`
+        // });
 
     } catch (error) {
         console.error("Error serving PDF:", error);

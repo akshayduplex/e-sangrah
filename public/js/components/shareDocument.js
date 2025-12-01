@@ -22,7 +22,7 @@
     // Load users for invite dropdown
     function loadUsersForInvite($select) {
         $.ajax({
-            url: `${baseUrl}/api/user`,
+            url: `${baseUrl}/api/user?includeAllProfiles=true`,
             method: 'GET',
             success: function (response) {
                 $select.empty().append('<option value="">Search user...</option>');
@@ -653,9 +653,6 @@
                     console.warn('Missing docId or fileId for share modal');
                     return;
                 }
-
-                // Your existing share modal logic here...
-                // (Keep all the $.get, loadUsersForInvite, etc.)
             });
         }
 
@@ -676,13 +673,10 @@
         }
     });
     // Handle View Version button
-    // Handle View Version button
     document.addEventListener('click', function (e) {
         if (e.target.classList.contains('btn-view-version')) {
             const version = e.target.getAttribute('data-version');
             if (!currentDocId || !version) return;
-
-            // Correct URL: pass selected version only
             window.location.href = `/documents/${currentDocId}/versions/view?version=${version}`;
         }
     });
@@ -710,7 +704,6 @@
 
 
 
-    // Confirm restore action
     // Confirm restore action
     document.getElementById('confirm-restore-folder')?.addEventListener('click', function () {
 

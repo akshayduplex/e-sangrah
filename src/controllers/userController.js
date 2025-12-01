@@ -224,17 +224,25 @@ export const getAllUsers = async (req, res) => {
             search = "",
             sortBy = "createdAt",
             sortOrder = "desc",
-            createdDate
+            createdDate,
+            includeAllProfiles = false
         } = req.query;
 
         const filter = {};
+        const shouldApplyRoleFilter =
+            loggedInUser.profile_type !== "superadmin" &&
+            includeAllProfiles !== 'true';
 
-        // Role-based filtering
-        if (loggedInUser.profile_type !== "superadmin") {
+        if (shouldApplyRoleFilter) {
             filter.addedBy = loggedInUser._id;
         }
 
-        // Single Date Filter
+        // -----------------------------------------------------
+        // Profile Type Filter
+        // -----------------------------------------------------
+        if (profile_type && includeAllProfiles !== 'true') {
+            filter.profile_type = profile_type;
+        }
         if (createdDate) {
             const parsedDate = parseDateDDMMYYYY(createdDate);
             if (!parsedDate || isNaN(parsedDate)) {
@@ -250,10 +258,6 @@ export const getAllUsers = async (req, res) => {
 
             filter.createdAt = { $gte: start, $lte: end };
         }
-
-        if (profile_type) filter.profile_type = profile_type;
-
-        // Text search
         if (search) {
             filter.$or = [
                 { name: { $regex: search, $options: "i" } },
@@ -269,14 +273,12 @@ export const getAllUsers = async (req, res) => {
                 }
             ];
         }
-
-        // Query execution
         const [total, users] = await Promise.all([
             User.countDocuments(filter),
             User.find(filter)
                 .populate("userDetails.department", "name")
                 .populate("userDetails.designation", "name")
-                .select("name email phone_number profile_type createdAt userDetails status lastLogin")
+                .select("name email phone_number profile_type createdAt userDetails status lastLogin designation") // 💡 Added 'designation' for front-end
                 .sort({ [sortBy]: sortOrder === "asc" ? 1 : -1 })
                 .skip((page - 1) * limit)
                 .limit(Number(limit))
@@ -285,7 +287,7 @@ export const getAllUsers = async (req, res) => {
 
         res.json({
             success: true,
-            users,
+            data: users,
             total,
             page: Number(page),
             totalPages: Math.ceil(total / limit)
@@ -297,23 +299,53 @@ export const getAllUsers = async (req, res) => {
     }
 };
 
-
-
 export const searchUsers = async (req, res) => {
     try {
-        let { page = 1, limit = 10, search = "", profile_type = "user", projectId } = req.query;
+        let { page = 1, limit = 10, search = "", profile_type = "user", projectId, wantAllUser = false } = req.query;
 
         page = parseInt(page, 10);
         limit = parseInt(limit, 10);
+        wantAllUser = wantAllUser === "true"; // convert query string to boolean
 
         let users = [];
         let total = 0;
 
-        // If donor or vendor, fetch from Project
-        if ((profile_type === "donor" || profile_type === "vendor") && projectId) {
+        if (wantAllUser) {
+            // Fetch all types of users: user, donor, vendor
+            const filter = {
+                profile_type: { $in: ["user", "donor", "vendor"] }
+            };
+            if (search) filter.name = { $regex: search, $options: "i" };
+
+            users = await User.find(filter)
+                .select("name email profile_type userDetails.designation vendorDetails.designation donorDetails.designation")
+                .populate("userDetails.designation vendorDetails.designation donorDetails.designation", "name") // populate designation names
+                .limit(limit)
+                .skip((page - 1) * limit)
+                .sort({ name: 1 })
+                .lean();
+
+            total = await User.countDocuments(filter);
+
+            // Map designation from nested objects
+            users = users.map(u => {
+                let designation = null;
+                if (u.profile_type === "user" && u.userDetails?.designation) designation = u.userDetails.designation.name;
+                else if (u.profile_type === "vendor" && u.vendorDetails?.designation) designation = u.vendorDetails.designation.name;
+                else if (u.profile_type === "donor" && u.donorDetails?.designation) designation = u.donorDetails.designation.name;
+
+                return {
+                    name: u.name,
+                    email: u.email,
+                    profile_type: u.profile_type,
+                    designation
+                };
+            });
+
+        } else if ((profile_type === "donor" || profile_type === "vendor") && projectId) {
             const project = await Project.findById(projectId)
                 .populate({
-                    path: profile_type, // "donor" or "vendor"
+                    path: profile_type,
                     select: "name email",
                     match: search ? { name: { $regex: search, $options: "i" } } : {}
                 })
@@ -322,15 +354,12 @@ export const searchUsers = async (req, res) => {
             if (project) {
                 users = project[profile_type] || [];
                 total = users.length;
-                // Apply pagination manually
                 const start = (page - 1) * limit;
                 const end = start + limit;
                 users = users.slice(start, end);
             }
         } else {
-            // Default: search regular users
             const filter = { profile_type };
-
             if (search) filter.name = { $regex: search, $options: "i" };
 
             users = await User.find(filter)
@@ -361,6 +390,7 @@ export const searchUsers = async (req, res) => {
         });
     }
 };
+
 
 // Get single user by ID
 export const getUserById = async (req, res) => {

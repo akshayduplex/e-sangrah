@@ -161,7 +161,6 @@
     <!-- /Page Wrapper -->
     <%- include('../../modals/addApprovers') %>
         <%- include('../../partials/footer') %>
-            <!-- <link href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" rel="stylesheet"> -->
             <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
             <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
             <script src="/js/components/shareDocument.js"></script>
@@ -170,7 +169,6 @@
                 (function ($) {
                     "use strict";
 
-                    // Get initial status from server-side variable
                     const initialStatus = "<%= status %>";
                     const documentId = "<%= documentId %>";
                     const currentUserId = "<%= user._id %>";
@@ -194,7 +192,6 @@
                         default: "/img/icons/fn1.png"
                     };
 
-                    // Initialize status tabs based on query parameter
                     // Initialize status tabs based on query parameter
                     function initializeStatusTabs() {
 
@@ -250,7 +247,7 @@
                     }
 
 
-                    // Initialize when document is ready
+                    // Initialize
                     $(document).ready(function () {
                         initializeStatusTabs();
                     });
@@ -301,7 +298,6 @@
 
                     // Initialize Select2
                     initSelect2('#department', `${baseUrl}/api/departments/search`, 'Select Department', 'name');
-                    // initSelect2('#projectName', `${baseUrl}/api/projects`, 'Select Project', 'projectName');
 
                     // -------------------------
                     // Initialize DataTable
@@ -321,17 +317,14 @@
 
                                 const searchValue = $('#searchInput').val()?.trim() || '';
                                 const selectedDate = $('.datetimepicker').val();
-
-                                // Column sorting info
                                 const orderColumn = d.order[0]?.column;
                                 const orderDir = d.order[0]?.dir || 'desc';
 
                                 return {
                                     page: (d.start / d.length) + 1,
                                     limit: d.length,
-                                    status: getCurrentStatus(), // Use the current active status
+                                    status: getCurrentStatus(),
                                     department: $('#department').val(),
-                                    // project: $('#projectName').val(),
                                     date: selectedDate,
                                     search: searchValue,
                                     orderColumn,
@@ -381,7 +374,6 @@
                         }
                     });
 
-                    // Enable Bootstrap tooltips on table redraw
                     $('#documents_table').on('draw.dt', function () {
                         const tooltipTriggerList = [].slice.call(document.querySelectorAll('#documents_table [title]'));
                         tooltipTriggerList.map(function (tooltipTriggerEl) {
@@ -396,22 +388,16 @@
                         $('.status-tab').removeClass('btn-primary').addClass('btn-outline-primary');
                         $(this).removeClass('btn-outline-primary').addClass('btn-primary');
 
-                        // Get the selected status
                         const selectedStatus = $(this).text().trim();
                         const statusParam = selectedStatus === 'All' ? 'all' : selectedStatus;
 
-                        // Update the global variable
                         currentStatus = selectedStatus;
 
-                        // Update URL without page reload
                         updateUrlParameter('status', statusParam);
-
-                        // Reload table with new status filter
                         table.ajax.reload();
                     });
 
 
-                    // Helper function to update URL parameters
                     function updateUrlParameter(key, value) {
                         const url = new URL(window.location);
                         if (value === 'all' || value === '') {
@@ -421,13 +407,11 @@
                         }
                         window.history.pushState({}, '', url);
                     }
-
-                    // Handle browser back/forward buttons
                     window.addEventListener('popstate', function () {
                         const urlParams = new URLSearchParams(window.location.search);
                         const statusFromUrl = urlParams.get('status') || 'all';
 
-                        currentStatus = statusFromUrl; //update global variable
+                        currentStatus = statusFromUrl;
                         initializeStatusTabs();
                         table.ajax.reload();
                     });
@@ -473,9 +457,13 @@
                     // Render each row
                     // -------------------------
                     function renderRow(doc) {
-                        // --- CRITICAL: Current logged-in user ID (must be passed from backend) ---
-                        const currentUserId = "<%= user._id %>"; // EJS injects the logged-in user ID
+                        const currentUserId = "<%= user._id %>";
+                        const currentUserProfileType = "<%= user.profile_type %>";
+
+                        // New Logic: Full access if Owner OR Superadmin
                         const isOwner = doc.owner && doc.owner._id === currentUserId;
+                        const isSuperAdmin = currentUserProfileType === 'superadmin';
+                        const hasFullAccess = isOwner || isSuperAdmin;
 
                         var fileSizeKB = doc.files[0]?.fileSize ? (doc.files[0].fileSize / 1024).toFixed(2) + ' KB' : '-';
                         const lastModified = formatDateTime(doc.updatedAt);
@@ -561,11 +549,8 @@
                     </div>
                 </div>`
                             : '-';
-
-                        // ———————— ACTION DROPDOWN: OWNER vs NON-OWNER ————————
                         let dropdown;
-                        if (isOwner) {
-                            // Full access for owner
+                        if (hasFullAccess) {
                             dropdown = `
             <div class="btn-group" role="group">
                 <button type="button" class="btn border-0" data-bs-toggle="dropdown"><i class="ti ti-settings"></i></button>
@@ -585,7 +570,6 @@
             </div>
         `;
                         } else {
-                            // Non-owner: Only View + Download
                             dropdown = `
             <div class="btn-group" role="group">
                 <button type="button" class="btn border-0" data-bs-toggle="dropdown">

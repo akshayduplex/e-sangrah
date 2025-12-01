@@ -25,15 +25,21 @@ document.addEventListener("DOMContentLoaded", function () {
     if ($headerYearSelect.length) {
         const currentYear = new Date().getFullYear();
         const startYear = 1995;
-        $headerYearSelect.append(new Option('All', 'all', false, false));
+        const savedYear = window.selectedYear;
+        if (!savedYear) {
+            $headerYearSelect.append(new Option('All', 'all', false, false));
+        }
+
         for (let year = currentYear; year >= startYear; year--) {
             $headerYearSelect.append(new Option(year, year, false, false));
         }
-
         $headerYearSelect.select2({ placeholder: 'Select Year', allowClear: false });
 
         $headerYearSelect.on('change', async function () {
             const selectedYear = $(this).val();
+            if (selectedYear !== 'all') {
+                $headerYearSelect.find('option[value="all"]').remove();
+            }
             try {
                 const res = await fetch(`${baseUrl}/api/session/project`, {
                     method: 'POST',
@@ -53,11 +59,21 @@ document.addEventListener("DOMContentLoaded", function () {
             try {
                 const res = await fetch(`${baseUrl}/api/session/project`, { credentials: 'include' });
                 const data = await res.json();
-                const savedYear = data.selectedYear || 'all';
-                if (!$headerYearSelect.find(`option[value="${savedYear}"]`).length) {
+                window.selectedYear = data.selectedYear || null;
+                const savedYear = data.selectedYear;
+
+                // If a year was selected → hide "All"
+                if (savedYear) {
+                    $headerYearSelect.find('option[value="all"]').remove();
+                } else {
+                    // No saved year → default to 'all'
+                    $headerYearSelect.val('all');
+                }
+                if (savedYear && !$headerYearSelect.find(`option[value="${savedYear}"]`).length) {
                     $headerYearSelect.append(new Option(savedYear, savedYear, true, true));
                 }
-                $headerYearSelect.val(savedYear).trigger('change.select2');
+
+                $headerYearSelect.val(savedYear || 'all').trigger('change.select2');
             } catch (err) { console.error('Error loading saved year:', err); }
         })();
     }
@@ -75,6 +91,9 @@ document.addEventListener("DOMContentLoaded", function () {
                 data: params => ({ search: params.term || '', page: params.page || 1, limit: 10 }),
                 processResults: function (data) {
                     const projects = (data.data || []).map(p => ({ id: p._id, text: p.projectName || p.name }));
+                    if (window.selectedProjectId) {
+                        return { results: projects };
+                    }
                     return { results: [{ id: 'all', text: 'All Projects' }, ...projects] };
                 },
                 cache: true
@@ -235,12 +254,31 @@ document.addEventListener("DOMContentLoaded", function () {
         width: 'resolve',
         dropdownParent: $('#sharedoc-modal'),
         ajax: {
-            url: `${baseUrl}/api/user/search`,
+            url: `${baseUrl}/api/user/search?wantAllUser=true`,
             dataType: 'json',
             delay: 250,
             data: params => ({ search: params.term }),
             processResults: data => ({
-                results: (data.users || []).map(u => ({ id: u.email, text: u.name, isNew: false }))
+                results: (data.users || []).map(u => {
+
+                    let label = u.name;
+                    const designation = u.designation?.trim();
+                    const profile = u.profile_type;
+
+                    if (designation) {
+                        // User with designation
+                        label += ` [${designation}]`;
+                    } else {
+                        // Vendor / Donor (no designation)
+                        label += ` [${profile}]`;
+                    }
+
+                    return {
+                        id: u.email,
+                        text: label,
+                        isNew: false
+                    };
+                })
             })
         },
         tags: true,

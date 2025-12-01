@@ -6,6 +6,18 @@
 			opacity: 0.5;
 		}
 
+		.folderbox.blocked-user {
+			cursor: not-allowed !important;
+		}
+
+		.folderbox.blocked-user img {
+			filter: grayscale(100%) brightness(60%);
+		}
+
+		.folderbox.blocked-owner img {
+			filter: brightness(70%) saturate(80%);
+		}
+
 		.disabled-link {
 			pointer-events: none;
 			opacity: 0.5;
@@ -501,15 +513,25 @@
 
 							const isOwner = folder.isOwner;
 							const isBlocked = folder.status === "inactive";
-
 							const userPermission = folder.permissions?.[0] || null;
 
-							const canView = isSuperAdmin || isOwner || (userPermission && (userPermission.access === "view" || userPermission.access === "edit"));
-							const canDownload = isSuperAdmin || isOwner || (userPermission && userPermission.canDownload === true);
+							// Access permissions
+							const canView = isSuperAdmin || isOwner ||
+								(userPermission && (userPermission.access === "view" || userPermission.access === "edit"));
 
-							if (!isSuperAdmin && !isOwner && isBlocked) {
-								div.classList.add("blocked");
+							const canDownload = isSuperAdmin || isOwner ||
+								(userPermission && userPermission.canDownload === true);
+
+							const isUserBlocked = !isSuperAdmin && !isOwner && isBlocked;
+
+							// Decide CSS class
+							let blockedClass = "";
+							if (isBlocked) {
+								if (isUserBlocked) blockedClass = "blocked-user";        // dark
+								else blockedClass = "blocked-owner";                    // light
 							}
+
+							if (blockedClass) div.classList.add(blockedClass);
 
 							div.innerHTML = `
         <div class="fldricon"><img src="/img/icons/folder.png"></div>
@@ -524,29 +546,34 @@
 
                 <!-- VIEW -->
                 <li>
-                      <a class="dropdown-item view-folder 
-                        ${(!canView && !isSuperAdmin) ? "disabled-link" : ""}"
-                        href="${(!canView && !isSuperAdmin) ? "#" : "/" + folder._id + "/list"}">
+                    <a class="dropdown-item view-folder 
+                        ${(!canView || isUserBlocked) ? "disabled-link" : ""}"
+                        href="${(!canView || isUserBlocked) ? "#" : "/" + folder._id + "/list"}">
                         <i class="ti ti-eye"></i> View
                     </a>
                 </li>
 
                 <!-- DOWNLOAD -->
                 <li>
-                   <a class="dropdown-item download-folder 
-                        ${(!canDownload && !isSuperAdmin) ? "disabled-link" : ""}"
-                        href="#" data-folder-id="${folder._id}" data-bs-toggle="modal" 
-                        data-bs-target="#downloaddoc-modal">
+                    <a class="dropdown-item download-folder 
+                        ${(!canDownload || isUserBlocked) ? "disabled-link" : ""}"
+                        href="#"
+                        data-folder-id="${folder._id}"
+                        ${(!canDownload || isUserBlocked) ? "style='pointer-events:none;opacity:0.5;'" : ""}
+                        data-bs-toggle="${(!canDownload || isUserBlocked) ? "" : "modal"}"
+                        data-bs-target="${(!canDownload || isUserBlocked) ? "" : "#downloaddoc-modal"}">
                         <i class="ti ti-download"></i> Download
                     </a>
                 </li>
 
                 ${(isOwner || isSuperAdmin) ? `
                     <li><a class="dropdown-item rename-folder" href="#"><i class="ti ti-pencil-minus"></i> Rename</a></li>
-                    <li><a class="dropdown-item toggle-block" href="#" data-id="${folder._id}">
-                        <i class="ti ti-lock${isBlocked ? "-open" : ""}"></i>
-                        <span class="block-text">${isBlocked ? "Unblock" : "Block"}</span>
-                    </a></li>
+                    <li>
+                        <a class="dropdown-item toggle-block" href="#" data-id="${folder._id}">
+                            <i class="ti ti-lock${isBlocked ? "-open" : ""}"></i>
+                            <span class="block-text">${isBlocked ? "Unblock" : "Block"}</span>
+                        </a>
+                    </li>
                     <li><a class="dropdown-item share-btn" href="#" data-doc-id="${folder._id}" data-bs-toggle="modal" data-bs-target="#sharedoc-modal"><i class="ti ti-share"></i> Share</a></li>
                     <li><a class="dropdown-item delete-folder" href="#" data-bs-toggle="modal" data-bs-target="#trashdoc-modal"><i class="ti ti-trash"></i> Move to Trash</a></li>
                     <li><a class="dropdown-item archive-folder" href="#" data-bs-toggle="modal" data-bs-target="#archivedoc-modal"><i class="ti ti-archive"></i> Move to Archive</a></li>
@@ -554,19 +581,20 @@
             </ul>
         </div>
     `;
-							if (canView || isSuperAdmin) {
+
+							// Navigation disabled for normal blocked users
+							if (!isUserBlocked && (canView || isSuperAdmin)) {
 								if (isMobile) {
-									// Single tap
 									div.addEventListener("click", () => {
 										loadFolders(folder._id, [...parentPath, { id: folder._id, name: folder.name }]);
 									});
 								} else {
-									// Desktop double-click
 									div.addEventListener("dblclick", () => {
 										loadFolders(folder._id, [...parentPath, { id: folder._id, name: folder.name }]);
 									});
 								}
 							}
+
 							elements.container.appendChild(div);
 						});
 

@@ -942,21 +942,13 @@ export const getFolderTree = async (req, res) => {
             match.projectId = finalProjectId;
         }
 
-        /* -----------------------------------
-         * PERMISSION FILTER (non-superadmin)
-         * ----------------------------------- */
-        /* -----------------------------------
-         * PERMISSION FILTER (non-superadmin)
-         * ----------------------------------- */
+        // Permission filtering (same as before)
         if (profileType !== "superadmin") {
-
-            // Base access: owner or shared permission
             const accessConditions = [
                 { owner: userId },
                 { "permissions.principal": userId }
             ];
 
-            // Vendor → show folders containing his vendor documents
             if (profileType === "vendor") {
                 accessConditions.push({
                     _id: {
@@ -969,7 +961,6 @@ export const getFolderTree = async (req, res) => {
                 });
             }
 
-            // Donor → show folders containing his donor documents
             if (profileType === "donor") {
                 accessConditions.push({
                     _id: {
