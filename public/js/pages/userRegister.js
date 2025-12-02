@@ -1,5 +1,21 @@
 $(document).ready(function () {
+    window.parseNewLocationTag = function (value) {
+        const prefix = 'NEW_LOC:';
+        if (value && typeof value === 'string' && value.startsWith(prefix)) {
+            return value.replace(prefix, '').trim();
+        }
+        return value;
+    };
+    function createSelect2Tag(params) {
+        let term = $.trim(params.term);
+        if (term === '') return null;
 
+        return {
+            id: 'NEW_LOC:' + term,
+            text: term + ' (Add New)',
+            newTag: true
+        };
+    }
     // ------------------------------
     // DUPLICATE CHECK FUNCTION
     // ------------------------------
@@ -86,6 +102,93 @@ $(document).ready(function () {
         $(this).addClass('is-valid').removeClass('is-invalid');
         checkDuplicate('employee_id', emp, $(this));
     });
+    // Country Select2
+    $('#country').select2({
+        placeholder: "Search or add Country",
+        tags: true,
+        createTag: createSelect2Tag,
+        allowClear: true,
+        ajax: {
+            url: `${baseUrl}/api/location/search`,
+            dataType: 'json',
+            delay: 300,
+            data: function (params) {
+                return {
+                    type: 'country',
+                    search: params.term || ''
+                };
+            },
+            processResults: function (data) {
+                return {
+                    results: data.results || []
+                };
+            },
+            cache: true
+        }
+    });
+
+    // State Select2 - Depends on Country
+    $('#state').select2({
+        placeholder: "Search or add State",
+        tags: true,
+        createTag: createSelect2Tag,
+        allowClear: true,
+        ajax: {
+            url: `${baseUrl}/api/location/search`,
+            dataType: 'json',
+            delay: 300,
+            data: function (params) {
+                return {
+                    type: 'state',
+                    search: params.term || '',
+                    country: $('#country').val() ? parseNewLocationTag($('#country').val()) : ''
+                };
+            },
+            processResults: function (data) {
+                return {
+                    results: data.results || []
+                };
+            },
+            cache: true
+        }
+    });
+
+    // City Select2 - Depends on State
+    $('#city').select2({
+        placeholder: "Search or add City",
+        tags: true,
+        createTag: createSelect2Tag,
+        allowClear: true,
+        ajax: {
+            url: `${baseUrl}/api/location/search`,
+            dataType: 'json',
+            delay: 300,
+            data: function (params) {
+                return {
+                    type: 'city',
+                    search: params.term || '',
+                    country: $('#country').val() ? parseNewLocationTag($('#country').val()) : '',
+                    state: $('#state').val() ? parseNewLocationTag($('#state').val()) : ''
+                };
+            },
+            processResults: function (data) {
+                return {
+                    results: data.results || []
+                };
+            },
+            cache: true
+        }
+    });
+
+    // Reset dependent fields when parent changes
+    $('#country').on('change', function () {
+        $('#state').empty().trigger('change');
+        $('#city').empty().trigger('change');
+    });
+
+    $('#state').on('change', function () {
+        $('#city').empty().trigger('change');
+    });
 
     // ------------------------------
     // FORM SUBMIT
@@ -93,25 +196,33 @@ $(document).ready(function () {
     $('#registerForm').on('submit', async function (e) {
         e.preventDefault();
 
-        let isValid = true;
+        // Normalize new location tags
+        const normalize = (val) => window.parseNewLocationTag(val) || val;
 
-        // Required field validation
-        $(this).find('[required]').each(function () {
-            if (!$(this).val().trim()) {
-                $(this).addClass('is-invalid');
-                isValid = false;
-            } else {
-                $(this).removeClass('is-invalid').addClass('is-valid');
-            }
-        });
+        const country = normalize($('#country').val());
+        const state = normalize($('#state').val());
+        const city = normalize($('#city').val());
 
-        // If any duplicate exists → block submit
-        if ($('.is-invalid').length > 0) {
-            showToast('Please fix highlighted fields before submitting.', 'error');
+        if (!country || !state || !city) {
+            showToast('Please fill Country, State, and City', 'error');
             return;
         }
 
+        // Create location in background if it's new
+        try {
+            await fetch(`${baseUrl}/api/location/add`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ country, state, city })
+            });
+        } catch (err) {
+            console.log("Location already exists or minor issue");
+        }
+
         const formData = new FormData(this);
+        formData.set('country', country);
+        formData.set('state', state);
+        formData.set('city', city);
 
         try {
             const response = await fetch(`${baseUrl}/api/user/register`, {
@@ -124,14 +235,12 @@ $(document).ready(function () {
             if (response.ok && result.success) {
                 const successModal = new bootstrap.Modal(document.getElementById('data-success-register'));
                 successModal.show();
-
                 this.reset();
                 $('#preview').empty();
-                $('.is-valid, .is-invalid').removeClass('is-valid is-invalid');
+                $('#country, #state, #city').val(null).trigger('change');
             } else {
                 showToast(result.message || 'Registration failed!', 'error');
             }
-
         } catch (err) {
             showToast('Network error. Please try again.', 'error');
         }

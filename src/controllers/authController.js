@@ -13,6 +13,7 @@ import logger from "../utils/logger.js";
 import { API_CONFIG } from "../config/ApiEndpoints.js";
 import UserToken from "../models/UserToken.js";
 import { generateEmailTemplate } from "../helper/emailTemplate.js";
+import { createOrGetLocation } from "./LocationController.js";
 const otpStore = {};
 
 // ---------------------------
@@ -596,7 +597,9 @@ export const showMyProfile = async (req, res) => {
 export const getProfile = async (req, res) => {
     try {
         const userId = req.user._id;
+
         const user = await User.findById(userId)
+            // Populate all possible designation fields
             .populate("userDetails.designation", "name")
             .populate("userDetails.department", "name")
             .lean();
@@ -605,38 +608,77 @@ export const getProfile = async (req, res) => {
             return res.status(404).json({ success: false, message: "User not found" });
         }
 
+        // Everything is already included: location, post_code, designation, department
         res.json({ success: true, user });
+
     } catch (err) {
         logger.error(err);
         res.status(500).json({ success: false, message: "Server Error" });
     }
 };
 
-
 export const updateProfile = async (req, res) => {
     try {
         const userId = req.user._id;
-        const { name, email, phone_number, department, designation, address } = req.body;
 
+        // Extract fields from body + form data
+        const {
+            name,
+            phone_number,
+            address,
+            country,
+            state,
+            city,
+            post_code
+        } = req.body;
 
-        const updateFields = { name, email, phone_number, address };
+        const updateFields = {};
 
-        if (department) updateFields["userDetails.department"] = department;
-        if (designation) updateFields["userDetails.designation"] = designation;
-        if (req.file) updateFields.profile_image = req.file.location;
+        if (name) updateFields.name = name.trim();
+        if (phone_number) updateFields.phone_number = phone_number;
+        if (address) updateFields.address = address.trim();
+        if (post_code) updateFields.post_code = post_code.trim();
 
+        // Handle location as EMBEDDED object (not reference)
+        if (country || state || city) {
+            updateFields.location = {
+                country: (country || '').trim(),
+                state: (state || '').trim(),
+                city: (city || '').trim()
+            };
+        }
+
+        // Handle profile image
+        if (req.file) {
+            updateFields.profile_image = req.file.location || req.file.path;
+        }
+
+        // Update user
         const updatedUser = await User.findByIdAndUpdate(
             userId,
             { $set: updateFields },
-            { new: true }
+            { new: true, runValidators: true }
         )
             .populate("userDetails.designation", "name")
             .populate("userDetails.department", "name")
             .lean();
 
-        res.json({ success: true, user: updatedUser });
+        if (!updatedUser) {
+            return res.status(404).json({ success: false, message: "User not found" });
+        }
+
+        res.json({
+            success: true,
+            message: "Profile updated successfully",
+            user: updatedUser
+        });
+
     } catch (err) {
-        logger.error(err);
-        res.status(500).json({ success: false, message: "Server Error" });
+        console.error("Update Profile Error:", err);
+        res.status(500).json({
+            success: false,
+            message: "Server error during profile update",
+            error: err.message
+        });
     }
 };

@@ -21,6 +21,7 @@ import * as FolderController from "../controllers/FolderController.js";
 import * as NotificationController from "../controllers/NotificationController.js";
 import * as TempController from "../controllers/FileController.js";
 import * as CommonController from "../controllers/CommonController.js"
+import * as LocationController from "../controllers/LocationController.js"
 import * as WebSettings from "../controllers/WebSettingController.js"
 
 // ---------------------------
@@ -132,6 +133,11 @@ router.get('/export/formats', authenticate, CommonController.getExportFormats);
 router.get("/settings/web-settings", authenticate, authorize('superadmin'), WebSettings.getWebSettings);
 router.post("/settings/web-settings", authenticate, authorize('superadmin'), uploadWebImages, WebSettings.updateWebSettings);
 
+// ---------------------------
+// Location routes
+// ---------------------------
+router.get("/location/search", LocationController.searchLocation);          // ?type=country&search=a
+router.post("/location/add", LocationController.addLocation);               // add new
 // ---------------------------
 // Admin routes
 // ---------------------------

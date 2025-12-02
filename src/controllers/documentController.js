@@ -27,12 +27,13 @@ import { activityLogger } from "../helper/activityLogger.js";
 import DocumentVersion from "../models/DocumentVersion.js";
 import { recomputeProjectTotalTags } from "../helper/CommonHelper.js";
 import Folder from "../models/Folder.js";
+import Notification from "../models/Notification.js";
 
 
 // Document List page
 export const showDocumentListPage = async (req, res) => {
     try {
-        const { status, q, filter, month, year, documentId } = req.query;
+        const { status, q, filter, month, year, documentId, project } = req.query;
 
         const designations = await Designation.find({ status: "Active" })
             .sort({ name: 1 })
@@ -44,6 +45,7 @@ export const showDocumentListPage = async (req, res) => {
             metaKeywords: "documents list, document management, search documents, filter documents",
             canonicalUrl: `${req.protocol}://${req.get("host")}${req.originalUrl}`,
             designations,
+            project,
             user: req.user,
             searchQuery: q || "",
             status,
@@ -2888,9 +2890,10 @@ export const deleteDocument = async (req, res) => {
     const session = await mongoose.startSession();
     try {
         session.startTransaction();
-        const userId = req.user?._id ?? null
-        const userName = req.user?.name ?? 'Guest'
+        const userId = req.user?._id ?? null;
+        const userName = req.user?.name ?? 'Guest';
         const { ids } = req.body;
+
         if (!ids || !Array.isArray(ids) || ids.length === 0) {
             await session.abortTransaction();
             session.endSession();
@@ -2902,7 +2905,6 @@ export const deleteDocument = async (req, res) => {
 
         const objectIds = ids.map(id => new mongoose.Types.ObjectId(id));
 
-        // Fetch all dependent data
         const docs = await Document.aggregate([
             { $match: { _id: { $in: objectIds } } },
             {
@@ -2925,42 +2927,34 @@ export const deleteDocument = async (req, res) => {
             });
         }
 
-        // Gather all file and approval IDs
         const fileIds = docs.flatMap(d => [...(d.files || []), ...(d.versionFiles || [])]);
         const approvalIds = docs.flatMap(d => d.approvalHistory || []);
 
-        // Retrieve file records to delete from S3
         let filesToDelete = [];
         if (fileIds.length) {
             const files = await File.find({ _id: { $in: fileIds } }).session(session);
             filesToDelete = files.map(f => f.s3Key || f.key).filter(Boolean);
         }
 
-        // Delete from MongoDB (inside transaction)
         const deletions = [];
         if (fileIds.length) deletions.push(File.deleteMany({ _id: { $in: fileIds } }).session(session));
         if (approvalIds.length) deletions.push(Approval.deleteMany({ _id: { $in: approvalIds } }).session(session));
+
+        deletions.push(
+            Notification.deleteMany({ relatedDocument: { $in: objectIds } }).session(session)
+        );
+
         deletions.push(Document.deleteMany({ _id: { $in: objectIds } }).session(session));
 
-        for (const op of deletions) {
-            await op;
-        }
+        for (const op of deletions) await op;
 
-        // Commit DB changes first
         await session.commitTransaction();
         session.endSession();
-        // ----------------------------------------------
-        // Recompute project totalTags after delete
-        // ----------------------------------------------
+
         try {
             const uniqueProjectIds = [
-                ...new Set(
-                    docs
-                        .map(d => d.project?.toString())
-                        .filter(Boolean)
-                )
+                ...new Set(docs.map(d => d.project?.toString()).filter(Boolean))
             ];
-
             for (const projectId of uniqueProjectIds) {
                 await recomputeProjectTotalTags(projectId);
             }
@@ -2968,7 +2962,6 @@ export const deleteDocument = async (req, res) => {
             console.error("Failed to recompute project totalTags after delete:", err);
         }
 
-        // Then delete from S3 (outside transaction)
         if (filesToDelete.length) {
             await Promise.allSettled(
                 filesToDelete.map(async (key) => {
@@ -2980,10 +2973,10 @@ export const deleteDocument = async (req, res) => {
                 })
             );
         }
+
         await Promise.allSettled(
             docs.map(async (doc) => {
                 const fileName = doc?.metadata?.fileName || "Unnamed Document";
-
                 return activityLogger({
                     actorId: userId,
                     entityId: doc._id,
@@ -2994,9 +2987,10 @@ export const deleteDocument = async (req, res) => {
                 });
             })
         );
+
         return res.status(200).json({
             success: true,
-            message: `${docs.length} document(s) and their dependencies permanently deleted.`,
+            message: `${docs.length} document(s), their dependencies and related notifications deleted.`,
             s3FilesDeleted: filesToDelete.length
         });
 
@@ -3011,6 +3005,7 @@ export const deleteDocument = async (req, res) => {
         });
     }
 };
+
 
 
 

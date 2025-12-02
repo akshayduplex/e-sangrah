@@ -71,11 +71,8 @@
 		<script>
 			$(document).ready(function () {
 
-				let recycleTable; // global DataTable instance
+				let recycleTable;
 
-				// ------------------------
-				// 1. Load recycle bin data
-				// ------------------------
 				function loadRecycleBinFolders() {
 					$.ajax({
 						url: '/api/folders/recyclebin',
@@ -126,8 +123,6 @@
 				</tr>`;
 						tbody.append(row);
 					});
-
-					// If DataTable already exists, destroy before reinitializing
 					if ($.fn.DataTable.isDataTable('#recycleTable')) {
 						recycleTable.clear().destroy();
 					}
@@ -140,9 +135,6 @@
 					});
 				}
 
-				// ------------------------
-				// 2. Restore Folder
-				// ------------------------
 				$(document).on('click', '.restore-folder', function (e) {
 					e.preventDefault();
 					const folderId = $(this).data('folder-id');
@@ -160,8 +152,6 @@
 								success: function () {
 									$('#archivedoc-modal').modal('hide');
 									showToast('Folder restored successfully.', 'success');
-
-									// Remove only the restored row from the table
 									const row = $(`.restore-folder[data-folder-id="${folderId}"]`).closest('tr');
 									recycleTable.row(row).remove().draw(false);
 								},
@@ -173,10 +163,6 @@
 						});
 				});
 
-
-				// ------------------------
-				// 3. Delete a single folder
-				// ------------------------
 				$(document).on('click', '.delete-folder', function (e) {
 					e.preventDefault();
 					const folderId = $(this).data('folder-id');
@@ -209,9 +195,7 @@
 							});
 						});
 				});
-				// ------------------------
-				// 4. Empty Recycle Bin
-				// ------------------------
+
 				$('#emptybin-modal').on('show.bs.modal', function () {
 					$.get('/api/folders/recyclebin/size', function (res) {
 						if (res.totalSize) {
@@ -238,9 +222,6 @@
 					});
 				});
 
-				// ------------------------
-				// 5. Utility functions
-				// ------------------------
 				function formatBytes(bytes) {
 					if (!bytes) return '0 Bytes';
 					const k = 1024;
@@ -249,7 +230,6 @@
 					return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 				}
 
-				// Initial load
 				loadRecycleBinFolders();
 			});
 		</script>

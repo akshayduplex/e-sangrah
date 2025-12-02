@@ -21,7 +21,6 @@
 					<span class="avatar avatar-lg me-3 avatar-rounded">
 						<img id="profileImage" src="" alt="img"
 							style="width:60px; height:60px; object-fit:cover; border-radius:50%;">
-
 					</span>
 					<div>
 						<h6 class="mb-0" id="profileName">Guest</h6>
@@ -47,28 +46,32 @@
 						<div class="value" id="viewPhone"></div>
 					</div>
 					<div class="col-md-12 profileview_fields">
-						<div class="label">Status:</div>
-						<div class="value" id="viewStatus"></div>
+						<div class="label">Designation:</div>
+						<div class="value" id="viewDesignation"></div>
 					</div>
 					<div class="col-md-12 profileview_fields">
-						<div class="label">Profile Type:</div>
-						<div class="value" id="viewProfileType"></div>
+						<div class="label">Department:</div>
+						<div class="value" id="viewDepartment"></div>
 					</div>
 					<div class="col-md-12 profileview_fields">
-						<div class="label">Position:</div>
-						<div class="value" id="viewPosition"></div>
-					</div>
-					<div class="col-md-12 profileview_fields">
-						<div class="label">Address</div>
+						<div class="label">Address:</div>
 						<div class="value" id="viewAddress"></div>
 					</div>
 					<div class="col-md-12 profileview_fields">
-						<div class="label">Created On:</div>
-						<div class="value" id="viewCreatedAt"></div>
+						<div class="label">Country:</div>
+						<div class="value" id="viewCountry"></div>
 					</div>
 					<div class="col-md-12 profileview_fields">
-						<div class="label">Updated On:</div>
-						<div class="value" id="viewUpdatedAt"></div>
+						<div class="label">State:</div>
+						<div class="value" id="viewState"></div>
+					</div>
+					<div class="col-md-12 profileview_fields">
+						<div class="label">City:</div>
+						<div class="value" id="viewCity"></div>
+					</div>
+					<div class="col-md-12 profileview_fields">
+						<div class="label">Post Code:</div>
+						<div class="value" id="viewPostCode"></div>
 					</div>
 				</div>
 			</div>
@@ -77,153 +80,305 @@
 			<div id="editProfile" style="display:none;">
 				<form id="editProfileForm" enctype="multipart/form-data">
 					<div class="row g-4">
-						<!-- Editable fields -->
+						<!-- Name (Full Name) -->
 						<div class="col-md-6">
 							<label class="form-label">Name</label>
-							<input type="text" name="name" class="form-control" id="inputName" required>
+							<input type="text" name="name" class="form-control" id="inputFirstName" required>
 						</div>
 						<div class="col-md-6">
+							<label class="form-label">Profile Image</label>
+							<input type="file" name="profile_image" class="form-control" id="inputProfileImage">
+						</div>
+
+						<!-- Email / Phone Number -->
+						<div class="col-md-6">
 							<label class="form-label">Email</label>
-							<input type="email" name="email" class="form-control" id="inputEmail" required>
+							<input type="email" name="email" class="form-control" id="inputEmail" disabled>
 						</div>
 						<div class="col-md-6">
 							<label class="form-label">Phone Number</label>
 							<input type="text" name="phone_number" class="form-control" id="inputPhone">
 						</div>
+
+						<!-- Designation / Department (Disabled) -->
 						<div class="col-md-6">
-							<label class="form-label">Address</label>
-							<input type="text" name="address" class="form-control" id="inputAddress" readonly>
+							<label class="form-label">Designation</label>
+							<input type="text" class="form-control" id="inputDesignation" disabled>
 						</div>
-						<div class="col-12">
-							<label class="form-label">Profile Image</label>
-							<input type="file" name="profile_image" class="form-control" id="inputProfileImage">
+						<div class="col-md-6">
+							<label class="form-label">Department</label>
+							<input type="text" class="form-control" id="inputDepartment" disabled>
 						</div>
 
-						<!-- Read-only fields -->
+						<!-- Address -->
+						<div class="col-12">
+							<label class="form-label">Address</label>
+							<input type="text" name="address" class="form-control" id="inputAddress">
+						</div>
+
+						<!-- Country / State -->
 						<div class="col-md-6">
-							<label class="form-label">Status</label>
-							<input type="text" class="form-control" id="inputStatus" disabled>
+							<label class="form-label">Country</label>
+							<select name="country" class="form-control" id="country"></select>
 						</div>
 						<div class="col-md-6">
-							<label class="form-label">Profile Type</label>
-							<input type="text" class="form-control" id="inputProfileType" disabled>
+							<label class="form-label">State</label>
+							<select name="state" class="form-control" id="state"></select>
+						</div>
+
+						<!-- City / Post Code -->
+						<div class="col-md-6">
+							<label class="form-label">City</label>
+							<select name="city" class="form-control" id="city"></select>
 						</div>
 						<div class="col-md-6">
-							<label class="form-label">Created on</label>
-							<input type="text" class="form-control" id="inputCreatedAt" disabled>
-						</div>
-						<div class="col-md-6">
-							<label class="form-label">Updated on</label>
-							<input type="text" class="form-control" id="inputUpdatedAt" disabled>
+							<label class="form-label">Post Code</label>
+							<input type="text" name="post_code" class="form-control" id="inputPostCode">
 						</div>
 					</div>
 
 					<div class="d-flex justify-content-end mt-4 mb-4">
 						<button type="button" class="btn btn-light me-2" onclick="toggleProfile()">Cancel</button>
-						<button type="submit" class="btn btn-primary">Update</button>
+						<input type="hidden" name="name" id="inputHiddenName">
+						<button type="submit" id="updateBtn" class="btn btn-primary">Update & Save</button>
 					</div>
 				</form>
 			</div>
-
 		</div>
 	</div>
 
-	<%- include('../partials/footer') %>
-		<script>
-			const toggleProfile = () => {
-				const view = document.getElementById('viewProfile');
-				const edit = document.getElementById('editProfile');
-				view.style.display = view.style.display === "none" ? "block" : "none";
-				edit.style.display = edit.style.display === "none" ? "block" : "none";
-			};
 
-			const loadProfile = () => {
-				fetch(`${baseUrl}/api/auth/profile`, { credentials: 'include' })
-					.then(res => res.json())
-					.then(data => {
-						if (!data.success || !data.user) {
-							toggleProfile();
-							return;
+	<script>
+		const NEW_TAG_PREFIX = 'NEW_LOC:';
+
+		// Utility: Strip NEW_LOC: prefix
+		function parseNewLocationTag(value) {
+			if (value && typeof value === 'string' && value.startsWith(NEW_TAG_PREFIX)) {
+				return value.substring(NEW_TAG_PREFIX.length).trim();
+			}
+			return value || '';
+		}
+
+		// Create "Add New" option in Select2
+		function createSelect2Tag(params) {
+			const term = $.trim(params.term || '');
+			if (term === '') return null;
+
+			return {
+				id: NEW_TAG_PREFIX + term,
+				text: term + ' (Add New)',
+				newTag: true
+			};
+		}
+
+		// Initialize Select2 with location search + tagging
+		function initLocationSelect2(selector, type) {
+			$(selector).select2({
+				placeholder: `Search or add ${type}`,
+				tags: true,
+				createTag: createSelect2Tag,
+				allowClear: true,
+				dropdownParent: $('#editProfile'),
+				ajax: {
+					url: `${baseUrl}/api/location/search`,
+					dataType: 'json',
+					delay: 300,
+					data: function (params) {
+						const data = {
+							type: type,
+							search: params.term || ''
+						};
+
+						if (type === 'state') {
+							data.country = parseNewLocationTag($('#country').val());
 						}
+						if (type === 'city') {
+							data.country = parseNewLocationTag($('#country').val());
+							data.state = parseNewLocationTag($('#state').val());
+						}
+						return data;
+					},
+					processResults: function (data) {
+						return { results: data.results || [] };
+					},
+					cache: true
+				}
+			});
 
-						const user = data.user;
+			// Crucial: Allow new tags to be selected even if not in results
+			$(selector).on('select2:select', function (e) {
+				const data = e.params.data;
+				if (data.newTag) {
+					// This allows the "Add New" tag to stay selected
+					const newOption = new Option(data.text, data.id, true, true);
+					$(this).append(newOption).trigger('change');
+				}
+			});
+		}
 
-						// Header & avatar
-						document.getElementById('profileName').textContent = user.name;
-						document.getElementById('profileDesignation').textContent =
-							user.userDetails?.designation?.name ||
-							user.position ||
-							user.profile_type ||
-							"N/A";
-						document.getElementById('profileImage').src = user.profile_image || '/img/profiles/avatar-12.jpg';
+		// Properly set value in Select2 (handles both existing and new tags)
+		function setSelect2Value(selectElement, text, value) {
+			if (!text || text === 'N/A') {
+				selectElement.val(null).trigger('change');
+				return;
+			}
 
-						// Editable fields
-						document.getElementById('inputName').value = user.name || '';
-						document.getElementById('inputEmail').value = user.email || '';
-						document.getElementById('inputPhone').value = user.phone_number || '';
-						document.getElementById('inputAddress').value = user.address || '';
+			const cleanValue = value || text;
+			const existingOption = selectElement.find(`option[value="${cleanValue}"]`);
 
-						// Read-only fields
-						document.getElementById('inputStatus').value = user.status || '';
-						document.getElementById('inputProfileType').value = user.profile_type || '';
-						document.getElementById('inputCreatedAt').value = formatDateDDMMYYYY(user.createdAt);
-						document.getElementById('inputUpdatedAt').value = formatDateDDMMYYYY(user.updatedAt);
+			if (existingOption.length) {
+				selectElement.val(cleanValue).trigger('change');
+			} else {
+				// If not exists → create as pre-selected new tag or normal option
+				const displayText = text.includes('(Add New)') ? text : text;
+				const newOption = new Option(displayText, cleanValue, true, true);
+				selectElement.append(newOption).trigger('change');
+			}
+		}
 
-						// View mode display
-						document.getElementById('viewName').textContent = user.name || '';
-						document.getElementById('viewEmail').textContent = user.email || '';
-						document.getElementById('viewPhone').textContent = user.phone_number || '';
-						document.getElementById('viewStatus').textContent = user.status || '';
-						document.getElementById('viewProfileType').textContent = user.profile_type || '';
+		// Toggle View/Edit
+		function toggleProfile() {
+			$('#viewProfile').toggle();
+			$('#editProfile').toggle();
+		}
 
-						document.getElementById('viewPosition').textContent =
-							user.userDetails?.designation?.name ||
-							user.position ||
-							user.profile_type ||
-							'N/A';
+		// Load and populate profile
+		function loadProfile() {
+			fetch(`${baseUrl}/api/auth/profile`, { credentials: 'include' })
+				.then(res => res.json())
+				.then(data => {
+					if (!data.success || !data.user) {
+						console.error('Failed to load profile');
+						return;
+					}
 
-						document.getElementById('viewAddress').textContent = user.address || '';
-						document.getElementById('viewCreatedAt').textContent = formatDateDDMMYYYY(user.createdAt);
-						document.getElementById('viewUpdatedAt').textContent = formatDateDDMMYYYY(user.updatedAt);
-					})
-					.catch(err => {
-						console.error(err);
-						showToast('Failed to load profile', 'error');
-					});
-			};
+					const u = data.user;
+					const loc = u.location || {};
 
-			// Update profile via AJAX
-			document.getElementById('editProfileForm').addEventListener('submit', (e) => {
+					// Header
+					$('#profileName').text(u.name || 'Guest');
+					$('#profileDesignation').text(u.userDetails?.designation?.name || 'N/A');
+					$('#profileImage').attr('src', u.profile_image || '/img/profiles/avatar-12.jpg');
+
+					// View Mode
+					$('#viewName').text(u.name || '-');
+					$('#viewEmail').text(u.email || '-');
+					$('#viewPhone').text(u.phone_number || '-');
+					$('#viewDesignation').text(u.userDetails?.designation?.name || 'N/A');
+					$('#viewDepartment').text(u.userDetails?.department?.name || 'N/A');
+					$('#viewAddress').text(u.address || '-');
+					$('#viewCountry').text(loc.country || 'N/A');
+					$('#viewState').text(loc.state || 'N/A');
+					$('#viewCity').text(loc.city || 'N/A');
+					$('#viewPostCode').text(u.post_code || '-');
+
+					// Edit Mode - Populate inputs
+					$('#inputFirstName').val(u.name || '');
+					$('#inputHiddenName').val(u.name || '');
+					$('#inputEmail').val(u.email || '');
+					$('#inputPhone').val(u.phone_number || '');
+					$('#inputAddress').val(u.address || '');
+					$('#inputPostCode').val(u.post_code || '');
+					$('#inputDesignation').val(u.userDetails?.designation?.name || '');
+					$('#inputDepartment').val(u.userDetails?.department?.name || '');
+
+					// Set Select2 values properly
+					setSelect2Value($('#country'), loc.country, loc.country);
+					setSelect2Value($('#state'), loc.state, loc.state);
+					setSelect2Value($('#city'), loc.city, loc.city);
+				})
+				.catch(err => console.error('Load profile error:', err));
+		}
+
+		// Reset dependent dropdowns
+		$('#country').on('change', function () {
+			$('#state, #city').empty().trigger('change');
+		});
+		$('#state').on('change', function () {
+			$('#city').empty().trigger('change');
+		});
+
+		// Document Ready
+		$(document).ready(function () {
+			// Initialize all Select2 fields
+			initLocationSelect2('#country', 'country');
+			initLocationSelect2('#state', 'state');
+			initLocationSelect2('#city', 'city');
+
+			// Load profile data
+			loadProfile();
+
+			// Profile image preview
+			$('#inputProfileImage').on('change', function (e) {
+				const file = e.target.files[0];
+				if (file) {
+					const reader = new FileReader();
+					reader.onload = e => $('#profileImage').attr('src', e.target.result);
+					reader.readAsDataURL(file);
+				}
+			});
+
+			// Form Submit - Update Profile
+			$('#editProfileForm').on('submit', async function (e) {
 				e.preventDefault();
-				const formData = new FormData(e.target);
+				const btn = document.getElementById('updateBtn');
+				showLoader(btn);
+				const formData = new FormData(this);
+
+				const country = parseNewLocationTag($('#country').val());
+				const state = parseNewLocationTag($('#state').val());
+				const city = parseNewLocationTag($('#city').val());
+
+				if (!country || !state || !city) {
+					hideLoader(btn);
+					showToast('Please select Country, State, and City', 'error');
+					return;
+				}
+
+				try {
+					await fetch(`${baseUrl}/api/location/add`, {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({ country, state, city })
+					});
+				} catch (e) {
+					console.error('Error adding location:', e);
+				}
+
+				// Set clean values
+				formData.set('name', $('#inputFirstName').val().trim());
+				formData.set('country', country);
+				formData.set('state', state);
+				formData.set('city', city);
+				formData.set('phone_number', $('#inputPhone').val());
+				formData.set('address', $('#inputAddress').val());
+				formData.set('post_code', $('#inputPostCode').val());
+
+				// Remove conflicting fields
+				formData.delete('email');
 
 				fetch(`${baseUrl}/api/auth/edit-profile`, {
 					method: 'PATCH',
 					credentials: 'include',
 					body: formData
 				})
-					.then(res => res.json())
-					.then(data => {
-						if (!data.success) throw new Error(data.message);
-						showToast('Profile updated successfully', 'success');
-						toggleProfile();
-						loadProfile();
+					.then(r => r.json())
+					.then(result => {
+						hideLoader(btn);
+						if (result.success) {
+							toggleProfile();
+							loadProfile();
+							showToast('Profile updated!', 'success');
+						} else {
+							showToast(result.message || 'Update failed', 'error');
+						}
 					})
 					.catch(err => {
-						showToast('Failed to update profile', 'error');
+						hideLoader(btn);
+						console.error(err);
+						showToast('Network error', 'error');
 					});
 			});
-
-			// Live preview for profile image
-			document.getElementById('inputProfileImage').addEventListener('change', (e) => {
-				const file = e.target.files[0];
-				if (file) {
-					const reader = new FileReader();
-					reader.onload = () => document.getElementById('profileImage').src = reader.result;
-					reader.readAsDataURL(file);
-				}
-			});
-
-			// Load profile on page load
-			loadProfile();
-		</script>
+		});
+	</script>
+	<%- include('../partials/footer') %>

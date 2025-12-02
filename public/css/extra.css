@@ -128,3 +128,19 @@ table.datatable {
     height: 32px;
     flex-shrink: 0;
 }
+
+h5.mt-3.deleteLabel {
+    padding-left: 18px;
+}
+
+.flxtbltxt {
+    align-items: center;
+    gap: 6px;
+    /* space between name and size */
+}
+
+.flxtbltxt p,
+.flxtbltxt span {
+    margin: 0;
+    white-space: nowrap;
+}

@@ -83,13 +83,18 @@ document.addEventListener("DOMContentLoaded", () => {
                     </small>
 
                     <div class="prjtxt mt-3">
-                        <p class="fs-12 fw-light">Total Files  ${project.totalFiles ?? ''}</p>
 
-                        <div class="dflexbtwn">
-                            <a href="/folders?id=${project._id}" class="site-btnmd fw-light fs-12">Access Files</a>
-                            <span>${project.totalTags ?? 0} Tags</span>
-                        </div>
-                    </div>
+    <div class="dflexbtwn fs-12 fw-light mb-2">
+        <span>Total Files: ${project.totalFiles ?? ''}</span>
+        <span>Storage Used: ${project.storageConsumed ?? '0 KB'}</span>
+    </div>
+
+    <div class="dflexbtwn">
+        <a href="/documents/list?project=${project._id}" class="site-btnmd fw-light fs-12">Access Files</a>
+        <span>${project.totalTags ?? 0} Tags</span>
+    </div>
+
+</div>
 
                 </div>
             </div>

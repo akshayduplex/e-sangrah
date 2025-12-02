@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { API_CONFIG } from "../config/ApiEndpoints.js";
+import { LocationSchema } from "./Location.js";
 
 // Sub-schema for User Details
 const userDetailsSchema = new mongoose.Schema(
@@ -80,6 +81,8 @@ const userSchema = new mongoose.Schema(
             trim: true,
         },
         phone_number: { type: Number, trim: true },
+        location: LocationSchema,
+        post_code: { type: String, trim: true },
         address: { type: String, trim: true },
         raw_password: {
             type: String,

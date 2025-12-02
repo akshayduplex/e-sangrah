@@ -116,9 +116,21 @@ export const viewOrEditUser = async (req, res) => {
 // Register user with profile type 'user'
 export const registerUser = async (req, res) => {
     try {
-        const { name, email, phone_number, employee_id, department, designation, address } = req.body;
-        let profile_image = null;
+        const {
+            name,
+            email,
+            phone_number,
+            employee_id,
+            department,
+            designation,
+            address,
+            country,
+            state,
+            city,
+            post_code
+        } = req.body;
 
+        let profile_image = null;
         if (req.file) {
             profile_image = req.file.location;
         }
@@ -135,7 +147,7 @@ export const registerUser = async (req, res) => {
         // Generate random password
         const randomPassword = generateRandomPassword();
 
-        // Create new user
+        // Create new user with properly nested location
         const newUser = new User({
             name,
             email,
@@ -149,12 +161,18 @@ export const registerUser = async (req, res) => {
                 department,
                 designation,
             },
-            address
+            address: address?.trim() || null,
+            post_code: post_code?.trim() || null,
+            location: {
+                country: country?.trim(),
+                state: state?.trim(),
+                city: city?.trim(),
+            }
         });
 
         await newUser.save();
 
-        // === Assign ALL MENU PERMISSIONS to this user ===
+        // === Assign ALL MENU PERMISSIONS ===
         const allMenus = await Menu.find({});
         if (allMenus.length > 0) {
             const permissionDocs = allMenus.map(menu => ({
@@ -174,6 +192,8 @@ export const registerUser = async (req, res) => {
 
             await UserPermission.insertMany(permissionDocs);
         }
+
+        // Send welcome email
         const data = {
             name,
             email,
@@ -182,9 +202,9 @@ export const registerUser = async (req, res) => {
             logoUrl: res.locals.logo || "",
             bannerUrl: res.locals.mailImg || "",
             BASE_URL: API_CONFIG.baseUrl
-        }
+        };
 
-        const htmlContent = generateEmailTemplate("registeration", data)
+        const htmlContent = generateEmailTemplate("registeration", data);
 
         await sendEmail({
             to: email,
@@ -192,12 +212,14 @@ export const registerUser = async (req, res) => {
             html: htmlContent,
             fromName: "E-Sangrah Team",
         });
+
         await activityLogger({
             actorId: req.user._id,
             action: "ADDED_USER",
             details: `User Added by ${req.user?.name}`,
             meta: { email }
         });
+
         res.status(201).json({
             success: true,
             message: "User registered successfully and assigned all menu permissions.",
@@ -216,85 +238,62 @@ export const registerUser = async (req, res) => {
 
 export const getAllUsers = async (req, res) => {
     try {
-        const loggedInUser = req.user;
-        const {
+        let profile_type = req.query.profile_type || "user";
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const search = req.query.search || "";
+        const sortBy = req.query.sortBy || "createdAt";
+        const sortOrder = req.query.sortOrder === "asc" ? 1 : -1;
+
+        // Build filter
+        const filter = {
             profile_type,
-            page = 1,
-            limit = 10,
-            search = "",
-            sortBy = "createdAt",
-            sortOrder = "desc",
-            createdDate,
-            includeAllProfiles = false
-        } = req.query;
-
-        const filter = {};
-        const shouldApplyRoleFilter =
-            loggedInUser.profile_type !== "superadmin" &&
-            includeAllProfiles !== 'true';
-
-        if (shouldApplyRoleFilter) {
-            filter.addedBy = loggedInUser._id;
-        }
-
-        // -----------------------------------------------------
-        // Profile Type Filter
-        // -----------------------------------------------------
-        if (profile_type && includeAllProfiles !== 'true') {
-            filter.profile_type = profile_type;
-        }
-        if (createdDate) {
-            const parsedDate = parseDateDDMMYYYY(createdDate);
-            if (!parsedDate || isNaN(parsedDate)) {
-                return res.status(400).json({
-                    success: false,
-                    message: "Invalid date format. Use YYYY-MM-DD or DD-MM-YYYY.",
-                });
-            }
-
-            const start = new Date(parsedDate);
-            const end = new Date(parsedDate);
-            end.setHours(23, 59, 59, 999);
-
-            filter.createdAt = { $gte: start, $lte: end };
-        }
-        if (search) {
-            filter.$or = [
+            $or: [
                 { name: { $regex: search, $options: "i" } },
                 { email: { $regex: search, $options: "i" } },
-                {
-                    $expr: {
-                        $regexMatch: {
-                            input: { $toString: "$phone_number" },
-                            regex: search,
-                            options: "i"
-                        }
-                    }
-                }
-            ];
-        }
-        const [total, users] = await Promise.all([
-            User.countDocuments(filter),
-            User.find(filter)
-                .populate("userDetails.department", "name")
-                .populate("userDetails.designation", "name")
-                .select("name email phone_number profile_type createdAt userDetails status lastLogin designation") // 💡 Added 'designation' for front-end
-                .sort({ [sortBy]: sortOrder === "asc" ? 1 : -1 })
-                .skip((page - 1) * limit)
-                .limit(Number(limit))
-                .lean()
-        ]);
+                ...(search
+                    ? [{ $expr: { $regexMatch: { input: { $toString: "$phone_number" }, regex: search, options: "i" } } }]
+                    : [])
+            ]
+        };
+
+        // Total count
+        const total = await User.countDocuments(filter);
+
+        // Fetch users with pagination and sorting
+        const users = await User.find(filter)
+            .populate("userDetails.department", "name")
+            .populate("userDetails.designation", "name")
+            .select("-password -raw_password")
+            .sort({ [sortBy]: sortOrder })
+            .skip((page - 1) * limit)
+            .limit(limit)
+            .lean();
+
+        const mappedUsers = users.map(user => ({
+            _id: user._id,
+            name: user.name || "-",
+            email: user.email || "-",
+            phone_number: user.phone_number || "-",
+            profile_type: user.profile_type,
+            status: user.status || "-",
+            userDetails: {
+                department: user.userDetails?.department || null,
+                designation: user.userDetails?.designation || null
+            },
+            lastLogin: user.lastLogin || null,
+            createdAt: user.createdAt
+        }));
 
         res.json({
             success: true,
-            data: users,
+            users: mappedUsers,
             total,
-            page: Number(page),
+            page,
             totalPages: Math.ceil(total / limit)
         });
-
     } catch (error) {
-        console.error("getAllUsers error:", error);
+        console.error("DataTable error:", error);
         res.status(500).json({ success: false, message: "Internal server error" });
     }
 };

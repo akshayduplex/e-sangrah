@@ -10,6 +10,8 @@ import { parseDateDDMMYYYY } from "../utils/formatDate.js";
 import { renderProjectDetails } from "../utils/renderProjectDetails.js";
 import { activityLogger } from "../helper/activityLogger.js";
 import { addNotification } from "./NotificationController.js";
+import { formatProjectFileSize } from "../helper/CommonHelper.js";
+import File from "../models/File.js";
 //Page controllers
 
 const extractApprovalAuthority = (body) => {
@@ -710,20 +712,27 @@ export const updateProjectStatus = async (req, res) => {
     }
 };
 
-// Search projects with advanced filtering
 export const searchProjects = async (req, res) => {
     try {
-        const { q, status, manager, priority, startDate, endDate, page = 1, limit = 10, projectId = '' } = req.query;
+        const {
+            q,
+            status,
+            manager,
+            priority,
+            startDate,
+            endDate,
+            page = 1,
+            limit = 10,
+            projectId = ''
+        } = req.query;
 
-        // Build search query
+        // Build base query
         const query = { isActive: true };
 
-        // Filter by projectId
-        if (projectId && isValidObjectId(projectId)) {
-            query._id = projectId;
+        if (projectId && mongoose.Types.ObjectId.isValid(projectId)) {
+            query._id = new mongoose.Types.ObjectId(projectId);
         }
 
-        // Text search
         if (q) {
             query.$or = [
                 { projectName: { $regex: q, $options: 'i' } },
@@ -733,22 +742,12 @@ export const searchProjects = async (req, res) => {
             ];
         }
 
-        // Filter by status
-        if (status) {
-            query.projectStatus = status;
+        if (status) query.projectStatus = status;
+        if (manager && mongoose.Types.ObjectId.isValid(manager)) {
+            query.projectManager = new mongoose.Types.ObjectId(manager);
         }
+        if (priority) query.priority = priority;
 
-        // Filter by manager
-        if (manager && isValidObjectId(manager)) {
-            query.projectManager = manager;
-        }
-
-        // Filter by priority
-        if (priority) {
-            query.priority = priority;
-        }
-
-        // Date range filter
         if (startDate || endDate) {
             query.projectStartDate = {};
             if (startDate) query.projectStartDate.$gte = new Date(startDate);
@@ -756,34 +755,72 @@ export const searchProjects = async (req, res) => {
         }
 
         const options = {
-            page: parseInt(page),
-            limit: parseInt(limit),
+            page: parseInt(page, 10),
+            limit: parseInt(limit, 10),
             sort: { createdAt: -1 },
-            select: 'projectName projectDescription projectManager projectStatus totalFiles totalTags createdAt',
+            select: 'projectName projectDescription projectManager projectStatus totalFiles totalTags createdAt projectCode',
             populate: [
                 { path: 'projectManager', select: 'name email' }
             ]
         };
 
-        const projects = await Project.paginate(query, options);
+        const result = await Project.paginate(query, options);
+
+        const projectIds = result.docs.map(p => p._id);
+
+        let projectsWithSize = result.docs;
+
+        if (projectIds.length > 0) {
+            const sizeAggregation = await File.aggregate([
+                {
+                    $match: {
+                        projectId: { $in: projectIds },
+                        status: 'active'
+                    }
+                },
+                {
+                    $group: {
+                        _id: '$projectId',
+                        totalSize: { $sum: '$fileSize' }
+                    }
+                }
+            ]);
+
+            const sizeMap = {};
+            sizeAggregation.forEach(item => {
+                sizeMap[item._id.toString()] = item.totalSize;
+            });
+
+            projectsWithSize = result.docs.map(project => {
+                const projId = project._id.toString();
+                const totalBytes = sizeMap[projId] || 0;
+
+                return {
+                    ...project.toObject(),
+                    storageConsumed: formatProjectFileSize(totalBytes)
+                };
+            });
+        }
 
         res.status(200).json({
             success: true,
             query: { q, status, manager, priority, startDate, endDate, projectId },
-            count: projects.totalDocs,
-            data: projects.docs,
+            count: result.totalDocs,
+            data: projectsWithSize,
             pagination: {
-                page: projects.page,
-                limit: projects.limit,
-                totalPages: projects.totalPages,
-                totalResults: projects.totalDocs
+                page: result.page,
+                limit: result.limit,
+                totalPages: result.totalPages,
+                totalResults: result.totalDocs
             }
         });
+
     } catch (error) {
-        logger.error('Error searching projects:', error);
+        console.error('Error searching projects:', error);
         res.status(500).json({
             success: false,
-            message: 'Server error while searching projects'
+            message: 'Server error while searching projects',
+            error: error.message
         });
     }
 };

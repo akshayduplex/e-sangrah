@@ -144,7 +144,7 @@ function checkDuplicateValue(field, value, $input) {
 
 function showLoader(btn) {
     btn.dataset.originalText = btn.innerHTML;
-    btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Resetting...`;
+    btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Submitting...`;
     btn.disabled = true;
 }
 
@@ -199,3 +199,8 @@ function getRetentionStatus(archivedAt, docExpiresAt) {
         icon: '<i class="ti ti-folder-check fs-20 me-2" style="color:#3C951C;"></i>'
     };
 }
+
+/**
+ * Creates a new tag object for Select2 when the user types a term that doesn't exist.
+ * It prepends a special identifier to the ID so the backend can easily recognize it as a new location name.
+ */

@@ -108,7 +108,7 @@
                                 <!-- Filter dropdown here -->
                             </div>
                             <div class="position-relative mb-0">
-                                <input type="text" class="form-control datetimepicker" placeholder="Select date">
+                                <input type="text" class="form-control" id="documentDate" placeholder="Select date">
                                 <span class="input-icon-addon">
                                     <i class="ti ti-calendar text-gray-7"></i>
                                 </span>
@@ -171,6 +171,7 @@
 
                     const initialStatus = "<%= status %>";
                     const documentId = "<%= documentId %>";
+                    const project = "<%= project %>";
                     const currentUserId = "<%= user._id %>";
                     let currentDocId = null;
                     let customFlatpickr = null;
@@ -191,7 +192,10 @@
                         pdf: "/img/icons/fn4.png",
                         default: "/img/icons/fn1.png"
                     };
-
+                    flatpickr("#documentDate", {
+                        mode: "range",
+                        dateFormat: "Y-m-d"
+                    });
                     // Initialize status tabs based on query parameter
                     function initializeStatusTabs() {
 
@@ -306,7 +310,7 @@
                         serverSide: true,
                         processing: true,
                         ajax: {
-                            url: `${baseUrl}/api/documents?documentId=${documentId}`,
+                            url: `${baseUrl}/api/documents?documentId=${documentId}&project=${project}`,
                             type: 'GET',
                             data: function (d) {
                                 const filterColumns = [];
