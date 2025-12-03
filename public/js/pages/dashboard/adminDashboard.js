@@ -899,12 +899,12 @@ $(document).ready(function () {
             const top = departments[0];
             $center.html(`
             <p class="fs-13 mb-1 text-muted">${top.departmentName || 'N/A'}</p>
-            <h3 class="mb-0 fw-bold">${top.percentage}%</h3>
+            <h4 class="mb-0 fw-bold">${top.percentage}%</h4>
         `);
         } else {
             $center.html(`
             <p class="fs-13 mb-1 text-muted">No Data</p>
-            <h3 class="mb-0 fw-bold">0%</h3>
+            <h4 class="mb-0 fw-bold">0%</h4>
         `);
         }
     }

@@ -4483,10 +4483,10 @@ export const sendApprovalMail = async (req, res) => {
             return res.status(404).json({ success: false, message: "Approver not found in this document" });
         }
 
-        // Check if mail already sent
-        if (approverEntry.isMailSent) {
-            return res.status(400).json({ success: false, message: "Approval mail already sent to this approver" });
-        }
+        // // Check if mail already sent
+        // if (approverEntry.isMailSent) {
+        //     return res.status(400).json({ success: false, message: "Approval mail already sent to this approver" });
+        // }
 
         const approverUser = approverEntry.userId;
         if (!approverUser?.email) {
