@@ -31,9 +31,21 @@
                             <div class="mb-0">
                                 <select id="department" class="form-select select2" style="width: 200px;"></select>
                             </div>
-                            <div class="input-icon-end position-relative">
-                                <input type="text" class="form-control datetimepicker" placeholder="Date">
-                                <span class="input-icon-addon"><i class="ti ti-calendar text-gray-7"></i></span>
+                            <div class="position-relative mb-0">
+
+                                <input type="text" class="form-control pe-6" id="documentDate"
+                                    placeholder="Select Date Range" readonly>
+
+                                <!-- Calendar Icon -->
+                                <span class="calendar-icon">
+                                    <i class="ti ti-calendar text-gray-7"></i>
+                                </span>
+
+                                <!-- Clear Button (×) -->
+                                <button type="button" id="clearDateRange" class="btn-close clear-btn"
+                                    title="Clear date range">
+                                </button>
+
                             </div>
                         </div>
                     </div>
@@ -211,6 +223,55 @@
                     div.innerHTML = html || '';
                     return div.textContent || div.innerText || '';
                 }
+                let selectedDateRange = null;
+
+                // Initialize flatpickr on the #documentDate input
+                const fp = flatpickr("#documentDate", {
+                    mode: "range",
+                    dateFormat: "d-m-Y",
+                    allowInput: false,
+                    clickOpens: true,
+                    locale: { rangeSeparator: " to " },
+
+                    onChange: function (selectedDates, dateStr, instance) {
+                        if (selectedDates.length === 2) {
+                            selectedDateRange = {
+                                start: selectedDates[0],
+                                end: selectedDates[1]
+                            };
+                            document.getElementById("clearDateRange").style.display = "block";
+                            table.ajax.reload(); // reload table with range
+                        }
+                    },
+
+                    onClose: function (selectedDates) {
+                        // if partial selection (only one date) — clear to avoid confusion
+                        if (selectedDates.length === 1) {
+                            setTimeout(() => fp.clear(), 100);
+                            selectedDateRange = null;
+                            document.getElementById("clearDateRange").style.display = "none";
+                            table.ajax.reload();
+                        }
+
+                        // if fully cleared
+                        if (selectedDates.length === 0) {
+                            selectedDateRange = null;
+                            document.getElementById("clearDateRange").style.display = "none";
+                            table.ajax.reload();
+                        }
+                    }
+                });
+
+                // Hide clear button initially
+                document.getElementById("clearDateRange").style.display = "none";
+
+                // Clear button functionality
+                document.getElementById("clearDateRange").addEventListener("click", function () {
+                    fp.clear();
+                    selectedDateRange = null;
+                    this.style.display = "none";
+                    table.ajax.reload();
+                });
 
                 // Populate Modal
                 function populateModal(data, mode = 'approve', remark = '') {
@@ -485,13 +546,26 @@
                             sortOrder = data.order[0].dir;
                         }
 
-                        $.get(`/api/my-approvals?documentId=${documentId}`, {
+                        // Build params
+                        const params = {
                             page, limit,
                             status: $('.filterbtn.active').data('filter'),
                             department: $('#department').val() || '',
-                            createdAt: $('.datetimepicker').val() || '',
-                            sortField, sortOrder
-                        }, res => {
+                            sortField, sortOrder,
+                            documentId: documentId || ''
+                        };
+
+                        // If a date range is selected send ISO start/end
+                        if (selectedDateRange && selectedDateRange.start && selectedDateRange.end) {
+                            // We send ISO strings so backend can parse easily.
+                            params.createdAtStart = selectedDateRange.start.toISOString();
+                            params.createdAtEnd = selectedDateRange.end.toISOString();
+                        } else {
+                            // keep backward compatibility: if you ever use single-date, you can send createdAt in d-m-Y format
+                            params.createdAt = '';
+                        }
+
+                        $.get(`/api/my-approvals`, params, res => {
                             callback({
                                 draw: data.draw,
                                 data: res.data || [],
@@ -629,6 +703,6 @@
                     table.ajax.reload();
                 });
 
-                $('#department, .datetimepicker').on('change', () => table.ajax.reload());
+                $('#department').on('change', () => table.ajax.reload());
             });
         </script>

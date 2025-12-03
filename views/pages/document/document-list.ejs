@@ -53,11 +53,6 @@
                                     <option value="">-- Select Department --</option>
                                 </select>
                             </div>
-                            <!-- <div class=" mb-0">
-                        <select id="projectName" class="form-select select2" style="width: 200px;">
-                            <option value="">-- Select Project --</option>
-                        </select>
-                    </div> -->
                             <div class="mb-0 position-relative">
                                 <!-- Filter Button -->
                                 <div class="mb-0 position-relative">
@@ -108,11 +103,22 @@
                                 <!-- Filter dropdown here -->
                             </div>
                             <div class="position-relative mb-0">
-                                <input type="text" class="form-control" id="documentDate" placeholder="Select date">
-                                <span class="input-icon-addon">
+
+                                <input type="text" class="form-control pe-6" id="documentDate"
+                                    placeholder="Select Date Range" readonly>
+
+                                <!-- Calendar Icon -->
+                                <span class="calendar-icon">
                                     <i class="ti ti-calendar text-gray-7"></i>
                                 </span>
+
+                                <!-- Clear Button (×) -->
+                                <button type="button" id="clearDateRange" class="btn-close clear-btn"
+                                    title="Clear date range">
+                                </button>
+
                             </div>
+
                         </div>
             </div>
 
@@ -192,9 +198,50 @@
                         pdf: "/img/icons/fn4.png",
                         default: "/img/icons/fn1.png"
                     };
-                    flatpickr("#documentDate", {
+                    let selectedDateRange = null;
+
+                    const fp = flatpickr("#documentDate", {
                         mode: "range",
-                        dateFormat: "Y-m-d"
+                        dateFormat: "d-m-Y",
+                        allowInput: false,           // ← Blocks typing completely
+                        clickOpens: true,
+                        locale: {
+                            rangeSeparator: " to "
+                        },
+
+                        // When user selects both dates
+                        onChange: function (selectedDates, dateStr, instance) {
+                            if (selectedDates.length === 2) {
+                                selectedDateRange = {
+                                    start: selectedDates[0],
+                                    end: selectedDates[1]
+                                };
+                                document.getElementById("clearDateRange").style.display = "block";
+                                table.ajax.reload(); // Refresh table with new date range
+                            }
+                        },
+
+                        // When user clears or closes without full range
+                        onClose: function (selectedDates) {
+                            if (selectedDates.length < 2 && selectedDates.length > 0) {
+                                setTimeout(() => {
+                                    fp.clear();
+                                }, 100);
+                            }
+                            if (selectedDates.length === 0) {
+                                selectedDateRange = null;
+                                document.getElementById("clearDateRange").style.display = "none";
+                                table.ajax.reload();
+                            }
+                        }
+                    });
+
+                    // Clear button functionality
+                    document.getElementById("clearDateRange").addEventListener("click", function () {
+                        fp.clear();
+                        selectedDateRange = null;
+                        this.style.display = "none";
+                        table.ajax.reload();
                     });
                     // Initialize status tabs based on query parameter
                     function initializeStatusTabs() {
@@ -320,7 +367,17 @@
                                 });
 
                                 const searchValue = $('#searchInput').val()?.trim() || '';
-                                const selectedDate = $('.datetimepicker').val();
+                                // Properly format date range for backend
+                                let dateRangeParam = null;
+                                if (selectedDateRange) {
+                                    const formatDate = (date) => {
+                                        const d = date.getDate().toString().padStart(2, '0');
+                                        const m = (date.getMonth() + 1).toString().padStart(2, '0');
+                                        const y = date.getFullYear();
+                                        return `${d}-${m}-${y}`;
+                                    };
+                                    dateRangeParam = `${formatDate(selectedDateRange.start)} to ${formatDate(selectedDateRange.end)}`;
+                                }
                                 const orderColumn = d.order[0]?.column;
                                 const orderDir = d.order[0]?.dir || 'desc';
 
@@ -329,7 +386,8 @@
                                     limit: d.length,
                                     status: getCurrentStatus(),
                                     department: $('#department').val(),
-                                    date: selectedDate,
+                                    dateRange: dateRangeParam,
+                                    // date: selectedDate,
                                     search: searchValue,
                                     orderColumn,
                                     filterColumns,

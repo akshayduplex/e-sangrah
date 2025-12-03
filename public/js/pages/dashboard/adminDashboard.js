@@ -312,22 +312,26 @@ $(document).ready(function () {
                 const formattedDateTime = formatDateTime(activity.timestamp);
 
                 const cardItem = `
-                <div class="dflexbtwn mb-2 align-items-start">
-                    <div class="flxtblleft d-flex align-items-start">
-                        <span class="mb-2">
-                            <img src="/img/icons/user-activity.svg" alt="activity" class="icon-activity">
-                        </span>
-                        <div class="flxtbltxt ms-3">
-                            <p class="fs-16 mb-1 fw-normal">
-                                ${details}
-                            </p>
-                        </div>
-                    </div>
-                    <div class="text-end text-muted fs-13" style="white-space: nowrap;">
-                        ${formattedDateTime}
-                    </div>
-                </div>
-            `;
+    <div class="d-flex flex-column flex-md-row justify-content-between mb-3">
+        
+        <div class="d-flex">
+            <span class="me-3">
+                <img src="/img/icons/user-activity.svg" alt="activity" class="icon-activity">
+            </span>
+
+            <div>
+                <p class="fs-16 mb-1 fw-normal">
+                    ${details}
+                </p>
+            </div>
+        </div>
+
+        <div class="text-md-end text-muted fs-13 mt-2 mt-md-0">
+            ${formattedDateTime}
+        </div>
+
+    </div>
+`;
 
                 container.append(cardItem);
             });
@@ -367,8 +371,7 @@ $(document).ready(function () {
 
         $("#uploadDepartment").on('change', function () {
             const departmentId = $(this).val() || '';
-            // Refresh the stacked bar chart for department document uploads
-            loadDepartmentDocumentUploads(currentProjectId, currentPeriod, departmentId);
+            loadDepartmentDocumentUploads(currentProjectId, currentPeriod, $('#uploadDepartment').val() || '');
         });
     }
 
@@ -810,13 +813,9 @@ $(document).ready(function () {
         }
     }
 
-    // Department Uploads Chart
+    // Department Uploads
     function loadDepartmentUploads(projectId = '', period = 'year', departmentId = '') {
-        if (!$('#department').length) return;
-
-        const chartCanvas = document.getElementById('department');
-        const existingChart = Chart.getChart(chartCanvas);
-        if (existingChart) existingChart.destroy();
+        if (!$('#departmentChartContainer').length) return;
 
         const params = new URLSearchParams();
         if (projectId) params.append('projectId', projectId);
@@ -832,84 +831,86 @@ $(document).ready(function () {
             success: function (result) {
                 if (result.success && result.data?.departmentUploads?.length) {
                     const departments = result.data.departmentUploads;
-                    const labels = departments.map(d => d.departmentName);
-                    const dataValues = departments.map(d => d.percentage);
 
-                    const ctx = chartCanvas.getContext('2d');
-                    new Chart(ctx, {
-                        type: 'doughnut',
-                        data: {
-                            labels: labels,
-                            datasets: [{
-                                label: 'Department Uploads (%)',
-                                data: dataValues,
-                                backgroundColor: ['#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b'].slice(0, labels.length),
-                                borderWidth: 5,
-                                borderRadius: 10,
-                                borderColor: '#fff',
-                                hoverBorderWidth: 0,
-                                cutout: '63%',
-                            }]
+                    // Sort by percentage descending
+                    const sortedDepartments = [...departments].sort((a, b) => b.percentage - a.percentage);
+
+                    // Prepare data for Highcharts
+                    const chartData = sortedDepartments.map(d => ({
+                        name: d.departmentName,
+                        y: d.percentage,
+                        documentCount: d.documentCount
+                    }));
+
+                    // Destroy existing chart if exists
+                    if (window.departmentChart) {
+                        window.departmentChart.destroy();
+                    }
+
+                    // Create Highcharts donut chart
+                    window.departmentChart = Highcharts.chart('departmentChartContainer', {
+                        chart: {
+                            type: 'pie',
+                            height: 400,
+                            backgroundColor: 'transparent'
                         },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                legend: { display: false },
-                                tooltip: {
-                                    usePointStyle: true,
-                                    callbacks: {
-                                        title: function (context) {
-                                            const department = departments[context[0].dataIndex];
-                                            return department.departmentName;
-                                        },
-                                        label: function (context) {
-                                            const department = departments[context.dataIndex];
-                                            return [
-                                                `Documents: ${department.documentCount}`,
-                                                `Percentage: ${department.percentage}%`
-                                            ];
-                                        },
-                                        labelPointStyle: function (context) {
-                                            return {
-                                                pointStyle: 'rectRounded',
-                                                rotation: 0,
-                                                backgroundColor: ['#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b'][context.dataIndex]
-                                            };
-                                        }
-                                    }
+                        title: { text: '' },
+                        tooltip: {
+                            pointFormat: '<b>{point.y:.1f}%</b> ({point.documentCount} docs)'
+                        },
+                        plotOptions: {
+                            pie: {
+                                innerSize: '70%',
+                                allowPointSelect: true,
+                                cursor: 'pointer',
+                                borderRadius: 9,
+                                dataLabels: {
+                                    enabled: true,
+                                    distance: 20,
+                                    format: '{point.percentage:.0f}%<br>{point.name}',
+                                    style: { fontSize: '12px', textOutline: 'none' }
                                 }
                             }
-                        }
+                        },
+                        series: [{
+                            name: 'Upload Share',
+                            colorByPoint: true,
+                            data: chartData
+                        }],
+                        credits: { enabled: false },
+                        exporting: { enabled: false }
                     });
+                    updateDepartmentCenterText(sortedDepartments);
 
-                    updateDepartmentChartCenterText(departments);
                 } else {
-                    createEmptyChart(chartCanvas, 'department');
+                    createEmptyHighchart('departmentChartContainer', 'No department data available');
+                    updateDepartmentCenterText([]);
                 }
             },
-            error: () => createEmptyChart(chartCanvas, 'department')
-        });
-
-        function updateDepartmentChartCenterText(departments) {
-            const centerElement = document.querySelector('#department').closest('.chartjs-wrapper-demo').querySelector('.attendance-canvas');
-            if (centerElement && departments.length > 0) {
-                const topDepartment = departments[0];
-                centerElement.innerHTML = `
-                    <p class="fs-13 mb-1">${topDepartment.departmentName}</p>
-                    <h3>${topDepartment.percentage}%</h3>
-                `;
+            error: function () {
+                createEmptyHighchart('departmentChartContainer', 'Error loading data');
+                updateDepartmentCenterText([]);
             }
+        });
+    }
+    function updateDepartmentCenterText(departments) {
+        const $center = $('#departmentChartCenterText .center-text-content');
+        if (departments.length > 0) {
+            const top = departments[0];
+            $center.html(`
+            <p class="fs-13 mb-1 text-muted">${top.departmentName || 'N/A'}</p>
+            <h3 class="mb-0 fw-bold">${top.percentage}%</h3>
+        `);
+        } else {
+            $center.html(`
+            <p class="fs-13 mb-1 text-muted">No Data</p>
+            <h3 class="mb-0 fw-bold">0%</h3>
+        `);
         }
     }
 
-    // Document Type Uploads Chart
     function loadDocumentTypeUploads(projectId = '', period = 'year', departmentId = '') {
-        if (!$('#documentUploads').length) return;
-
-        const chartCanvas = document.getElementById('documentUploads');
-        const existingChart = Chart.getChart(chartCanvas);
-        if (existingChart) existingChart.destroy();
+        if (!$('#documentTypeChartContainer').length) return;
 
         const params = new URLSearchParams();
         if (projectId) params.append('projectId', projectId);
@@ -925,88 +926,132 @@ $(document).ready(function () {
             success: function (result) {
                 if (result.success && result.data?.fileTypeBreakdown?.length) {
                     const fileTypes = result.data.fileTypeBreakdown;
-                    const labels = fileTypes.map(ft => ft.type);
-                    const dataValues = fileTypes.map(ft => ft.percentage);
 
-                    const ctx = chartCanvas.getContext('2d');
-                    new Chart(ctx, {
-                        type: 'doughnut',
-                        data: {
-                            labels: labels,
-                            datasets: [{
-                                label: 'Document Types (%)',
-                                data: dataValues,
-                                backgroundColor: ['#6610f2', '#6f42c1', '#e83e8c', '#fd7e14', '#20c997'].slice(0, labels.length),
-                                borderWidth: 5,
-                                borderRadius: 10,
-                                borderColor: '#fff',
-                                hoverBorderWidth: 0,
-                                cutout: '63%',
-                            }]
+                    // Sort by percentage descending
+                    const sortedFileTypes = [...fileTypes].sort((a, b) => b.percentage - a.percentage);
+
+                    // Prepare data for Highcharts
+                    const chartData = sortedFileTypes.map(ft => ({
+                        name: ft.type,
+                        y: ft.percentage,
+                        count: ft.count,
+                        totalSizeMB: ft.totalSizeMB
+                    }));
+
+                    // Destroy existing chart if exists
+                    if (window.documentTypeChart) {
+                        window.documentTypeChart.destroy();
+                    }
+
+                    // Create Highcharts donut chart
+                    window.documentTypeChart = Highcharts.chart('documentTypeChartContainer', {
+                        chart: {
+                            type: 'pie',
+                            height: 400,
+                            backgroundColor: 'transparent'
                         },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                legend: { display: false },
-                                tooltip: {
-                                    usePointStyle: true,
-                                    callbacks: {
-                                        title: function (context) {
-                                            const fileType = fileTypes[context[0].dataIndex];
-                                            return fileType.type;
-                                        },
-                                        label: function (context) {
-                                            const fileType = fileTypes[context.dataIndex];
-                                            return [
-                                                `Documents: ${fileType.count}`,
-                                                `Percentage: ${fileType.percentage}%`,
-                                                `Total Size: ${fileType.totalSizeMB} MB`
-                                            ];
-                                        },
-                                        labelPointStyle: function (context) {
-                                            return {
-                                                pointStyle: 'rectRounded',
-                                                rotation: 0,
-                                                backgroundColor: ['#6610f2', '#6f42c1', '#e83e8c', '#fd7e14', '#20c997'][context.dataIndex]
-                                            };
-                                        }
-                                    }
+                        title: { text: '' },
+                        tooltip: {
+                            pointFormat: '<b>{point.y:.1f}%</b> ({point.count} files)'
+                        },
+                        plotOptions: {
+                            pie: {
+                                innerSize: '70%',
+                                allowPointSelect: true,
+                                cursor: 'pointer',
+                                borderRadius: 9,
+                                dataLabels: {
+                                    enabled: true,
+                                    distance: 20,
+                                    format: '{point.percentage:.0f}%<br>{point.name}',
+                                    style: { fontSize: '12px', textOutline: 'none' }
                                 }
                             }
-                        }
+                        },
+                        series: [{
+                            name: 'File Type',
+                            colorByPoint: true,
+                            data: chartData
+                        }],
+                        credits: { enabled: false },
+                        exporting: { enabled: false }
                     });
-
-                    updateDocumentTypeChartCenterText(fileTypes);
+                    updateDocumentTypeCenterText(sortedFileTypes);
                 } else {
-                    createEmptyChart(chartCanvas, 'documentUploads');
+                    createEmptyHighchart('documentTypeChartContainer', 'No document type data available');
+                    updateDocumentTypeCenterText([]);
                 }
             },
-            error: () => createEmptyChart(chartCanvas, 'documentUploads')
+            error: function () {
+                createEmptyHighchart('documentTypeChartContainer', 'Error loading data');
+                updateDocumentTypeCenterText([]);
+            }
         });
     }
 
-    function updateDocumentTypeChartCenterText(fileTypes) {
-        const centerElement = document.querySelector('#documentUploads').closest('.chartjs-wrapper-demo').querySelector('.attendance-canvas');
-        if (centerElement && fileTypes.length > 0) {
-            const topFileType = fileTypes.sort((a, b) => b.percentage - a.percentage)[0];
-            centerElement.innerHTML = `
-                <p class="fs-13 mb-1">${topFileType.type}</p>
-                <h3>${topFileType.percentage}%</h3>
-            `;
+    // Update document type chart center text
+    function updateDocumentTypeCenterText(fileTypes) {
+        const $center = $('#documentTypeChartCenterText .center-text-content');
+        if (fileTypes.length > 0) {
+            const top = fileTypes[0];
+            $center.html(`
+            <p class="fs-13 mb-1 text-muted text-capitalize">${top.type || 'Unknown'}</p>
+            <h3 class="mb-0 fw-bold">${top.percentage}%</h3>
+        `);
+        } else {
+            $center.html(`
+            <p class="fs-13 mb-1 text-muted">No Data</p>
+            <h3 class="mb-0 fw-bold">0%</h3>
+        `);
         }
     }
 
-    function createEmptyChart(canvas, id) {
-        const ctx = canvas.getContext('2d');
-        new Chart(ctx, {
-            type: 'doughnut',
-            data: { labels: ['No Data'], datasets: [{ data: [100], backgroundColor: ['#e9ecef'], borderColor: '#fff' }] },
-            options: { responsive: true, plugins: { legend: { display: false }, tooltip: { enabled: false } } }
-        });
+    // Helper function to create empty Highcharts chart
+    function createEmptyHighchart(containerId, message) {
+        const chartName = containerId.replace('ChartContainer', 'Chart');
+        if (window[chartName]) {
+            window[chartName].destroy();
+        }
 
-        const center = canvas.closest('.chartjs-wrapper-demo').querySelector('.attendance-canvas');
-        if (center) center.innerHTML = `<p class="fs-13 mb-1 text-muted">No Data</p><h3>0%</h3>`;
+        Highcharts.chart(containerId, {
+            chart: {
+                type: 'pie',
+                height: 400,
+                margin: [0, 0, 0, 0],
+                spacing: [0, 0, 0, 0]
+            },
+            title: {
+                text: ''
+            },
+            series: [{
+                name: 'No Data',
+                data: [{
+                    name: 'No Data',
+                    y: 100,
+                    color: '#e9ecef'
+                }],
+                innerSize: '70%',
+                dataLabels: {
+                    enabled: false
+                }
+            }],
+            plotOptions: {
+                pie: {
+                    innerSize: '70%',
+                    dataLabels: {
+                        enabled: false
+                    },
+                    borderWidth: 3,
+                    borderColor: '#fff'
+                }
+            },
+            credits: {
+                enabled: false
+            },
+            exporting: {
+                enabled: false
+            }
+        });
     }
 
     $(document).on('click', '.donor-vendor-period-option', function () {
@@ -1072,7 +1117,6 @@ $(document).ready(function () {
         loadDepartmentDocumentUploads(currentProjectId);
         safeSelect2Init('#dashboardDonor', initializeDonorSelect2);
         safeSelect2Init('#dashboardVendor', initializeVendorSelect2);
-
         loadDepartmentUploads(currentProjectId, currentPeriod);
         loadDocumentTypeUploads(currentProjectId, typeUploadsperiod);
         loadDepartmentDocumentUploads(currentProjectId, currentPeriod, departmentId);

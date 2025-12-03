@@ -33,9 +33,8 @@
 				</div>
 
 				<div class="progresscard">
-					<h5>Approval Progress</h5>
 					<div class="progresschart">
-						<canvas id="chartprogress" style="height:150px;"></canvas>
+						<div id="chartprogress" style="width:100%; height: 260px;"></div>
 					</div>
 				</div>
 			</div>
@@ -50,6 +49,7 @@
 								<th>Approved On</th>
 								<th>Request Status</th>
 								<th>Remark</th>
+								<th>Action</th>
 							</tr>
 						</thead>
 						<tbody id="approval-table">
@@ -86,22 +86,24 @@
 				const pathParts = window.location.pathname.split('/');
 				const documentIndex = pathParts.indexOf('document');
 				const documentId = documentIndex !== -1 ? pathParts[documentIndex + 1] : null;
+				const id = "<%= user._id %>";
+				const profile_type = "<%= user.profile_type %>";
 
 				if (!documentId) {
 					showToast("Document ID not found in URL", 'error');
 					return;
 				}
-
 				try {
 					const response = await fetch(`/api/documents/${documentId}/approval/track`);
 					if (!response.ok) throw new Error(`HTTP ${response.status}`);
 					const data = await response.json();
-
-					// Access data inside 'data' object
 					const doc = data.data.document;
 					const approvals = data.data.approvals || [];
+					const isOwner = id === doc.owner._id;
+					const isSuperAdmin = profile_type === "superadmin";
 
-					// Fill Document Info
+					const showAction = isOwner || isSuperAdmin;
+
 					const docNameEl = document.getElementById('doc-name');
 					const docSizeEl = document.getElementById('doc-size');
 					const docLinkEl = document.getElementById('doc-link');
@@ -124,59 +126,142 @@
 
 					document.getElementById('doc-submitted').innerText = `Submitted on: ${new Date(doc.createdAt).toDateString()}`;
 
-					// Populate Approvals Table
 					const tbody = document.getElementById('approval-table');
 					if (approvals.length === 0) {
 						tbody.innerHTML = `<tr><td colspan="5" class="text-center">No approvals yet</td></tr>`;
 					} else {
-						// Sort approvals: Approved first, Pending next
 						approvals.sort((a, b) => {
 							const statusPriority = { 'Approved': 1, 'Pending': 2 };
 							return (statusPriority[a.status] || 99) - (statusPriority[b.status] || 99);
 						});
 
-						tbody.innerHTML = approvals.map(appr => `
-                <tr>
-                    <td class="d-flex align-items-center">
-                    <div class="role-icon ${appr.status === 'Approved' ? 'done' : 'pending'}">
-                    <i class="ti ${appr.status === 'Approved' ? 'ti-circle-check' : 'ti-hourglass-low'}"></i>
-                    </div>
-                    <span class="ms-2" style="text-transform: capitalize;">
-                           ${appr.designation?.name || '-'}
-                    </span>
-                    </td>
-                    <td>${appr.userId?.name || '-'}</td>
-                    <td>${appr.approvedOn ? new Date(appr.approvedOn).toDateString() : 'In Review'}</td>
-                    <td><span class="status-badge status-${appr.status.toLowerCase()}">${appr.status}</span></td>
-                    <td>${appr?.remark}</td>
-                </tr>
-            `).join('');
+						tbody.innerHTML = approvals.map((appr, index) => {
+							const approver = appr.userId || {};
+							const userDetails = approver.userDetails || {};
+							const department = userDetails.department?.name || '-';
+							const approverDesignation = appr.designation?.name || '-';
+							const approverName = approver.name || 'Unknown';
+
+							const status = appr.status || 'Pending';
+							const priority = appr.priority ?? '-';
+							const isMailSent = appr.isMailSent ?? false;
+
+							let statusBadge = `<span class="status-badge status-${status.toLowerCase()}">${status}</span>`;
+							let actionBtn = "";
+
+							if (!showAction) {
+								actionBtn = `<span class="text-muted small">No Action</span>`;
+							}
+							else if (appr.isApproved) {
+								actionBtn = `<span class="text-success small fw-bold">Already Approved</span>`;
+							}
+							else if (!isMailSent && priority !== 1) {
+								actionBtn = `<span class="text-muted small">Mail not sent</span>`;
+							}
+							else {
+								actionBtn = `
+        <button class="btn btn-sm btn-success send-mail"
+            data-project-id="${doc._id}"
+            data-approver-id="${approver._id}">
+            Send Mail
+        </button>`;
+							}
+
+							return `
+        <tr>
+            <td class="d-flex align-items-center">
+                <div class="role-icon ${status === 'Approved' ? 'done' : 'pending'}">
+                    <i class="ti ${status === 'Approved' ? 'ti-circle-check' : 'ti-hourglass-low'}"></i>
+                </div>
+                <span class="ms-2">${approverDesignation}</span>
+            </td>
+            
+            <td>${approverName}</td>
+            <td>${appr.approvedOn ? new Date(appr.approvedOn).toDateString() : 'In Review'}</td>
+            <td>${statusBadge}</td>
+            <td>${appr.remark || '-'}</td>
+
+            <!-- ACTION BUTTON COLUMN -->
+            <td>${actionBtn}</td>
+        </tr>
+    `;
+						}).join('');
+
 					}
 
 					// Render Approval Progress Chart
-					const approvedCount = approvals.filter(a => a.status === 'Approved').length;
-					const pendingCount = approvals.filter(a => a.status === 'Pending').length;
-					const totalCount = approvals.length;
-					const ctx = document.getElementById('chartprogress').getContext('2d');
+					const approvedCount = approvals.filter(a => a.status === "Approved").length;
+					const pendingCount = approvals.filter(a => a.status === "Pending").length;
 
-					new Chart(ctx, {
-						type: 'doughnut',
-						data: {
-							labels: ['Approved', 'Pending'],
-							datasets: [{
-								data: [approvedCount, pendingCount],
-								backgroundColor: ['#28a745', '#ffc107'],
-							}]
+					Highcharts.chart('chartprogress', {
+						chart: {
+							type: 'pie',
+							backgroundColor: 'transparent',
 						},
-						options: {
-							cutout: '70%',
-							plugins: { legend: { display: true } }
-						}
+						title: {
+							text: 'Approval Progress'
+						},
+						accessibility: { point: { valueSuffix: '%' } },
+						plotOptions: {
+							pie: {
+								innerSize: '70%',       // doughnut
+								borderRadius: 8,        // rounded edges
+								dataLabels: {
+									enabled: true,
+									format: '{point.y}',
+									style: {
+										fontSize: '14px'
+									}
+								},
+								showInLegend: true
+							}
+						},
+						series: [{
+							name: '',
+							colorByPoint: true,
+							data: [
+								{ name: 'Approved', y: approvedCount, color: '#28a745' },
+								{ name: 'Pending', y: pendingCount, color: '#ffc107' }
+							]
+						}],
+						credits: { enabled: false },
+						exporting: { enabled: false }
 					});
-
 				} catch (error) {
 					console.error(error);
 					showToast("Failed to load approval tracking data", 'error');
 				}
+				$(document).on('click', '.send-mail', async function () {
+					const $btn = $(this);
+
+					if ($btn.prop('disabled')) return;
+					$btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span>');
+
+					const projectId = $btn.data('project-id');
+					const approverId = $btn.data('approver-id');
+
+					try {
+						const res = await fetch(`/api/documents/${projectId}/approval/${approverId}/mail`, {
+							method: 'GET',
+							credentials: 'include'
+						});
+
+						const json = await res.json();
+
+						if (res.ok && json.success) {
+							showToast(json.message || 'Mail sent!', 'success');
+
+							$btn.removeClass('btn-success')
+								.addClass('btn-outline-success')
+								.prop('disabled', true)
+								.html('<i class="ti ti-check"></i> Sent');
+						} else {
+							throw new Error(json.message || 'Failed to send');
+						}
+					} catch (err) {
+						showToast(err.message || 'Network error', 'error');
+						$btn.prop('disabled', false).html('Send Mail');
+					}
+				});
 			});
 		</script>

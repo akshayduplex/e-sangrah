@@ -144,3 +144,107 @@ h5.mt-3.deleteLabel {
     margin: 0;
     white-space: nowrap;
 }
+
+
+
+/* Flatpicker */
+
+/* Purple theme for selected dates */
+.flatpickr-day.selected,
+.flatpickr-day.startRange,
+.flatpickr-day.endRange,
+.flatpickr-day.selected:hover,
+.flatpickr-day.startRange:hover,
+.flatpickr-day.endRange:hover {
+    background: #2B1871 !important;
+    color: white !important;
+    border-color: #2B1871 !important;
+}
+
+.flatpickr-day.inRange {
+    background: rgba(43, 24, 113, 0.25) !important;
+    color: #2B1871 !important;
+}
+
+/* Calendar icon on the right */
+.calendar-icon {
+    position: absolute;
+    right: 2.4rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #6c757d;
+    pointer-events: none;
+}
+
+/* Clear (X) button */
+.clear-btn {
+    position: absolute;
+    right: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    display: none;
+
+    z-index: 10;
+    font-size: 0.75rem;
+}
+
+#documentDate {
+    padding-right: 3rem !important;
+}
+
+.chart-container-wrapper {
+    position: relative;
+    height: 400px;
+    width: 100%;
+}
+
+.chart-center-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    pointer-events: none;
+    z-index: 10;
+    width: 100px;
+    height: 100px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.center-text-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+}
+
+.center-text-content p {
+    color: #6c757d;
+    margin-bottom: 0.25rem;
+    font-weight: 400;
+    font-size: 13px;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 90px;
+}
+
+.center-text-content h3 {
+    color: #000;
+    font-weight: 600;
+    margin-bottom: 0;
+    font-size: 24px;
+    line-height: 1.2;
+}
+
+.flxtbltxt p {
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: block;
+}

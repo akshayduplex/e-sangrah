@@ -697,9 +697,17 @@
     .progresscard {
         border-radius: 20px;
         background: #FFF;
-        box-shadow: 0 1px 4px 0 rgba(0, 0, 0, 0.25);
-        text-align: center;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
         padding: 15px;
+        text-align: center;
+
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        max-width: 350px;
+        min-height: 300px;
+        box-sizing: border-box;
     }
 
     .progresscard h5 {

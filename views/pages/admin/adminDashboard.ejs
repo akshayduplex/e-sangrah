@@ -160,22 +160,20 @@
                         <div class="col-md-5">
                             <div class="card flex-fill">
                                 <div
-                                    class="card-header border-0 pb-2 d-flex align-items-center justify-content-between flex-wrap">
-                                    <h5 class="fs-20 mb-2 mxw-70">Department Document Uploads type</h5>
-                                    <div class="dropdown mb-2">
-                                        <a href="javascript:void(0);" id="deptUploadPeriodDropdown"
-                                            class="btn btn-white border text-black btn btn-outline-secondary"
+                                    class="card-header border-0 pb-2 d-flex align-items-center justify-content-between flex-wrap gap-3">
+                                    <h5 class="fs-20 mb-0">Department Document Uploads type</h5>
+                                    <div class="dropdown">
+                                        <a href="javascript:void(0);"
+                                            class="btn btn-white border btn-sm d-inline-flex align-items-center"
                                             data-bs-toggle="dropdown">
-                                            <i class="ti ti-calendar me-1"></i><span
-                                                id="currentDeptUploadPeriodLabel">This Year</span>
+                                            <i class="ti ti-calendar me-1"></i>
+                                            <span id="currentDeptUploadPeriodLabel">This Year</span>
                                         </a>
                                         <ul class="dropdown-menu dropdown-menu-end p-3">
-                                            <li><a href="javascript:void(0);"
-                                                    class="dropdown-item dept-upload-period-option"
-                                                    data-period="year">This Year</a></li>
-                                            <li><a href="javascript:void(0);"
-                                                    class="dropdown-item dept-upload-period-option"
-                                                    data-period="month">This Month</a></li>
+                                            <li><a href="javascript:void(0);" class=" dropdown-item
+                                                    dept-upload-period-option" data-period="year">This Year</a></li>
+                                            <li><a href="javascript:void(0);" class=" dropdown-item
+                                                    dept-upload-period-option" data-period="month">This Month</a></li>
                                             <li><a href="javascript:void(0);"
                                                     class="dropdown-item dept-upload-period-option"
                                                     data-period="week">This Week</a></li>
@@ -185,12 +183,14 @@
                                         </ul>
                                     </div>
                                 </div>
-                                <div class="card-body">
-                                    <div class="chartjs-wrapper-demo position-relative mb-4">
-                                        <canvas id="department" height="400"></canvas>
-                                        <div class="position-absolute text-center attendance-canvas">
-                                            <p class="fs-13 mb-1">Top Management</p>
-                                            <h3>22%</h3>
+                                <div class="card-body p-0">
+                                    <div class="chart-container-wrapper">
+                                        <div id="departmentChartContainer"></div>
+                                        <div id="departmentChartCenterText" class="chart-center-text">
+                                            <div class="center-text-content">
+                                                <p class="fs-13 mb-1 text-muted">Loading...</p>
+                                                <h3 class="mb-0 fw-bold">0%</h3>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -302,6 +302,82 @@
                         </div>
                     </div>
                 </div>
+                <!-- Department Uploads Chart -->
+                <!-- <div class="col-md-5">
+                    <div class="card flex-fill">
+                        <div
+                            class="card-header border-0 pb-2 d-flex align-items-center justify-content-between flex-wrap">
+                            <h5 class="fs-20 mb-2 mxw-70">Department Uploads</h5>
+                            <div class="dropdown mb-2">
+                                <a href="javascript:void(0);" id="deptUploadPeriodDropdown"
+                                    class="btn btn-white border text-black btn btn-outline-secondary"
+                                    data-bs-toggle="dropdown">
+                                    <i class="ti ti-calendar me-1"></i><span id="currentDeptUploadPeriodLabel">This
+                                        Year</span>
+                                </a>
+                                <ul class="dropdown-menu dropdown-menu-end p-3">
+                                    <li><a href="javascript:void(0);" class="dropdown-item dept-upload-period-option"
+                                            data-period="year">This Year</a></li>
+                                    <li><a href="javascript:void(0);" class="dropdown-item dept-upload-period-option"
+                                            data-period="month">This Month</a></li>
+                                    <li><a href="javascript:void(0);" class="dropdown-item dept-upload-period-option"
+                                            data-period="week">This Week</a></li>
+                                    <li><a href="javascript:void(0);" class="dropdown-item dept-upload-period-option"
+                                            data-period="today">Today</a></li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-container-wrapper position-relative">
+                                <div id="departmentChartContainer" style="height: 400px; position: relative;"></div>
+                                <div id="departmentChartCenterText" class="chart-center-text">
+                                    <div class="center-text-content">
+                                        <p class="fs-13 mb-1">Top Management</p>
+                                        <h3>40%</h3>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div> -->
+
+                <!-- Document Type Uploads Chart -->
+                <!-- <div class="col-md-5">
+                    <div class="card flex-fill">
+                        <div
+                            class="card-header border-0 pb-2 d-flex align-items-center justify-content-between flex-wrap">
+                            <h5 class="fs-20 mb-2 mxw-70">Document Types</h5>
+                            <div class="dropdown mb-2">
+                                <a href="javascript:void(0);" id="typePeriodDropdown"
+                                    class="btn btn-white border text-black btn btn-outline-secondary"
+                                    data-bs-toggle="dropdown">
+                                    <i class="ti ti-calendar me-1"></i><span id="typePeriodLabel">This Year</span>
+                                </a>
+                                <ul class="dropdown-menu dropdown-menu-end p-3">
+                                    <li><a href="javascript:void(0);" class="dropdown-item period-option-type"
+                                            data-period="year">This Year</a></li>
+                                    <li><a href="javascript:void(0);" class="dropdown-item period-option-type"
+                                            data-period="month">This Month</a></li>
+                                    <li><a href="javascript:void(0);" class="dropdown-item period-option-type"
+                                            data-period="week">This Week</a></li>
+                                    <li><a href="javascript:void(0);" class="dropdown-item period-option-type"
+                                            data-period="today">Today</a></li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-container-wrapper position-relative">
+                                <div id="documentTypeChartContainer" style="height: 400px; position: relative;"></div>
+                                <div id="documentTypeChartCenterText" class="chart-center-text">
+                                    <div class="center-text-content">
+                                        <p class="fs-13 mb-1">PDF</p>
+                                        <h3>40%</h3>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div> -->
                 <!-- /Sales Overview -->
             </div>
 

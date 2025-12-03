@@ -204,6 +204,8 @@ export const getMyApprovals = async (req, res) => {
             status,
             department,
             createdAt,
+            createdAtStart,
+            createdAtEnd,
             page = 1,
             limit = 10,
             sortField = "createdAt",
@@ -249,12 +251,27 @@ export const getMyApprovals = async (req, res) => {
             filter.department = new mongoose.Types.ObjectId(department);
         }
 
-        if (createdAt) {
-            const [day, month, year] = createdAt.split("-").map(Number);
-            if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
-                const start = new Date(year, month - 1, day, 0, 0, 0, 0);
-                const end = new Date(year, month - 1, day, 23, 59, 59, 999);
-                filter.createdAt = { $gte: start, $lte: end };
+        if (createdAtStart && createdAtEnd) {
+            // Expect ISO strings (sent by frontend flatpickr)
+            const start = new Date(createdAtStart);
+            const end = new Date(createdAtEnd);
+
+            if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+                // normalize: start at 00:00:00 of start date, end at 23:59:59.999 of end date
+                const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate(), 0, 0, 0, 0);
+                const endDay = new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59, 999);
+                filter.createdAt = { $gte: startDay, $lte: endDay };
+            }
+        } else if (createdAt) {
+            // Backwards compatibility: createdAt in "DD-MM-YYYY"
+            const parts = createdAt.split("-").map(Number);
+            if (parts.length === 3) {
+                const [day, month, year] = parts;
+                if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
+                    const start = new Date(year, month - 1, day, 0, 0, 0, 0);
+                    const end = new Date(year, month - 1, day, 23, 59, 59, 999);
+                    filter.createdAt = { $gte: start, $lte: end };
+                }
             }
         }
 
@@ -319,8 +336,6 @@ export const getMyApprovals = async (req, res) => {
         res.status(500).json({ success: false, message: "Server Error" });
     }
 };
-
-
 
 export const getPermissionLogs = async (req, res) => {
     const ownerId = req.user._id;

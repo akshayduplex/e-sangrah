@@ -505,6 +505,7 @@ export const getDocuments = async (req, res) => {
             status,
             department,
             project,
+            dateRange,
             date,
             orderColumn,
             orderDir,
@@ -629,7 +630,30 @@ export const getDocuments = async (req, res) => {
         }
 
         /** -------------------- DATE -------------------- **/
-        if (date) {
+        /** -------------------- DATE RANGE FILTER -------------------- **/
+        if (dateRange) {
+            const rangeMatch = dateRange.match(/(\d{2}-\d{2}-\d{4})\s+to\s+(\d{2}-\d{2}-\d{4})/);
+            if (rangeMatch) {
+                const [_, startStr, endStr] = rangeMatch;
+                const [startDay, startMonth, startYear] = startStr.split('-').map(Number);
+                const [endDay, endMonth, endYear] = endStr.split('-').map(Number);
+
+                const startDate = new Date(startYear, startMonth - 1, startDay);
+                const endDate = new Date(endYear, endMonth - 1, endDay);
+
+                // Set end date to end of day
+                endDate.setHours(23, 59, 59, 999);
+
+                if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
+                    filter.createdAt = {
+                        $gte: startDate,
+                        $lte: endDate
+                    };
+                }
+            }
+        }
+        // Single date fallback (optional)
+        else if (date) {
             const [day, month, year] = date.split("-").map(Number);
             const selectedDate = new Date(year, month - 1, day);
             if (!isNaN(selectedDate.getTime())) {
@@ -2852,8 +2876,11 @@ export const softDeleteDocument = async (req, res) => {
             return failResponse(res, "Document not found", 404);
         }
 
-        if (document.owner.toString() !== req.user._id.toString()) {
-            return failResponse(res, "Only the owner can delete this document", 403);
+        if (
+            document.owner.toString() !== req.user._id.toString() &&
+            req.user.profile_type !== "superadmin"
+        ) {
+            return failResponse(res, "Only the owner or a superadmin can delete this document", 403);
         }
 
         // Soft delete
@@ -2878,13 +2905,8 @@ export const softDeleteDocument = async (req, res) => {
         return errorResponse(res, error, "Failed to delete document");
     }
 };
-
-
 /**
  * Delete document(s) permanently
- * Single delete: via query ?id=<documentId>
- * Multiple delete: via body { ids: [] }
- * Empty trash: via query ?empty=true
  */
 export const deleteDocument = async (req, res) => {
     const session = await mongoose.startSession();
@@ -2905,10 +2927,12 @@ export const deleteDocument = async (req, res) => {
 
         const objectIds = ids.map(id => new mongoose.Types.ObjectId(id));
 
+        // Fetch documents
         const docs = await Document.aggregate([
             { $match: { _id: { $in: objectIds } } },
             {
                 $project: {
+                    owner: 1,
                     files: 1,
                     approvalHistory: 1,
                     versionFiles: "$versionHistory.file",
@@ -2927,6 +2951,21 @@ export const deleteDocument = async (req, res) => {
             });
         }
 
+        if (req.user.profile_type !== "superadmin") {
+            const unauthorizedDocs = docs.filter(
+                d => d.owner?.toString() !== userId?.toString()
+            );
+
+            if (unauthorizedDocs.length > 0) {
+                await session.abortTransaction();
+                session.endSession();
+                return res.status(403).json({
+                    success: false,
+                    message: "You can delete only your own documents. Superadmins can delete any document."
+                });
+            }
+        }
+
         const fileIds = docs.flatMap(d => [...(d.files || []), ...(d.versionFiles || [])]);
         const approvalIds = docs.flatMap(d => d.approvalHistory || []);
 
@@ -2936,14 +2975,11 @@ export const deleteDocument = async (req, res) => {
             filesToDelete = files.map(f => f.s3Key || f.key).filter(Boolean);
         }
 
+        // Delete dependencies
         const deletions = [];
         if (fileIds.length) deletions.push(File.deleteMany({ _id: { $in: fileIds } }).session(session));
         if (approvalIds.length) deletions.push(Approval.deleteMany({ _id: { $in: approvalIds } }).session(session));
-
-        deletions.push(
-            Notification.deleteMany({ relatedDocument: { $in: objectIds } }).session(session)
-        );
-
+        deletions.push(Notification.deleteMany({ relatedDocument: { $in: objectIds } }).session(session));
         deletions.push(Document.deleteMany({ _id: { $in: objectIds } }).session(session));
 
         for (const op of deletions) await op;
@@ -2951,10 +2987,9 @@ export const deleteDocument = async (req, res) => {
         await session.commitTransaction();
         session.endSession();
 
+        // Recompute project totals
         try {
-            const uniqueProjectIds = [
-                ...new Set(docs.map(d => d.project?.toString()).filter(Boolean))
-            ];
+            const uniqueProjectIds = [...new Set(docs.map(d => d.project?.toString()).filter(Boolean))];
             for (const projectId of uniqueProjectIds) {
                 await recomputeProjectTotalTags(projectId);
             }
@@ -2962,18 +2997,17 @@ export const deleteDocument = async (req, res) => {
             console.error("Failed to recompute project totalTags after delete:", err);
         }
 
+        // S3 file delete
         if (filesToDelete.length) {
             await Promise.allSettled(
                 filesToDelete.map(async (key) => {
-                    try {
-                        await deleteObject(key);
-                    } catch (err) {
-                        console.error(`Failed to delete S3 object ${key}:`, err.message);
-                    }
+                    try { await deleteObject(key); }
+                    catch (err) { console.error(`Failed to delete S3 object ${key}:`, err.message); }
                 })
             );
         }
 
+        // Activity Logging
         await Promise.allSettled(
             docs.map(async (doc) => {
                 const fileName = doc?.metadata?.fileName || "Unnamed Document";
@@ -2990,7 +3024,7 @@ export const deleteDocument = async (req, res) => {
 
         return res.status(200).json({
             success: true,
-            message: `${docs.length} document(s), their dependencies and related notifications deleted.`,
+            message: `${docs.length} document(s) and related data permanently deleted.`,
             s3FilesDeleted: filesToDelete.length
         });
 
@@ -3005,9 +3039,6 @@ export const deleteDocument = async (req, res) => {
         });
     }
 };
-
-
-
 
 /**
  * Update document status

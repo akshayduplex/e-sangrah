@@ -93,7 +93,6 @@ const app = express();
         const { selectedProjectId, selectedProjectName } = await getSessionFilters(req);
         const user = req.user || req.session.user || {};
         const settings = await WebSetting.findOne();
-
         res.locals.pageTitle = "";
         res.locals.pageDescription = settings?.metaDescription || "";
         res.locals.metaKeywords = settings?.metaKeywords || "";
@@ -112,6 +111,7 @@ const app = express();
         res.locals.checkMailImg = settings?.checkMailImg || "";
 
         res.locals.BASE_URL = API_CONFIG.baseUrl || "";
+        res.locals.userId = user._id || null;
         res.locals.designation = user.designation || null;
         res.locals.selectedProject = selectedProjectId || null;
         res.locals.selectedProjectName = selectedProjectName || null;

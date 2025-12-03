@@ -112,6 +112,8 @@ export const getApprovalRequests = async (req, res) => {
             status,
             department,
             createdAt,
+            startDate,
+            endDate,
             page = 1,
             limit = 10,
             sortField = "createdAt",
@@ -141,7 +143,13 @@ export const getApprovalRequests = async (req, res) => {
         if (status && status !== "All") {
             filter.status = status;
         }
+        if (startDate && endDate) {
+            const start = new Date(startDate);
+            const end = new Date(endDate);
+            end.setHours(23, 59, 59, 999);
 
+            filter.createdAt = { $gte: start, $lte: end };
+        }
 
         if (department && mongoose.Types.ObjectId.isValid(department)) {
             filter.department = new mongoose.Types.ObjectId(department);

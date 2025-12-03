@@ -54,6 +54,7 @@
     <!-- Bootstrap CSS -->
     <link rel="stylesheet" href="/css/bootstrap.min.css">
     <script src="https://code.highcharts.com/highcharts.js"></script>
+    <script src="https://code.highcharts.com/modules/accessibility.js"></script>
     <!-- Feather CSS -->
     <link rel="stylesheet" href="/plugins/icons/feather/feather.css">
     <!-- Toastify CSS -->
@@ -321,14 +322,14 @@
                     <img src="<%= logo %>" alt="<%= companyName %> Logo">
                 </a>
                 <a href="#" class="logo-small">
-                    <img src="/img/logo-small.svg" alt="Logo">
+                    <img src="<%= logo %>" alt="<%= companyName %> Logo">
                 </a>
                 <a href="#" class="dark-logo">
-                    <img src="/img/logo-white.svg" alt="Logo">
+                    <img src="<%= logo %>" alt="<%= companyName %> Logo">
                 </a>
             </div>
 
-            <div class="sidebar-inner slimscroll">
+            <div class=" sidebar-inner slimscroll">
                 <div id="sidebar-menu" class="sidebar-menu">
                     <ul id="menu-list"></ul>
                 </div>
