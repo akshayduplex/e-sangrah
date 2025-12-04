@@ -19,6 +19,7 @@ import PQueue from 'p-queue';
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { Readable } from "stream";
 import Project from "../models/Project.js";
+import DocumentVersion from "../models/DocumentVersion.js";
 
 function formatHeader(text) {
     if (!text) return "";
@@ -95,65 +96,74 @@ export const showApproverPage = async (req, res) => {
         const { token } = req.query;
 
         if (!token) {
-            return renderExpiredPage(res, "Invalid or missing token.", null);
+            return res.status(400).send("Missing approval token.");
         }
 
-        // Verify token
+        // 1. Verify JWT token (this is what you actually use)
         let payload;
         try {
             payload = jwt.verify(token, API_CONFIG.JWT_SECRET);
         } catch (err) {
-            return renderExpiredPage(res, "This link has expired or is invalid.", null);
+            return res.status(400).send("Invalid or expired approval link.");
         }
 
         const { documentId, approverId } = payload;
 
-        // Fetch document + current version files
+        // 2. Fetch document
         const document = await Document.findById(documentId)
-            .populate("owner", "name")
-            .populate("department", "name")
-            .populate("documentApprovalAuthority.userId", "name email");
+            .populate("owner", "name email")
+            .lean();
 
         if (!document) {
-            return renderExpiredPage(res, "Document not found.", null);
+            return res.status(404).send("Document not found.");
         }
 
-        // Find current approver record
-        const approverRecord = document.documentApprovalAuthority.find(
-            a => a.userId && a.userId._id.toString() === approverId
+        // 3. Optional: Check if this approver is still valid
+        const approverEntry = document.documentApprovalAuthority?.find(
+            a => a.userId && a.userId.toString() === approverId
         );
 
-        if (!approverRecord) {
-            return renderExpiredPage(res, "You are not authorized to approve this document.", null);
+        if (!approverEntry) {
+            return res.status(403).send("You are not authorized to approve this document.");
         }
 
-        // If already approved/rejected → show status
-        if (approverRecord.isApproved || approverRecord.status === "Rejected") {
-            return renderExpiredPage(res, `You have already ${approverRecord.status.toLowerCase()} this document.`, null);
+        if (approverEntry.status !== "Pending") {
+            return res.render("pages/document/alreadyActed", {
+                message: `You have already ${approverEntry.status.toLowerCase()} this document.`,
+                status: approverEntry.status
+            });
+        }
+        // 4. Get current version files
+        const versionLabel = document.currentVersionLabel || "1.0";
+
+        const versionData = await DocumentVersion.findOne({
+            documentId,
+            versionLabel
+        })
+            .populate("files")
+            .lean();
+
+        if (versionData?.files) {
+            for (const file of versionData.files) {
+                file.fileUrl = file.s3Url || (file.file ? await getObjectUrl(file.file, 3600) : null);
+            }
         }
 
-        const currentVersion = document.versions.id(document.currentVersion);
-        const versionData = {
-            versionLabel: document.currentVersionLabel,
-            files: currentVersion?.files || []
-        };
-
+        // 5. Render the beautiful approval page
         res.render("pages/document/approveDocument", {
-            pageTitle: document.metadata?.fileName || "Document Approval",
+            pageTitle: document.metadata?.fileName || "Approve Document",
             documentTitle: document.metadata?.fileName || "Document",
             document,
-            versionData,
-            approverToken: token, // pass token for API calls
-            approverName: approverRecord.userId?.name || "Approver",
-            requesterName: document.owner?.name || "Unknown",
-            description: document.description || "No description",
-            requestDate: document.createdAt?.toLocaleDateString() || new Date().toLocaleDateString(),
-            docExpired: false
+            versionData: versionData || { files: [] },
+            version: versionLabel,
+            token,
+            approverId,
+            currentUserName: approverEntry.userId?.name || "Approver"
         });
 
     } catch (error) {
-        console.error("showApproverPage Error:", error);
-        renderExpiredPage(res, "Server error. Please try again later.", null);
+        console.error("approveDocument error:", error);
+        res.status(500).send("Server error.");
     }
 };
 

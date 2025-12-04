@@ -7,8 +7,7 @@ export const documentApprovalRequestTemplate = (data) => {
         description = 'No description provided',
         departmentName = 'N/A',
         requesterName = 'N/A',
-        reviewUrl = '#',
-        verifyUrl = '#',
+        approvalLink = '#',
         companyName = '',
         logoUrl = '',
         bannerUrl = '',
@@ -66,8 +65,7 @@ export const documentApprovalRequestTemplate = (data) => {
     html += '<tr>';
     html += '<td style="text-align:center;">';
     html += '<div style="margin:20px 0;">';
-    html += `<a href="${reviewUrl}" style="text-decoration:none;border-radius:7px;padding:10px 20px;color:#fff;background:${themeColor};margin-right:10px;">View Document</a>`;
-    html += `<a href="${verifyUrl}" style="text-decoration:none;border-radius:7px;padding:10px 20px;color:#fff;background:#28a745;">Approve Document</a>`;
+    html += `<a href="${approvalLink}" style="text-decoration:none;border-radius:7px;padding:10px 20px;color:#fff;background:${themeColor};margin-right:10px;">Approve Document</a>`;
     html += '</div>';
     html += '</td>';
     html += '</tr>';

@@ -4479,94 +4479,296 @@ export const updateApprovalStatus = async (req, res) => {
     }
 };
 
-/**
- * Send approval mail for a given document approver.
- */
-export const sendApprovalMail = async (req, res) => {
+export const submitApprovalByToken = async (req, res) => {
     try {
-        const { documentId, approverId } = req.params;
+        const { token, documentId, action, comment } = req.body;
 
-        // Fetch document and populate necessary fields
+        if (!token || !documentId || !action) {
+            return res.status(400).json({ success: false, message: "Missing required fields" });
+        }
+
+        // Verify JWT token
+        let payload;
+        try {
+            payload = jwt.verify(token, API_CONFIG.JWT_SECRET);
+        } catch (err) {
+            return res.status(401).json({ success: false, message: "Invalid or expired link" });
+        }
+
+        if (payload.documentId !== documentId || !payload.approverId) {
+            return res.status(403).json({ success: false, message: "Invalid token" });
+        }
+
         const document = await Document.findById(documentId)
-            .populate("project", "projectName")
-            .populate("owner", "name email")
-            .populate("department", "name")
-            .populate("documentApprovalAuthority.userId", "name email");
+            .populate('documentApprovalAuthority.userId', 'name email')
+            .populate('owner', 'name email');
 
         if (!document) {
             return res.status(404).json({ success: false, message: "Document not found" });
         }
 
-        // Find approver entry
-        const approverEntry = document.documentApprovalAuthority.find(
-            (a) => a.userId && a.userId._id.toString() === approverId
+        const approverRecord = document.documentApprovalAuthority.find(
+            a => a.userId && a.userId._id.toString() === payload.approverId
         );
 
-        if (!approverEntry) {
-            return res.status(404).json({ success: false, message: "Approver not found in this document" });
+        if (!approverRecord) {
+            return res.status(403).json({ success: false, message: "You are not authorized" });
         }
 
-        // // Check if mail already sent
-        // if (approverEntry.isMailSent) {
-        //     return res.status(400).json({ success: false, message: "Approval mail already sent to this approver" });
-        // }
-
-        const approverUser = approverEntry.userId;
-        if (!approverUser?.email) {
-            return res.status(400).json({ success: false, message: "Approver does not have an email address" });
+        // Already acted?
+        if (approverRecord.isApproved || approverRecord.status === "Rejected") {
+            return res.json({
+                success: true,
+                alreadyActed: true,
+                message: "Already acted",
+                status: approverRecord.status
+            });
         }
-        const currentVersion = document.currentVersionLabel;
 
-        const reviewUrl = `${API_CONFIG.baseUrl}/documents/${document._id}/versions/view?version=${currentVersion}`;
-        const verifyUrl = `${API_CONFIG.baseUrl}/approval-requests`;
-        const data = {
-            approverName: approverUser.name,
-            documentName: document.metadata?.fileName || "Untitled Document",
-            description: document.description || "No description provided",
-            departmentName: document.department?.name || "N/A",
-            requesterName: document.owner?.name || "System",
-            companyName: res.locals.companyName || "Our Company",
-            logoUrl: res.locals.logo || "",
-            bannerUrl: res.locals.mailImg || "",
-            companyName: res.locals.companyName || "Our Company",
-            logoUrl: res.locals.logo || "",
-            bannerUrl: res.locals.mailImg || "",
-            verifyUrl,
-            reviewUrl
+        // Apply action
+        if (action === 'approve') {
+            approverRecord.status = 'Approved';
+            approverRecord.isApproved = true;
+            approverRecord.remark = comment || '';
+            approverRecord.approvedOn = new Date();
+        } else if (action === 'reject') {
+            approverRecord.status = 'Rejected';
+            approverRecord.isApproved = false;
+            approverRecord.remark = comment || '';
+            approverRecord.approvedOn = new Date();
+        } else if (action === 'need_discussion') {
+            approverRecord.status = 'Pending';
+            approverRecord.remark = comment || 'Discussion needed';
+        } else {
+            return res.status(400).json({ success: false, message: "Invalid action" });
         }
-        // Generate HTML using your central email generator
-        const html = generateEmailTemplate('documentApprovalRequest', data);
-        // Send the email
-        await sendEmail({
-            to: approverUser.email,
-            subject: `Document Approval Request - ${document.metadata?.fileName || "Document"}`,
-            html,
-            fromName: res.locals?.supportTeamName || "DMS Support Team",
-        });
-        await activityLogger({
-            actorId: req.user?._id,
-            entityId: documentId,
-            entityType: "Document",
-            action: "SEND_APPROVAL_MAIL",
-            details: `Approval email sent to approver ${approverUser.email}`
-        });
 
-        // Mark as mail sent
-        approverEntry.isMailSent = true;
+        // Update overall document status (only for approve/reject)
+        if (action !== 'need_discussion') {
+            const anyRejected = document.documentApprovalAuthority.some(a => a.status === 'Rejected');
+            const allApproved = document.documentApprovalAuthority.every(a => a.isApproved || a.status !== 'Pending');
+            document.status = anyRejected ? 'Rejected' : allApproved ? 'Approved' : 'Pending';
+        }
+
         await document.save();
 
-        return res.status(200).json({
+        // Log activity
+        await activityLogger({
+            actorId: payload.approverId,
+            entityId: documentId,
+            entityType: "Document",
+            action: "ACCESS_APPROVED",
+            details: `${action} via email link`,
+            meta: { comment }
+        });
+
+        // Get approver name
+        const approverUser = await User.findById(payload.approverId).select('name email');
+        const approverName = approverUser?.name || 'Approver';
+
+        const fileName = document.metadata?.fileName || 'Document';
+
+        // Helper: Notify user
+        const notifyUser = async (userId, type, title, message, priority = 'medium') => {
+            if (!userId) return;
+            await addNotification({
+                recipient: userId,
+                sender: payload.approverId,
+                type,
+                title,
+                message,
+                relatedDocument: documentId,
+                priority
+            });
+        };
+
+        // CASE: Need Discussion
+        if (action === 'need_discussion') {
+            const ownerId = document.owner?._id || document.owner;
+            await notifyUser(ownerId, 'document_discussion', 'Discussion Requested',
+                `${approverName} requested discussion on "${fileName}"`, 'high');
+
+            const html = generateEmailTemplate('discussionRequested', {
+                ownerName: document.owner?.name || 'User',
+                requesterName: approverName,
+                fileName,
+                comment: comment || 'No comment',
+                documentLink: `${API_CONFIG.baseUrl}/employee/approval?id=${documentId}`,
+                companyName: res.locals.companyName || "Company",
+                logoUrl: res.locals.logo || "",
+                bannerUrl: res.locals.mailImg || "",
+            });
+
+            await sendEmail({
+                to: document.owner?.email,
+                subject: `Discussion Requested - ${fileName}`,
+                html,
+                fromName: "Document System"
+            });
+
+            return res.json({ success: true, message: "Discussion request sent", status: 'Pending' });
+        }
+
+        const isApproved = action === 'approve';
+
+        // Notify other approvers
+        for (const auth of document.documentApprovalAuthority) {
+            if (!auth.userId || auth.userId._id.toString() === payload.approverId) continue;
+            await notifyUser(auth.userId._id, 'approval_update',
+                `Document ${isApproved ? 'Approved' : 'Rejected'}`,
+                `${approverName} has ${isApproved ? 'approved' : 'rejected'} "${fileName}"`,
+                isApproved ? 'low' : 'high'
+            );
+        }
+
+        // Notify owner
+        if (document.owner && document.owner._id.toString() !== payload.approverId) {
+            await notifyUser(document.owner._id, 'approval_update',
+                `Document ${isApproved ? 'Approved' : 'Rejected'}`,
+                `${approverName} has ${isApproved ? 'approved' : 'rejected'} your document "${fileName}"`,
+                isApproved ? 'low' : 'high'
+            );
+
+            const templateKey = isApproved ? 'documentApproved' : 'documentRejected';
+            const html = generateEmailTemplate(templateKey, {
+                ownerName: document.owner.name,
+                approverName,
+                fileName,
+                action: isApproved ? 'approved' : 'rejected',
+                documentLink: `${API_CONFIG.baseUrl}/employee/documents/${documentId}`,
+                companyName: res.locals.companyName || "Company",
+                logoUrl: res.locals.logo || "",
+                bannerUrl: res.locals.mailImg || "",
+            });
+
+            await sendEmail({
+                to: document.owner.email,
+                subject: `Document ${isApproved ? 'Approved' : 'Rejected'} - ${fileName}`,
+                html,
+                fromName: "Document System"
+            });
+        }
+
+        // Sequential approval: send to next approver
+        if (isApproved && document.status === 'Pending') {
+            const currentPriority = approverRecord.priority;
+            const nextApprover = document.documentApprovalAuthority.find(
+                a => a.priority === currentPriority + 1 && !a.isApproved && a.status !== 'Rejected'
+            );
+
+            if (nextApprover?.userId) {
+                const nextToken = jwt.sign(
+                    { documentId: document._id, approverId: nextApprover.userId._id },
+                    API_CONFIG.JWT_SECRET,
+                    { expiresIn: '7d' }
+                );
+
+                nextApprover.isMailSent = true;
+                await document.save();
+
+                const nextLink = `${API_CONFIG.baseUrl}/approve/document?token=${nextToken}`;
+
+                await notifyUser(nextApprover.userId._id, 'approval_request',
+                    'Your Approval Required',
+                    `${approverName} approved "${fileName}". Your review is now needed.`,
+                    'high'
+                );
+
+                const nextHtml = generateEmailTemplate('documentApprovalRequest', {
+                    approverName: nextApprover.userId.name,
+                    documentName: fileName,
+                    description: document.description || "No description",
+                    requesterName: approverName,
+                    approvalLink: nextLink,
+                    companyName: res.locals.companyName || "Company",
+                    logoUrl: res.locals.logo || "",
+                    bannerUrl: res.locals.mailImg || "",
+                });
+
+                await sendEmail({
+                    to: nextApprover.userId.email,
+                    subject: `Approval Required: ${fileName}`,
+                    html: nextHtml,
+                    fromName: "Document System"
+                });
+            }
+        }
+
+        res.json({
             success: true,
-            message: `Approval email sent successfully to ${approverUser.email}`,
+            message: "Action recorded successfully",
+            status: document.status
         });
 
     } catch (error) {
-        console.error("Error sending approval mail:", error);
-        return res.status(500).json({
-            success: false,
-            message: "Failed to send approval mail",
-            error: error.message,
+        console.error("submitApprovalByToken error:", error);
+        res.status(500).json({ success: false, message: "Server error" });
+    }
+};
+/**
+ * Send approval mail for a given document approver.
+ */
+// In sendApprovalMail controller
+export const sendApprovalMail = async (req, res) => {
+    try {
+        const { documentId, approverId } = req.params;
+
+        const document = await Document.findById(documentId)
+            .populate("owner", "name email")
+            .populate("department", "name")
+            .populate("documentApprovalAuthority.userId", "name email");
+
+        if (!document) return res.status(404).json({ success: false, message: "Document not found" });
+
+        const approverEntry = document.documentApprovalAuthority.find(
+            a => a.userId && a.userId._id.toString() === approverId
+        );
+
+        if (!approverEntry || !approverEntry.userId?.email) {
+            return res.status(400).json({ success: false, message: "Invalid approver" });
+        }
+
+        // Generate secure token
+        const token = jwt.sign(
+            { documentId: document._id, approverId: approverId },
+            API_CONFIG.JWT_SECRET,
+            { expiresIn: '7d' }
+        );
+
+        const approvalLink = `${API_CONFIG.baseUrl}/approve/document?token=${token}`;
+
+        const data = {
+            approverName: approverEntry.userId.name,
+            documentName: document.metadata?.fileName || "Untitled Document",
+            description: document.description || "No description provided",
+            departmentName: document.department?.name || "N/A",
+            requesterName: document.owner?.name || "Unknown",
+            companyName: res.locals.companyName || "Our Company",
+            logoUrl: res.locals.logo || "",
+            bannerUrl: res.locals.mailImg || "",
+            approvalLink,  // Direct link to approval page
+            reviewUrl: approvalLink,
+            verifyUrl: approvalLink,
+            BASE_URL: API_CONFIG.baseUrl
+        };
+
+        const html = generateEmailTemplate('documentApprovalRequest', data);
+
+        await sendEmail({
+            to: approverEntry.userId.email,
+            subject: `Approval Required: ${document.metadata?.fileName}`,
+            html,
+            fromName: "Document Management System"
         });
+
+        approverEntry.isMailSent = true;
+        await document.save();
+
+        return res.json({ success: true, message: "Approval email sent" });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: "Failed to send email" });
     }
 };
 /**

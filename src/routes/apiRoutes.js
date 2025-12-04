@@ -86,7 +86,7 @@ router.get("/auth/verify-reset/:token", AuthController.verifyResetLink);
 router.get('/file/pdf/:fileId', optionalAuth, CommonController.servePDF);
 router.get('/documents/:id/versions/view', DocumentController.viewDocumentVersion);
 router.get("/download/file/:fileId", optionalAuth, CommonController.downloadFile);
-
+router.post("/approval/submit", optionalAuth, DocumentController.submitApprovalByToken);
 
 // Apply authentication to all routes
 router.use(authenticate);
@@ -249,6 +249,7 @@ router.get('/verify-approval/:token', authenticate, DocumentController.verifyApp
 
 // Update approval for a document
 router.patch('/documents/:documentId/approval', authenticate, DocumentValidators.updateApprovalStatusValidator, validators, DocumentController.updateApprovalStatus);
+// routes/document.js
 
 
 // ---------------------------
