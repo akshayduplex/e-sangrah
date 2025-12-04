@@ -25,7 +25,7 @@ import { deleteObject } from "../utils/s3Helpers.js";
 import { generateEmailTemplate } from "../helper/emailTemplate.js";
 import { activityLogger } from "../helper/activityLogger.js";
 import DocumentVersion from "../models/DocumentVersion.js";
-import { recomputeProjectTotalTags } from "../helper/CommonHelper.js";
+import { formatTotalFileSize, recomputeProjectTotalTags } from "../helper/CommonHelper.js";
 import Folder from "../models/Folder.js";
 import Notification from "../models/Notification.js";
 
@@ -528,25 +528,31 @@ export const getDocuments = async (req, res) => {
         }
 
         if (profile_type !== "superadmin") {
-            const baseAccess = [
-                { owner: userId },
-                {
-                    $and: [
-                        { owner: { $ne: userId } },       // non-owner
-                        { status: "Approved" }            // only if approved
-                    ]
-                }
-            ];
+            const accessRules = [];
+
+            if (profile_type === "admin" || profile_type === "user") {
+                accessRules.push({ owner: userId });
+            }
 
             if (profile_type === "vendor") {
-                baseAccess.push({ documentVendor: userId });
+                accessRules.push({
+                    $and: [
+                        { documentVendor: userId },
+                        { status: "Approved" }
+                    ]
+                });
             }
 
             if (profile_type === "donor") {
-                baseAccess.push({ documentDonor: userId });
+                accessRules.push({
+                    $and: [
+                        { documentDonor: userId },
+                        { status: "Approved" }
+                    ]
+                });
             }
 
-            filter.$or = baseAccess;
+            filter.$or = accessRules;
         }
 
         const toArray = val => {
@@ -736,7 +742,7 @@ export const getDocuments = async (req, res) => {
         const skip = (pageNum - 1) * limitNum;
 
         // --- Fetch documents ---
-        const documents = await Document.find(filter)
+        let documents = await Document.find(filter)
             .select(`
                 files updatedAt createdAt wantApprovers signature isDeleted isArchived archivedAt
                 comment sharedWithUsers compliance status metadata tags owner versioning
@@ -763,6 +769,23 @@ export const getDocuments = async (req, res) => {
             .limit(limitNum)
             .lean();
 
+        documents.forEach(doc => {
+            const filesArray = doc.files || [];
+            const totalBytes = filesArray.reduce((sum, file) => {
+                return sum + (Number(file.fileSize) || 0);
+            }, 0);
+
+            const formatted = formatTotalFileSize(totalBytes);
+            const firstFile = filesArray[0] || {};
+            const firstFileOriginalName = firstFile.originalName || null;
+            const firstFileId = firstFile._id || null;
+            doc.files = {
+                _id: firstFileId,
+                originalName: firstFileOriginalName,
+                version: doc.currentVersionLabel || null,
+                fileSize: formatted
+            };
+        });
         const totalDocuments = await Document.countDocuments(filter);
 
         return successResponse(res, {

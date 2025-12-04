@@ -10,7 +10,7 @@ import { parseDateDDMMYYYY } from "../utils/formatDate.js";
 import { renderProjectDetails } from "../utils/renderProjectDetails.js";
 import { activityLogger } from "../helper/activityLogger.js";
 import { addNotification } from "./NotificationController.js";
-import { formatProjectFileSize } from "../helper/CommonHelper.js";
+import { formatTotalFileSize } from "../helper/CommonHelper.js";
 import File from "../models/File.js";
 //Page controllers
 
@@ -797,7 +797,7 @@ export const searchProjects = async (req, res) => {
 
                 return {
                     ...project.toObject(),
-                    storageConsumed: formatProjectFileSize(totalBytes)
+                    storageConsumed: formatTotalFileSize(totalBytes)
                 };
             });
         }

@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import Document from "../models/Document.js";
+import { formatTotalFileSize } from "../helper/CommonHelper.js";
 
 //Page controllers
 
@@ -179,7 +180,7 @@ export const getApprovalRequests = async (req, res) => {
         const skip = (page - 1) * limit;
 
 
-        const [documents, total] = await Promise.all([
+        let [documents, total] = await Promise.all([
             Document.find(filter)
                 .select('department createdAt status wantApprovers metadata.fileName files documentApprovalAuthority comment versioning ')
                 .populate("department", "name")
@@ -194,6 +195,24 @@ export const getApprovalRequests = async (req, res) => {
             Document.countDocuments(filter)
         ]);
 
+        documents.forEach(doc => {
+            const filesArray = doc.files || [];
+            const totalBytes = filesArray.reduce((sum, file) => {
+                return sum + (Number(file.fileSize) || 0);
+            }, 0);
+
+            const formatted = formatTotalFileSize(totalBytes);
+            const firstFile = filesArray[0] || {};
+            const firstFileOriginalName = firstFile.originalName || null;
+            const firstFileId = firstFile._id || null;
+
+            doc.files = {
+                _id: firstFileId,
+                originalName: firstFileOriginalName,
+                version: doc.currentVersionLabel || null,
+                fileSize: formatted
+            };
+        });
 
         res.status(200).json({
             success: true,

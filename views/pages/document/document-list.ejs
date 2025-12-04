@@ -527,7 +527,7 @@
                         const isSuperAdmin = currentUserProfileType === 'superadmin';
                         const hasFullAccess = isOwner || isSuperAdmin;
 
-                        var fileSizeKB = doc.files[0]?.fileSize ? (doc.files[0].fileSize / 1024).toFixed(2) + ' KB' : '-';
+                        var fileSizeKB = doc.files?.fileSize || 'N/A';
                         const lastModified = formatDateTime(doc.updatedAt);
 
                         const owner = doc.owner
@@ -579,35 +579,38 @@
                             'archived': 'bg-soft-secondary'
                         }[(doc.status || '').toLowerCase().replace(/\s+/g, '')] || 'bg-soft-secondary';
 
-                        const currentVersion = doc.currentVersionLabel
-                            ? `v${doc.currentVersionLabel}`
+                        const currentVersionLabel = doc.currentVersionLabel
+                            ? parseFloat(doc.currentVersionLabel)
+                            : null;
+
+                        const currentVersion = currentVersionLabel !== null
+                            ? `v${currentVersionLabel.toFixed(1)}`
                             : '-';
 
                         let allVersions = [];
-                        if (doc.files && doc.files.length > 0) {
-                            allVersions = doc.files
-                                .map(f => f.version?.$numberDecimal ?? f.version?.toString())
-                                .filter(v => v !== null);
-                            allVersions = [...new Set(allVersions)];
-                            allVersions.sort((a, b) => parseFloat(b) - parseFloat(a));
-                            allVersions = allVersions.map(v => `v${v}`);
+
+                        if (currentVersionLabel !== null) {
+
+                            let v = 1.0;
+                            while (v <= currentVersionLabel + 0.00001) {
+                                allVersions.push(`v${v.toFixed(1)}`);
+                                v += 0.1;
+                                v = Math.round(v * 10) / 10;
+                            }
                         }
-
                         const versionDisplay = `
-    <div>
-        <div><strong>Current Version:</strong> ${currentVersion}</div>
-        <div><strong>Versions:</strong> ${allVersions.join(', ')}</div>
-    </div>
-`;
-
-                        const filesInfo = doc?.files?.[0]
+                                             <div>
+                                                <div><strong>Current Version:</strong> ${currentVersion}</div>
+                                                <div><strong>Versions:</strong> ${allVersions.join(', ')}</div>
+                                             </div>`;
+                        const filesInfo = doc?.files
                             ? `<div class="d-flex align-items-center">
                     <span class="avatar rounded bg-light me-2">
-                        <img src="${fileIcons[doc?.files[0]?.originalName.split('.').pop().toLowerCase()] || fileIcons.default}" style="height:30px;">
+                        <img src="${fileIcons[doc?.files?.originalName.split('.').pop().toLowerCase()] || fileIcons.default}" style="height:30px;">
                     </span>
                     <div>
                          <p class="mb-0 text-dark">${doc?.metadata?.fileName || 'N/A'}</p>
-                        <small class="text-muted">${fileSizeKB}</small>
+                        <small class="text-muted">${doc?.files.fileSize}</small>
                     </div>
                 </div>`
                             : '-';
@@ -620,12 +623,12 @@
                     <li><a class="dropdown-item" href="/documents/${doc._id}/versions/view?version=""><i class="ti ti-eye"></i> View</a></li>
                     <li><a class="dropdown-item" href="/documents/edit/${doc._id}"><i class="ti ti-pencil-minus"></i> Edit</a></li>
                     <li>
-                        <a class="dropdown-item share-btn" href="#" data-doc-id="${doc._id}"  data-file-id="${doc.files?.[0]?._id || ''}"  data-bs-toggle="modal" data-bs-target="#sharedoc-modal">
+                        <a class="dropdown-item share-btn" href="#" data-doc-id="${doc._id}"  data-file-id="${doc.files?._id || ''}"  data-bs-toggle="modal" data-bs-target="#sharedoc-modal">
                             <i class="ti ti-share"></i> Share
                         </a>
                     </li>
                     <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-id="${doc._id}" data-bs-target="#versionhistory-modal"><i class="ti ti-history"></i> Version History</a></li>
-                    <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-file-id="${doc.files?.[0]?._id || ''}" data-bs-target="#downloaddoc-modal"><i class="ti ti-download"></i> Download</a></li>
+                    <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-file-id="${doc.files?._id || ''}" data-bs-target="#downloaddoc-modal"><i class="ti ti-download"></i> Download</a></li>
                     <li><a class="dropdown-item btn-delete" href="#" data-id="${doc._id}" data-bs-toggle="modal" data-bs-target="#trashdoc-modal"><i class="ti ti-trash"></i> Move to Trash</a></li>
                     <li><a class="dropdown-item archive-document" href="#"  data-id="${doc._id}" data-bs-toggle="modal" data-bs-target="#archivedoc-modal"><i class="ti ti-archive"></i> Move to Archive</a></li>
                 </ul>

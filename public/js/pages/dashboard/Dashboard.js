@@ -266,7 +266,7 @@ $(document).ready(function () {
                             <img src="${file.icon}" alt="icon" data-id="${file._id}" class="file-icon" style="width:24px;height:24px;">
                         </span>
                         <div class="flxtbltxt">
-                            <p class="fs-14 mb-1 fw-normal">${file.name}</p>
+                            <p class="fs-14 mb-1 fw-normal filestatusName">${file.name}</p>
                             <span class="fs-11 fw-light text-black">${file.fileSize}</span>
                         </div>
                     </div>
@@ -735,7 +735,7 @@ $(document).ready(function () {
             }
 
             documents.forEach(doc => {
-                const fileSizeKB = doc.files?.[0] ? (doc.files[0].fileSize / 1024).toFixed(2) + ' KB' : '0 KB';
+                const fileSizeKB = doc.files.fileSize || 'N/A';
                 const createdDate = formatDateTime(doc.createdAt);
                 const updatedDate = formatDateTime(doc.updatedAt);
                 const tags = doc.tags?.join(', ') || '-';
@@ -754,7 +754,7 @@ $(document).ready(function () {
                     ? doc.description.replace(/<\/?[^>]+(>|$)/g, '').substring(0, 30) + (doc.description.length > 30 ? '...' : '')
                     : '-';
 
-                const firstFile = doc.files?.[0];
+                const firstFile = doc.files;
                 const fileIcon = firstFile
                     ? fileIcons[firstFile.originalName.split('.').pop().toLowerCase()] || fileIcons.default
                     : fileIcons.default;
@@ -784,7 +784,7 @@ $(document).ready(function () {
                                     <li><a class="dropdown-item" href="/documents/edit/${doc._id}"><i class="ti ti-pencil-minus"></i> Edit</a></li>
                                     <li><a class="dropdown-item share-btn" href="#" data-doc-id="${doc._id}" data-file-id="${firstFile?._id || ''}" data-bs-toggle="modal" data-bs-target="#sharedoc-modal"><i class="ti ti-share"></i> Share</a></li>
                                     <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-id="${doc._id}" data-bs-target="#versionhistory-modal"><i class="ti ti-history"></i> Version History</a></li>
-                                    <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-file-id="${doc.files?.[0]?._id || ''}" data-bs-target="#downloaddoc-modal"><i class="ti ti-download"></i> Download</a></li>
+                                    <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-file-id="${doc.files?._id || ''}" data-bs-target="#downloaddoc-modal"><i class="ti ti-download"></i> Download</a></li>
                                     <li><a class="dropdown-item btn-delete" href="#" data-id="${doc._id}" data-bs-toggle="modal" data-bs-target="#trashdoc-modal"><i class="ti ti-trash"></i> Move to Trash</a></li>
                                     <li><a class="dropdown-item archive-document" href="#" data-id="${doc._id}" data-bs-toggle="modal" data-bs-target="#archivedoc-modal"><i class="ti ti-archive"></i> Move to Archive</a></li>
                                 </ul>
@@ -829,66 +829,81 @@ $(document).ready(function () {
             method: "GET",
             dataType: "json",
             success: function (result) {
-                if (result.success && result.data?.departmentUploads?.length) {
-                    const departments = result.data.departmentUploads;
+                const container = document.getElementById('departmentChartContainer');
+                const hasData = result.success && result.data?.departmentUploads?.length > 0;
+                const departments = hasData ? result.data.departmentUploads : [];
 
-                    // Sort by percentage descending
-                    const sortedDepartments = [...departments].sort((a, b) => b.percentage - a.percentage);
+                // Sort and prepare data
+                const sortedDepartments = [...departments].sort((a, b) => b.percentage - a.percentage);
+                const chartData = sortedDepartments.map(d => ({
+                    name: d.departmentName || 'Unknown',
+                    y: d.percentage,
+                    documentCount: d.documentCount
+                }));
 
-                    // Prepare data for Highcharts
-                    const chartData = sortedDepartments.map(d => ({
-                        name: d.departmentName,
-                        y: d.percentage,
-                        documentCount: d.documentCount
-                    }));
+                // Always clear container first to prevent Highcharts ghosting
+                container.innerHTML = '';
 
-                    // Destroy existing chart if exists
-                    if (window.departmentChart) {
-                        window.departmentChart.destroy();
-                    }
-
-                    // Create Highcharts donut chart
-                    window.departmentChart = Highcharts.chart('departmentChartContainer', {
-                        chart: {
-                            type: 'pie',
-                            height: 400,
-                            backgroundColor: 'transparent'
-                        },
-                        title: { text: '' },
-                        tooltip: {
-                            pointFormat: '<b>{point.y:.1f}%</b> ({point.documentCount} docs)'
-                        },
-                        plotOptions: {
-                            pie: {
-                                innerSize: '70%',
-                                allowPointSelect: true,
-                                cursor: 'pointer',
-                                borderRadius: 9,
-                                dataLabels: {
-                                    enabled: true,
-                                    distance: 20,
-                                    format: '{point.percentage:.0f}%<br>{point.name}',
-                                    style: { fontSize: '12px', textOutline: 'none' }
-                                }
-                            }
-                        },
-                        series: [{
-                            name: 'Upload Share',
-                            colorByPoint: true,
-                            data: chartData
-                        }],
-                        credits: { enabled: false },
-                        exporting: { enabled: false }
-                    });
-                    updateDepartmentCenterText(sortedDepartments);
-
-                } else {
-                    createEmptyHighchart('departmentChartContainer', 'No department data available');
-                    updateDepartmentCenterText([]);
+                // Destroy old chart instance if exists
+                if (window.departmentChart) {
+                    window.departmentChart.destroy();
+                    window.departmentChart = null;
                 }
+
+                const chartOptions = {
+                    chart: {
+                        type: 'pie',
+                        height: 400,
+                        backgroundColor: 'transparent'
+                    },
+                    title: { text: '' },
+                    tooltip: {
+                        pointFormat: '<b>{point.y:.1f}%</b> ({point.documentCount} docs)'
+                    },
+                    plotOptions: {
+                        pie: {
+                            innerSize: '70%',
+                            allowPointSelect: true,
+                            cursor: 'pointer',
+                            borderRadius: 9,
+                            dataLabels: {
+                                enabled: true,
+                                distance: 20,
+                                format: '{point.percentage:.0f}%<br>{point.name}',
+                                style: { fontSize: '12px', textOutline: 'none' }
+                            }
+                        }
+                    },
+                    series: [{
+                        name: 'Upload Share',
+                        colorByPoint: true,
+                        data: hasData ? chartData : [{
+                            name: 'No Data',
+                            y: 100,
+                            color: '#e9ecef',
+                            dataLabels: { enabled: false }
+                        }]
+                    }],
+                    credits: { enabled: false },
+                    exporting: { enabled: false }
+                };
+
+                // Create new chart
+                window.departmentChart = Highcharts.chart(container, chartOptions);
+                updateDepartmentCenterText(sortedDepartments);
             },
             error: function () {
-                createEmptyHighchart('departmentChartContainer', 'Error loading data');
+                const container = document.getElementById('departmentChartContainer');
+                container.innerHTML = '';
+                if (window.departmentChart) {
+                    window.departmentChart.destroy();
+                }
+                window.departmentChart = Highcharts.chart(container, {
+                    chart: { type: 'pie', height: 400 },
+                    title: { text: '' },
+                    series: [{ data: [{ name: 'Error', y: 100, color: '#f8d7da' }], innerSize: '70%', dataLabels: { enabled: false } }],
+                    credits: { enabled: false }
+                });
                 updateDepartmentCenterText([]);
             }
         });
@@ -924,71 +939,71 @@ $(document).ready(function () {
             method: "GET",
             dataType: "json",
             success: function (result) {
-                if (result.success && result.data?.fileTypeBreakdown?.length) {
-                    const fileTypes = result.data.fileTypeBreakdown;
+                const container = document.getElementById('documentTypeChartContainer');
+                const hasData = result.success && result.data?.fileTypeBreakdown?.length > 0;
+                const fileTypes = hasData ? result.data.fileTypeBreakdown : [];
 
-                    // Sort by percentage descending
-                    const sortedFileTypes = [...fileTypes].sort((a, b) => b.percentage - a.percentage);
+                const sortedFileTypes = [...fileTypes].sort((a, b) => b.percentage - a.percentage);
+                const chartData = sortedFileTypes.map(ft => ({
+                    name: ft.type,
+                    y: ft.percentage,
+                    count: ft.count
+                }));
 
-                    // Prepare data for Highcharts
-                    const chartData = sortedFileTypes.map(ft => ({
-                        name: ft.type,
-                        y: ft.percentage,
-                        count: ft.count,
-                        totalSizeMB: ft.totalSizeMB
-                    }));
-
-                    // Destroy existing chart if exists
-                    if (window.documentTypeChart) {
-                        window.documentTypeChart.destroy();
-                    }
-
-                    // Create Highcharts donut chart
-                    window.documentTypeChart = Highcharts.chart('documentTypeChartContainer', {
-                        chart: {
-                            type: 'pie',
-                            height: 400,
-                            backgroundColor: 'transparent'
-                        },
-                        title: { text: '' },
-                        tooltip: {
-                            pointFormat: '<b>{point.y:.1f}%</b> ({point.count} files)'
-                        },
-                        plotOptions: {
-                            pie: {
-                                innerSize: '70%',
-                                allowPointSelect: true,
-                                cursor: 'pointer',
-                                borderRadius: 9,
-                                dataLabels: {
-                                    enabled: true,
-                                    distance: 20,
-                                    format: '{point.percentage:.0f}%<br>{point.name}',
-                                    style: { fontSize: '12px', textOutline: 'none' }
-                                }
-                            }
-                        },
-                        series: [{
-                            name: 'File Type',
-                            colorByPoint: true,
-                            data: chartData
-                        }],
-                        credits: { enabled: false },
-                        exporting: { enabled: false }
-                    });
-                    updateDocumentTypeCenterText(sortedFileTypes);
-                } else {
-                    createEmptyHighchart('documentTypeChartContainer', 'No document type data available');
-                    updateDocumentTypeCenterText([]);
+                // Critical: Clear container + destroy old chart
+                container.innerHTML = '';
+                if (window.documentTypeChart) {
+                    window.documentTypeChart.destroy();
+                    window.documentTypeChart = null;
                 }
+
+                window.documentTypeChart = Highcharts.chart(container, {
+                    chart: { type: 'pie', height: 400, backgroundColor: 'transparent' },
+                    title: { text: '' },
+                    tooltip: { pointFormat: '<b>{point.y:.1f}%</b> ({point.count} files)' },
+                    plotOptions: {
+                        pie: {
+                            innerSize: '70%',
+                            allowPointSelect: true,
+                            cursor: 'pointer',
+                            borderRadius: 9,
+                            dataLabels: {
+                                enabled: hasData,
+                                distance: 20,
+                                format: '{point.percentage:.0f}%<br>{point.name}',
+                                style: { fontSize: '12px', textOutline: 'none' }
+                            }
+                        }
+                    },
+                    series: [{
+                        name: 'File Type',
+                        colorByPoint: true,
+                        data: hasData ? chartData : [{
+                            name: 'No Data',
+                            y: 100,
+                            color: '#e9ecef',
+                            dataLabels: { enabled: false }
+                        }]
+                    }],
+                    credits: { enabled: false },
+                    exporting: { enabled: false }
+                });
+
+                updateDocumentTypeCenterText(sortedFileTypes);
             },
             error: function () {
-                createEmptyHighchart('documentTypeChartContainer', 'Error loading data');
+                const container = document.getElementById('documentTypeChartContainer');
+                container.innerHTML = '';
+                if (window.documentTypeChart) window.documentTypeChart.destroy();
+                Highcharts.chart(container, {
+                    chart: { type: 'pie', height: 400 },
+                    series: [{ data: [{ name: 'Error', y: 100, color: '#f8d7da' }], innerSize: '70%', dataLabels: { enabled: false } }],
+                    credits: { enabled: false }
+                });
                 updateDocumentTypeCenterText([]);
             }
         });
     }
-
     // Update document type chart center text
     function updateDocumentTypeCenterText(fileTypes) {
         const $center = $('#documentTypeChartCenterText .center-text-content');

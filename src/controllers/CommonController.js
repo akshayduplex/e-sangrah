@@ -1,5 +1,6 @@
 import File from "../models/File.js";
 import Folder from "../models/Folder.js";
+import jwt from "jsonwebtoken";
 import { s3Client } from "../config/S3Client.js";
 import { ListObjectsV2Command, GetObjectCommand } from "@aws-sdk/client-s3";
 import archiver from "archiver";
@@ -89,6 +90,72 @@ export const showSettingPage = async (req, res) => {
     }
 };
 
+export const showApproverPage = async (req, res) => {
+    try {
+        const { token } = req.query;
+
+        if (!token) {
+            return renderExpiredPage(res, "Invalid or missing token.", null);
+        }
+
+        // Verify token
+        let payload;
+        try {
+            payload = jwt.verify(token, API_CONFIG.JWT_SECRET);
+        } catch (err) {
+            return renderExpiredPage(res, "This link has expired or is invalid.", null);
+        }
+
+        const { documentId, approverId } = payload;
+
+        // Fetch document + current version files
+        const document = await Document.findById(documentId)
+            .populate("owner", "name")
+            .populate("department", "name")
+            .populate("documentApprovalAuthority.userId", "name email");
+
+        if (!document) {
+            return renderExpiredPage(res, "Document not found.", null);
+        }
+
+        // Find current approver record
+        const approverRecord = document.documentApprovalAuthority.find(
+            a => a.userId && a.userId._id.toString() === approverId
+        );
+
+        if (!approverRecord) {
+            return renderExpiredPage(res, "You are not authorized to approve this document.", null);
+        }
+
+        // If already approved/rejected → show status
+        if (approverRecord.isApproved || approverRecord.status === "Rejected") {
+            return renderExpiredPage(res, `You have already ${approverRecord.status.toLowerCase()} this document.`, null);
+        }
+
+        const currentVersion = document.versions.id(document.currentVersion);
+        const versionData = {
+            versionLabel: document.currentVersionLabel,
+            files: currentVersion?.files || []
+        };
+
+        res.render("pages/document/approveDocument", {
+            pageTitle: document.metadata?.fileName || "Document Approval",
+            documentTitle: document.metadata?.fileName || "Document",
+            document,
+            versionData,
+            approverToken: token, // pass token for API calls
+            approverName: approverRecord.userId?.name || "Approver",
+            requesterName: document.owner?.name || "Unknown",
+            description: document.description || "No description",
+            requestDate: document.createdAt?.toLocaleDateString() || new Date().toLocaleDateString(),
+            docExpired: false
+        });
+
+    } catch (error) {
+        console.error("showApproverPage Error:", error);
+        renderExpiredPage(res, "Server error. Please try again later.", null);
+    }
+};
 
 // Check duplicate fields
 export const checkDuplicate = async (req, res) => {

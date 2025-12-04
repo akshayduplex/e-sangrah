@@ -1,4 +1,4 @@
-/* adminDashboard */
+/* Dashboard */
 
 .flxtblhdr,
 .flxtblrow {
@@ -241,7 +241,7 @@ h5.mt-3.deleteLabel {
     line-height: 1.2;
 }
 
-.flxtbltxt p {
+.filestatusName {
     max-width: 150px;
     overflow: hidden;
     text-overflow: ellipsis;

@@ -135,8 +135,8 @@ export async function getDateRange(filter) {
     }
 };
 
-// Add this to a utils/fileSize.js or helpers/global.js file
-export const formatProjectFileSize = (bytes, decimals = 2) => {
+
+export const formatTotalFileSize = (bytes, decimals = 2) => {
     if (bytes === 0) return '0 Bytes';
     if (!bytes || bytes < 0) return '0 Bytes';
 

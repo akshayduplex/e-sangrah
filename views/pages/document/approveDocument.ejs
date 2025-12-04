@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>
+        <%= documentTitle %> - Approval Required
+    </title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <style>
+        body {
+            background: #f8f9fa;
+            padding: 30px 0;
+        }
+
+        .card {
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        }
+
+        .btn-approve {
+            background: #28a745;
+            color: white;
+        }
+
+        .file-card {
+            transition: transform 0.2s;
+        }
+
+        .file-card:hover {
+            transform: translateY(-4px);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="card">
+            <div class="card-header bg-primary text-white text-center py-4">
+                <h3 class="mb-0">
+                    <%= document.metadata.fileName %>
+                </h3>
+                <small>Version <%= versionData.versionLabel %> • Approval Requested</small>
+            </div>
+
+            <div class="card-body p-4">
+                <div class="row mb-4">
+                    <div class="col-md-8">
+                        <p><strong>Requested by:</strong>
+                            <%= requesterName %>
+                        </p>
+                        <p><strong>Date:</strong>
+                            <%= requestDate %>
+                        </p>
+                        <% if (description) { %>
+                            <p><strong>Description:</strong>
+                                <%= description %>
+                            </p>
+                            <% } %>
+                    </div>
+                    <div class="col-md-4 text-end">
+                        <button class="btn btn-success btn-lg" data-bs-toggle="modal" data-bs-target="#approvalModal">
+                            <i class="bi bi-check-circle"></i> Review & Approve
+                        </button>
+                    </div>
+                </div>
+
+                <hr>
+
+                <h5>Attached Files</h5>
+                <div class="d-flex flex-wrap gap-3">
+                    <% if (versionData.files.length> 0) { %>
+                        <% versionData.files.forEach(file=> { %>
+                            <% const ext=file.originalName.split('.').pop().toLowerCase(); let icon='/img/icons/fn4.png'
+                                ; if (['doc','docx'].includes(ext)) icon='/img/icons/fn2.png' ; else if
+                                (['xls','xlsx'].includes(ext)) icon='/img/icons/fn3.png' ; else if
+                                (['ppt','pptx'].includes(ext)) icon='/img/icons/fn1.png' ; %>
+                                <div class="file-card text-center p-3 border rounded">
+                                    <img src="<%= icon %>" alt="icon" width="48">
+                                    <p class="mt-2 mb-1 small fw-bold">
+                                        <%= file.originalName %>
+                                    </p>
+                                    <small class="text-muted">
+                                        <%= (file.fileSize / 1024).toFixed(1) %> KB
+                                    </small>
+                                    <div class="mt-2">
+                                        <a href="/api/download/file/<%= file._id %>?token=<%= approverToken %>"
+                                            class="btn btn-sm btn-outline-secondary">
+                                            <i class="bi bi-download"></i>
+                                        </a>
+                                        <a href="/folders/view/<%= file._id %>?token=<%= approverToken %>"
+                                            target="_blank" class="btn btn-sm btn-outline-primary">
+                                            <i class="bi bi-eye"></i>
+                                        </a>
+                                    </div>
+                                </div>
+                                <% }) %>
+                                    <% } else { %>
+                                        <p class="text-muted">No files attached.</p>
+                                        <% } %>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Approval Modal -->
+    <div class="modal fade" id="approvalModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Document Approval Action</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p><strong>
+                            <%= requesterName %>
+                        </strong> requested your approval for:</p>
+                    <h6>
+                        <%= document.metadata.fileName %>
+                    </h6>
+
+                    <div class="btn-group w-100 mb-3" role="group">
+                        <button type="button" class="btn btn-success active" data-action="approve">Approve</button>
+                        <button type="button" class="btn btn-danger" data-action="reject">Reject</button>
+                        <button type="button" class="btn btn-warning" data-action="need_discussion">Need
+                            Discussion</button>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Comment (optional)</label>
+                        <textarea class="form-control" id="comment" rows="3"
+                            placeholder="Add your feedback..."></textarea>
+                    </div>
+
+                    <div class="alert alert-info small">
+                        Your decision will be recorded and notified to relevant users.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="submitAction">
+                        <span id="submitText">Submit Approval</span>
+                        <span class="spinner-border spinner-border-sm d-none" id="loadingSpinner"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const token = new URLSearchParams(window.location.search).get('token');
+        const documentId = "<%= document._id %>";
+
+        let selectedAction = 'approve';
+
+        document.querySelectorAll('[data-action]').forEach(btn => {
+            btn.addEventListener('click', function () {
+                document.querySelectorAll('[data-action]').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                selectedAction = this.getAttribute('data-action');
+
+                const texts = { approve: 'Approve', reject: 'Reject', need_discussion: 'Request Discussion' };
+                document.getElementById('submitText').textContent = texts[selectedAction] || 'Submit';
+            });
+        });
+
+        document.getElementById('submitAction').addEventListener('click', async () => {
+            const comment = document.getElementById('comment').value.trim();
+            const btn = document.getElementById('submitAction');
+            const spinner = document.getElementById('loadingSpinner');
+            const text = document.getElementById('submitText');
+
+            btn.disabled = true;
+            spinner.classList.remove('d-none');
+            text.textContent = 'Submitting...';
+
+            try {
+                const res = await fetch('/api/approval/submit', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        token,
+                        documentId,
+                        action: selectedAction === 'need_discussion' ? 'need_discussion' :
+                            selectedAction === 'reject' ? 'reject' : 'approve',
+                        comment
+                    })
+                });
+
+                const data = await res.json();
+
+                if (data.success) {
+                    alert(`Document ${data.status === 'Approved' ? 'Approved' : data.status} Successfully!`);
+                    window.location.reload();
+                } else {
+                    alert(data.message || 'Action failed');
+                }
+            } catch (err) {
+                alert('Network error. Please try again.');
+            } finally {
+                btn.disabled = false;
+                spinner.classList.add('d-none');
+                text.textContent = 'Submit Approval';
+            }
+        });
+    </script>
+</body>
+
+</html>

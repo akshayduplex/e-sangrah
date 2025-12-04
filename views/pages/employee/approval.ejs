@@ -198,10 +198,10 @@
                         },
                         dataSrc: function (json) {
                             return json.data.map(item => {
-                                const file = item.files?.[0];
+                                const file = item.files || null;
                                 const fileExt = file?.originalName?.split('.').pop().toLowerCase() || '';
                                 const fileIcon = fileIcons[fileExt] || fileIcons.default;
-                                const fileSize = file?.fileSize ? formatBytes(file.fileSize) : null;
+                                const fileSize = file?.fileSize || null;
                                 const fileInfoHtml = file ? `
                         <div class="d-flex align-items-center">
                             <span class="avatar rounded bg-light me-2">
@@ -259,7 +259,7 @@
                    data-bs-toggle="modal" 
                    data-bs-target="#sharedoc-modal"
                    data-doc-id="${item._id}"
-                   data-file-id="${item.files?.[0]?._id || ''}">
+                   data-file-id="${item.files?._id || ''}">
                    <i class="ti ti-share"></i> Share
                 </a>
             </li>
@@ -272,7 +272,7 @@
                    <i class="ti ti-history"></i> Version History
                 </a>
             </li>
-                                                                      <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-file-id="${item.files?.[0]?._id || ''}" data-bs-target="#downloaddoc-modal"><i class="ti ti-download"></i> Download</a></li>
+                                                                      <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-file-id="${item.files?._id || ''}" data-bs-target="#downloaddoc-modal"><i class="ti ti-download"></i> Download</a></li>
                     <li><a class="dropdown-item btn-delete" href="#" data-id="${item._id}" data-bs-toggle="modal" data-bs-target="#trashdoc-modal"><i class="ti ti-trash"></i> Move to Trash</a></li>
                     <li><a class="dropdown-item archive-document" href="#"  data-id="${item._id}" data-bs-toggle="modal" data-bs-target="#archivedoc-modal"><i class="ti ti-archive"></i> Move to Archive</a></li>
                         </div>`;

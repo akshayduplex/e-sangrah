@@ -89,10 +89,18 @@
 							</select>
 						</div>
 						<div class="input-icon-end position-relative flex-grow-1">
-							<input type="text" class="form-control datetimepicker" placeholder="Select Date">
-							<span class="input-icon-addon">
+							<input type="text" class="form-control pe-6" id="documentDate"
+								placeholder="Select Date Range" readonly>
+
+							<!-- Calendar Icon -->
+							<span class="calendar-icon">
 								<i class="ti ti-calendar text-gray-7"></i>
 							</span>
+
+							<!-- Clear Button (×) -->
+							<button type="button" id="clearDateRange" class="btn-close clear-btn"
+								title="Clear date range">
+							</button>
 						</div>
 					</div>
 
@@ -164,6 +172,50 @@
 				function sanitize(text) {
 					return text.replace(/[^a-zA-Z0-9-_]/g, '_').substring(0, 50);
 				}
+				let selectedDateRange = null;
+
+				const fp = flatpickr("#documentDate", {
+					mode: "range",
+					dateFormat: "d-m-Y",
+					allowInput: true,
+					clickOpens: true,
+					locale: {
+						rangeSeparator: " to "
+					},
+					conjunction: " to ",
+					// When user selects both dates
+					onChange: function (selectedDates, dateStr, instance) {
+						if (selectedDates.length === 2) {
+							selectedDateRange = {
+								start: selectedDates[0],
+								end: selectedDates[1]
+							};
+							document.getElementById("clearDateRange").style.display = "block";
+							table.ajax.reload();
+						}
+					},
+					// When user clears or closes without full range
+					onClose: function (selectedDates) {
+						{
+							if (selectedDates.length < 2 && selectedDates.length > 0) {
+								fp.clear();
+							}
+							if (selectedDates.length === 0) {
+								selectedDateRange = null;
+								document.getElementById("clearDateRange").style.display = "none";
+								table.ajax.reload();
+							}
+						}
+					}
+				});
+
+				// Clear button functionality
+				document.getElementById("clearDateRange").addEventListener("click", function () {
+					fp.clear();
+					selectedDateRange = null;
+					this.style.display = "none";
+					table.ajax.reload();
+				});
 				// ------------------------- Initialize Select2 with Clear Option -------------------------
 				function initSelect2(selector, url, textKey) {
 					$(selector).select2({
@@ -237,18 +289,30 @@
 						url: `${baseUrl}/api/documents`,
 						type: 'GET',
 						data: function (d) {
+							let dateRange = null;
+							if (selectedDateRange && selectedDateRange.start && selectedDateRange.end) {
+								const formatDate = (date) => {
+									const d = date.getDate().toString().padStart(2, '0');
+									const m = (date.getMonth() + 1).toString().padStart(2, '0');
+									const y = date.getFullYear();
+									return `${d}-${m}-${y}`;
+								};
+								dateRange = `${formatDate(selectedDateRange.start)} to ${formatDate(selectedDateRange.end)}`;
+							}
+
 							return {
 								page: Math.ceil(d.start / d.length) + 1,
 								limit: d.length,
 								search: d.search.value,
 								orderColumn: d.order.length ? d.order[0].column + 1 : undefined,
 								orderDir: d.order.length ? d.order[0].dir : undefined,
+
 								// Filters
-								role: $('#roleSelect').val(),
-								department: $('#department').val(),
-								docType: $('#docTypeSelect').val(),
-								designation: $('#designation_select').val(),
-								date: $('.datetimepicker').val()
+								role: $('#roleSelect').val() || undefined,
+								department: $('#department').val() || undefined,
+								docType: $('#docTypeSelect').val() || undefined,
+								designation: $('#designation_select').val() || undefined,
+								dateRange: dateRange
 							};
 						},
 						dataSrc: function (json) {
@@ -283,7 +347,7 @@
 
 								return {
 									fileName: `${doc.metadata.fileName || '—'} <br><small class="text-muted">
-                            ${doc.files[0]?.fileSize ? (doc.files[0].fileSize / 1024).toFixed(2) + ' KB' : ''}
+                            ${doc.files?.fileSize || 'N/A'}
                         </small>`,
 									owner: doc.owner?.name || '—',
 									designation: doc.owner?.userDetails?.designation?.name
@@ -343,11 +407,19 @@
 				});
 
 				// ------------------------- Export Functionality -------------------------
-				// In your frontend script, update the export function:
 				$('.export-link').on('click', async function (e) {
 					e.preventDefault();
 					const format = $(this).data('format');
-
+					let dateRange = null;
+					if (selectedDateRange && selectedDateRange.start && selectedDateRange.end) {
+						const formatDate = (date) => {
+							const d = date.getDate().toString().padStart(2, '0');
+							const m = (date.getMonth() + 1).toString().padStart(2, '0');
+							const y = date.getFullYear();
+							return `${d}-${m}-${y}`;
+						};
+						dateRange = `${formatDate(selectedDateRange.start)} to ${formatDate(selectedDateRange.end)}`;
+					}
 					// Get ALL current filters including search
 					const filters = {
 						role: $('#roleSelect').val(),
@@ -355,9 +427,7 @@
 						docType: $('#docTypeSelect').val(),
 						designation: $('#designation_select').val(),
 						search: $('input[name="q"]').val(),
-						date: $('.datetimepicker').val(),
-						// Add status if you have it in your UI
-						// status: $('#statusSelect').val()
+						dateRange: dateRange
 					};
 
 					try {
@@ -397,7 +467,7 @@
 				});
 
 				// ------------------------- Live Filtering -------------------------
-				$('#roleSelect, #department, #docTypeSelect, #designation_select, .datetimepicker, input[name="q"]')
+				$('#roleSelect, #department, #docTypeSelect, #designation_select, input[name="q"]')
 					.on('change keyup', function () {
 						table.ajax.reload();
 					});
