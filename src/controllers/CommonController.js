@@ -322,6 +322,98 @@ export const servePDF = async (req, res) => {
         res.status(500).send("Error loading PDF");
     }
 };
+export const downloadFilesZip = async (req, res) => {
+    try {
+        const userId = req.user?._id || null;
+        const { documentId } = req.params;
+
+        const document = await Document.findById(documentId)
+            .populate("currentVersion")
+            .lean();
+
+        if (!document) {
+            return res.status(404).json({ message: "Document not found" });
+        }
+
+        if (!document.metadata?.fileName) {
+            return res.status(400).json({ message: "Document has no metadata.fileName" });
+        }
+
+        if (!document.folderId) {
+            return res.status(400).json({ message: "Document has no folder" });
+        }
+
+        const folder = await Folder.findById(document.folderId);
+        if (!folder) {
+            return res.status(404).json({ message: "Folder not found" });
+        }
+
+        const currentVersion = document.currentVersionNumber?.toString() || "1.0";
+
+        const zipName = `${document.metadata.fileName}.zip`;
+        console.log("downklload filesname", zipName)
+        res.setHeader("Content-Type", "application/zip");
+        res.setHeader("Content-Disposition", `attachment; filename="${zipName}"`);
+
+        const archive = archiver("zip", { zlib: { level: 9 } });
+
+        archive.on("error", err => {
+            console.error("ZIP Error:", err);
+            return res.status(500).send({ message: "Error creating ZIP" });
+        });
+
+        archive.pipe(res);
+
+        const queue = new PQueue({ concurrency: 15 });
+
+        const files = await File.find({
+            folder: document.folderId,
+            version: currentVersion,
+            status: "active"
+        });
+
+        if (!files.length) {
+            return res.status(404).json({
+                message: "No files found for current version inside folder"
+            });
+        }
+
+        for (const file of files) {
+            queue.add(async () => {
+                const command = new GetObjectCommand({
+                    Bucket: process.env.AWS_BUCKET,
+                    Key: file.file
+                });
+
+                const signedUrl = await getSignedUrl(s3Client, command, { expiresIn: 300 });
+
+                const response = await fetch(signedUrl);
+
+                if (!response.ok) {
+                    throw new Error(`Fetch failed: ${response.statusText}`);
+                }
+
+                const nodeStream = Readable.fromWeb(response.body);
+
+                archive.append(nodeStream, {
+                    name: file.originalName
+                });
+            });
+        }
+        await queue.onIdle();
+        await archive.finalize();
+        await activityLogger({
+            actorId: userId || null,
+            entityId: documentId,
+            entityType: 'Document',
+            action: 'DOWNLOAD',
+            details: `${document?.metadata?.fileName}'s files downloaded by ${req.user ? req.user.name : "Guest User"}`
+        });
+    } catch (error) {
+        console.error("Download ZIP error:", error);
+        return res.status(500).json({ message: "Failed to download document files" });
+    }
+};
 export const downloadFolderAsZip = async (req, res) => {
     try {
         const userId = req.user._id;

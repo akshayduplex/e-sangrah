@@ -28,11 +28,11 @@
                     <div class="d-flex align-items-center mb-3">
                         <span class="avatar avatar-xl flex-shrink-0">
                             <img src="<%= user.profile_image || '/img/profiles/avatar-12.jpg' %>" class="rounded-circle"
-                                alt="<%= name || 'User' %>">
+                                alt="<%= user.name || 'User' %>">
                         </span>
                         <div class="ms-3">
                             <h3 class="mb-2">
-                                <%= name || "User" %>
+                                <%= user.name || "User" %>
                             </h3>
                             <p>You have <span class="text-primary text-decoration-underline" id="pendingCount">0</span>
                                 Pending Approvals

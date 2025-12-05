@@ -178,7 +178,7 @@ async function loadDocuments(selectedDept = "", sortBy = "") {
 <a class="dropdown-item" href="#" data-id="${doc._id}" data-bs-toggle="modal" data-bs-target="#versionhistory-modal">
     <i class="ti ti-history"></i> Version History
 </a></li>
-                    <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-file-id="${doc.files?.[0]?._id || ''}" data-bs-target="#downloaddoc-modal"><i class="ti ti-download"></i> Download</a></li>
+                    <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-file-id="${doc._id || ''}" data-bs-target="#downloaddoc-modal"><i class="ti ti-download"></i> Download</a></li>
                     <li><a class="dropdown-item btn-delete" href="#" data-id="${doc._id}" data-bs-toggle="modal" data-bs-target="#trashdoc-modal"><i class="ti ti-trash"></i> Move to Trash</a></li>
                     <li><a class="dropdown-item archive-document" href="#"  data-id="${doc._id}" data-bs-toggle="modal" data-bs-target="#archivedoc-modal"><i class="ti ti-archive"></i> Move to Archive</a></li>
                 </ul>

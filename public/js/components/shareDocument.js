@@ -457,7 +457,7 @@
         }
 
         // Load file info for display
-        $.get(`${baseUrl}/api/download/file/${downloadFileId}`)
+        $.get(`${baseUrl}/api/download/${downloadFileId}`)
             .done(res => {
                 $("#downloadFileLabel").text(res.data.originalName || "Original File");
                 $("#downloadFileSize").text(res.data.size || "(—)");
@@ -479,22 +479,36 @@
         const downloadBtn = $(this);
         downloadBtn.prop("disabled", true).text("Downloading...");
 
-        fetch(`${baseUrl}/api/download/file/${downloadFileId}`, {
+        fetch(`${baseUrl}/api/download/${downloadFileId}`, {
             method: "GET",
             credentials: "include"
         })
             .then(res => {
                 if (!res.ok) throw new Error("Download failed");
-                return res.blob();
+
+                // Extract filename
+                const disposition = res.headers.get("Content-Disposition");
+                let filename = "download.zip";
+
+                if (disposition && disposition.includes("filename=")) {
+                    const match = disposition.match(/filename\*?=(?:UTF-8''|")(.*?)"?$/);
+                    if (match && match[1]) {
+                        filename = decodeURIComponent(match[1]);
+                    }
+                }
+
+                return res.blob().then(blob => ({ blob, filename }));
             })
-            .then(blob => {
+            .then(({ blob, filename }) => {
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement("a");
+
                 a.href = url;
-                a.download = "file"; // Filename is controlled by backend headers
+                a.download = filename;
                 document.body.appendChild(a);
                 a.click();
                 a.remove();
+
                 window.URL.revokeObjectURL(url);
 
                 $("#downloaddoc-modal").modal("hide");

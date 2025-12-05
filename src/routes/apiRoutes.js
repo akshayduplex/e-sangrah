@@ -85,6 +85,7 @@ router.get("/auth/verify-reset/:token", AuthController.verifyResetLink);
 //public routes
 router.get('/file/pdf/:fileId', optionalAuth, CommonController.servePDF);
 router.get('/documents/:id/versions/view', DocumentController.viewDocumentVersion);
+router.get("/download/:documentId", optionalAuth, CommonController.downloadFilesZip);
 router.get("/download/file/:fileId", optionalAuth, CommonController.downloadFile);
 router.post("/approval/submit", optionalAuth, DocumentController.submitApprovalByToken);
 

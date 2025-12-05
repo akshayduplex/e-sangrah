@@ -786,26 +786,21 @@
 					loadFolders();
 				});
 
-				async function generateShareLink(folderId, accessType, role) {
-					if (!folderId || accessType !== "anyone") return;
+				async function generateShareLink(folderId) {
+					if (!folderId) return;
 
 					try {
 						const res = await fetch(`/api/folders/${folderId}/link`, {
 							method: "POST",
 							headers: { "Content-Type": "application/json" },
-							body: JSON.stringify({ access: role === "editor" ? "editor" : "viewer" })
+							body: JSON.stringify({ access: "viewer" })
 						});
 
 						const data = await res.json();
-						if (!res.ok) throw new Error(data.error || "Failed to generate share link");
-
-
-						const shareLink = data.link;
-						window.currentShareLink = shareLink;
-						shareLinkInput.value = shareLink;
+						shareLinkInput.value = data.link;
+						window.currentShareLink = data.link;
 
 					} catch (err) {
-						console.error(err);
 						shareLinkInput.value = "";
 						window.currentShareLink = null;
 					}
@@ -886,7 +881,7 @@
 						infoText.textContent = roleTypeSelect.value === "viewer" ?
 							"Anyone on the internet with the link can view" :
 							"Anyone on the internet with the link can edit";
-						roleTypeSelect.style.display = "inline-block";
+						// roleTypeSelect.style.display = "inline-block";
 					} else {
 						infoText.textContent = "Only people with access can view";
 						roleTypeSelect.style.display = "none";
@@ -925,9 +920,8 @@
 						});
 						if ((data.shareLinks || []).length > 0) {
 							const shareData = data.shareLinks[0];
-							roleTypeSelect.value = shareData.access === "editor" ? "editor" : "viewer";
-							accessTypeSelect.value = shareData.access === "restricted" ? "restricted" : "anyone";
-
+							roleTypeSelect.value = "viewer";
+							accessTypeSelect.value = "anyone";
 							updateAccessInfoText();
 
 							const shareLink = `${window.location.origin}/folders/${shareData.access}/${folderId}?=${shareData.token}`;
@@ -935,9 +929,9 @@
 							window.currentShareLink = shareLink;
 						} else {
 							accessTypeSelect.value = "anyone";
-							roleTypeSelect.value = "viewer";
+							// roleTypeSelect.value = "viewer";
 							updateAccessInfoText();
-							await generateShareLink(folderId, accessTypeSelect.value, roleTypeSelect.value);
+							await generateShareLink(folderId, accessTypeSelect.value);
 						}
 
 					} catch (err) {
@@ -1064,7 +1058,7 @@
 					usersWithAccessContainer.querySelectorAll(".user-accssrow").forEach(row => {
 						const userId = row.querySelector(".download-access").dataset.userId;
 						const canDownload = row.querySelector(".download-access").checked;
-						const access = row.querySelector("select").value;
+						const access = "view";
 
 						permissionData.push({
 							principalId: userId,
@@ -1210,19 +1204,10 @@
 					updateAccessInfoText();
 
 					if (currentShareFolderId && accessTypeSelect.value === "anyone") {
-						await generateShareLink(currentShareFolderId, accessTypeSelect.value, roleTypeSelect.value);
+						await generateShareLink(currentShareFolderId, "anyone", "viewer");
 					} else {
 						shareLinkInput.value = "";
 						window.currentShareLink = null;
 					}
 				});
-
-
-				roleTypeSelect.addEventListener("change", () => {
-					updateAccessInfoText();
-					if (currentShareFolderId && accessTypeSelect.value === "anyone") {
-						generateShareLink(currentShareFolderId, accessTypeSelect.value, roleTypeSelect.value);
-					}
-				});
-
 			</script>

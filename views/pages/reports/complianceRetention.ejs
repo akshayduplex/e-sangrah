@@ -275,7 +275,7 @@
                         <li><a class="dropdown-item" href="/documents/edit/${_id}"><i class="ti ti-pencil"></i> Edit</a></li>
                         <li><a class="dropdown-item share-btn" href="#" data-doc-id="${_id}" data-bs-toggle="modal" data-bs-target="#sharedoc-modal"><i class="ti ti-share"></i> Share</a></li>
                         <li><a class="dropdown-item" href="#" data-id="${_id}" data-bs-toggle="modal" data-bs-target="#versionhistory-modal"><i class="ti ti-history"></i> Version History</a></li>
-                        <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#downloaddoc-modal"><i class="ti ti-download"></i> Download</a></li>
+                        <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-file-id="${_id || ''}" data-bs-target="#downloaddoc-modal"><i class="ti ti-download"></i> Download</a></li>
                         <li><hr class="dropdown-divider"></li>
                         <li><a class="dropdown-item text-warning archive-document" href="#" data-id="${_id}" data-bs-toggle="modal" data-bs-target="#archivedoc-modal"><i class="ti ti-archive"></i> Archive</a></li>
                         <li><a class="dropdown-item text-danger btn-delete" href="#" data-id="${_id}" data-bs-toggle="modal" data-bs-target="#trashdoc-modal"><i class="ti ti-trash"></i> Move to Trash</a></li>

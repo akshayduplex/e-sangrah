@@ -2,6 +2,12 @@
 
 // -------- Utility Functions --------
 const baseUrl = window.baseUrl || "";
+let deviceId = localStorage.getItem("device_id");
+
+if (!deviceId) {
+    deviceId = crypto.randomUUID();
+    localStorage.setItem("device_id", deviceId);
+}
 
 // Show error message
 function showError(message) {
@@ -109,7 +115,7 @@ async function verifyOtp(email, otp) {
         const response = await fetch(`${baseUrl}/api/auth/verify/token`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email, otp })
+            body: JSON.stringify({ email, otp, deviceId })
         });
         const data = await response.json().catch(() => ({}));
 
@@ -153,7 +159,6 @@ async function resendOtp(email) {
 }
 
 // Handle login submission
-// Handle login submission
 async function handleLogin({ emailInput, passwordInput, loginBtn }) {
     const email = emailInput.value.trim();
     const password = passwordInput.value;
@@ -177,7 +182,7 @@ async function handleLogin({ emailInput, passwordInput, loginBtn }) {
         const response = await fetch(`${baseUrl}/api/auth/login`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email, password })
+            body: JSON.stringify({ email, password, deviceId })
         });
 
         const data = await response.json().catch(() => ({}));

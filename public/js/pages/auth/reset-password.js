@@ -11,6 +11,22 @@ document.addEventListener("DOMContentLoaded", function () {
     const baseUrl = window.baseUrl || "";
     let countdownInterval;
     let otpSent = false;
+    // Toggle password visibility
+    document.querySelectorAll(".toggle-password").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const inputID = btn.getAttribute("data-target");
+            const input = document.getElementById(inputID);
+            const icon = btn.querySelector("i");
+
+            if (input.type === "password") {
+                input.type = "text";
+                icon.classList.replace("fa-eye", "fa-eye-slash");
+            } else {
+                input.type = "password";
+                icon.classList.replace("fa-eye-slash", "fa-eye");
+            }
+        });
+    });
 
     // Reset all fields
     const resetAllFields = () => {
@@ -176,18 +192,21 @@ document.addEventListener("DOMContentLoaded", function () {
     // Submit new password
     resetForm.addEventListener("submit", async function (e) {
         e.preventDefault();
-
+        const submitBtn = resetForm.querySelector("button[type='submit']");
+        showLoader(submitBtn);
         const email = emailInput.value.trim();
         const password = document.getElementById("newPassword").value.trim();
         const confirmPassword = document.getElementById("confirmPassword").value.trim();
 
         if (!password || !confirmPassword) {
             showToast("Please fill both password fields.", "info");
+            hideLoader(submitBtn);
             return;
         }
 
         if (password !== confirmPassword) {
             showToast("Passwords do not match!", "info");
+            hideLoader(submitBtn);
             return;
         }
 
@@ -215,5 +234,6 @@ document.addEventListener("DOMContentLoaded", function () {
         } catch (err) {
             showToast("Something went wrong. Please try again." + err, "error");
         }
+        hideLoader(submitBtn);
     });
 });

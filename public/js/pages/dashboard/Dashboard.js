@@ -784,7 +784,7 @@ $(document).ready(function () {
                                     <li><a class="dropdown-item" href="/documents/edit/${doc._id}"><i class="ti ti-pencil-minus"></i> Edit</a></li>
                                     <li><a class="dropdown-item share-btn" href="#" data-doc-id="${doc._id}" data-file-id="${firstFile?._id || ''}" data-bs-toggle="modal" data-bs-target="#sharedoc-modal"><i class="ti ti-share"></i> Share</a></li>
                                     <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-id="${doc._id}" data-bs-target="#versionhistory-modal"><i class="ti ti-history"></i> Version History</a></li>
-                                    <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-file-id="${doc.files?._id || ''}" data-bs-target="#downloaddoc-modal"><i class="ti ti-download"></i> Download</a></li>
+                                    <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-file-id="${doc._id || ''}" data-bs-target="#downloaddoc-modal"><i class="ti ti-download"></i> Download</a></li>
                                     <li><a class="dropdown-item btn-delete" href="#" data-id="${doc._id}" data-bs-toggle="modal" data-bs-target="#trashdoc-modal"><i class="ti ti-trash"></i> Move to Trash</a></li>
                                     <li><a class="dropdown-item archive-document" href="#" data-id="${doc._id}" data-bs-toggle="modal" data-bs-target="#archivedoc-modal"><i class="ti ti-archive"></i> Move to Archive</a></li>
                                 </ul>

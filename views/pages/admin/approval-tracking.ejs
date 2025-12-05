@@ -109,13 +109,16 @@
 					const docLinkEl = document.getElementById('doc-link');
 					const docIconEl = document.getElementById('doc-icon');
 
-					if (doc.files?.length > 0) {
-						const file = doc.files[0];
+					if (doc.files) {
+						const file = doc.files;
 						docNameEl.innerText = file.originalName || "-";
-						docSizeEl.innerText = file.fileSize ? `${(file.fileSize / 1024).toFixed(2)} KB` : "-";
-						docLinkEl.href = file._id ? `/folders/view/${file._id}` : "#";
+						docSizeEl.innerText = file.fileSize || "-";
 
-						const ext = file.file.split('.').pop().toLowerCase();
+						const versionLabel = doc.currentVersionLabel || file.version || "1.0";
+						docLinkEl.href = `/documents/view?documentId=${documentId}&version=${versionLabel}`;
+						docLinkEl.target = "_blank";
+
+						const ext = file.originalName.split('.').pop().toLowerCase();
 						docIconEl.src = fileIcons[ext] || fileIcons.default;
 					} else {
 						docNameEl.innerText = "-";
@@ -123,7 +126,6 @@
 						docLinkEl.href = "#";
 						docIconEl.src = "/img/icons/fn1.png";
 					}
-
 					document.getElementById('doc-submitted').innerText = `Submitted on: ${new Date(doc.createdAt).toDateString()}`;
 
 					const tbody = document.getElementById('approval-table');

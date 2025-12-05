@@ -93,118 +93,92 @@ export const getLoginPage = (req, res) => {
 };
 
 
-
 export const login = async (req, res) => {
     try {
-        const { email, password } = req.body;
+        const { email, password, deviceId } = req.body;
+        if (!deviceId) return failResponse(res, "Device ID is required", 400);
 
-        // Find user
         const user = await User.findOne({ email })
-            .select(
-                "+password name email isActive preferences profile_type phone_number passwordVerification profile_image address userDetails status"
-            )
-            .populate([
-                { path: "userDetails.designation", select: "name" },
-                { path: "userDetails.department", select: "name" }
-            ]);
+            .select("+password +otp +otpExpiresAt status name email isActive preferences profile_type userDetails profile_image passwordVerification");
+
         if (!user) return failResponse(res, "User not found", 401);
 
-        //Password change verification check
-        if (user.passwordVerification === "pending") {
-            return failResponse(
-                res,
-                "Your password change is pending verification. Please check your email.",
-                403
-            );
-        }
-
-        // Verify password
         const isPasswordValid = await bcrypt.compare(password, user.password);
         if (!isPasswordValid) return failResponse(res, "Password incorrect", 401);
 
+        if (user.status !== "Active") {
+            return failResponse(res, "Your account is inactive or blocked.", 403);
+        }
+
         const now = new Date();
 
-        // Check for existing token
-        let userToken = await UserToken.findOne({ user: user._id });
+        // ===========================
+        // CHECK EXISTING TOKEN
+        // ===========================
+        let existingToken = await UserToken.findOne({ user: user._id });
 
-        if (userToken && userToken.expiresAt > now) {
-            try {
-                const decoded = jwt.verify(userToken.token, API_CONFIG.JWT_SECRET);
+        if (existingToken) {
+            if (existingToken.deviceId !== deviceId) {
+                await UserToken.deleteOne({ _id: existingToken._id });
+            }
+            else if (existingToken.expiresAt > now) {
 
-                if (decoded.email !== user.email) {
-                    return failResponse(res, "Token invalid for this user", 401);
+                try {
+                    const decoded = jwt.verify(existingToken.token, API_CONFIG.JWT_SECRET);
+
+                    req.session.user = {
+                        _id: user._id,
+                        email: user.email,
+                        profile_type: user.profile_type,
+                        name: user.name,
+                    };
+
+                    user.lastLogin = new Date();
+                    await user.save();
+
+                    return successResponse(res, {
+                        message: "Login successful",
+                        requireOTP: false,
+                        token: existingToken.token,
+                        user
+                    });
+
+                } catch (err) {
+                    // token expired → delete and send OTP
+                    await UserToken.deleteOne({ _id: existingToken._id });
                 }
-                if (user.status === "Inactive") {
-                    return failResponse(res, "Your account is inactive. Please contact admin.", 403);
-                }
-
-                if (user.status === "Blocked") {
-                    return failResponse(res, "Your account has been blocked. Contact support.", 403);
-                }
-
-                if (user.status !== "Active") {
-                    return failResponse(res, "User status invalid", 403);
-                }
-                req.session.user = {
-                    _id: user._id,
-                    designation: user.userDetails?.designation || null,
-                    department: user.userDetails?.department || null,
-                    email: user.email,
-                    profile_type: user.profile_type,
-                    name: user.name,
-                };
-                user.lastLogin = new Date();
-                await user.save();
-
-                //Return login success WITHOUT OTP
-                return successResponse(res, {
-                    message: "Login successful",
-                    requireOTP: false,
-                    user
-                });
-            } catch (err) {
-                logger.error("Token verification failed:", err.message);
-                // fall back to OTP flow
+            } else {
+                // Token expired
+                await UserToken.deleteOne({ _id: existingToken._id });
             }
         }
 
+        // ===========================
+        // GENERATE NEW OTP
+        // ===========================
 
-        // No valid token -> generate OTP
-        const otp = Math.floor(1000 + Math.random() * 9000).toString(); // 4-digit OTP
-
-        // Generate OTP and save
+        const otp = Math.floor(1000 + Math.random() * 9000).toString();
         user.otp = otp;
-        user.otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+        user.otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
         await user.save();
 
-        // Prepare data for the email template
-        const data = {
-            userName: user.name,
-            otp,
-            expiryMinutes: 10,
-            companyName: res.locals.companyName || "Our Company",
-            logoUrl: res.locals.logo || "",
-            bannerUrl: res.locals.mailImg || "",
-            BASE_URL: API_CONFIG.baseUrl
-        };
-
-        // Generate email HTML using your central template function
-        const html = generateEmailTemplate('otp', data);
-
-        // Send OTP email
         await sendEmail({
-            to: email,
+            to: user.email,
             subject: "Your Login OTP",
-            html,
-            fromName: res.locals?.supportTeamName || "DMS Support Team",
+            html: generateEmailTemplate("otp", {
+                userName: user.name,
+                otp,
+                expiryMinutes: 10,
+            })
         });
 
         return successResponse(res, {
             message: "OTP sent to your registered email",
+            requireOTP: true
         });
 
     } catch (err) {
-        console.error("Login error:", err);
+        logger.error("Login error:", err);
         return errorResponse(res, "Internal server error");
     }
 };
@@ -212,24 +186,26 @@ export const login = async (req, res) => {
 
 export const verifyTokenOtp = async (req, res) => {
     try {
-        const { email, otp } = req.body;
-        const user = await User.findOne({ email }).select("+otp +otpExpiresAt");;
+        const { email, otp, deviceId } = req.body;
+        if (!deviceId) return failResponse(res, "Device ID is required", 400);
+
+        const user = await User.findOne({ email }).select("+otp +otpExpiresAt +password +status profile_type userDetails");
         if (!user) return failResponse(res, "User not found", 404);
-        // Check OTP
-        if (!user.otp || user.otpExpiresAt < new Date()) {
+
+        if (!user.otp || user.otpExpiresAt < new Date())
             return failResponse(res, "OTP expired, please login again", 400);
-        }
+
         if (user.otp !== otp) return failResponse(res, "Invalid OTP", 400);
 
-        // OTP valid -> generate token
-        const tokenValue = user.generateAuthToken();
-        const tokenExpiry = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000); // 15 days
+        // OTP valid -> generate JWT
+        const tokenValue = jwt.sign({ id: user._id, email: user.email }, API_CONFIG.JWT_SECRET, { expiresIn: "15d" });
+        const tokenExpiry = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000);
 
-        // Save token in DB
+        // Save or update UserToken for this device
         await UserToken.findOneAndUpdate(
-            { user: user._id },
-            { token: tokenValue, expiresAt: tokenExpiry },
-            { upsert: true }
+            { user: user._id, deviceId },
+            { token: tokenValue, deviceId, expiresAt: tokenExpiry },
+            { upsert: true, new: true }
         );
 
         // Clear OTP
@@ -240,23 +216,20 @@ export const verifyTokenOtp = async (req, res) => {
         // Set session
         req.session.user = {
             _id: user._id,
-            designation_id: user.userDetails?.designation,
-            department: user.userDetails?.department,
             email: user.email,
-            profile_type: user.profile_type,
             name: user.name,
+            profile_type: user.profile_type,
+            designation: user.userDetails?.designation || null,
+            department: user.userDetails?.department || null,
         };
 
-        return successResponse(res, { token: tokenValue, user: user.toJSON() }, "OTP verified, login successful");
+        return successResponse(res, { token: tokenValue, user }, "OTP verified, login successful");
 
     } catch (err) {
-        console.error("OTP verification error:", err);
+        logger.error("OTP verification error:", err);
         return errorResponse(res, "Internal server error");
     }
-
 };
-
-
 
 // ---------------------------
 // Get Logged-in User
@@ -393,7 +366,8 @@ export const resetPassword = async (req, res) => {
 
         const user = await User.findOne({ email });
         if (!user) return failResponse(res, "User not found", 404);
-
+        // --- Delete existing tokens ---
+        await UserToken.deleteMany({ user: user._id });
         user.raw_password = password;
         await user.save();
 
@@ -439,7 +413,10 @@ export const sendResetLink = async (req, res) => {
         };
 
         user.passwordVerification = "pending";
+
         await user.save();
+        // --- Delete existing UserTokens for  user ---
+        await UserToken.deleteMany({ user: user._id });
 
         // --- Destroy Session ---
         await new Promise((resolve) => {
@@ -520,7 +497,8 @@ export const verifyResetLink = async (req, res) => {
         if (!user) {
             return res.redirect("/forgot-password?error=User+not+found");
         }
-
+        // --- Delete existing UserTokens after password update ---
+        await UserToken.deleteMany({ user: user._id });
         // Update password
         user.raw_password = otpEntry.newPassword;
         user.passwordVerification = "verified";

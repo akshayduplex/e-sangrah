@@ -40,11 +40,13 @@
                     </p>
                     <div class="mb-4">
                         <label for="emailInput" class="form-label">Email</label>
-                        <input type="email" class="form-control" id="emailInput" placeholder="name@example.com">
+                        <input type="email" class="form-control" id="emailInput" placeholder="name@example.com"
+                            autocomplete="username">
                     </div>
                     <div class="mb-4 password-box">
                         <label for="passwordInput" class="form-label">Enter your Password</label>
-                        <input type="password" class="form-control" id="passwordInput" placeholder="••••••••••••••••">
+                        <input type="password" class="form-control" id="passwordInput" placeholder="••••••••••••••••"
+                            autocomplete="new-password">
                         <span class="password-toggle" data-target="passwordInput">
                             <i class="fa fa-eye"></i>
                         </span>
@@ -100,7 +102,7 @@
             });
         });</script>
     <script defer src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script defer src="/js/pages/login.js"></script>
+    <script defer src="/js/pages/auth/login.js"></script>
 </body>
 
 </html>

@@ -208,20 +208,32 @@ export const showArchivedDocumentPage = async (req, res) => {
 
 export const viewDocumentFiles = async (req, res) => {
     try {
-        const { token } = req.query;
-        if (!token) throw new Error("Invalid link");
+        const { token, documentId: queryDocumentId, version: queryVersion } = req.query;
 
-        let decrypted;
-        try {
-            decrypted = JSON.parse(decrypt(token));
-        } catch {
-            return renderExpiredPage(res, "Invalid or corrupted link.", req.user);
+        let documentId, version;
+
+        if (token) {
+            let decrypted;
+            try {
+                decrypted = JSON.parse(decrypt(token));
+            } catch {
+                return renderExpiredPage(res, "Invalid or corrupted link.", req.user);
+            }
+            documentId = decrypted.id;
+            version = decrypted.version;
+        } else {
+            if (!queryDocumentId) {
+                return renderExpiredPage(res, "Document ID is missing.", req.user);
+            }
+            documentId = queryDocumentId;
+            version = queryVersion;
         }
 
-        const { id: documentId, fileId, version } = decrypted;
         const now = new Date();
+        const document = await Document.findById(documentId)
+            .populate('currentVersion')
+            .lean();
 
-        const document = await Document.findById(documentId).lean();
         if (!document) {
             return renderExpiredPage(res, "Document not found.", req.user, version, documentId);
         }
@@ -249,15 +261,22 @@ export const viewDocumentFiles = async (req, res) => {
         let versionData = null;
 
         if (!docExpired) {
-            versionData = await DocumentVersion.findOne({
-                documentId,
-                versionLabel: version
-            })
-                .populate("files")
-                .lean();
+            if (version) {
+
+                versionData = await DocumentVersion.findOne({
+                    documentId,
+                    versionLabel: version
+                }).populate("files").lean();
+            } else {
+
+                versionData = document.currentVersion;
+                if (versionData) {
+                    versionData = await DocumentVersion.findById(versionData._id).populate("files").lean();
+                    version = document.currentVersionLabel;
+                }
+            }
         }
 
-        // Attach S3 file URLs
         if (versionData?.files) {
             for (let file of versionData.files) {
                 file.fileUrl = file.s3Url || (file.file ? await getObjectUrl(file.file, 3600) : null);
@@ -295,7 +314,7 @@ const renderExpiredPage = (res, message, user, version = null, documentId = null
         pageDescription: "This document link is invalid, expired, or inaccessible.",
         metaKeywords: "document expired, restricted document, invalid document link",
         canonicalUrl: "",
-
+        documentTitle: "Document",
         expiredMessage: message,
         file: null,
         user,
@@ -635,7 +654,6 @@ export const getDocuments = async (req, res) => {
             filter.project = projectIds.length === 1 ? projectIds[0] : { $in: projectIds };
         }
 
-        /** -------------------- DATE -------------------- **/
         /** -------------------- DATE RANGE FILTER -------------------- **/
         if (dateRange) {
             const rangeMatch = dateRange.match(/(\d{2}-\d{2}-\d{4})\s+to\s+(\d{2}-\d{2}-\d{4})/);
@@ -658,7 +676,7 @@ export const getDocuments = async (req, res) => {
                 }
             }
         }
-        // Single date fallback (optional)
+
         else if (date) {
             const [day, month, year] = date.split("-").map(Number);
             const selectedDate = new Date(year, month - 1, day);
@@ -1355,9 +1373,6 @@ export const restoreDocument = async (req, res) => {
 /**
  * Compare old & new document values.
  */
-/**
- * Compute old/new diffs for changed fields
- */
 const computeDiff = (oldDoc, newDoc, changedFields) => {
     const diff = {};
 
@@ -1859,7 +1874,6 @@ export const createDocument = async (req, res) => {
 };
 
 
-
 const createVersionSnapshot = async (document, changesMade, userId, reason) => {
     try {
         const snapshot = {
@@ -1879,9 +1893,8 @@ const createVersionSnapshot = async (document, changesMade, userId, reason) => {
             documentDonor: document.documentDonor,
             documentVendor: document.documentVendor,
             updatedAt: document.updatedAt,
-            files: document.files,
+            files: document.files, // Use actual current files
         };
-        // const newFiles = document.__newFiles || [];
 
         const versionNumber = document.currentVersionNumber;
         const versionLabel = document.currentVersionLabel;
@@ -1894,21 +1907,17 @@ const createVersionSnapshot = async (document, changesMade, userId, reason) => {
             changeReason: reason,
             versionNumber,
             versionLabel,
-            files: document.files,
+            files: document.files, // Current active files only
             timestamp: new Date(),
         });
+
         return versionDoc;
     } catch (error) {
-        console.error(' Error creating version snapshot:', error);
+        console.error('Error creating version snapshot:', error);
         throw error;
     }
-}
+};
 
-
-/**
- * Update document with proper version handling, fixing double-save and 
- * ensuring version consistency on restore.
- */
 export const updateDocument = async (req, res) => {
     const session = await mongoose.startSession();
 
@@ -1964,13 +1973,9 @@ export const updateDocument = async (req, res) => {
                 }
 
                 if (fileIds.length > 0) {
-                    // processFileUpdates handles updating document.files and adding 'files' to changedFields
-                    // NOTE: processFileUpdates must be available in scope
                     const newFiles = await processFileUpdates(document, fileIds, req.user, changedFields, session);
 
                     if (newFiles?.length) {
-                        document.__newFiles = newFiles; // store ONLY new files for snapshot
-                        // Ensure 'files' is in versionedChanges if files were added/replaced
                         if (!versionedChanges.includes("files")) {
                             versionedChanges.push("files");
                         }
@@ -2290,13 +2295,6 @@ export const updateDocument = async (req, res) => {
 };
 
 
-/**
- * Process file updates and versioning
- */
-/**
- * Process file updates and versioning
- * Ensures document and folder share the same File IDs
- */
 const processFileUpdates = async (document, fileIds, user, changedFields, session = null) => {
     try {
 
@@ -2362,11 +2360,10 @@ const processFileUpdates = async (document, fileIds, user, changedFields, sessio
         // -----------------------
         // Update Document Files
         // -----------------------
-        const existingFileIds = document.files.map(id => id.toString());
-        const uniqueNewFileIds = newFileIds.filter(id => !existingFileIds.includes(id.toString()));
-        if (uniqueNewFileIds.length > 0) {
-            document.files.push(...uniqueNewFileIds);
-            if (!changedFields.includes("files")) changedFields.push("files");
+        // CLEAR old files and set only new ones
+        document.files = newFileIds;  // FULL REPLACEMENT
+        if (!changedFields.includes("files")) {
+            changedFields.push("files");
         }
 
         // -----------------------
@@ -2460,7 +2457,7 @@ export const createDocumentVersion = async (document, user, reason, changedField
             snapshot[field] = JSON.parse(JSON.stringify(document[field]));
         }
     });
-    const newFiles = document.__newFiles || [];
+    // const newFiles = document.__newFiles || [];
     await DocumentVersion.create({
         documentId: document._id,
         versionNumber: document.currentVersionNumber,
@@ -2468,7 +2465,7 @@ export const createDocumentVersion = async (document, user, reason, changedField
         createdBy: user?._id || null,
         changeReason: reason,
         snapshot,
-        files: newFiles
+        files: document.files
     });
 };
 
@@ -4708,7 +4705,7 @@ export const submitApprovalByToken = async (req, res) => {
 /**
  * Send approval mail for a given document approver.
  */
-// In sendApprovalMail controller
+
 export const sendApprovalMail = async (req, res) => {
     try {
         const { documentId, approverId } = req.params;
@@ -4732,7 +4729,7 @@ export const sendApprovalMail = async (req, res) => {
         const token = jwt.sign(
             { documentId: document._id, approverId: approverId },
             API_CONFIG.JWT_SECRET,
-            { expiresIn: '7d' }
+            { expiresIn: '15d' }
         );
 
         const approvalLink = `${API_CONFIG.baseUrl}/approve/document?token=${token}`;
@@ -4867,34 +4864,18 @@ export const getApprovals = async (req, res) => {
         const { documentId } = req.params;
 
         const document = await Document.findById(documentId)
-            .select('owner files description createdAt updatedAt documentApprovalAuthority slug isDeleted status isArchived compliance files comment versioning project')
+            .select('owner files description createdAt updatedAt documentApprovalAuthority currentVersionLabel slug isDeleted status isArchived compliance files comment versioning project')
             .populate("owner files")
-            // .populate({
-            //     path: "versionHistory.changedBy",
-            //     model: "User"
-            // })
             .populate({
                 path: "documentApprovalAuthority.userId",
                 model: "User",
                 select: "name email phone_number profile_type userDetails",
                 populate: [
-                    {
-                        path: "userDetails.designation",
-                        model: "Designation",
-                        select: "name"
-                    },
-                    {
-                        path: "userDetails.department",
-                        model: "Department",
-                        select: "name"
-                    },
+                    { path: "userDetails.designation", model: "Designation", select: "name" },
+                    { path: "userDetails.department", model: "Department", select: "name" },
                 ]
             })
-            .populate({
-                path: "documentApprovalAuthority.designation",
-                model: "Designation",
-                select: "name"
-            })
+            .populate({ path: "documentApprovalAuthority.designation", model: "Designation", select: "name" })
             .lean();
 
         if (!document) {
@@ -4907,12 +4888,26 @@ export const getApprovals = async (req, res) => {
             return failResponse(res, "No approval authorities found for this document", 404);
         }
 
-        approvals.sort((a, b) => a.priority - b.priority);
+        approvals.sort((a, b) => (a.priority || 0) - (b.priority || 0));
+
+        const filesArray = document.files || [];
+        const totalBytes = filesArray.reduce((sum, file) => sum + (Number(file.fileSize) || 0), 0);
+        const formatted = formatTotalFileSize(totalBytes);
+        const firstFile = filesArray[0] || {};
+        const firstFileOriginalName = firstFile.originalName || null;
+        const firstFileId = firstFile._id || null;
+
+        document.files = {
+            _id: firstFileId,
+            originalName: firstFileOriginalName,
+            version: document.currentVersionLabel || null,
+            fileSize: formatted
+        };
 
         return successResponse(res, { document, approvals }, "Approvals fetched successfully from document");
     } catch (error) {
         console.error("Error fetching approvals from document:", error);
-        return failResponse(res, "Server Error", 500, error.message);
+        return failResponse(res, "Server Error", 500);
     }
 };
 

@@ -911,7 +911,7 @@ $(document).ready(function () {
         if (paths.length === 0) { showToast('Please draw a signature first.', 'info'); return; }
         const dataURL = canvas.toDataURL('image/png');
         signaturePreview.innerHTML = `<img src="${dataURL}" style="max-height:100%; max-width:100%; object-fit:contain;">`;
-        signatureData.value = dataURL; // save base64
+        signatureData.value = dataURL;
         modal.hide();
     });
 
@@ -943,14 +943,12 @@ $(document).ready(function () {
         );
 
         try {
-            // Add uploaded file IDs
             const fileIdsInput = document.createElement('input');
             fileIdsInput.type = 'hidden';
             fileIdsInput.name = 'fileIds';
             fileIdsInput.value = JSON.stringify(uploadedFileIds || []);
             this.appendChild(fileIdsInput);
 
-            // Remove required and clear old input value
             const rawFileInput = document.getElementById('fileInput');
             if (rawFileInput) {
                 rawFileInput.removeAttribute('required');
@@ -1017,7 +1015,7 @@ $(document).ready(function () {
                     .addEventListener(
                         'hidden.bs.modal',
                         () => {
-                            window.location.href = '/documents/add';
+                            window.location.href = '/documents/list';
                         },
                         { once: true }
                     );

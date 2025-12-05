@@ -174,7 +174,7 @@ router.get("/documents/add", authenticate, DocumentController.showAddDocumentPag
 
 // Edit Document page
 router.get("/documents/edit/:id", authenticate, DocumentController.showEditDocumentPage);
-router.get('/documents/view', DocumentController.viewDocumentFiles);
+router.get('/documents/view', optionalAuth, DocumentController.viewDocumentFiles);
 router.get('/documents/invited/:token', authenticate, DocumentController.viewInvitedDocumentFiles);
 router.get('/documents/approve-access/:token', authenticate, DocumentController.viewGrantAccessPage);
 
@@ -330,7 +330,7 @@ router.get("/folders/recyclebin", authenticate, FolderController.showRecycleBinP
 // Main Folders page
 router.get("/folders", authenticate, FolderController.showMainFoldersPage);
 router.get('/folders/view/:fileId', optionalAuth, FolderController.viewFile)
-router.get("/folders/:accesslevel/:folderId", authenticate, FolderController.showviewFoldersPage);
+router.get("/folders/viewer/:folderId", authenticate, FolderController.showviewFoldersPage);
 
 /* =========================================
    File ROUTE
