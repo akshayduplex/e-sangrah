@@ -178,7 +178,6 @@
 
     <%- include('../../partials/footer') %>
 
-
         <!-- DataTables CSS -->
         <link href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" rel="stylesheet">
 
@@ -190,8 +189,8 @@
             document.addEventListener("DOMContentLoaded", function () {
                 const baseUrl = window.location.origin;
                 let currentDocumentId = null;
-                let currentRow = null; // To refresh only this row
-                let currentMode = 'approve'; // 'approve', 'edit', 'view'
+                let currentRow = null;
+                let currentMode = 'approve';
                 const documentId = "<%= documentId %>";
                 // File Icons
                 const fileIcons = {
@@ -276,7 +275,7 @@
                 // Populate Modal
                 function populateModal(data, mode = 'approve', remark = '') {
                     const doc = data.data.document;
-                    const file = doc.files.find(f => f.isPrimary) || doc.files[0];
+                    const file = doc.files;
 
                     document.getElementById('modalLoading').style.display = 'none';
                     document.getElementById('modalContent').style.display = 'block';
@@ -285,9 +284,9 @@
                     document.getElementById('modalOwnerName').textContent = doc.owner?.name || 'User';
                     const version = doc.versioning?.currentVersion?.$numberDecimal || '1.0';
                     document.getElementById('modalFileName').innerHTML = `${file.originalName} <span class="text-success">v${version}</span>`;
-                    document.getElementById('modalFileSize').textContent = formatFileSize(file.fileSize);
+                    document.getElementById('modalFileSize').textContent = file.fileSize;
                     document.getElementById('modalFileIcon').src = getFileIcon(file.originalName);
-                    document.getElementById('modalViewFile').href = `/folders/view/${file._id}`;
+                    document.getElementById('modalViewFile').href = `/documents/view?documentId=${documentId}&version=${version}`;
                     document.getElementById('modalRequestDate').textContent = formatDate(doc.createdAt);
                     document.getElementById('modalDescription').value = stripHtml(doc.description);
                     document.getElementById('modalCompliance').textContent = doc.compliance?.isCompliance ? 'Yes' : 'No';
@@ -359,7 +358,6 @@
                     commentBox.value = remark;
 
                     // Reset toggle state
-                    // Reset toggle state (for 'approve' mode)
                     if (mode === 'approve') {
                         const approveBtn = document.getElementById('approveBtn');
                         const declineBtn = document.getElementById('declineBtn');
@@ -582,7 +580,7 @@
                             orderable: false,
                             render: (data, type, row) => {
                                 const version = row.versioning?.currentVersion?.$numberDecimal || '1.0';
-                                const fileId = row.files?.[0]?._id || '';
+                                const fileId = row.files?._id || '';
 
                                 return `
         <div class="btn-group" role="group">
@@ -613,12 +611,13 @@
                         {
                             data: null,
                             render: (data, type, row) => {
-                                const file = row.files?.find(f => f.isPrimary) || row.files?.[0];
+                                const file = row.files;
                                 if (!file) return '<div class="flxtblleft"><div class="flxtbltxt"><p>-</p></div></div>';
                                 const fileName = row.metadata?.fileName || file?.originalName || 'Unknown';
-                                const fileSize = formatFileSize(file.fileSize);
+                                const fileIcon = file?.originalName || null;
+                                const fileSize = file.fileSize;
                                 const version = row.versioning?.currentVersion?.$numberDecimal || '1.0';
-                                const icon = getFileIcon(fileName);
+                                const icon = getFileIcon(fileIcon);
                                 return `<div class="flxtblleft">
                             <span class="avatar rounded bg-light mb-2"><img src="${icon}" alt="icon"></span>
                             <div class="flxtbltxt">
@@ -664,11 +663,13 @@
                                     label = 'View';
                                     btnCls = 'btn btn-light';
                                 } else {
-                                    const cfg = {
-                                        'Pending': { label: 'Approve', class: 'adminapprv_btn', mode: 'approve' },
-                                        'Approved': { label: 'Edit', class: 'adminapprv_btn bg-primary', mode: 'edit' },
-                                        'Rejected': { label: 'View', class: 'btn btn-light', mode: 'view' }
-                                    }[approverStatus] || cfg['Pending'];
+                                    const config = {
+                                        Pending: { label: 'Approve', class: 'adminapprv_btn', mode: 'approve' },
+                                        Approved: { label: 'Edit', class: 'adminapprv_btn bg-primary', mode: 'edit' },
+                                        Rejected: { label: 'View', class: 'btn btn-light', mode: 'view' }
+                                    };
+
+                                    const cfg = config[approverStatus] || config['Pending'];
 
                                     label = cfg.label;
                                     btnCls = cfg.class;

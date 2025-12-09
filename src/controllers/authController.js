@@ -99,8 +99,9 @@ export const login = async (req, res) => {
         if (!deviceId) return failResponse(res, "Device ID is required", 400);
 
         const user = await User.findOne({ email })
-            .select("+password +otp +otpExpiresAt status name email isActive preferences profile_type userDetails profile_image passwordVerification");
-
+            .select("+password +otp +otpExpiresAt status name email isActive preferences profile_type userDetails profile_image passwordVerification")
+            .populate("userDetails.designation", "name")
+            .populate("userDetails.department", "name");
         if (!user) return failResponse(res, "User not found", 401);
 
         const isPasswordValid = await bcrypt.compare(password, user.password);
@@ -130,6 +131,8 @@ export const login = async (req, res) => {
                         _id: user._id,
                         email: user.email,
                         profile_type: user.profile_type,
+                        designation: user.userDetails?.designation?.name,
+                        department: user.userDetails?.department?.name,
                         name: user.name,
                     };
 
@@ -169,6 +172,9 @@ export const login = async (req, res) => {
                 userName: user.name,
                 otp,
                 expiryMinutes: 10,
+                companyName: res.locals.companyName || "Our Company",
+                logoUrl: res.locals.logo || "",
+                bannerUrl: res.locals.mailImg || "",
             })
         });
 
@@ -189,7 +195,10 @@ export const verifyTokenOtp = async (req, res) => {
         const { email, otp, deviceId } = req.body;
         if (!deviceId) return failResponse(res, "Device ID is required", 400);
 
-        const user = await User.findOne({ email }).select("+otp +otpExpiresAt +password +status profile_type userDetails");
+        const user = await User.findOne({ email })
+            .select("+otp +otpExpiresAt +password +status profile_type userDetails")
+            .populate("userDetails.designation", "name")
+            .populate("userDetails.department", "name");
         if (!user) return failResponse(res, "User not found", 404);
 
         if (!user.otp || user.otpExpiresAt < new Date())
@@ -219,8 +228,8 @@ export const verifyTokenOtp = async (req, res) => {
             email: user.email,
             name: user.name,
             profile_type: user.profile_type,
-            designation: user.userDetails?.designation || null,
-            department: user.userDetails?.department || null,
+            designation: user.userDetails?.designation?.name || null,
+            department: user.userDetails?.department?.name || null,
         };
 
         return successResponse(res, { token: tokenValue, user }, "OTP verified, login successful");

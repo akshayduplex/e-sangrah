@@ -270,7 +270,7 @@
                         if (!selectedLogId) return;
 
                         $.ajax({
-                            url: 'http://localhost:5000/api/permission-logs/requestStatus',
+                            url: '/api/permission-logs/requestStatus',
                             type: 'PATCH',
                             contentType: 'application/json',
                             data: JSON.stringify({

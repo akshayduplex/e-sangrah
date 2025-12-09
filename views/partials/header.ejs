@@ -231,7 +231,7 @@
                                             <%= user.name || "User" %>
                                         </h5>
                                         <p class="subtxt">
-                                            <%= designation?.name || user.profile_type || "" %>
+                                            <%= designation|| user.profile_type || "" %>
                                         </p>
                                     </span>
                                 </a>
@@ -250,7 +250,7 @@
                                                         <%= user.name || "User" %>
                                                     </h5>
                                                     <p class="subtxt">
-                                                        <%= designation?.name || user?.profile_type|| "Guest" %>
+                                                        <%= designation || user?.profile_type|| "Guest" %>
                                                     </p>
                                                 </span>
                                             </div>

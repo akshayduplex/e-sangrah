@@ -9,6 +9,7 @@ import SharedWith from "../models/SharedWith.js";
 import { sendEmail } from "../services/emailService.js";
 import { API_CONFIG } from "../config/ApiEndpoints.js";
 import { generateEmailTemplate } from "../helper/emailTemplate.js";
+import { formatTotalFileSize } from "../helper/CommonHelper.js";
 
 //Page controllers
 
@@ -199,7 +200,8 @@ export const getMyApprovals = async (req, res) => {
         const userId = new mongoose.Types.ObjectId(user._id);
         const profileType = user.profile_type;
         const userDepartment = user.department ? new mongoose.Types.ObjectId(user.department) : null;
-        const documentId = req.query.documentId
+        const documentId = req.query.documentId;
+
         const {
             status,
             department,
@@ -216,9 +218,6 @@ export const getMyApprovals = async (req, res) => {
         const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
         const skip = (pageNum - 1) * limitNum;
 
-        // ---------------------------------------------
-        // STEP 1: Build document filter
-        // ---------------------------------------------
         const filter = {
             isDeleted: { $ne: true },
             isArchived: { $ne: true },
@@ -229,7 +228,7 @@ export const getMyApprovals = async (req, res) => {
                 }
             }
         };
-        // Filter by documentId if provided
+
         if (documentId && mongoose.Types.ObjectId.isValid(documentId)) {
             filter._id = new mongoose.Types.ObjectId(documentId);
         }
@@ -243,41 +242,32 @@ export const getMyApprovals = async (req, res) => {
             filter.$or = accessConditions;
         }
 
-        if (status && status !== "All") {
-            filter.status = status;
-        }
+        if (status && status !== "All") filter.status = status;
 
         if (department && mongoose.Types.ObjectId.isValid(department)) {
             filter.department = new mongoose.Types.ObjectId(department);
         }
 
         if (createdAtStart && createdAtEnd) {
-            // Expect ISO strings (sent by frontend flatpickr)
             const start = new Date(createdAtStart);
             const end = new Date(createdAtEnd);
 
-            if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
-                // normalize: start at 00:00:00 of start date, end at 23:59:59.999 of end date
-                const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate(), 0, 0, 0, 0);
-                const endDay = new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59, 999);
-                filter.createdAt = { $gte: startDay, $lte: endDay };
+            if (!isNaN(start) && !isNaN(end)) {
+                filter.createdAt = {
+                    $gte: new Date(start.getFullYear(), start.getMonth(), start.getDate(), 0, 0, 0, 0),
+                    $lte: new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59, 999)
+                };
             }
         } else if (createdAt) {
-            // Backwards compatibility: createdAt in "DD-MM-YYYY"
-            const parts = createdAt.split("-").map(Number);
-            if (parts.length === 3) {
-                const [day, month, year] = parts;
-                if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
-                    const start = new Date(year, month - 1, day, 0, 0, 0, 0);
-                    const end = new Date(year, month - 1, day, 23, 59, 59, 999);
-                    filter.createdAt = { $gte: start, $lte: end };
-                }
+            const [day, month, year] = createdAt.split("-").map(Number);
+            if (!isNaN(day)) {
+                filter.createdAt = {
+                    $gte: new Date(year, month - 1, day, 0, 0, 0),
+                    $lte: new Date(year, month - 1, day, 23, 59, 59, 999)
+                };
             }
         }
 
-        // ---------------------------------------------
-        // STEP 2: Sorting setup
-        // ---------------------------------------------
         const allowedFields = [
             "metadata.fileName",
             "createdAt",
@@ -288,11 +278,7 @@ export const getMyApprovals = async (req, res) => {
         ];
         const sortFieldValidated = allowedFields.includes(sortField) ? sortField : "createdAt";
         const sortOrderValidated = sortOrder === "asc" ? 1 : -1;
-        const sortObj = { [sortFieldValidated]: sortOrderValidated };
 
-        // ---------------------------------------------
-        // STEP 3: Query documents
-        // ---------------------------------------------
         const [documents, total] = await Promise.all([
             Document.find(filter)
                 .populate("department", "name")
@@ -302,23 +288,40 @@ export const getMyApprovals = async (req, res) => {
                     path: "documentApprovalAuthority.userId",
                     select: "name email profile_type"
                 })
-                .sort(sortObj)
+                .sort({ [sortFieldValidated]: sortOrderValidated })
                 .skip(skip)
                 .limit(limitNum)
                 .lean(),
             Document.countDocuments(filter)
         ]);
 
-        // ---------------------------------------------
-        // STEP 4: Filter only approvals for this user where isMailSent = true
-        // ---------------------------------------------
+        documents.forEach(doc => {
+            const filesArray = doc.files || [];
+            const totalBytes = filesArray.reduce((sum, file) => {
+                return sum + (Number(file.fileSize) || 0);
+            }, 0);
+
+            const formatted = formatTotalFileSize(totalBytes);
+            const firstFile = filesArray[0] || {};
+            const firstFileOriginalName = firstFile.originalName || null;
+            const firstFileId = firstFile._id || null;
+
+            doc.files = {
+                _id: firstFileId,
+                originalName: firstFileOriginalName,
+                version: doc.currentVersionLabel || null,
+                fileSize: formatted
+            };
+        });
+
         const filteredDocuments = documents.map(doc => ({
             ...doc,
-            documentApprovalAuthority: doc.documentApprovalAuthority?.filter(
-                auth =>
-                    auth.userId?._id?.toString() === userId.toString() &&
-                    auth.isMailSent === true
-            ) || []
+            documentApprovalAuthority:
+                doc.documentApprovalAuthority?.filter(
+                    auth =>
+                        auth.userId?._id?.toString() === userId.toString() &&
+                        auth.isMailSent === true
+                ) || []
         }));
 
         res.status(200).json({
@@ -336,6 +339,7 @@ export const getMyApprovals = async (req, res) => {
         res.status(500).json({ success: false, message: "Server Error" });
     }
 };
+
 
 export const getPermissionLogs = async (req, res) => {
     const ownerId = req.user._id;

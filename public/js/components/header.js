@@ -266,12 +266,13 @@ document.addEventListener("DOMContentLoaded", function () {
                     const profile = u.profile_type;
 
                     if (designation) {
-                        // User with designation
                         label += ` [${designation}]`;
                     } else {
-                        // Vendor / Donor (no designation)
                         label += ` [${profile}]`;
                     }
+
+                    // ADD EMAIL
+                    label += ` (${u.email})`;
 
                     return {
                         id: u.email,

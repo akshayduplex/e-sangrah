@@ -8,7 +8,6 @@ export const folderSharedTemplate = (data) => {
         access = '',
         expiresAt = '',
         folderLink = '#',
-        systemName = ApiEndpoints.API_CONFIG.COMPANY_NAME,
         companyName = '',
         logoUrl = '',
         bannerUrl = '',
@@ -75,7 +74,7 @@ export const folderSharedTemplate = (data) => {
     html += `<tr>`;
     html += `<td style="background:#f2f4f7; padding:20px 30px;">`;
     html += `<p style="font-size:14px; margin:0 0 8px 0;">Best regards,</p>`;
-    html += `<h4 style="font-size:16px; font-weight:600; margin:0;">${companyName} / ${systemName}</h4>`;
+    html += `<h4 style="font-size:16px; font-weight:600; margin:0;">${companyName}}</h4>`;
     html += `<p style="font-size:12px; color:#777; margin-top:10px;">© ${new Date().getFullYear()} ${companyName}. All rights reserved.</p>`;
     html += `</td>`;
     html += `</tr>`;

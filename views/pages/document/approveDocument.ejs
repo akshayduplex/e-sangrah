@@ -259,6 +259,18 @@
             </div>
         </div>
     </div>
+    <!-- Toast Container -->
+    <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 9999">
+        <div id="toastBox"></div>
+    </div>
+
+    <!-- Toast Template -->
+    <div id="toastTemplate" class="toast align-items-center text-bg-primary border-0" role="alert">
+        <div class="d-flex">
+            <div class="toast-body"></div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+        </div>
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
@@ -272,7 +284,21 @@
             document.getElementById('modalLoading').style.display = 'none';
             document.getElementById('modalContent').style.display = 'block';
         });
+        function showToast(message, type = "primary") {
+            const template = document.getElementById("toastTemplate").cloneNode(true);
+            template.id = "";
+            template.classList.add("show");
+            template.classList.remove("text-bg-primary");
+            template.classList.add(`text-bg-${type}`);
+            template.querySelector(".toast-body").textContent = message;
 
+            document.getElementById("toastBox").appendChild(template);
+
+            const bsToast = new bootstrap.Toast(template);
+            bsToast.show();
+
+            setTimeout(() => template.remove(), 5000);
+        }
         document.querySelectorAll('#approvalToggle button').forEach(btn => {
             btn.addEventListener('click', function () {
                 document.querySelectorAll('#approvalToggle button').forEach(b => b.classList.remove('active'));
@@ -286,7 +312,7 @@
 
         submitBtn.addEventListener('click', async () => {
             const activeBtn = document.querySelector('#approvalToggle .active');
-            if (!activeBtn) return alert("Please select an action");
+            if (!activeBtn) return showToast("Please select an action", "warning");
 
             const action = activeBtn.getAttribute('data-action');
             const comment = document.getElementById('modalComment').value.trim();
@@ -302,12 +328,12 @@
                 });
 
                 const data = await res.json();
-                alert(data.message || "Action submitted!");
+                showToast(data.message || "Action submitted!", data.success ? "success" : "danger");
                 if (data.success) {
                     document.body.innerHTML = `<div class="text-center py-5"><h2 class="text-success">Thank You!</h2><p>Your response has been recorded.</p></div>`;
                 }
             } catch (err) {
-                alert("Submission failed. Please try again.");
+                showToast("Submission failed. Please try again.", "danger");
             } finally {
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = submitBtn.textContent.trim();

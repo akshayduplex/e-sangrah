@@ -351,7 +351,6 @@ export const downloadFilesZip = async (req, res) => {
         const currentVersion = document.currentVersionNumber?.toString() || "1.0";
 
         const zipName = `${document.metadata.fileName}.zip`;
-        console.log("downklload filesname", zipName)
         res.setHeader("Content-Type", "application/zip");
         res.setHeader("Content-Disposition", `attachment; filename="${zipName}"`);
 

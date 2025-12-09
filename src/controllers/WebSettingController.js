@@ -6,7 +6,6 @@ export const updateWebSettings = async (req, res) => {
         if (!settings) settings = new WebSetting();
 
         const { companyName, metaTitle, metaDescription, supportTeamName, metaKeywords, companyEmail, supportEmail } = req.body;
-        console.log("Received Body:", req.body);
         // Validate required
         if (!companyEmail || !supportEmail || !supportTeamName) {
             return res.status(400).json({

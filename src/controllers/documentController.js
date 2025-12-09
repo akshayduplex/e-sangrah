@@ -3594,7 +3594,7 @@ export const inviteUser = async (req, res) => {
     try {
         const { documentId } = req.params;
         const { userEmail, accessLevel = "view", duration = "oneweek", customEnd } = req.body;
-        const inviterId = req.session.user?._id;
+        const inviterId = req.user?._id;
 
         if (!inviterId) return res.status(401).json({ success: false, message: "Unauthorized" });
         if (!userEmail) return res.status(400).json({ success: false, message: "User email is required" });
@@ -3603,14 +3603,27 @@ export const inviteUser = async (req, res) => {
         const doc = await Document.findById(documentId);
         if (!doc) return res.status(404).json({ success: false, message: "Document not found" });
 
-        // Only owner or editor can share
-        const isOwner = doc.owner.toString() === inviterId.toString();
-        const existingShare = await SharedWith.findOne({ document: documentId, user: inviterId, accessLevel: "edit" });
-        if (!isOwner && !existingShare) {
-            return res.status(403).json({ success: false, message: "No permission to share this document" });
+        const inviter = req.user?.profile_type;
+        console.log("user details", req.user?.profile_type)
+        const isSuperAdmin = inviter === "superadmin";
+
+        // Permission checks — superadmin bypass
+        if (!isSuperAdmin) {
+            const isOwner = doc.owner.toString() === inviterId.toString();
+            const existingShare = await SharedWith.findOne({
+                document: documentId,
+                user: inviterId,
+                accessLevel: "edit"
+            });
+
+            if (!isOwner && !existingShare) {
+                return res.status(403).json({
+                    success: false,
+                    message: "No permission to share this document"
+                });
+            }
         }
 
-        // Find or create user
         let user = await User.findOne({ email: userEmail.toLowerCase().trim() });
         if (!user) {
             user = new User({
@@ -3630,10 +3643,10 @@ export const inviteUser = async (req, res) => {
             case "oneday": expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); break;
             case "oneweek": expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); break;
             case "onemonth": expiresAt = new Date(now.setMonth(now.getMonth() + 1)); break;
-            case "lifetime": expiresAt = new Date(now); expiresAt.setFullYear(expiresAt.getFullYear() + 50); break;
+            case "lifetime": expiresAt = new Date(now.setFullYear(now.getFullYear() + 50)); break;
             case "custom": if (customEnd) expiresAt = new Date(customEnd); break;
         }
-        // Create or update share entry
+
         const share = await SharedWith.findOneAndUpdate(
             { document: documentId, user: user._id },
             { accessLevel, expiresAt, duration, inviteStatus: "pending", generalAccess: true, addedby: inviterId },
@@ -3641,6 +3654,7 @@ export const inviteUser = async (req, res) => {
         );
 
         await Document.findByIdAndUpdate(documentId, { $addToSet: { sharedWithUsers: user._id } });
+
         await activityLogger({
             actorId: inviterId,
             entityId: documentId,
@@ -3661,16 +3675,17 @@ export const inviteUser = async (req, res) => {
             logoUrl: res.locals.logo || "",
             bannerUrl: res.locals.mailImg || "",
             inviteLink
-        }
-        // Generate HTML using your central email generator
+        };
+
         const html = generateEmailTemplate('documentInvitation', data);
-        // Send the email
+
         await sendEmail({
             to: userEmail,
             subject: "Document Access Invitation - E-Sangrah",
             html,
             fromName: "E-Sangrah Team",
         });
+
         res.json({ success: true, message: "Invite sent successfully" });
 
     } catch (err) {
@@ -3678,6 +3693,7 @@ export const inviteUser = async (req, res) => {
         res.status(500).json({ success: false, message: "Server error: " + err.message });
     }
 };
+
 
 export const autoAcceptInvite = async (req, res) => {
     try {
