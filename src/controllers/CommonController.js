@@ -826,8 +826,8 @@ function formatExportData(documents) {
                 : "",
             owner: doc.owner?.name || "",
             empcode: doc.owner?.profile_type === "user"
-                ? doc.owner?.userDetails?.employee_id || ""
-                : "",
+                ? doc.owner?.userDetails?.employee_id || "N/A"
+                : "N/A",
             designation: doc.owner?.userDetails?.designation?.name || "N/A",
             department: doc.department?.name || "N/A",
             approver: buildApproverString(doc),

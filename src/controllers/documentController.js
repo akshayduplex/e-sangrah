@@ -299,7 +299,7 @@ export const viewDocumentFiles = async (req, res) => {
         });
 
     } catch (error) {
-        console.error("viewDocumentFiles Error:", error);
+        logger.error("viewDocumentFiles Error:", error);
         renderExpiredPage(res, "Server error while fetching file.", req.user);
     }
 };
@@ -451,7 +451,7 @@ export const viewInvitedDocumentFiles = async (req, res) => {
         });
 
     } catch (error) {
-        console.error("Error in viewInvitedDocumentFiles:", error);
+        logger.error("Error in viewInvitedDocumentFiles:", error);
         res.render("pages/document/viewInvitedDocumentFiles", {
             pageTitle: "Document Error",
             title: "Document Error",

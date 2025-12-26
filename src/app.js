@@ -19,15 +19,22 @@ import fs from "fs";
 import { API_CONFIG } from "./config/ApiEndpoints.js";
 import { getSessionFilters } from "./helper/sessionHelpers.js";
 import WebSetting from "./models/WebSetting.js";
+import { apiLimiter, loginLimiter } from "./middlewares/rateLimiter.js";
+import logger from "./utils/logger.js";
+
+// Basic in-memory cache for WebSetting
+let cachedSettings = null;
+let lastSettingsFetch = 0;
+const SETTINGS_CACHE_TTL = 60 * 1000; // 1 minute
 
 const app = express();
 
 // ------------------- Async Startup -------------------
 (async () => {
     // Connect to MongoDB
-    console.time("MongoDB Connect");
+    logger.info("Connecting to MongoDB...");
     await connectDB();
-    console.timeEnd("MongoDB Connect");
+    logger.info("MongoDB Connected");
     app.use(cors({
         origin: [API_CONFIG.baseUrl, 'http://localhost:5000'],
         methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -71,7 +78,7 @@ const app = express();
             cookie: {
                 maxAge: 1000 * 60 * 60,
                 httpOnly: true,
-                // secure: process.env.NODE_ENV === "production",
+                secure: API_CONFIG.NODE_ENV === "production", // Secure in production
                 sameSite: "lax",
             },
         })
@@ -92,7 +99,19 @@ const app = express();
     app.use(async (req, res, next) => {
         const { selectedProjectId, selectedProjectName } = await getSessionFilters(req);
         const user = req.user || req.session.user || {};
-        const settings = await WebSetting.findOne();
+
+        // Cache strategy for settings
+        const now = Date.now();
+        if (!cachedSettings || (now - lastSettingsFetch > SETTINGS_CACHE_TTL)) {
+            try {
+                cachedSettings = await WebSetting.findOne().lean() || {};
+                lastSettingsFetch = now;
+            } catch (err) {
+                logger.error("Error fetching WebSettings:", err);
+                cachedSettings = {}; // Fallback
+            }
+        }
+        const settings = cachedSettings;
         res.locals.pageTitle = "";
         res.locals.pageDescription = settings?.metaDescription || "";
         res.locals.metaKeywords = settings?.metaKeywords || "";
@@ -125,8 +144,9 @@ const app = express();
     });
 
     // ------------------- Routes -------------------
-    app.use("/api", ApiRoutes);
+    app.use("/api", apiLimiter, ApiRoutes);
     app.use("/", pageRoutes);
+    app.use("/login", loginLimiter);
     app.get('/', async (req, res) => {
         res.redirect('/login');
     });

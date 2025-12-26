@@ -14,7 +14,6 @@ const normalizeUrl = (url) => {
 
 const methodMap = { GET: 'read', POST: 'write', PUT: 'write', PATCH: 'write', DELETE: 'delete' };
 
-// 🔥 NEW — FETCH DESIGNATION FOR ALL USER TYPES
 function getUserDesignationId(user) {
     return (
         user?.userDetails?.designation ||
@@ -32,7 +31,7 @@ const fetchUserPermissions = async (userId, designationId, menuId) => {
 
     return {
         designation: designationPermission?.permissions || {},
-        user: userPermission?.permissions || {}
+        user: userPermission?.permissions || {},
     };
 };
 
@@ -40,16 +39,19 @@ const checkPermissions = async (req, res, next) => {
     try {
         const user = req.user || req.session.user;
 
-        const isApi = req.originalUrl.startsWith('/api') || req.headers.accept?.includes('application/json');
+        const isApi =
+            req.originalUrl.startsWith("/api") ||
+            req.headers.accept?.includes("application/json");
 
+        // Not logged in
         if (!user) {
             return isApi
-                ? res.status(401).json({ error: 'Unauthorized' })
-                : res.redirect('/login');
+                ? res.status(401).json({ error: "Unauthorized" })
+                : res.redirect("/login");
         }
 
-        // Superadmin/Admin bypass
-        if (['superadmin', 'admin'].includes(user.profile_type)) {
+        // Superadmin/admin bypass
+        if (["superadmin", "admin"].includes(user.profile_type)) {
             return next();
         }
 
@@ -68,37 +70,67 @@ const checkPermissions = async (req, res, next) => {
             isActive: true,
             $or: [
                 { url },
-                { url: url.replace(/\/:id/g, '/:id') }
+                { url: url.replace(/\/:id/g, "/:id") }
             ]
         }).lean();
 
         if (!menu) {
             return isApi
-                ? res.status(404).json({ error: 'Menu not found or inactive', requestedUrl: url })
-                : res.status(404).render('error', { title: 'Menu Not Found', message: 'Menu not found or inactive' });
+                ? res.status(404).json({ error: "Menu not found or inactive", requestedUrl: url })
+                : res.status(404).render("error", {
+                    title: "Menu Not Found",
+                    message: "Menu not found or inactive",
+                });
         }
 
         const menuId = menu._id.toString();
         const requiredPermission = methodMap[req.method] || "read";
 
-        const perms = await fetchUserPermissions(userId, designationId.toString(), menuId);
-
-        const hasPermission = !!(
-            perms.designation[requiredPermission] ||
-            perms.user[requiredPermission]
+        // Fetch designation-level and user-level permissions
+        const perms = await fetchUserPermissions(
+            userId,
+            designationId.toString(),
+            menuId
         );
 
-        if (hasPermission) return next();
+        // Helper for denial
+        const deny = () =>
+            isApi
+                ? res.status(403).json({
+                    error: "Forbidden",
+                    required: requiredPermission,
+                })
+                : res.status(403).render("no-permission", {
+                    title: "403 - Forbidden",
+                    message: "You do not have permission.",
+                });
 
-        return isApi
-            ? res.status(403).json({ error: 'Forbidden', required: requiredPermission })
-            : res.status(403).render('no-permission', { title: '403 - Forbidden', message: 'You do not have permission.' });
+        const designationAllows = perms.designation[requiredPermission] === true;
+        if (!designationAllows) {
+            return deny();
+        }
+
+        if (perms.user.hasOwnProperty(requiredPermission)) {
+            const userAllows = perms.user[requiredPermission] === true;
+            if (!userAllows) {
+                return deny();
+            }
+        }
+
+        return next();
 
     } catch (error) {
-        console.error('[RBAC Error]', error);
-        return req.originalUrl.startsWith('/api') || req.headers.accept?.includes('application/json')
-            ? res.status(500).json({ error: 'Internal Server Error', details: error.message })
-            : res.status(500).render('error', { title: 'Internal Server Error', message: error.message });
+        console.error("[RBAC Error]", error);
+        return req.originalUrl.startsWith("/api") ||
+            req.headers.accept?.includes("application/json")
+            ? res.status(500).json({
+                error: "Internal Server Error",
+                details: error.message,
+            })
+            : res.status(500).render("error", {
+                title: "Internal Server Error",
+                message: error.message,
+            });
     }
 };
 
